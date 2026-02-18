@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: livre-souvenir-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: SUPABASE_URL
+        value: https://zlzbrucekzfmtioempek.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: sb_publishable_Y1uWhj69qC-KD1yaZeAyng_8K5qbz-z
+      - key: FRONTEND_URL
+        value: https://votre-frontend.onrender.com
