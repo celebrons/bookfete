@@ -15,18 +15,46 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ============================================
-// CONFIGURATION CORS ULTRA-PERMISSIVE
+// CONFIGURATION CORS - AVEC VOS URLS RENDER
 // ============================================
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://bookfete-front.onrender.com',  // ✅ VOTRE FRONTEND RENDER
+  /\.onrender\.com$/  // Accepte tous les sous-domaines onrender.com (optionnel)
+];
+
 app.use(cors({
-  origin: '*',  // Accepte TOUTES les origines (localhost, ngrok, etc.)
+  origin: function(origin, callback) {
+    // Permettre les requêtes sans origin (comme Postman ou curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.some(allowed => 
+      typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
+    )) {
+      callback(null, true);
+    } else {
+      console.log('❌ Origine non autorisée CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning']
+  optionsSuccessStatus: 200,
+  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
+  exposedHeaders: ['ngrok-skip-browser-warning'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
 // Middleware pour parser le JSON
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ============================================
+// MIDDLEWARE DE LOGS (optionnel, pour debug)
+// ============================================
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.originalUrl} - Origine: ${req.headers.origin || 'inconnue'}`);
+  next();
+});
 
 // ============================================
 // ROUTES PUBLIQUES
@@ -37,7 +65,8 @@ app.get('/api/ping', (req, res) => {
   console.log('✅ Ping reçu de:', req.headers.origin || 'origine inconnue');
   res.json({ 
     message: 'pong', 
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
   });
 });
 
@@ -98,15 +127,10 @@ const server = app.listen(PORT, () => {
   console.log('✅ SERVEUR DÉMARRÉ AVEC SUCCÈS');
   console.log('='.repeat(60));
   console.log(`📡 URL locale: http://localhost:${PORT}`);
-  console.log('\n📋 Routes configurées:');
-  console.log(`   - GET  /api/ping`);
-  console.log(`   - GET  /api/routes`);
-  console.log(`   - GET  /api/auth/test`);
-  console.log(`   - POST /api/auth/profile`);
-  console.log(`   - POST /api/projects`);
-  console.log(`   - POST /api/invites`);
-  console.log(`   - GET  /api/contribute/:token`);
-  console.log(`   - POST /api/orders/generate/:projectId`);
+  console.log(`📡 URL Render: https://bookfete.onrender.com`);
+  console.log('\n📋 Frontend autorisé:');
+  console.log(`   - http://localhost:3000`);
+  console.log(`   - https://bookfete-front.onrender.com`);
   console.log('='.repeat(60) + '\n');
 });
 
