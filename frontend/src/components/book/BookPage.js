@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import BookConfig from './BookConfig';
 import ChapterList from './ChapterList';
+import BookConfigurator from '../create-book/BookConfigurator';
 import Loading from '../common/Loading';
 
 const BookPage = () => {
@@ -301,11 +302,13 @@ const BookPage = () => {
         )}
 
         {activeTab === 'config' && (
-          <BookConfig
-            book={book}
-            onUpdate={updateBook}
-          />
-        )}
+		  <BookConfigurator
+			initialBook={book}
+			onSave={(bookId) => {
+			  fetchBookData();
+			}}
+		  />
+		)}
 
         {activeTab === 'apercu' && (
           <div style={{
