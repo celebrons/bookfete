@@ -10,20 +10,22 @@ import Layout from './components/layout/Layout';
 import HomePage from './components/home/HomePage';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import PublicContributePage from './components/contributeur/PublicContributePage';
+import TokenContributePage from './components/contributeur/TokenContributePage';
 
-// Pages organisateur
-import Dashboard from './components/organisateur/Dashboard';
-import CreateProject from './components/organisateur/CreateProject';
-import ProjectDetails from './components/organisateur/ProjectDetails';
-import EditProject from './components/organisateur/EditProject';
-import InviteContributors from './components/organisateur/InviteContributors';
-import ReviewContributions from './components/organisateur/ReviewContributions';
-import ChooseMaquette from './components/organisateur/ChooseMaquette';
-import OrderPayment from './components/organisateur/OrderPayment';
-import OrderConfirmation from './components/organisateur/OrderConfirmation';
+// Pages organisateur - NOUVELLE STRUCTURE
+import DashboardGeneral from './components/dashboard/DashboardGeneral';
+import CreateBookWizard from './components/create-book/CreateBookWizard';
+import BookPage from './components/book/BookPage';
+import ChapterPage from './components/book/ChapterPage';
 
-// Pages contributeur
-import ContributePage from './components/contributeur/ContributePage';
+// ❌ ANCIENS IMPORTS SUPPRIMÉS
+// import EditProject from './components/organisateur/EditProject';
+// import InviteContributors from './components/organisateur/InviteContributors';
+// import ReviewContributions from './components/organisateur/ReviewContributions';
+// import ChooseMaquette from './components/organisateur/ChooseMaquette';
+// import OrderPayment from './components/organisateur/OrderPayment';
+// import OrderConfirmation from './components/organisateur/OrderConfirmation';
 
 // Composant de route protégée
 const ProtectedRoute = ({ children }) => {
@@ -52,67 +54,53 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Pages publiques */}
+        {/* ============================================
+            PAGES PUBLIQUES
+        ============================================ */}
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/contribute/:token" element={<ContributePage />} />
+        <Route path="/contribute/:bookId/:chapterId" element={<PublicContributePage />} />
+        <Route path="/invite/:token" element={<TokenContributePage />} />
 
-        {/* Pages protégées */}
+        {/* ============================================
+            PAGES PROTÉGÉES (Nouvelle structure Livres)
+        ============================================ */}
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <Dashboard />
+            <DashboardGeneral />
           </ProtectedRoute>
         } />
         
-        <Route path="/create-project" element={
+        <Route path="/create-book" element={
           <ProtectedRoute>
-            <CreateProject />
+            <CreateBookWizard />
           </ProtectedRoute>
         } />
         
-        {/* Routes des projets */}
-        <Route path="/project/:projectId" element={
+        <Route path="/book/:bookId" element={
           <ProtectedRoute>
-            <ProjectDetails />
+            <BookPage />
           </ProtectedRoute>
         } />
         
-        <Route path="/project/:projectId/edit" element={
+        <Route path="/book/:bookId/chapter/:chapterId" element={
           <ProtectedRoute>
-            <EditProject />
+            <ChapterPage />
           </ProtectedRoute>
         } />
-        
-        <Route path="/project/:projectId/invite" element={
-          <ProtectedRoute>
-            <InviteContributors />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/project/:projectId/review" element={
-          <ProtectedRoute>
-            <ReviewContributions />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/project/:projectId/choose-maquette" element={
-          <ProtectedRoute>
-            <ChooseMaquette />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/project/:projectId/payment" element={
-          <ProtectedRoute>
-            <OrderPayment />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/order-confirmation/:orderId" element={
-          <ProtectedRoute>
-            <OrderConfirmation />
-          </ProtectedRoute>
-        } />
+
+        {/* ❌ ANCIENNES ROUTES SUPPRIMÉES
+        <Route path="/project/:projectId/edit" element={...} />
+        <Route path="/project/:projectId/invite" element={...} />
+        <Route path="/project/:projectId/review" element={...} />
+        <Route path="/project/:projectId/choose-maquette" element={...} />
+        <Route path="/project/:projectId/payment" element={...} />
+        <Route path="/order-confirmation/:orderId" element={...} />
+        */}
+
+        {/* Route par défaut - redirection */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );
