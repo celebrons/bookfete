@@ -10,7 +10,6 @@ import Layout from './components/layout/Layout';
 import HomePage from './components/home/HomePage';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
-import ThemeSelectionPage from './components/home/ThemeSelectionPage';
 
 // Pages organisateur
 import Dashboard from './components/organisateur/Dashboard';
@@ -57,7 +56,6 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/theme/:themeId" element={<ThemeSelectionPage />} />
         <Route path="/contribute/:token" element={<ContributePage />} />
 
         {/* Pages protégées */}
@@ -73,7 +71,7 @@ function App() {
           </ProtectedRoute>
         } />
         
-        {/* Routes des projets - TOUTES LES ROUTES NÉCESSAIRES */}
+        {/* Routes des projets */}
         <Route path="/project/:projectId" element={
           <ProtectedRoute>
             <ProjectDetails />
@@ -86,7 +84,6 @@ function App() {
           </ProtectedRoute>
         } />
         
-        {/* ✅ ROUTE POUR INVITER - AJOUTÉE */}
         <Route path="/project/:projectId/invite" element={
           <ProtectedRoute>
             <InviteContributors />
