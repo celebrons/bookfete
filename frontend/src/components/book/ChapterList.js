@@ -142,6 +142,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
+  // ✅ FONCTION D'INVITATION CORRIGÉE
   const copyInviteLink = async (chapterId, e) => {
     e.stopPropagation();
     
@@ -154,6 +155,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         return;
       }
 
+      // 1. Créer l'invitation en base
       const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/chapter`, {
         method: 'POST',
         headers: {
@@ -173,11 +175,21 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         throw new Error(data.error || 'Erreur création invitation');
       }
 
-      const inviteLink = `${window.location.origin}/invite/${data.invites[0].token}`;
+      // 2. Construire l'URL complète du lien d'invitation avec le VRAI token
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://bookfete-front.onrender.com' 
+        : window.location.origin;
+      
+      const inviteLink = `${baseUrl}/invite/${data.invites[0].token}`;
+      
+      // 3. Copier dans le presse-papier
       await navigator.clipboard.writeText(inviteLink);
 
+      // 4. Feedback visuel
       setInviteSuccess(chapterId);
       setTimeout(() => setInviteSuccess(null), 2000);
+      
+      console.log('✅ Lien copié:', inviteLink);
       
     } catch (err) {
       console.error('❌ Erreur:', err);
@@ -463,7 +475,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
               <li>Cliquez sur un chapitre pour voir les détails</li>
               <li>✏️ Modifier le titre</li>
               <li>❓ Modifier les questions</li>
-              <li>🔗 Copier le lien d'invitation</li>
+              <li>🔗 Copier le lien d'invitation (génère un vrai token)</li>
               <li>🗑️ Supprimer le chapitre</li>
               <li>🤖 Générer des questions avec l'IA</li>
             </ul>
@@ -905,49 +917,43 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
                   </button>
                 </div>
 
-                {/* Inviter des proches */}
+                {/* Inviter des proches - VERSION CORRIGÉE */}
                 <div style={{
                   background: '#f3e8ff',
                   padding: '1.5rem',
                   borderRadius: '10px',
-                  border: '1px solid #764ba2'
+                  border: '1px solid #764ba2',
+                  textAlign: 'center'
                 }}>
                   <h3 style={{ margin: '0 0 0.5rem', color: '#764ba2' }}>Inviter des proches à contribuer</h3>
                   <p style={{ marginBottom: '1rem', color: '#666' }}>
-                    Partagez ce lien pour que vos proches répondent aussi à ces questions.
+                    Générez un lien d'invitation unique à partager avec vos proches.
                   </p>
                   
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <input
-                      type="text"
-                      value={`${window.location.origin}/invite/${selectedChapter.id}`}
-                      readOnly
-                      style={{
-                        flex: 1,
-                        padding: '0.8rem',
-                        border: '1px solid #ddd',
-                        borderRadius: '5px',
-                        fontSize: '0.9rem',
-                        background: 'white'
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/invite/${selectedChapter.id}`);
-                        alert('Lien copié !');
-                      }}
-                      style={{
-                        padding: '0.8rem 1.5rem',
-                        background: '#764ba2',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Copier
-                    </button>
-                  </div>
+                  <button
+                    onClick={(e) => copyInviteLink(selectedChapter.id, e)}
+                    style={{
+                      padding: '1rem 2rem',
+                      background: '#764ba2',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    🔗 Générer un lien d'invitation
+                  </button>
+                  
+                  {inviteSuccess === selectedChapter.id && (
+                    <p style={{ color: '#28a745', marginTop: '1rem' }}>
+                      ✅ Lien copié dans le presse-papier !
+                    </p>
+                  )}
                 </div>
               </>
             )}
