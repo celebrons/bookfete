@@ -10,22 +10,32 @@ const projectRoutes = require('./routes/projects');
 const inviteRoutes = require('./routes/invites');
 const contributionRoutes = require('./routes/contributions');
 const orderRoutes = require('./routes/orders');
-const aiRoutes = require('./routes/ai'); // ✅ Déplacé ici avec les autres imports
+
+const express = require('express');
+const aiRoutes = require('./routes/ai');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
+app.use('/api/ai', aiRoutes);
+
+
+
+
+
+
 // ============================================
-// CONFIGURATION CORS - DOIT ÊTRE TOUT EN HAUT !
+// CONFIGURATION CORS - AVEC VOS URLS RENDER
 // ============================================
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://bookfete-front.onrender.com',
-  /\.onrender\.com$/
+  'https://bookfete-front.onrender.com',  // ✅ VOTRE FRONTEND RENDER
+  /\.onrender\.com$/  // Accepte tous les sous-domaines onrender.com (optionnel)
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
+    // Permettre les requêtes sans origin (comme Postman ou curl)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.some(allowed => 
@@ -44,11 +54,13 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-// Middleware pour parser le JSON (DOIT VENIR APRÈS CORS)
+// Middleware pour parser le JSON
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware de logs
+// ============================================
+// MIDDLEWARE DE LOGS (optionnel, pour debug)
+// ============================================
 app.use((req, res, next) => {
   console.log(`📨 ${req.method} ${req.originalUrl} - Origine: ${req.headers.origin || 'inconnue'}`);
   next();
@@ -57,6 +69,8 @@ app.use((req, res, next) => {
 // ============================================
 // ROUTES PUBLIQUES
 // ============================================
+
+// Route de test
 app.get('/api/ping', (req, res) => {
   console.log('✅ Ping reçu de:', req.headers.origin || 'origine inconnue');
   res.json({ 
@@ -66,6 +80,7 @@ app.get('/api/ping', (req, res) => {
   });
 });
 
+// Route pour lister toutes les routes disponibles
 app.get('/api/routes', (req, res) => {
   res.json({
     routes: [
@@ -75,22 +90,19 @@ app.get('/api/routes', (req, res) => {
       '/api/projects',
       '/api/invites',
       '/api/contribute/:token',
-      '/api/orders/generate/:projectId',
-      '/api/ai/generate-questions', // ✅ Ajouté
-      '/api/ai/health'
+      '/api/orders/generate/:projectId'
     ]
   });
 });
 
 // ============================================
-// ROUTES PROTÉGÉES - TOUTES APRÈS LES MIDDLEWARES
+// ROUTES PROTÉGÉES
 // ============================================
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/contribute', contributionRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/ai', aiRoutes); // ✅ Maintenant bien placé après CORS et JSON
 
 // ============================================
 // GESTION DES ERREURS 404
@@ -125,14 +137,14 @@ const server = app.listen(PORT, () => {
   console.log('✅ SERVEUR DÉMARRÉ AVEC SUCCÈS');
   console.log('='.repeat(60));
   console.log(`📡 URL locale: http://localhost:${PORT}`);
-  console.log('\n📋 Routes IA disponibles:');
-  console.log(`   - POST  /api/ai/generate-questions`);
-  console.log(`   - POST  /api/ai/generate-questions-advanced`);
-  console.log(`   - GET   /api/ai/health`);
-  console.log(`   - GET   /api/ai/fallback-questions?chapterTitle=...`);
+  console.log(`📡 URL Render: https://bookfete.onrender.com`);
+  console.log('\n📋 Frontend autorisé:');
+  console.log(`   - http://localhost:3000`);
+  console.log(`   - https://bookfete-front.onrender.com`);
   console.log('='.repeat(60) + '\n');
 });
 
+// Gestion propre de l'arrêt
 process.on('SIGTERM', () => {
   console.log('🛑 Arrêt du serveur...');
   server.close(() => {

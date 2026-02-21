@@ -10,176 +10,625 @@ const BookConfig = ({ book, onUpdate }) => {
     style_narratif: book.style_narratif
   });
 
+  // Options
   const finitions = [
-    { id: 'livret', label: 'Livret', icon: '📘' },
-    { id: 'classique', label: 'Classique', icon: '📕' },
-    { id: 'luxe', label: 'Luxe', icon: '📚' }
+    { id: 'livret', label: 'Livret', description: 'Souple' },
+    { id: 'classique', label: 'Classique', description: 'Rigide' },
+    { id: 'luxe', label: 'Luxe', description: 'Toilé' }
   ];
 
   const papiers = [
-    { id: 'satine', label: 'Satiné', icon: '✨' },
-    { id: 'mat', label: 'Mat', icon: '🎨' },
-    { id: 'verge', label: 'Vergé Ivoire', icon: '📜' }
+    { id: 'satine', label: 'Satiné' },
+    { id: 'mat', label: 'Mat' },
+    { id: 'verge', label: 'Vergé Ivoire' }
   ];
 
   const styles = [
-    { id: 'poetique', label: 'Poétique', icon: '🌸' },
-    { id: 'factuel', label: 'Factuel', icon: '📰' },
-    { id: 'intime', label: 'Intime', icon: '💝' }
+    { id: 'poetique', label: 'Poétique' },
+    { id: 'factuel', label: 'Factuel' },
+    { id: 'intime', label: 'Intime' }
   ];
+
+  // Calculs
+  const pages = book.pages || 96;
+  const chapters = book.chapters || 24;
+  
+  // Calcul du prix
+  const calculatePrice = () => {
+    const base = book.finition === 'luxe' ? 85 : book.finition === 'classique' ? 55 : 29;
+    const perPage = book.finition === 'luxe' ? 0.50 : book.finition === 'classique' ? 0.35 : 0.25;
+    return Math.round(base + (pages * perPage));
+  };
 
   const handleSave = () => {
     onUpdate(formData);
     setIsEditing(false);
   };
 
-  return (
-    <div style={{
-      background: 'white',
-      padding: '2rem',
-      borderRadius: '10px',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
-        <h2>Configuration du livre</h2>
-        {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
+  if (isEditing) {
+    return (
+      <div className="configurator-card" style={{
+        background: 'white',
+        width: '100%',
+        padding: '40px',
+        borderRadius: '2px',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.05)',
+        border: '1px solid #e8e8e8',
+      }}>
+        <h2 style={{
+          fontFamily: "'Playfair Display', serif",
+          fontSize: '28px',
+          color: '#1f1f1f',
+          textAlign: 'center',
+          marginBottom: '30px'
+        }}>
+          Modifier la configuration
+        </h2>
+
+        <div style={{ marginBottom: '2rem' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            marginBottom: '15px',
+            color: '#888',
+            fontWeight: '600'
+          }}>
+            Titre du livre
+          </label>
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             style={{
-              padding: '0.5rem 1rem',
-              background: '#764ba2',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #e8e8e8',
+              fontSize: '14px'
             }}
-          >
-            ✏️ Modifier
-          </button>
-        )}
-      </div>
-
-      {!isEditing ? (
-        // Mode visualisation
-        <div>
-          <p><strong>Titre :</strong> {book.title}</p>
-          <p><strong>Finition :</strong> {finitions.find(f => f.id === book.finition)?.label}</p>
-          <p><strong>Papier :</strong> {papiers.find(p => p.id === book.papier)?.label}</p>
-          <p><strong>Style narratif :</strong> {styles.find(s => s.id === book.style_narratif)?.label}</p>
+          />
         </div>
-      ) : (
-        // Mode édition
-        <div>
-          <div style={{ marginBottom: '2rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-              Titre du livre
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.8rem',
-                border: '1px solid #ddd',
-                borderRadius: '5px'
-              }}
-            />
-          </div>
 
-          <h3>Finition</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            marginBottom: '15px',
+            color: '#888',
+            fontWeight: '600'
+          }}>
+            1. Finition
+          </label>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '10px'
+          }}>
             {finitions.map(f => (
               <div
                 key={f.id}
-                onClick={() => setFormData(prev => ({ ...prev, finition: f.id }))}
+                onClick={() => setFormData({ ...formData, finition: f.id })}
                 style={{
-                  padding: '1rem',
-                  background: formData.finition === f.id ? '#f3e8ff' : '#f8f9fa',
-                  border: formData.finition === f.id ? '2px solid #764ba2' : '1px solid #ddd',
-                  borderRadius: '8px',
+                  border: `1px solid ${formData.finition === f.id ? '#b8924a' : '#e8e8e8'}`,
+                  padding: '12px 5px',
+                  textAlign: 'center',
                   cursor: 'pointer',
-                  textAlign: 'center'
+                  background: formData.finition === f.id ? '#f4f0e6' : 'white',
+                  boxShadow: formData.finition === f.id ? 'inset 0 0 0 1px #b8924a' : 'none'
                 }}
               >
-                <span style={{ fontSize: '2rem' }}>{f.icon}</span>
-                <p style={{ margin: '0.5rem 0 0', fontWeight: 'bold' }}>{f.label}</p>
+                <span style={{ display: 'block', fontSize: '13px', fontWeight: '600' }}>{f.label}</span>
+                <small style={{ fontSize: '10px', color: '#999' }}>{f.description}</small>
               </div>
             ))}
           </div>
+        </div>
 
-          <h3>Papier</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            marginBottom: '15px',
+            color: '#888',
+            fontWeight: '600'
+          }}>
+            2. Papier d'Art
+          </label>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px'
+          }}>
             {papiers.map(p => (
               <div
                 key={p.id}
-                onClick={() => setFormData(prev => ({ ...prev, papier: p.id }))}
+                onClick={() => setFormData({ ...formData, papier: p.id })}
                 style={{
-                  padding: '1rem',
-                  background: formData.papier === p.id ? '#f3e8ff' : '#f8f9fa',
-                  border: formData.papier === p.id ? '2px solid #764ba2' : '1px solid #ddd',
-                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  border: `1px solid ${formData.papier === p.id ? '#b8924a' : '#e8e8e8'}`,
+                  background: formData.papier === p.id ? '#b8924a' : 'white',
+                  color: formData.papier === p.id ? 'white' : '#555',
+                  fontSize: '12px',
                   cursor: 'pointer',
-                  textAlign: 'center'
+                  borderRadius: '20px'
                 }}
               >
-                <span style={{ fontSize: '2rem' }}>{p.icon}</span>
-                <p style={{ margin: '0.5rem 0 0', fontWeight: 'bold' }}>{p.label}</p>
+                {p.label}
               </div>
             ))}
           </div>
+        </div>
 
-          <h3>Style narratif</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '11px',
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            marginBottom: '15px',
+            color: '#888',
+            fontWeight: '600'
+          }}>
+            3. Style Narratif de l'IA
+          </label>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px'
+          }}>
             {styles.map(s => (
               <div
                 key={s.id}
-                onClick={() => setFormData(prev => ({ ...prev, style_narratif: s.id }))}
+                onClick={() => setFormData({ ...formData, style_narratif: s.id })}
                 style={{
-                  padding: '1rem',
-                  background: formData.style_narratif === s.id ? '#f3e8ff' : '#f8f9fa',
-                  border: formData.style_narratif === s.id ? '2px solid #764ba2' : '1px solid #ddd',
-                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  border: `1px solid ${formData.style_narratif === s.id ? '#b8924a' : '#e8e8e8'}`,
+                  background: formData.style_narratif === s.id ? '#b8924a' : 'white',
+                  color: formData.style_narratif === s.id ? 'white' : '#555',
+                  fontSize: '12px',
                   cursor: 'pointer',
-                  textAlign: 'center'
+                  borderRadius: '20px'
                 }}
               >
-                <span style={{ fontSize: '2rem' }}>{s.icon}</span>
-                <p style={{ margin: '0.5rem 0 0', fontWeight: 'bold' }}>{s.label}</p>
+                {s.label}
               </div>
             ))}
           </div>
+        </div>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => setIsEditing(false)}
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+          <button
+            onClick={() => setIsEditing(false)}
+            style={{
+              padding: '12px 24px',
+              background: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              padding: '12px 24px',
+              background: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Mettre à jour
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // MODE VISUALISATION - EXACTEMENT COMME LE HTML
+  return (
+    <div className="configurator-card" style={{
+      background: 'white',
+      width: '100%',
+      padding: '40px',
+      borderRadius: '2px',
+      boxShadow: '0 20px 50px rgba(0,0,0,0.05)',
+      border: '1px solid #e8e8e8',
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: '50px'
+    }}>
+      <h2 style={{
+        fontFamily: "'Playfair Display', serif",
+        fontSize: '28px',
+        color: '#1f1f1f',
+        marginTop: 0,
+        marginBottom: '30px',
+        gridColumn: 'span 2',
+        textAlign: 'center'
+      }}>
+        Votre Édition MonLivreLuxe
+      </h2>
+      
+      {/* Partie gauche - Sélections */}
+      <div className="selection-area">
+        {/* 1. Finition & Teinte */}
+        <label style={{
+          display: 'block',
+          fontSize: '11px',
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+          marginBottom: '15px',
+          color: '#888',
+          fontWeight: '600'
+        }}>
+          1. Finition & Teinte
+        </label>
+        
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '10px',
+          marginBottom: '25px'
+        }}>
+          {finitions.map(f => (
+            <div
+              key={f.id}
               style={{
-                padding: '0.8rem 1.5rem',
-                background: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
+                border: `1px solid ${book.finition === f.id ? '#b8924a' : '#e8e8e8'}`,
+                padding: '12px 5px',
+                textAlign: 'center',
+                background: book.finition === f.id ? '#f4f0e6' : 'white',
+                boxShadow: book.finition === f.id ? 'inset 0 0 0 1px #b8924a' : 'none'
               }}
             >
-              Annuler
-            </button>
-            <button
-              onClick={handleSave}
+              <span style={{ display: 'block', fontSize: '13px', fontWeight: '600' }}>{f.label}</span>
+              <small style={{ fontSize: '10px', color: '#999' }}>{f.description}</small>
+            </div>
+          ))}
+        </div>
+
+        {/* Sélecteur de couleur (optionnel) */}
+        <div style={{
+          display: 'flex',
+          gap: '15px',
+          marginBottom: '25px',
+          paddingLeft: '5px'
+        }}>
+          <div style={{
+            width: '25px',
+            height: '25px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            border: '2px solid white',
+            boxShadow: '0 0 0 2px #b8924a',
+            transform: 'scale(1.1)',
+            background: '#333'
+          }} />
+          <div style={{
+            width: '25px',
+            height: '25px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            border: '2px solid white',
+            boxShadow: '0 0 0 1px #eee',
+            background: '#4a5d4e'
+          }} />
+          <div style={{
+            width: '25px',
+            height: '25px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            border: '2px solid white',
+            boxShadow: '0 0 0 1px #eee',
+            background: '#5d4a4a'
+          }} />
+        </div>
+
+        {/* 2. Papier d'Art */}
+        <label style={{
+          display: 'block',
+          fontSize: '11px',
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+          marginBottom: '15px',
+          color: '#888',
+          fontWeight: '600'
+        }}>
+          2. Papier d'Art
+        </label>
+        
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          marginBottom: '25px'
+        }}>
+          {papiers.map(p => (
+            <div
+              key={p.id}
               style={{
-                padding: '0.8rem 1.5rem',
-                background: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
+                padding: '8px 16px',
+                border: `1px solid ${book.papier === p.id ? '#b8924a' : '#e8e8e8'}`,
+                background: book.papier === p.id ? '#b8924a' : 'white',
+                color: book.papier === p.id ? 'white' : '#555',
+                fontSize: '12px',
+                cursor: 'pointer',
+                borderRadius: '20px'
               }}
             >
-              💾 Enregistrer
-            </button>
+              {p.label}
+            </div>
+          ))}
+        </div>
+
+        {/* 3. Style Narratif de l'IA */}
+        <label style={{
+          display: 'block',
+          fontSize: '11px',
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+          marginBottom: '15px',
+          color: '#888',
+          fontWeight: '600'
+        }}>
+          3. Style Narratif de l'IA
+        </label>
+        
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          marginBottom: '25px'
+        }}>
+          {styles.map(s => (
+            <div
+              key={s.id}
+              style={{
+                padding: '8px 16px',
+                border: `1px solid ${book.style_narratif === s.id ? '#b8924a' : '#e8e8e8'}`,
+                background: book.style_narratif === s.id ? '#b8924a' : 'white',
+                color: book.style_narratif === s.id ? 'white' : '#555',
+                fontSize: '12px',
+                cursor: 'pointer',
+                borderRadius: '20px'
+              }}
+            >
+              {s.label}
+            </div>
+          ))}
+        </div>
+
+        {/* 4. Pagination */}
+        <label style={{
+          display: 'block',
+          fontSize: '11px',
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+          marginBottom: '15px',
+          color: '#888',
+          fontWeight: '600'
+        }}>
+          4. Pagination : <span style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: '32px',
+            color: '#b8924a',
+            fontWeight: '700'
+          }}>{pages}</span> pages
+        </label>
+        
+        {/* Slider (simulé) */}
+        <div style={{
+          width: '100%',
+          height: '4px',
+          background: '#e8e8e8',
+          margin: '15px 0 25px',
+          position: 'relative'
+        }}>
+          <div style={{
+            width: `${(pages / 216) * 100}%`,
+            height: '4px',
+            background: '#b8924a',
+            position: 'absolute'
+          }} />
+        </div>
+
+        {/* Effort Card */}
+        <div style={{
+          background: '#fafafa',
+          border: '1px solid #eee',
+          padding: '20px',
+          borderRadius: '4px'
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '15px',
+            marginBottom: '10px'
+          }}>
+            <div>
+              <span style={{
+                fontSize: '10px',
+                color: '#888',
+                textTransform: 'uppercase'
+              }}>Structure</span>
+              <span style={{
+                fontSize: '15px',
+                fontWeight: '700',
+                color: '#1f1f1f',
+                display: 'block'
+              }}>{chapters} Chapitres</span>
+            </div>
+            <div>
+              <span style={{
+                fontSize: '10px',
+                color: '#888',
+                textTransform: 'uppercase'
+              }}>Contenu / Chapitre</span>
+              <span style={{
+                fontSize: '15px',
+                fontWeight: '700',
+                color: '#1f1f1f',
+                display: 'block'
+              }}>3 min • 2 photos max.</span>
+            </div>
+          </div>
+          <div style={{
+            fontSize: '11px',
+            color: '#777',
+            lineHeight: '1.4',
+            borderTop: '1px solid #eee',
+            paddingTop: '10px'
+          }}>
+            <strong>Collaboratif :</strong> Répartissez les chapitres entre vos proches. L'IA guide chaque participant et harmonise l'ensemble.
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Partie droite - Prévisualisation */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#fdfdfd',
+        padding: '20px',
+        borderRadius: '4px'
+      }}>
+        {/* Book Container */}
+        <div style={{
+          width: '100%',
+          height: '280px',
+          position: 'relative',
+          marginBottom: '20px',
+          borderRadius: '4px',
+          boxShadow: '0 15px 35px rgba(0,0,0,0.1)',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            width: '100%',
+            height: '100%',
+            backgroundImage: `url(${
+              book.finition === 'luxe' 
+                ? 'https://images.unsplash.com/photo-1621351123023-7550a28861bd?auto=format&fit=crop&q=80&w=800'
+                : book.finition === 'classique'
+                ? 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?auto=format&fit=crop&q=80&w=800'
+                : 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=800'
+            })`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            transition: '0.5s ease'
+          }} />
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'transparent',
+            mixBlendMode: 'multiply',
+            pointerEvents: 'none',
+            transition: '0.5s'
+          }} />
+        </div>
+
+        {/* Prix */}
+        <div style={{
+          fontFamily: "'Playfair Display', serif",
+          fontSize: '48px',
+          color: '#1f1f1f',
+          marginBottom: '5px'
+        }}>
+          {calculatePrice()}€
+        </div>
+
+        {/* Badge IA */}
+        <div style={{
+          padding: '5px 12px',
+          background: '#b8924a',
+          color: 'white',
+          fontSize: '10px',
+          fontWeight: '700',
+          borderRadius: '2px',
+          marginBottom: '10px'
+        }}>
+          MÉTHODE ÉDITORIALE IA
+        </div>
+
+        {/* Validation */}
+        <div style={{
+          fontSize: '10px',
+          color: '#b8924a',
+          textTransform: 'uppercase',
+          fontWeight: '700',
+          letterSpacing: '1px',
+          marginTop: '10px',
+          marginBottom: '10px'
+        }}>
+          🔒 Contrôle & Validation finale par vos soins
+        </div>
+
+        {/* Légende */}
+        <p style={{
+          fontSize: '11px',
+          color: '#999',
+          marginTop: '10px',
+          textAlign: 'center',
+          fontStyle: 'italic'
+        }}>
+          Finition {finitions.find(f => f.id === book.finition)?.label}, Style {styles.find(s => s.id === book.style_narratif)?.label}, Papier {papiers.find(p => p.id === book.papier)?.label}.
+        </p>
+
+        {/* Boutons d'action */}
+        <div style={{
+          display: 'flex',
+          gap: '1rem',
+          marginTop: '2rem',
+          width: '100%'
+        }}>
+          <button
+            onClick={() => window.history.back()}
+            style={{
+              flex: 1,
+              padding: '12px',
+              background: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Annuler
+          </button>
+          <button
+            onClick={() => setIsEditing(true)}
+            style={{
+              flex: 1,
+              padding: '12px',
+              background: '#b8924a',
+              color: 'white',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600'
+            }}
+          >
+            Modifier
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

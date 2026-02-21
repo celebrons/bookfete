@@ -15,16 +15,7 @@ const ChapterPage = () => {
   const [contributionText, setContributionText] = useState('');
   const [photos, setPhotos] = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
-  const [showQuestions, setShowQuestions] = useState(false);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
-
-  // Questions suggérées (simulées - à remplacer par appel IA plus tard)
-  const suggestedQuestions = [
-    "Quel est votre plus beau souvenir avec la personne ?",
-    "Si vous deviez la décrire en trois mots, lesquels choisiriez-vous ?",
-    "Racontez une anecdote qui vous a marqué.",
-    "Qu'est-ce que vous souhaitez lui souhaiter pour l'avenir ?"
-  ];
 
   useEffect(() => {
     fetchData();
@@ -37,7 +28,7 @@ const ChapterPage = () => {
       // Récupérer le livre
       const { data: bookData, error: bookError } = await supabase
         .from('books')
-        .select('title, finition, papier, style_narratif')
+        .select('title, event_type, style_narratif')
         .eq('id', bookId)
         .single();
 
@@ -71,14 +62,58 @@ const ChapterPage = () => {
     }
   };
 
-  const generateNewQuestions = () => {
+  // ✅ FONCTION DE GÉNÉRATION IA
+  const generateAIQuestions = async () => {
+    if (!chapter || !book) return;
+    
     setGeneratingQuestions(true);
-    // Simuler une génération IA
-    setTimeout(() => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        alert('Vous devez être connecté');
+        return;
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          chapterTitle: chapter.title,
+          eventType: book.event_type || 'default',
+          style: book.style_narratif || 'factuel'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur génération IA');
+      }
+
+      // Mettre à jour les questions du chapitre
+      const { error } = await supabase
+        .from('chapters')
+        .update({ questions_ia: data.questions })
+        .eq('id', chapterId);
+
+      if (error) throw error;
+
+      // Mettre à jour l'état local
+      setChapter(prev => ({ ...prev, questions_ia: data.questions }));
+      
+      alert('✅ Nouvelles questions générées avec succès !');
+      
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      alert('Erreur lors de la génération des questions');
+    } finally {
       setGeneratingQuestions(false);
-      setShowQuestions(true);
-      // Ici vous appelleriez votre API IA
-    }, 1500);
+    }
   };
 
   const handlePhotoChange = (e) => {
@@ -207,7 +242,7 @@ const ChapterPage = () => {
         </div>
       </div>
 
-      {/* BANNIERE QUESTIONS IA - MISE EN EXERGUE */}
+      {/* BANNIERE QUESTIONS IA AVEC BOUTON DE GÉNÉRATION */}
       <div style={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         padding: '2rem',
@@ -216,38 +251,43 @@ const ChapterPage = () => {
         color: 'white',
         boxShadow: '0 10px 30px rgba(118, 75, 162, 0.3)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-          <span style={{ fontSize: '2rem' }}>✨</span>
-          <h2 style={{ margin: 0, color: 'white' }}>Questions pour vous aider</h2>
-        </div>
-        
-        <p style={{ fontSize: '1.1rem', marginBottom: '1.5rem', opacity: 0.95 }}>
-          Pour vous aider à rédiger votre contribution, nous vous proposons 4 questions en lien avec ce chapitre. 
-          <strong> Libre à vous de suivre ou pas ces questions.</strong>
-        </p>
-
-        {!showQuestions ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span style={{ fontSize: '2rem' }}>✨</span>
+            <h2 style={{ margin: 0, color: 'white' }}>Questions pour vous aider</h2>
+          </div>
           <button
-            onClick={generateNewQuestions}
+            onClick={generateAIQuestions}
             disabled={generatingQuestions}
             style={{
-              padding: '1rem 2rem',
+              padding: '0.8rem 1.5rem',
               background: 'white',
               color: '#764ba2',
               border: 'none',
               borderRadius: '5px',
-              fontSize: '1rem',
+              fontSize: '0.95rem',
               fontWeight: 'bold',
               cursor: generatingQuestions ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
               opacity: generatingQuestions ? 0.7 : 1
             }}
           >
-            {generatingQuestions ? '✨ Génération en cours...' : '🎲 Générer des questions'}
+            {generatingQuestions ? (
+              <>✨ Génération en cours...</>
+            ) : (
+              <>🤖 Générer de nouvelles questions</>
+            )}
           </button>
-        ) : (
+        </div>
+        
+        <p style={{ fontSize: '1.1rem', marginBottom: '1.5rem', opacity: 0.95 }}>
+          Pour vous aider à rédiger votre contribution, voici des questions suggérées. 
+          <strong> Libre à vous de les suivre ou pas.</strong>
+        </p>
+
+        {chapter.questions_ia && chapter.questions_ia.length > 0 ? (
           <div style={{
             background: 'rgba(255,255,255,0.1)',
             backdropFilter: 'blur(10px)',
@@ -255,31 +295,16 @@ const ChapterPage = () => {
             borderRadius: '8px',
             border: '1px solid rgba(255,255,255,0.2)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, color: 'white', fontSize: '1.2rem' }}>Questions suggérées</h3>
-              <button
-                onClick={() => setShowQuestions(false)}
-                style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  border: 'none',
-                  color: 'white',
-                  padding: '0.3rem 0.8rem',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem'
-                }}
-              >
-                Masquer
-              </button>
-            </div>
             <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'white' }}>
-              {suggestedQuestions.map((q, idx) => (
-                <li key={idx} style={{ marginBottom: '0.8rem', lineHeight: '1.5' }}>
-                  {q}
-                </li>
+              {chapter.questions_ia.map((q, idx) => (
+                <li key={idx} style={{ marginBottom: '0.8rem', lineHeight: '1.5' }}>{q}</li>
               ))}
             </ul>
           </div>
+        ) : (
+          <p style={{ fontStyle: 'italic', opacity: 0.8 }}>
+            Aucune question pour l'instant. Cliquez sur "Générer" pour en créer.
+          </p>
         )}
       </div>
 
@@ -333,14 +358,13 @@ const ChapterPage = () => {
               border: '2px dashed #ccc',
               borderRadius: '5px',
               cursor: photos.length >= 2 ? 'not-allowed' : 'pointer',
-              color: photos.length >= 2 ? '#999' : '#333',
-              marginBottom: '1rem'
+              color: photos.length >= 2 ? '#999' : '#333'
             }}
           >
             📷 Choisir des photos
           </label>
           
-          <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+          <p style={{ margin: '0.5rem 0 0', color: '#666', fontSize: '0.9rem' }}>
             {photos.length}/2 photos
           </p>
         </div>

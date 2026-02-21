@@ -3,6 +3,106 @@ const supabase = require('../config/supabase');
 
 console.log('=== CHARGEMENT AUTH CONTROLLER ===');
 
+// ✅ NOUVELLE FONCTION LOGIN
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    console.log('📝 Tentative de login pour:', email);
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email et mot de passe requis' });
+    }
+
+    // Authentification via Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      console.error('❌ Erreur login Supabase:', error.message);
+      return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+    }
+
+    console.log('✅ Login réussi pour:', email);
+
+    // Retourner le token et les infos utilisateur
+    res.json({
+      token: data.session.access_token,
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.user_metadata?.full_name || email.split('@')[0]
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur login:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ✅ NOUVELLE FONCTION REGISTER
+const register = async (req, res) => {
+  try {
+    const { email, password, full_name } = req.body;
+    
+    console.log('📝 Tentative d\'inscription pour:', email);
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email et mot de passe requis' });
+    }
+
+    // Création via Supabase
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: full_name || email.split('@')[0]
+        }
+      }
+    });
+
+    if (error) {
+      console.error('❌ Erreur inscription Supabase:', error.message);
+      return res.status(400).json({ error: error.message });
+    }
+
+    console.log('✅ Inscription réussie pour:', email);
+
+    res.json({
+      message: 'Inscription réussie',
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.user_metadata?.full_name
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur register:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ✅ NOUVELLE FONCTION LOGOUT
+const logout = async (req, res) => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ message: 'Déconnexion réussie' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ✅ FONCTIONS EXISTANTES (inchangées)
 const getProfile = async (req, res) => {
   try {
     console.log('📝 getProfile appelé pour user:', req.user?.id);
@@ -21,7 +121,7 @@ const getProfile = async (req, res) => {
       console.error('❌ Erreur Supabase getProfile:', error);
       
       // Si le profil n'existe pas, on le crée
-      if (error.code === 'PGRST116') { // Pas de résultat
+      if (error.code === 'PGRST116') {
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert([{ 
@@ -79,10 +179,18 @@ const updateProfile = async (req, res) => {
   }
 };
 
-console.log('getProfile type:', typeof getProfile);
-console.log('updateProfile type:', typeof updateProfile);
+console.log('Fonctions exportées:', {
+  login: typeof login,
+  register: typeof register,
+  logout: typeof logout,
+  getProfile: typeof getProfile,
+  updateProfile: typeof updateProfile
+});
 
 module.exports = {
+  login,
+  register,
+  logout,
   getProfile,
   updateProfile
 };

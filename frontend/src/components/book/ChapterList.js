@@ -7,19 +7,18 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   const navigate = useNavigate();
   const [editingChapter, setEditingChapter] = useState(null);
   const [editingQuestions, setEditingQuestions] = useState(null);
-  const [showQuestions, setShowQuestions] = useState({});
   const [inviteSuccess, setInviteSuccess] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [showGuide, setShowGuide] = useState(true);
   const [newQuestion, setNewQuestion] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-
-  const toggleQuestions = (chapterId) => {
-    setShowQuestions(prev => ({
-      ...prev,
-      [chapterId]: !prev[chapterId]
-    }));
-  };
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  
+  // État pour la contribution
+  const [contributionText, setContributionText] = useState('');
+  const [photos, setPhotos] = useState([]);
+  const [photoPreviews, setPhotoPreviews] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleEdit = (chapter) => {
     setEditingChapter({
@@ -94,12 +93,10 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
-  // ✅ FONCTION CORRIGÉE POUR L'INVITATION
-  const copyInviteLink = async (chapterId, e) => {
-    e.stopPropagation();
-    
+  const generateAIQuestions = async (chapter) => {
     try {
-      // 1. Récupérer le token d'authentification
+      setGeneratingQuestions(true);
+      
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       
@@ -108,7 +105,55 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         return;
       }
 
-      // 2. Créer l'invitation en base (email par défaut pour test)
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          chapterTitle: chapter.title,
+          eventType: 'default',
+          style: 'factuel'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur génération IA');
+      }
+
+      await onUpdateChapter(chapter.id, {
+        questions_ia: data.questions
+      });
+
+      // Mettre à jour le chapitre sélectionné
+      setSelectedChapter(prev => ({
+        ...prev,
+        questions_ia: data.questions
+      }));
+
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      alert('Erreur lors de la génération des questions');
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+
+  const copyInviteLink = async (chapterId, e) => {
+    e.stopPropagation();
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        alert('Vous devez être connecté');
+        return;
+      }
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/chapter`, {
         method: 'POST',
         headers: {
@@ -117,7 +162,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         },
         body: JSON.stringify({
           chapterId: chapterId,
-          emails: ['invite@example.com'], // À remplacer par une vraie saisie utilisateur
+          emails: ['invite@example.com'],
           customMessage: ''
         })
       });
@@ -128,11 +173,9 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         throw new Error(data.error || 'Erreur création invitation');
       }
 
-      // 3. Copier le lien avec le vrai token généré
       const inviteLink = `${window.location.origin}/invite/${data.invites[0].token}`;
       await navigator.clipboard.writeText(inviteLink);
 
-      // 4. Feedback visuel
       setInviteSuccess(chapterId);
       setTimeout(() => setInviteSuccess(null), 2000);
       
@@ -142,18 +185,101 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
+  const handlePhotoChange = (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (photos.length + files.length > 2) {
+      alert('Maximum 2 photos');
+      return;
+    }
+
+    const validFiles = files.filter(file => {
+      const isValid = file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024;
+      if (!isValid) {
+        alert(`${file.name} : format invalide ou trop volumineux (max 5MB)`);
+      }
+      return isValid;
+    });
+
+    setPhotos(prev => [...prev, ...validFiles]);
+
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreviews(prev => [...prev, reader.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removePhoto = (index) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitContribution = async () => {
+    if (!selectedChapter) return;
+    if (!contributionText.trim()) {
+      alert('Veuillez écrire un message');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const photoUrls = [];
+      for (const photo of photos) {
+        const fileExt = photo.name.split('.').pop();
+        const fileName = `${selectedChapter.id}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('contribution-photos')
+          .upload(fileName, photo);
+
+        if (uploadError) {
+          console.error('❌ Erreur upload:', uploadError);
+          continue;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('contribution-photos')
+          .getPublicUrl(fileName);
+
+        photoUrls.push(publicUrl);
+      }
+
+      const { error } = await supabase
+        .from('contributions')
+        .insert([{
+          chapter_id: selectedChapter.id,
+          contributor_name: user.user_metadata?.full_name || user.email,
+          contributor_email: user.email,
+          message: contributionText,
+          photo_urls: photoUrls,
+          approved: false
+        }]);
+
+      if (error) throw error;
+
+      setContributionText('');
+      setPhotos([]);
+      setPhotoPreviews([]);
+      alert('✅ Contribution envoyée !');
+      
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      alert('Erreur lors de l\'envoi');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getStatusColor = (contributions) => {
     const count = contributions?.[0]?.count || 0;
     if (count === 0) return '#ffc107';
     if (count < 3) return '#17a2b8';
     return '#28a745';
-  };
-
-  const getStatusText = (contributions) => {
-    const count = contributions?.[0]?.count || 0;
-    if (count === 0) return 'En attente';
-    if (count === 1) return '1 contribution';
-    return `${count} contributions`;
   };
 
   return (
@@ -339,7 +465,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
               <li>❓ Modifier les questions</li>
               <li>🔗 Copier le lien d'invitation</li>
               <li>🗑️ Supprimer le chapitre</li>
-              <li>Les suggestions sont marquées en bleu</li>
+              <li>🤖 Générer des questions avec l'IA</li>
             </ul>
             <button
               onClick={() => setShowGuide(false)}
@@ -377,14 +503,16 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         )}
       </div>
 
-      {/* Colonne de droite : Espace d'instructions */}
+      {/* Colonne de droite : Détails du chapitre sélectionné */}
       <div style={{ 
         flex: 2,
         background: 'white',
         borderRadius: '10px',
         padding: '2rem',
         boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        position: 'relative'
+        position: 'relative',
+        overflowY: 'auto',
+        maxHeight: 'calc(100vh - 200px)'
       }}>
         {/* Modal de confirmation de suppression */}
         {deleteConfirm && (
@@ -603,29 +731,213 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
                 </div>
               </div>
             ) : (
-              // Mode normal
+              // Mode normal - AFFICHAGE COMPLET DU CHAPITRE
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <h2 style={{ margin: 0, color: '#333' }}>
+                {/* Titre du chapitre avec sous-titre */}
+                <div style={{ marginBottom: '2rem' }}>
+                  <h2 style={{ margin: '0 0 0.5rem', color: '#333' }}>
                     {selectedChapter.title}
-                    {selectedChapter.is_default && (
-                      <span style={{
-                        background: '#e8f4fd',
-                        color: '#0c5460',
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '3px',
-                        fontSize: '0.8rem',
-                        marginLeft: '1rem'
-                      }}>
-                        Suggestion
-                      </span>
-                    )}
                   </h2>
-                  <div>
+                  <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                    ALBUM PRESTIGE • {chapters.length} CHAPITRES
+                  </p>
+                </div>
+
+                {/* QUESTIONS SUGGÉRÉES PAR L'IA */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  padding: '1.5rem',
+                  borderRadius: '10px',
+                  marginBottom: '2rem',
+                  color: 'white'
+                }}>
+                  <h3 style={{ margin: '0 0 1rem', color: 'white', fontSize: '1.1rem' }}>
+                    ✨ QUESTIONS SUGGÉRÉES PAR L'IA
+                  </h3>
+                  
+                  <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+                    {selectedChapter.questions_ia && selectedChapter.questions_ia.length > 0 ? (
+                      selectedChapter.questions_ia.map((q, idx) => (
+                        <li key={idx} style={{ marginBottom: '0.8rem', lineHeight: '1.5' }}>{q}</li>
+                      ))
+                    ) : (
+                      <li style={{ fontStyle: 'italic' }}>Aucune question pour l'instant</li>
+                    )}
+                  </ul>
+
+                  <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center' }}>
                     <button
-                      onClick={() => navigate(`/book/${bookId}/chapter/${selectedChapter.id}`)}
+                      onClick={() => generateAIQuestions(selectedChapter)}
+                      disabled={generatingQuestions}
                       style={{
                         padding: '0.6rem 1.2rem',
+                        background: 'white',
+                        color: '#764ba2',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold',
+                        cursor: generatingQuestions ? 'not-allowed' : 'pointer',
+                        opacity: generatingQuestions ? 0.7 : 1
+                      }}
+                    >
+                      {generatingQuestions ? '✨ Génération...' : '🎲 Générer de nouvelles questions'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* MA CONTRIBUTION PERSONNELLE */}
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '1.5rem',
+                  borderRadius: '10px',
+                  marginBottom: '2rem',
+                  border: '1px solid #e9ecef'
+                }}>
+                  <h3 style={{ margin: '0 0 1rem', color: '#333' }}>MA CONTRIBUTION PERSONNELLE</h3>
+                  
+                  <textarea
+                    value={contributionText}
+                    onChange={(e) => setContributionText(e.target.value)}
+                    placeholder="Rédigez ici votre texte pour ce chapitre..."
+                    rows="6"
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '1px solid #ddd',
+                      borderRadius: '5px',
+                      fontSize: '1rem',
+                      marginBottom: '1.5rem',
+                      resize: 'vertical'
+                    }}
+                  />
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoChange}
+                      id="photo-upload"
+                      style={{ display: 'none' }}
+                      disabled={photos.length >= 2}
+                    />
+                    
+                    <label
+                      htmlFor="photo-upload"
+                      style={{
+                        display: 'inline-block',
+                        padding: '0.8rem 2rem',
+                        background: 'white',
+                        border: '2px dashed #ccc',
+                        borderRadius: '5px',
+                        cursor: photos.length >= 2 ? 'not-allowed' : 'pointer',
+                        color: photos.length >= 2 ? '#999' : '#333',
+                        marginBottom: '1rem'
+                      }}
+                    >
+                      📷 Ajouter mes photos (max 2)
+                    </label>
+                    
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                      {photos.length}/2 photos
+                    </p>
+                  </div>
+
+                  {/* Aperçu des photos */}
+                  {photoPreviews.length > 0 && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                      gap: '1rem',
+                      marginBottom: '1.5rem'
+                    }}>
+                      {photoPreviews.map((preview, index) => (
+                        <div key={index} style={{ position: 'relative' }}>
+                          <img
+                            src={preview}
+                            alt={`Aperçu ${index + 1}`}
+                            style={{
+                              width: '100%',
+                              height: '100px',
+                              objectFit: 'cover',
+                              borderRadius: '5px'
+                            }}
+                          />
+                          <button
+                            onClick={() => removePhoto(index)}
+                            style={{
+                              position: 'absolute',
+                              top: '-5px',
+                              right: '-5px',
+                              width: '25px',
+                              height: '25px',
+                              borderRadius: '50%',
+                              background: '#dc3545',
+                              color: 'white',
+                              border: 'none',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSubmitContribution}
+                    disabled={submitting || !contributionText.trim()}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      background: submitting || !contributionText.trim() ? '#ccc' : '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      cursor: submitting || !contributionText.trim() ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {submitting ? 'Envoi en cours...' : 'ENREGISTRER MA CONTRIBUTION'}
+                  </button>
+                </div>
+
+                {/* Inviter des proches */}
+                <div style={{
+                  background: '#f3e8ff',
+                  padding: '1.5rem',
+                  borderRadius: '10px',
+                  border: '1px solid #764ba2'
+                }}>
+                  <h3 style={{ margin: '0 0 0.5rem', color: '#764ba2' }}>Inviter des proches à contribuer</h3>
+                  <p style={{ marginBottom: '1rem', color: '#666' }}>
+                    Partagez ce lien pour que vos proches répondent aussi à ces questions.
+                  </p>
+                  
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <input
+                      type="text"
+                      value={`${window.location.origin}/invite/${selectedChapter.id}`}
+                      readOnly
+                      style={{
+                        flex: 1,
+                        padding: '0.8rem',
+                        border: '1px solid #ddd',
+                        borderRadius: '5px',
+                        fontSize: '0.9rem',
+                        background: 'white'
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/invite/${selectedChapter.id}`);
+                        alert('Lien copié !');
+                      }}
+                      style={{
+                        padding: '0.8rem 1.5rem',
                         background: '#764ba2',
                         color: 'white',
                         border: 'none',
@@ -633,105 +945,8 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
                         cursor: 'pointer'
                       }}
                     >
-                      Voir le chapitre
+                      Copier
                     </button>
-                  </div>
-                </div>
-
-                {selectedChapter.description && (
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    marginBottom: '2rem',
-                    border: '1px solid #e9ecef'
-                  }}>
-                    <p style={{ margin: 0, color: '#666' }}>{selectedChapter.description}</p>
-                  </div>
-                )}
-
-                {/* Zone d'instructions */}
-                <div style={{
-                  background: '#f8f9fa',
-                  padding: '1.5rem',
-                  borderRadius: '8px',
-                  marginBottom: '2rem',
-                  border: '1px solid #e9ecef'
-                }}>
-                  <h3 style={{ margin: '0 0 1rem', color: '#764ba2' }}>📋 Questions suggérées</h3>
-                  
-                  <div style={{ marginBottom: '1rem' }}>
-                    {selectedChapter.questions_ia && selectedChapter.questions_ia.length > 0 ? (
-                      <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#666' }}>
-                        {selectedChapter.questions_ia.map((q, idx) => (
-                          <li key={idx} style={{ marginBottom: '0.5rem' }}>{q}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p style={{ color: '#999', fontStyle: 'italic' }}>Aucune question pour l'instant</p>
-                    )}
-                  </div>
-
-                  <div style={{ marginTop: '1rem' }}>
-                    <p style={{ margin: '0 0 0.5rem', fontWeight: 'bold' }}>Consignes pour les contributeurs :</p>
-                    <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>
-                      • Maximum 2 photos par contribution<br/>
-                      • Format JPG ou PNG (5MB max)<br/>
-                      • Vous pouvez modifier votre contribution après envoi
-                    </p>
-                  </div>
-
-                  <div style={{
-                    marginTop: '1rem',
-                    padding: '0.5rem',
-                    background: '#e8f4fd',
-                    borderRadius: '5px',
-                    fontSize: '0.9rem',
-                    color: '#0c5460'
-                  }}>
-                    <strong>💡 Astuce :</strong> Cliquez sur ❓ pour modifier les questions
-                  </div>
-                </div>
-
-                {/* Statistiques du chapitre */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: '1rem',
-                  marginBottom: '2rem'
-                }}>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ffc107' }}>
-                      {selectedChapter.contributions?.[0]?.count || 0}
-                    </div>
-                    <div style={{ color: '#666', fontSize: '0.9rem' }}>contributions</div>
-                  </div>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#17a2b8' }}>
-                      {selectedChapter.questions_ia?.length || 0}
-                    </div>
-                    <div style={{ color: '#666', fontSize: '0.9rem' }}>questions</div>
-                  </div>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#28a745' }}>
-                      {selectedChapter.invites_count || 0}
-                    </div>
-                    <div style={{ color: '#666', fontSize: '0.9rem' }}>invités</div>
                   </div>
                 </div>
               </>
@@ -749,7 +964,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
             <span style={{ fontSize: '4rem', marginBottom: '1rem' }}>📖</span>
             <h3>Sélectionnez un chapitre</h3>
             <p style={{ textAlign: 'center', maxWidth: '400px' }}>
-              Cliquez sur un chapitre à gauche pour voir les instructions, gérer les questions et les contributions
+              Cliquez sur un chapitre à gauche pour voir les questions, ajouter votre contribution et inviter des proches
             </p>
           </div>
         )}

@@ -4,7 +4,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import BookConfig from './BookConfig';
 import ChapterList from './ChapterList';
-import BookConfigurator from '../create-book/BookConfigurator';
 import Loading from '../common/Loading';
 
 const BookPage = () => {
@@ -24,7 +23,6 @@ const BookPage = () => {
     try {
       setLoading(true);
       
-      // Récupérer le livre
       const { data: bookData, error: bookError } = await supabase
         .from('books')
         .select('*')
@@ -34,7 +32,6 @@ const BookPage = () => {
       if (bookError) throw bookError;
       setBook(bookData);
 
-      // Récupérer les chapitres avec le comptage des contributions
       const { data: chaptersData, error: chaptersError } = await supabase
         .from('chapters')
         .select(`
@@ -108,7 +105,6 @@ const BookPage = () => {
 
       if (error) throw error;
       
-      // Ajouter le comptage de contributions vide
       data.contributions = [{ count: 0 }];
       setChapters(prev => [...prev, data]);
       
@@ -138,13 +134,9 @@ const BookPage = () => {
     const totalContributions = chapters.reduce((acc, ch) => 
       acc + (ch.contributions?.[0]?.count || 0), 0);
     
-    // À implémenter avec une vraie requête plus tard
-    const totalInvites = 0;
-
     return {
       chapitres: chapters.length,
-      contributions: totalContributions,
-      invites: totalInvites
+      contributions: totalContributions
     };
   };
 
@@ -170,11 +162,7 @@ const BookPage = () => {
               background: '#f8f9fa',
               border: '1px solid #ddd',
               borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem'
+              cursor: 'pointer'
             }}
           >
             ← Retour
@@ -192,45 +180,34 @@ const BookPage = () => {
       {/* Stats rapides */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateColumns: 'repeat(2, 1fr)',
         gap: '1rem',
-        marginBottom: '2rem'
+        marginBottom: '2rem',
+        maxWidth: '400px'
       }}>
         <div style={{
           background: 'white',
-          padding: '1.5rem',
-          borderRadius: '10px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          padding: '1rem',
+          borderRadius: '8px',
+          boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#764ba2' }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#764ba2' }}>
             {stats.chapitres}
           </div>
-          <div style={{ color: '#666' }}>chapitres</div>
+          <div style={{ color: '#666', fontSize: '0.9rem' }}>chapitres</div>
         </div>
         <div style={{
           background: 'white',
-          padding: '1.5rem',
-          borderRadius: '10px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          padding: '1rem',
+          borderRadius: '8px',
+          boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ffc107' }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ffc107' }}>
             {stats.contributions}
           </div>
-          <div style={{ color: '#666' }}>contributions</div>
-        </div>
-        <div style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '10px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#17a2b8' }}>
-            {stats.invites}
-          </div>
-          <div style={{ color: '#666' }}>invités</div>
+          <div style={{ color: '#666', fontSize: '0.9rem' }}>contributions</div>
         </div>
       </div>
 
@@ -302,13 +279,11 @@ const BookPage = () => {
         )}
 
         {activeTab === 'config' && (
-		  <BookConfigurator
-			initialBook={book}
-			onSave={(bookId) => {
-			  fetchBookData();
-			}}
-		  />
-		)}
+          <BookConfig
+            book={book}
+            onUpdate={updateBook}
+          />
+        )}
 
         {activeTab === 'apercu' && (
           <div style={{
@@ -322,22 +297,7 @@ const BookPage = () => {
             <h2 style={{ marginBottom: '1rem' }}>Aperçu du livre</h2>
             <p style={{ color: '#666', marginBottom: '2rem' }}>
               Cette fonctionnalité sera disponible prochainement.
-              Vous pourrez visualiser votre livre avant de le commander.
             </p>
-            <button
-              disabled
-              style={{
-                padding: '1rem 2rem',
-                background: '#ccc',
-                color: '#666',
-                border: 'none',
-                borderRadius: '5px',
-                fontSize: '1rem',
-                cursor: 'not-allowed'
-              }}
-            >
-              Générer un aperçu (bientôt)
-            </button>
           </div>
         )}
       </div>
