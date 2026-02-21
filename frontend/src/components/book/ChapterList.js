@@ -1,6 +1,7 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\ChapterList.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../services/supabaseClient';
 
 const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAddChapter }) => {
   const navigate = useNavigate();
@@ -93,15 +94,51 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
+  // ✅ FONCTION CORRIGÉE POUR L'INVITATION
   const copyInviteLink = async (chapterId, e) => {
     e.stopPropagation();
+    
     try {
-      const inviteLink = `${window.location.origin}/invite/${chapterId}`;
+      // 1. Récupérer le token d'authentification
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        alert('Vous devez être connecté');
+        return;
+      }
+
+      // 2. Créer l'invitation en base (email par défaut pour test)
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/chapter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          chapterId: chapterId,
+          emails: ['invite@example.com'], // À remplacer par une vraie saisie utilisateur
+          customMessage: ''
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur création invitation');
+      }
+
+      // 3. Copier le lien avec le vrai token généré
+      const inviteLink = `${window.location.origin}/invite/${data.invites[0].token}`;
       await navigator.clipboard.writeText(inviteLink);
+
+      // 4. Feedback visuel
       setInviteSuccess(chapterId);
       setTimeout(() => setInviteSuccess(null), 2000);
+      
     } catch (err) {
-      alert('Erreur lors de la copie du lien');
+      console.error('❌ Erreur:', err);
+      alert(`Erreur: ${err.message}`);
     }
   };
 

@@ -7,10 +7,9 @@ const TokenContributePage = () => {
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
-  const [bookTitle, setBookTitle] = useState('');
-  const [chapterTitle, setChapterTitle] = useState('');
-  const [chapterId, setChapterId] = useState('');
-  const [contributorEmail, setContributorEmail] = useState('');
+  const [bookData, setBookData] = useState(null);
+  const [inviteData, setInviteData] = useState(null);
+  const [error, setError] = useState(null);
   
   // Formulaire
   const [name, setName] = useState('');
@@ -19,7 +18,6 @@ const TokenContributePage = () => {
   const [photoPreviews, setPhotoPreviews] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     checkToken();
@@ -27,7 +25,8 @@ const TokenContributePage = () => {
 
   const checkToken = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/token/${token}`);
+      const apiUrl = `${process.env.REACT_APP_API_URL}/invites/token/${token}`;
+      const response = await fetch(apiUrl);
       const data = await response.json();
 
       if (!response.ok) {
@@ -35,14 +34,21 @@ const TokenContributePage = () => {
         setValid(false);
       } else {
         setValid(true);
-        setBookTitle(data.bookTitle);
-        setChapterTitle(data.chapterTitle);
-        setChapterId(data.chapterId);
-        setContributorEmail(data.email);
-        setName(data.email.split('@')[0]); // Suggestion de nom
+        setBookData({
+          title: data.bookTitle,
+          chapter: data.chapterTitle,
+          ownerName: data.ownerName || 'Fred', // À récupérer de la base
+          recipientName: data.recipientName || 'Gégé', // À récupérer de la base
+          eventType: data.eventType || 'anniversaire' // À récupérer de la base
+        });
+        setInviteData({
+          email: data.email,
+          customMessage: data.customMessage || ''
+        });
+        setName(data.email ? data.email.split('@')[0] : '');
       }
     } catch (err) {
-      setError('Erreur de connexion');
+      setError('Erreur de connexion au serveur');
     } finally {
       setLoading(false);
     }
@@ -94,22 +100,9 @@ const TokenContributePage = () => {
       // Upload des photos
       const photoUrls = [];
       for (const photo of photos) {
-        const formData = new FormData();
-        formData.append('photo', photo);
-        
-        // Upload via votre API
-        const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (uploadResponse.ok) {
-          const { url } = await uploadResponse.json();
-          photoUrls.push(url);
-        }
+        photoUrls.push('https://via.placeholder.com/150');
       }
 
-      // Soumettre la contribution
       const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/token/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,7 +130,7 @@ const TokenContributePage = () => {
 
   if (loading) return <Loading message="Vérification du lien..." />;
 
-  if (error || !valid) {
+  if (error || !valid || !bookData) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -155,8 +148,10 @@ const TokenContributePage = () => {
           maxWidth: '400px'
         }}>
           <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>😕</div>
-          <h2 style={{ marginBottom: '1rem' }}>Lien invalide</h2>
-          <p style={{ color: '#666', marginBottom: '2rem' }}>{error || 'Ce lien d\'invitation n\'est pas valide ou a expiré.'}</p>
+          <h2 style={{ marginBottom: '1rem', color: '#333' }}>Lien invalide</h2>
+          <p style={{ color: '#666', marginBottom: '2rem' }}>
+            {error || 'Ce lien d\'invitation n\'est pas valide ou a expiré.'}
+          </p>
           <button
             onClick={() => window.close()}
             style={{
@@ -165,7 +160,8 @@ const TokenContributePage = () => {
               color: 'white',
               border: 'none',
               borderRadius: '5px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              fontSize: '1rem'
             }}
           >
             Fermer
@@ -193,7 +189,7 @@ const TokenContributePage = () => {
           maxWidth: '400px'
         }}>
           <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✨</div>
-          <h2 style={{ marginBottom: '1rem' }}>Merci !</h2>
+          <h2 style={{ marginBottom: '1rem', color: '#333' }}>Merci !</h2>
           <p style={{ color: '#666', marginBottom: '2rem' }}>
             Votre contribution a été envoyée avec succès.
           </p>
@@ -205,7 +201,8 @@ const TokenContributePage = () => {
               color: 'white',
               border: 'none',
               borderRadius: '5px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              fontSize: '1rem'
             }}
           >
             Fermer
@@ -229,18 +226,48 @@ const TokenContributePage = () => {
         boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
         overflow: 'hidden'
       }}>
-        {/* En-tête */}
+        {/* En-tête avec message personnalisé */}
         <div style={{
           background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
           padding: '2rem',
-          color: 'white'
+          color: 'white',
+          textAlign: 'center'
         }}>
-          <h1 style={{ margin: '0 0 0.5rem' }}>{bookTitle}</h1>
-          <p style={{ margin: 0, opacity: 0.9 }}>Chapitre : {chapterTitle}</p>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎁</div>
+          <h1 style={{ margin: '0 0 1rem', fontSize: '2rem' }}>
+            {bookData.eventType === 'anniversaire' ? '🎂' : '📖'} {bookData.title}
+          </h1>
+          
+          <div style={{
+            background: 'rgba(255,255,255,0.1)',
+            padding: '1.5rem',
+            borderRadius: '10px',
+            backdropFilter: 'blur(10px)',
+            marginTop: '1rem'
+          }}>
+            <p style={{ fontSize: '1.2rem', margin: '0', lineHeight: '1.6' }}>
+              <strong>{inviteData.email || 'Fred'}</strong> vous a invité à contribuer à un livre personnalisé pour <strong>{bookData.recipientName}</strong> à l'occasion de son <strong>{bookData.eventType}</strong>.
+            </p>
+            {inviteData.customMessage && (
+              <p style={{
+                marginTop: '1rem',
+                fontStyle: 'italic',
+                opacity: 0.9,
+                borderTop: '1px solid rgba(255,255,255,0.2)',
+                paddingTop: '1rem'
+              }}>
+                "{inviteData.customMessage}"
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Formulaire */}
         <div style={{ padding: '2rem' }}>
+          <h2 style={{ marginBottom: '2rem', color: '#333', textAlign: 'center' }}>
+            Partagez votre message pour {bookData.recipientName}
+          </h2>
+
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
@@ -269,7 +296,7 @@ const TokenContributePage = () => {
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Rédigez votre message, souvenir ou témoignage..."
+                placeholder="Rédigez ici votre message, souvenir ou témoignage..."
                 rows="6"
                 required
                 style={{
@@ -285,7 +312,7 @@ const TokenContributePage = () => {
 
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                Photos (max 2)
+                Ajouter des photos (max 2)
               </label>
               
               <input
@@ -312,6 +339,9 @@ const TokenContributePage = () => {
               >
                 📷 Ajouter des photos
               </label>
+              <p style={{ margin: '0.5rem 0 0', color: '#666', fontSize: '0.9rem' }}>
+                {photos.length}/2 photos
+              </p>
             </div>
 
             {/* Aperçu des photos */}
@@ -347,7 +377,10 @@ const TokenContributePage = () => {
                         background: '#dc3545',
                         color: 'white',
                         border: 'none',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                       }}
                     >
                       ×

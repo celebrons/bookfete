@@ -15,7 +15,16 @@ const ChapterPage = () => {
   const [contributionText, setContributionText] = useState('');
   const [photos, setPhotos] = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
-  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [showQuestions, setShowQuestions] = useState(false);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+
+  // Questions suggérées (simulées - à remplacer par appel IA plus tard)
+  const suggestedQuestions = [
+    "Quel est votre plus beau souvenir avec la personne ?",
+    "Si vous deviez la décrire en trois mots, lesquels choisiriez-vous ?",
+    "Racontez une anecdote qui vous a marqué.",
+    "Qu'est-ce que vous souhaitez lui souhaiter pour l'avenir ?"
+  ];
 
   useEffect(() => {
     fetchData();
@@ -28,7 +37,7 @@ const ChapterPage = () => {
       // Récupérer le livre
       const { data: bookData, error: bookError } = await supabase
         .from('books')
-        .select('*')
+        .select('title, finition, papier, style_narratif')
         .eq('id', bookId)
         .single();
 
@@ -45,7 +54,7 @@ const ChapterPage = () => {
       if (chapterError) throw chapterError;
       setChapter(chapterData);
 
-      // Récupérer les contributions pour ce chapitre
+      // Récupérer les contributions
       const { data: contributionsData, error: contributionsError } = await supabase
         .from('contributions')
         .select('*')
@@ -60,6 +69,16 @@ const ChapterPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const generateNewQuestions = () => {
+    setGeneratingQuestions(true);
+    // Simuler une génération IA
+    setTimeout(() => {
+      setGeneratingQuestions(false);
+      setShowQuestions(true);
+      // Ici vous appelleriez votre API IA
+    }, 1500);
   };
 
   const handlePhotoChange = (e) => {
@@ -131,8 +150,8 @@ const ChapterPage = () => {
         .from('contributions')
         .insert([{
           chapter_id: chapterId,
-          contributor_email: user.email,
           contributor_name: user.user_metadata?.full_name || user.email,
+          contributor_email: user.email,
           message: contributionText,
           photo_urls: photoUrls,
           approved: false
@@ -156,53 +175,8 @@ const ChapterPage = () => {
     }
   };
 
-  const copyInviteLink = async () => {
-    const inviteLink = `${window.location.origin}/contribute/${bookId}/${chapterId}`;
-    await navigator.clipboard.writeText(inviteLink);
-    setInviteSuccess(true);
-    setTimeout(() => setInviteSuccess(false), 2000);
-  };
-
-  const approveContribution = async (contributionId) => {
-    try {
-      const { error } = await supabase
-        .from('contributions')
-        .update({ approved: true })
-        .eq('id', contributionId);
-
-      if (error) throw error;
-      
-      setContributions(prev => prev.map(c => 
-        c.id === contributionId ? { ...c, approved: true } : c
-      ));
-      
-    } catch (error) {
-      console.error('❌ Erreur approbation:', error);
-    }
-  };
-
-  const deleteContribution = async (contributionId) => {
-    if (!window.confirm('Supprimer cette contribution ?')) return;
-    
-    try {
-      const { error } = await supabase
-        .from('contributions')
-        .delete()
-        .eq('id', contributionId);
-
-      if (error) throw error;
-      
-      setContributions(prev => prev.filter(c => c.id !== contributionId));
-      
-    } catch (error) {
-      console.error('❌ Erreur suppression:', error);
-    }
-  };
-
   if (loading) return <Loading message="Chargement du chapitre..." />;
   if (!book || !chapter) return <div>Chapitre non trouvé</div>;
-
-  const isOwner = true; // À vérifier avec l'utilisateur connecté
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
@@ -226,57 +200,88 @@ const ChapterPage = () => {
           >
             ← Retour au livre
           </button>
-          <h1 style={{ margin: 0 }}>{chapter.title}</h1>
+          <div>
+            <h1 style={{ margin: 0 }}>{chapter.title}</h1>
+            <p style={{ margin: '0.3rem 0 0', color: '#666' }}>{book.title}</p>
+          </div>
         </div>
-        <button
-          onClick={copyInviteLink}
-          style={{
-            padding: '0.8rem 1.5rem',
-            background: '#764ba2',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          🔗 Inviter des proches
-          {inviteSuccess && <span style={{ color: '#ffc107' }}>✓ Copié !</span>}
-        </button>
       </div>
 
-      {/* Description du chapitre */}
-      {chapter.description && (
-        <div style={{
-          background: '#f8f9fa',
-          padding: '1.5rem',
-          borderRadius: '10px',
-          marginBottom: '2rem',
-          border: '1px solid #dee2e6'
-        }}>
-          <p style={{ margin: 0, color: '#666' }}>{chapter.description}</p>
+      {/* BANNIERE QUESTIONS IA - MISE EN EXERGUE */}
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '2rem',
+        borderRadius: '10px',
+        marginBottom: '2rem',
+        color: 'white',
+        boxShadow: '0 10px 30px rgba(118, 75, 162, 0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+          <span style={{ fontSize: '2rem' }}>✨</span>
+          <h2 style={{ margin: 0, color: 'white' }}>Questions pour vous aider</h2>
         </div>
-      )}
+        
+        <p style={{ fontSize: '1.1rem', marginBottom: '1.5rem', opacity: 0.95 }}>
+          Pour vous aider à rédiger votre contribution, nous vous proposons 4 questions en lien avec ce chapitre. 
+          <strong> Libre à vous de suivre ou pas ces questions.</strong>
+        </p>
 
-      {/* Questions IA */}
-      {chapter.questions_ia && chapter.questions_ia.length > 0 && (
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '1.5rem',
-          borderRadius: '10px',
-          marginBottom: '2rem',
-          color: 'white'
-        }}>
-          <h3 style={{ margin: '0 0 1rem', color: 'white' }}>✨ Questions suggérées par l'IA</h3>
-          <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
-            {chapter.questions_ia.map((question, idx) => (
-              <li key={idx} style={{ marginBottom: '0.5rem' }}>{question}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+        {!showQuestions ? (
+          <button
+            onClick={generateNewQuestions}
+            disabled={generatingQuestions}
+            style={{
+              padding: '1rem 2rem',
+              background: 'white',
+              color: '#764ba2',
+              border: 'none',
+              borderRadius: '5px',
+              fontSize: '1rem',
+              fontWeight: 'bold',
+              cursor: generatingQuestions ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              opacity: generatingQuestions ? 0.7 : 1
+            }}
+          >
+            {generatingQuestions ? '✨ Génération en cours...' : '🎲 Générer des questions'}
+          </button>
+        ) : (
+          <div style={{
+            background: 'rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '1.5rem',
+            borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.2)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: 'white', fontSize: '1.2rem' }}>Questions suggérées</h3>
+              <button
+                onClick={() => setShowQuestions(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: 'white',
+                  padding: '0.3rem 0.8rem',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem'
+                }}
+              >
+                Masquer
+              </button>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'white' }}>
+              {suggestedQuestions.map((q, idx) => (
+                <li key={idx} style={{ marginBottom: '0.8rem', lineHeight: '1.5' }}>
+                  {q}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       {/* Formulaire de contribution */}
       <div style={{
@@ -328,13 +333,14 @@ const ChapterPage = () => {
               border: '2px dashed #ccc',
               borderRadius: '5px',
               cursor: photos.length >= 2 ? 'not-allowed' : 'pointer',
-              color: photos.length >= 2 ? '#999' : '#333'
+              color: photos.length >= 2 ? '#999' : '#333',
+              marginBottom: '1rem'
             }}
           >
             📷 Choisir des photos
           </label>
           
-          <p style={{ margin: '0.5rem 0 0', color: '#666', fontSize: '0.9rem' }}>
+          <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
             {photos.length}/2 photos
           </p>
         </div>
@@ -432,36 +438,6 @@ const ChapterPage = () => {
                       {new Date(contribution.created_at).toLocaleDateString('fr-FR')}
                     </span>
                   </div>
-                  {isOwner && !contribution.approved && (
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        onClick={() => approveContribution(contribution.id)}
-                        style={{
-                          padding: '0.3rem 0.8rem',
-                          background: '#28a745',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ✓ Approuver
-                      </button>
-                      <button
-                        onClick={() => deleteContribution(contribution.id)}
-                        style={{
-                          padding: '0.3rem 0.8rem',
-                          background: '#dc3545',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 <p style={{ margin: '0 0 1rem', lineHeight: '1.6' }}>
