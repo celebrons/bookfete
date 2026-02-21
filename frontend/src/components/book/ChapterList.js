@@ -20,6 +20,11 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   const [photoPreviews, setPhotoPreviews] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
+  // État pour les contributions (modération)
+  const [showContributions, setShowContributions] = useState(false);
+  const [chapterContributions, setChapterContributions] = useState([]);
+  const [loadingContributions, setLoadingContributions] = useState(false);
+
   const handleEdit = (chapter) => {
     setEditingChapter({
       id: chapter.id,
@@ -142,7 +147,66 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
-  // ✅ FONCTION D'INVITATION CORRIGÉE
+  // FONCTION POUR CHARGER LES CONTRIBUTIONS D'UN CHAPITRE
+  const loadContributions = async (chapterId) => {
+    setLoadingContributions(true);
+    try {
+      const { data, error } = await supabase
+        .from('contributions')
+        .select('*')
+        .eq('chapter_id', chapterId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setChapterContributions(data || []);
+      setShowContributions(true);
+    } catch (error) {
+      console.error('❌ Erreur chargement contributions:', error);
+      alert('Erreur lors du chargement des contributions');
+    } finally {
+      setLoadingContributions(false);
+    }
+  };
+
+  // FONCTION POUR APPROUVER UNE CONTRIBUTION
+  const approveContribution = async (contributionId) => {
+    try {
+      const { error } = await supabase
+        .from('contributions')
+        .update({ approved: true })
+        .eq('id', contributionId);
+
+      if (error) throw error;
+
+      setChapterContributions(prev =>
+        prev.map(c => c.id === contributionId ? { ...c, approved: true } : c)
+      );
+    } catch (error) {
+      console.error('❌ Erreur approbation:', error);
+      alert('Erreur lors de l\'approbation');
+    }
+  };
+
+  // FONCTION POUR SUPPRIMER UNE CONTRIBUTION
+  const deleteContribution = async (contributionId) => {
+    if (!window.confirm('Supprimer cette contribution ?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('contributions')
+        .delete()
+        .eq('id', contributionId);
+
+      if (error) throw error;
+
+      setChapterContributions(prev => prev.filter(c => c.id !== contributionId));
+    } catch (error) {
+      console.error('❌ Erreur suppression:', error);
+      alert('Erreur lors de la suppression');
+    }
+  };
+
+  // FONCTION D'INVITATION
   const copyInviteLink = async (chapterId, e) => {
     e.stopPropagation();
     
@@ -155,7 +219,6 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         return;
       }
 
-      // 1. Créer l'invitation en base
       const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/chapter`, {
         method: 'POST',
         headers: {
@@ -175,21 +238,15 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         throw new Error(data.error || 'Erreur création invitation');
       }
 
-      // 2. Construire l'URL complète du lien d'invitation avec le VRAI token
       const baseUrl = process.env.NODE_ENV === 'production' 
         ? 'https://bookfete-front.onrender.com' 
         : window.location.origin;
       
       const inviteLink = `${baseUrl}/invite/${data.invites[0].token}`;
       
-      // 3. Copier dans le presse-papier
       await navigator.clipboard.writeText(inviteLink);
-
-      // 4. Feedback visuel
       setInviteSuccess(chapterId);
       setTimeout(() => setInviteSuccess(null), 2000);
-      
-      console.log('✅ Lien copié:', inviteLink);
       
     } catch (err) {
       console.error('❌ Erreur:', err);
@@ -340,7 +397,10 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
           {chapters.map((chapter, index) => (
             <div
               key={chapter.id}
-              onClick={() => setSelectedChapter(chapter)}
+              onClick={() => {
+                setSelectedChapter(chapter);
+                setShowContributions(false);
+              }}
               style={{
                 padding: '1rem',
                 background: selectedChapter?.id === chapter.id ? '#f3e8ff' : '#f8f9fa',
@@ -475,9 +535,10 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
               <li>Cliquez sur un chapitre pour voir les détails</li>
               <li>✏️ Modifier le titre</li>
               <li>❓ Modifier les questions</li>
-              <li>🔗 Copier le lien d'invitation (génère un vrai token)</li>
+              <li>🔗 Copier le lien d'invitation</li>
               <li>🗑️ Supprimer le chapitre</li>
               <li>🤖 Générer des questions avec l'IA</li>
+              <li>👁️ Voir/Modérer les contributions</li>
             </ul>
             <button
               onClick={() => setShowGuide(false)}
@@ -742,15 +803,190 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
                   </button>
                 </div>
               </div>
+            ) : showContributions ? (
+              // MODE MODÉRATION DES CONTRIBUTIONS
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                  <h2 style={{ margin: 0, color: '#333' }}>
+                    Contributions pour "{selectedChapter.title}"
+                  </h2>
+                  <button
+                    onClick={() => setShowContributions(false)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ← Retour au chapitre
+                  </button>
+                </div>
+
+                {loadingContributions ? (
+                  <div style={{ textAlign: 'center', padding: '2rem' }}>
+                    <div className="spinner" style={{
+                      border: '3px solid #f3f3f3',
+                      borderTop: '3px solid #764ba2',
+                      borderRadius: '50%',
+                      width: '40px',
+                      height: '40px',
+                      animation: 'spin 1s linear infinite',
+                      margin: '0 auto 1rem'
+                    }} />
+                    <p>Chargement des contributions...</p>
+                  </div>
+                ) : chapterContributions.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '3rem',
+                    background: '#f8f9fa',
+                    borderRadius: '8px',
+                    color: '#666'
+                  }}>
+                    <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📭</span>
+                    <h3>Aucune contribution pour ce chapitre</h3>
+                    <p>Les contributions apparaîtront ici une fois que les invités auront répondu.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {chapterContributions.map(contribution => (
+                      <div
+                        key={contribution.id}
+                        style={{
+                          background: contribution.approved ? '#f3e8ff' : '#fff3cd',
+                          padding: '1.5rem',
+                          borderRadius: '10px',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                          border: contribution.approved ? '1px solid #764ba2' : '1px solid #ffc107',
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '1rem'
+                        }}>
+                          <div>
+                            <strong>{contribution.contributor_name}</strong>
+                            <span style={{ color: '#666', marginLeft: '1rem', fontSize: '0.9rem' }}>
+                              {new Date(contribution.created_at).toLocaleDateString('fr-FR')}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {!contribution.approved && (
+                              <button
+                                onClick={() => approveContribution(contribution.id)}
+                                style={{
+                                  padding: '0.3rem 0.8rem',
+                                  background: '#28a745',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '5px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem'
+                                }}
+                              >
+                                ✓ Approuver
+                              </button>
+                            )}
+                            <button
+                              onClick={() => deleteContribution(contribution.id)}
+                              style={{
+                                padding: '0.3rem 0.8rem',
+                                background: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem'
+                              }}
+                            >
+                              🗑️ Supprimer
+                            </button>
+                          </div>
+                        </div>
+
+                        <p style={{ margin: '0 0 1rem', lineHeight: '1.6' }}>
+                          {contribution.message}
+                        </p>
+
+                        {contribution.photo_urls && contribution.photo_urls.length > 0 && (
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                            gap: '0.5rem',
+                            marginTop: '1rem'
+                          }}>
+                            {contribution.photo_urls.map((url, idx) => (
+                              <img
+                                key={idx}
+                                src={url}
+                                alt={`Photo ${idx + 1}`}
+                                style={{
+                                  width: '100%',
+                                  height: '100px',
+                                  objectFit: 'cover',
+                                  borderRadius: '5px',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => window.open(url, '_blank')}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {!contribution.approved && (
+                          <span style={{
+                            position: 'absolute',
+                            top: '-5px',
+                            right: '-5px',
+                            background: '#ffc107',
+                            color: '#333',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '3px',
+                            fontSize: '0.8rem'
+                          }}>
+                            En attente
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : (
               // Mode normal - AFFICHAGE COMPLET DU CHAPITRE
               <>
                 {/* Titre du chapitre avec sous-titre */}
                 <div style={{ marginBottom: '2rem' }}>
-                  <h2 style={{ margin: '0 0 0.5rem', color: '#333' }}>
-                    {selectedChapter.title}
-                  </h2>
-                  <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 style={{ margin: 0, color: '#333' }}>
+                      {selectedChapter.title}
+                    </h2>
+                    {/* BOUTON VOIR/MODÉRER LES CONTRIBUTIONS */}
+                    <button
+                      onClick={() => loadContributions(selectedChapter.id)}
+                      style={{
+                        padding: '0.6rem 1.2rem',
+                        background: '#17a2b8',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      👁️ Voir/Modérer ({selectedChapter.contributions?.[0]?.count || 0})
+                    </button>
+                  </div>
+                  <p style={{ margin: '0.5rem 0 0', color: '#666', fontSize: '0.9rem' }}>
                     ALBUM PRESTIGE • {chapters.length} CHAPITRES
                   </p>
                 </div>
@@ -917,7 +1153,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
                   </button>
                 </div>
 
-                {/* Inviter des proches - VERSION CORRIGÉE */}
+                {/* Inviter des proches */}
                 <div style={{
                   background: '#f3e8ff',
                   padding: '1.5rem',
@@ -955,6 +1191,13 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
                     </p>
                   )}
                 </div>
+
+                <style>{`
+                  @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                  }
+                `}</style>
               </>
             )}
           </div>
