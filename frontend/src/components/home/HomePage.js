@@ -86,7 +86,7 @@ const HomePage = () => {
           </div>
         </div>
         <div className="hero-image">
-          <img src="/images/hero-book.jpg" alt="Livre souvenir" />
+          <img src="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800" alt="Livre souvenir" />
         </div>
       </section>
 
