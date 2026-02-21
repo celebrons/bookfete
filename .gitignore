@@ -1,6 +1,7 @@
 # Logs
 deploy.ps1
 git-render-deploy.ps1
+*.token.ps1
 
 logs
 *.log
