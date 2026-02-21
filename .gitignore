@@ -1,4 +1,7 @@
 # Logs
+deploy.ps1
+git-render-deploy.ps1
+
 logs
 *.log
 npm-debug.log*
