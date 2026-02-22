@@ -8,16 +8,10 @@ param(
 # CONFIGURATION - À REMPLACER !
 # ============================================
 
-# 1. Votre token GitHub (à créer dans Settings → Developer settings → Personal access tokens)
+# 1. Votre token GitHub
 $GITHUB_TOKEN = "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"
-
-# 2. Votre nom d'utilisateur GitHub
 $GITHUB_USER = "celebrons"
-
-# 3. Votre dépôt
 $GITHUB_REPO = "bookfete"
-
-# 4. Webhooks Render (les URLs de vos services)
 $BACKEND_URL = "https://api.render.com/deploy/srv-d6aq7ccr85hc73eqpe50?key=1E-kcJG_wFc"
 $FRONTEND_URL = "https://api.render.com/deploy/srv-d6aqaei4d50c73c84ve0?key=6nd8ie5ibFs"
 
@@ -105,8 +99,8 @@ Write-Host "-------------------"
 Write-Host "  - Deploiement..." -NoNewline
 try {
     $response = Invoke-WebRequest -Uri $BACKEND_URL -Method POST -UseBasicParsing -TimeoutSec 30
-    # ✅ 200 = OK, 202 = Accepté (en cours), 201 = Créé
-    if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 201 -or $response.StatusCode -eq 202) {
+    # ✅ 200 = OK, 202 = Accepté (en cours) - les deux sont bons !
+    if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 202) {
         Write-Host " OK" -ForegroundColor Green
     } else {
         Write-Host " ERREUR ($($response.StatusCode))" -ForegroundColor Red
@@ -126,8 +120,8 @@ Write-Host "--------------------"
 Write-Host "  - Deploiement..." -NoNewline
 try {
     $response = Invoke-WebRequest -Uri $FRONTEND_URL -Method POST -UseBasicParsing -TimeoutSec 30
-    # ✅ 200 = OK, 202 = Accepté (en cours), 201 = Créé
-    if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 201 -or $response.StatusCode -eq 202) {
+    # ✅ 200 = OK, 202 = Accepté (en cours) - les deux sont bons !
+    if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 202) {
         Write-Host " OK" -ForegroundColor Green
     } else {
         Write-Host " ERREUR ($($response.StatusCode))" -ForegroundColor Red
@@ -149,21 +143,3 @@ Write-Host "  - Dashboard: https://dashboard.render.com"
 Write-Host "  - Backend  : https://bookfete.onrender.com"
 Write-Host "  - Frontend : https://bookfete-front.onrender.com"
 Write-Host ""
-
-# Optionnel : attendre un peu et vérifier que les sites sont en ligne
-Write-Host "Verification des sites..." -ForegroundColor Yellow
-Start-Sleep -Seconds 5
-
-try {
-    $backendCheck = Invoke-WebRequest -Uri "https://bookfete.onrender.com/api/health" -UseBasicParsing -TimeoutSec 10
-    Write-Host "  - Backend: EN LIGNE" -ForegroundColor Green
-} catch {
-    Write-Host "  - Backend: EN ATTENTE" -ForegroundColor Yellow
-}
-
-try {
-    $frontendCheck = Invoke-WebRequest -Uri "https://bookfete-front.onrender.com" -UseBasicParsing -TimeoutSec 10
-    Write-Host "  - Frontend: EN LIGNE" -ForegroundColor Green
-} catch {
-    Write-Host "  - Frontend: EN ATTENTE" -ForegroundColor Yellow
-}
