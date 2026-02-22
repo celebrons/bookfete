@@ -1,152 +1,69 @@
 // C:\Users\USER\bookfete\backend\server.js
 const express = require('express');
-const multer = require('multer');
 const cors = require('cors');
 require('dotenv').config();
 
-// Import des routes
-const authRoutes = require('./routes/auth');
-const projectRoutes = require('./routes/projects');
-const inviteRoutes = require('./routes/invites');
-const contributionRoutes = require('./routes/contributions');
-const orderRoutes = require('./routes/orders');
-const aiRoutes = require('./routes/ai'); // ✅ Déplacé ici avec les autres imports
-
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+const PORT = process.env.PORT || 5001;
 
-// ============================================
-// CONFIGURATION CORS - DOIT ÊTRE TOUT EN HAUT !
-// ============================================
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://bookfete-front.onrender.com',
-  /\.onrender\.com$/
-];
-
+// Middleware
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.some(allowed => 
-      typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
-    )) {
-      callback(null, true);
-    } else {
-      console.log('❌ Origine non autorisée CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
-  exposedHeaders: ['ngrok-skip-browser-warning'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://bookfete-front.onrender.com', 'https://bookfete.onrender.com']
+    : '*'
 }));
-
-// Middleware pour parser le JSON (DOIT VENIR APRÈS CORS)
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Middleware de logs
-app.use((req, res, next) => {
-  console.log(`📨 ${req.method} ${req.originalUrl} - Origine: ${req.headers.origin || 'inconnue'}`);
-  next();
-});
 
 // ============================================
-// ROUTES PUBLIQUES
+// ROUTES - Version mise à jour (sans projects)
 // ============================================
-app.get('/api/ping', (req, res) => {
-  console.log('✅ Ping reçu de:', req.headers.origin || 'origine inconnue');
-  res.json({ 
-    message: 'pong', 
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV || 'development'
-  });
-});
-
-app.get('/api/routes', (req, res) => {
-  res.json({
-    routes: [
-      '/api/ping',
-      '/api/auth/test',
-      '/api/auth/profile',
-      '/api/projects',
-      '/api/invites',
-      '/api/contribute/:token',
-      '/api/orders/generate/:projectId',
-      '/api/ai/generate-questions', // ✅ Ajouté
-      '/api/ai/health'
-    ]
-  });
-});
+const authRoutes = require('./routes/auth');
+const bookRoutes = require('./routes/books'); // À créer si nécessaire
+const chapterRoutes = require('./routes/chapters');
+const contributionRoutes = require('./routes/contributions');
+const inviteRoutes = require('./routes/invites');
+const aiRoutes = require('./routes/ai');
 
 // ============================================
-// ROUTES PROTÉGÉES - TOUTES APRÈS LES MIDDLEWARES
+// ANCIENNES ROUTES À SUPPRIMER (commentées)
+// ============================================
+// const projectRoutes = require('./routes/projects'); // ← À SUPPRIMER
+// const orderRoutes = require('./routes/orders');     // ← À SUPPRIMER
+
+// ============================================
+// ROUTES ACTIVES
 // ============================================
 app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
+app.use('/api/books', bookRoutes);
+app.use('/api/chapters', chapterRoutes);
+app.use('/api/contributions', contributionRoutes);
 app.use('/api/invites', inviteRoutes);
-app.use('/api/contribute', contributionRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/ai', aiRoutes); // ✅ Maintenant bien placé après CORS et JSON
+app.use('/api/ai', aiRoutes);
 
-// ============================================
-// GESTION DES ERREURS 404
-// ============================================
-app.use('*', (req, res) => {
-  console.log(`❌ Route non trouvée: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({ 
-    error: 'Route non trouvée',
-    method: req.method,
-    path: req.originalUrl
-  });
+// Route de test
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// ============================================
-// GESTION DES ERREURS GLOBALES
-// ============================================
+// Gestion des erreurs 404
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Gestion des erreurs globales
 app.use((err, req, res, next) => {
-  console.error('❌ Erreur serveur:', err.stack);
-  res.status(500).json({ 
-    error: 'Erreur serveur interne',
-    message: err.message 
-  });
+  console.error('❌ Erreur serveur:', err);
+  res.status(500).json({ error: err.message });
 });
 
-// ============================================
-// DÉMARRAGE DU SERVEUR
-// ============================================
-const PORT = process.env.PORT || 5000;
-
-const server = app.listen(PORT, () => {
-  console.log('\n' + '='.repeat(60));
-  console.log('✅ SERVEUR DÉMARRÉ AVEC SUCCÈS');
-  console.log('='.repeat(60));
-  console.log(`📡 URL locale: http://localhost:${PORT}`);
-  console.log('\n📋 Routes IA disponibles:');
-  console.log(`   - POST  /api/ai/generate-questions`);
-  console.log(`   - POST  /api/ai/generate-questions-advanced`);
-  console.log(`   - GET   /api/ai/health`);
-  console.log(`   - GET   /api/ai/fallback-questions?chapterTitle=...`);
-  console.log('='.repeat(60) + '\n');
+app.listen(PORT, () => {
+  console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
+  console.log(`📝 Routes disponibles:`);
+  console.log(`   - /api/auth`);
+  console.log(`   - /api/books`);
+  console.log(`   - /api/chapters`);
+  console.log(`   - /api/contributions`);
+  console.log(`   - /api/invites`);
+  console.log(`   - /api/ai`);
+  console.log(`   - /api/health`);
 });
-
-process.on('SIGTERM', () => {
-  console.log('🛑 Arrêt du serveur...');
-  server.close(() => {
-    console.log('✅ Serveur arrêté');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('🛑 Arrêt du serveur...');
-  server.close(() => {
-    console.log('✅ Serveur arrêté');
-    process.exit(0);
-  });
-});
-
-module.exports = app;

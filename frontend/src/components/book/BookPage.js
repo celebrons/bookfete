@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import ChapterList from './ChapterList';
-import BookConfig from './BookConfig';
+import BookConfig from './BookConfig'; // ← À REMETTRE
 import Loading from '../common/Loading';
 
 const BookPage = () => {
@@ -11,7 +11,7 @@ const BookPage = () => {
   const [book, setBook] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('chapitres'); // 'chapitres', 'config', ou 'apercu'
+  const [activeTab, setActiveTab] = useState('chapitres'); // 'chapitres', 'config', 'apercu'
 
   useEffect(() => {
     loadBookAndChapters();
@@ -230,20 +230,26 @@ const BookPage = () => {
         width: '100%',
         padding: '0 2rem 2rem'
       }}>
-        {activeTab === 'chapitres' ? (
+        {activeTab === 'chapitres' && (
           <ChapterList
             chapters={chapters}
             bookId={bookId}
+            book={book}
             onUpdateChapter={handleUpdateChapter}
             onDeleteChapter={handleDeleteChapter}
             onAddChapter={handleAddChapter}
+            onUpdateBook={handleUpdateBook}
           />
-        ) : activeTab === 'config' ? (
+        )}
+        
+        {activeTab === 'config' && (
           <BookConfig
             book={book}
             onUpdateBook={handleUpdateBook}
           />
-        ) : (
+        )}
+        
+        {activeTab === 'apercu' && (
           <div style={{
             background: 'white',
             borderRadius: '10px',
@@ -251,8 +257,67 @@ const BookPage = () => {
             boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
             minHeight: '600px'
           }}>
-            <h2>Aperçu du livre</h2>
-            <p style={{ color: '#666' }}>L'aperçu sera bientôt disponible...</p>
+            <h2 style={{ marginBottom: '2rem' }}>Aperçu du livre</h2>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '2rem'
+            }}>
+              {/* Aperçu couverture */}
+              <div>
+                <h3 style={{ color: '#b8924a' }}>Couverture</h3>
+                <div style={{
+                  background: book.cover_config?.color || '#8B4513',
+                  height: '200px',
+                  borderRadius: '5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontFamily: book.cover_config?.font || 'Playfair Display',
+                  padding: '1rem',
+                  textAlign: 'center'
+                }}>
+                  {book.cover_config?.title || book.title}
+                </div>
+              </div>
+
+              {/* Aperçu chapitres */}
+              <div>
+                <h3 style={{ color: '#764ba2' }}>Chapitres</h3>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
+                  {chapters.slice(0, 3).map((ch, i) => (
+                    <li key={ch.id} style={{
+                      padding: '0.5rem',
+                      borderBottom: '1px solid #eee'
+                    }}>
+                      {i+1}. {ch.title}
+                    </li>
+                  ))}
+                  {chapters.length > 3 && (
+                    <li style={{ padding: '0.5rem', color: '#999' }}>
+                      ... et {chapters.length - 3} autres
+                    </li>
+                  )}
+                </ul>
+              </div>
+
+              {/* Aperçu 4ème couverture */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <h3 style={{ color: '#17a2b8' }}>4ème couverture</h3>
+                <div style={{
+                  background: book.back_cover_config?.color || '#f5f5f5',
+                  padding: '2rem',
+                  borderRadius: '5px',
+                  border: '1px solid #ddd'
+                }}>
+                  <p><strong>Contributors:</strong> {chapters.reduce((acc, ch) => acc + (ch.contributions?.[0]?.count || 0), 0)}</p>
+                  {book.back_cover_config?.custom_text && (
+                    <p style={{ fontStyle: 'italic' }}>"{book.back_cover_config.custom_text}"</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

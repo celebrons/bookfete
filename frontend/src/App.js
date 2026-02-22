@@ -11,14 +11,14 @@ import HomePage from './components/home/HomePage';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import EventPages from './components/home/EventPages';
-import PublicContributePage from './components/contributeur/PublicContributePage';
+// PublicContributePage est supprimé, on garde seulement TokenContributePage
 import TokenContributePage from './components/contributeur/TokenContributePage';
 
 // Pages organisateur
 import DashboardGeneral from './components/dashboard/DashboardGeneral';
 import CreateBookWizard from './components/create-book/CreateBookWizard';
-import BookPage from './components/book/BookPage';
-import ChapterPage from './components/book/ChapterPage';
+import BookPage from './components/book/BookPage'; // Vérifie que ce chemin est correct
+// ChapterPage n'est plus utilisé (tout est dans BookPage)
 
 // Composant de route protégée
 const ProtectedRoute = ({ children }) => {
@@ -54,11 +54,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/evenement/:eventType" element={<EventPages />} />
-        <Route path="/contribute/:bookId/:chapterId" element={<PublicContributePage />} />
+        {/* PublicContributePage supprimé, on garde uniquement TokenContributePage */}
         <Route path="/invite/:token" element={<TokenContributePage />} />
 
         {/* ============================================
-            PAGES PROTÉGÉES (Nouvelle structure Livres)
+            PAGES PROTÉGÉES
         ============================================ */}
         <Route path="/dashboard" element={
           <ProtectedRoute>
@@ -78,26 +78,9 @@ function App() {
           </ProtectedRoute>
         } />
         
-        <Route path="/book/:bookId/chapter/:chapterId" element={
-          <ProtectedRoute>
-            <ChapterPage />
-          </ProtectedRoute>
-        } />
+        {/* ChapterPage supprimé - plus besoin */}
 
-        {/* ============================================
-            PAGES PROTÉGÉES (Ancienne structure - conservée pour migration)
-        ============================================ */}
-        {/* 
-        <Route path="/project/:projectId" element={<ProjectDetails />} />
-        <Route path="/project/:projectId/edit" element={<EditProject />} />
-        <Route path="/project/:projectId/invite" element={<InviteContributors />} />
-        <Route path="/project/:projectId/review" element={<ReviewContributions />} />
-        <Route path="/project/:projectId/choose-maquette" element={<ChooseMaquette />} />
-        <Route path="/project/:projectId/payment" element={<OrderPayment />} />
-        <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
-        */}
-
-        {/* Route par défaut - redirection */}
+        {/* Route par défaut */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
