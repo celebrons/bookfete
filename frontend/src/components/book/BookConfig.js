@@ -1,7 +1,7 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\BookConfig.js
 import React, { useState } from 'react';
 
-const BookConfig = ({ book, onUpdate }) => {
+const BookConfig = ({ book, onUpdateBook }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     title: book.title,
@@ -41,7 +41,7 @@ const BookConfig = ({ book, onUpdate }) => {
   };
 
   const handleSave = () => {
-    onUpdate(formData);
+    onUpdateBook(formData);
     setIsEditing(false);
   };
 
