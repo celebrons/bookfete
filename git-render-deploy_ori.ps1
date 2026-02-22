@@ -17,7 +17,7 @@ $GITHUB_USER = "celebrons"
 # 3. Votre dépôt
 $GITHUB_REPO = "bookfete"
 
-# 4. Webhooks Render
+# 4. Webhooks Render (les URLs de vos services)
 $BACKEND_URL = "https://api.render.com/deploy/srv-d6aq7ccr85hc73eqpe50?key=1E-kcJG_wFc"
 $FRONTEND_URL = "https://api.render.com/deploy/srv-d6aqaei4d50c73c84ve0?key=6nd8ie5ibFs"
 
@@ -78,18 +78,16 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host " OK" -ForegroundColor Green 
 } else { 
     Write-Host " ERREUR" -ForegroundColor Red
-    # Parfois il n'y a rien à commit
     Write-Host "    (rien a commit? on continue)" -ForegroundColor Yellow
 }
 
-# Push (maintenant sans fenêtre)
+# Push
 Write-Host "  - Push vers GitHub..." -NoNewline
 git push origin main 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) { 
     Write-Host " OK" -ForegroundColor Green 
 } else { 
     Write-Host " ERREUR" -ForegroundColor Red
-    # On continue quand même pour le déploiement
     Write-Host "    (on continue quand meme)" -ForegroundColor Yellow
 }
 
@@ -107,7 +105,8 @@ Write-Host "-------------------"
 Write-Host "  - Deploiement..." -NoNewline
 try {
     $response = Invoke-WebRequest -Uri $BACKEND_URL -Method POST -UseBasicParsing -TimeoutSec 30
-    if ($response.StatusCode -eq 200) {
+    # ✅ 200 = OK, 202 = Accepté (en cours), 201 = Créé
+    if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 201 -or $response.StatusCode -eq 202) {
         Write-Host " OK" -ForegroundColor Green
     } else {
         Write-Host " ERREUR ($($response.StatusCode))" -ForegroundColor Red
@@ -127,7 +126,8 @@ Write-Host "--------------------"
 Write-Host "  - Deploiement..." -NoNewline
 try {
     $response = Invoke-WebRequest -Uri $FRONTEND_URL -Method POST -UseBasicParsing -TimeoutSec 30
-    if ($response.StatusCode -eq 200) {
+    # ✅ 200 = OK, 202 = Accepté (en cours), 201 = Créé
+    if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 201 -or $response.StatusCode -eq 202) {
         Write-Host " OK" -ForegroundColor Green
     } else {
         Write-Host " ERREUR ($($response.StatusCode))" -ForegroundColor Red
@@ -149,3 +149,21 @@ Write-Host "  - Dashboard: https://dashboard.render.com"
 Write-Host "  - Backend  : https://bookfete.onrender.com"
 Write-Host "  - Frontend : https://bookfete-front.onrender.com"
 Write-Host ""
+
+# Optionnel : attendre un peu et vérifier que les sites sont en ligne
+Write-Host "Verification des sites..." -ForegroundColor Yellow
+Start-Sleep -Seconds 5
+
+try {
+    $backendCheck = Invoke-WebRequest -Uri "https://bookfete.onrender.com/api/health" -UseBasicParsing -TimeoutSec 10
+    Write-Host "  - Backend: EN LIGNE" -ForegroundColor Green
+} catch {
+    Write-Host "  - Backend: EN ATTENTE" -ForegroundColor Yellow
+}
+
+try {
+    $frontendCheck = Invoke-WebRequest -Uri "https://bookfete-front.onrender.com" -UseBasicParsing -TimeoutSec 10
+    Write-Host "  - Frontend: EN LIGNE" -ForegroundColor Green
+} catch {
+    Write-Host "  - Frontend: EN ATTENTE" -ForegroundColor Yellow
+}
