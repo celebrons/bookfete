@@ -1,9 +1,10 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\BookPage.js
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import ChapterList from './ChapterList';
-import BookConfig from './BookConfig'; // ← À REMETTRE
+import BookConfig from './BookConfig';
+import ContributorsTab from './contributors/ContributorsTab';
 import Loading from '../common/Loading';
 
 const BookPage = () => {
@@ -11,7 +12,7 @@ const BookPage = () => {
   const [book, setBook] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('chapitres'); // 'chapitres', 'config', 'apercu'
+  const [activeTab, setActiveTab] = useState('chapitres');
 
   useEffect(() => {
     loadBookAndChapters();
@@ -21,7 +22,6 @@ const BookPage = () => {
     try {
       setLoading(true);
       
-      // Charger le livre
       const { data: bookData, error: bookError } = await supabase
         .from('books')
         .select('*')
@@ -31,7 +31,6 @@ const BookPage = () => {
       if (bookError) throw bookError;
       setBook(bookData);
 
-      // Charger les chapitres avec le compteur de contributions
       const { data: chaptersData, error: chaptersError } = await supabase
         .from('chapters')
         .select(`
@@ -59,12 +58,7 @@ const BookPage = () => {
         .eq('id', chapterId);
 
       if (error) throw error;
-
-      // Mettre à jour l'état local
-      setChapters(prev => prev.map(ch => 
-        ch.id === chapterId ? { ...ch, ...updates } : ch
-      ));
-
+      setChapters(prev => prev.map(ch => ch.id === chapterId ? { ...ch, ...updates } : ch));
     } catch (error) {
       console.error('❌ Erreur mise à jour:', error);
       alert('Erreur lors de la mise à jour');
@@ -79,7 +73,6 @@ const BookPage = () => {
         .eq('id', chapterId);
 
       if (error) throw error;
-
       setChapters(prev => prev.filter(ch => ch.id !== chapterId));
     } catch (error) {
       console.error('❌ Erreur suppression:', error);
@@ -109,7 +102,6 @@ const BookPage = () => {
         .single();
 
       if (error) throw error;
-
       setChapters(prev => [...prev, data]);
     } catch (error) {
       console.error('❌ Erreur ajout:', error);
@@ -125,7 +117,6 @@ const BookPage = () => {
         .eq('id', bookId);
 
       if (error) throw error;
-
       setBook(prev => ({ ...prev, ...updates }));
     } catch (error) {
       console.error('❌ Erreur mise à jour livre:', error);
@@ -133,14 +124,7 @@ const BookPage = () => {
   };
 
   if (loading) return <Loading message="Chargement du livre..." />;
-
-  if (!book) {
-    return (
-      <div style={{ textAlign: 'center', padding: '3rem' }}>
-        <h2>Livre non trouvé</h2>
-      </div>
-    );
-  }
+  if (!book) return <div>Livre non trouvé</div>;
 
   return (
     <div style={{
@@ -149,20 +133,51 @@ const BookPage = () => {
       flexDirection: 'column',
       backgroundColor: '#f5f5f5'
     }}>
-      {/* En-tête du livre */}
+      {/* En-tête du livre avec lien tableau de bord */}
       <div style={{
         background: 'white',
         padding: '1.5rem 2rem',
         boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
         marginBottom: '2rem'
       }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          <h1 style={{ margin: '0 0 0.5rem' }}>{book.title}</h1>
-          <div style={{ display: 'flex', gap: '1rem', color: '#666' }}>
-            <span>📖 {book.finition || 'Classique'}</span>
-            <span>📄 {book.papier || 'Mat'}</span>
-            <span>✍️ {book.style_narratif || 'Factuel'}</span>
+        <div style={{ 
+          maxWidth: '1400px', 
+          margin: '0 auto', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center' 
+        }}>
+          <div>
+            <h1 style={{ margin: '0 0 0.5rem' }}>{book.title}</h1>
+            <div style={{ display: 'flex', gap: '1rem', color: '#666' }}>
+              <span>📖 {book.finition || 'Classique'}</span>
+              <span>📄 {book.papier || 'Mat'}</span>
+              <span>✍️ {book.style_narratif || 'Factuel'}</span>
+            </div>
           </div>
+          
+          {/* Lien vers tableau de bord */}
+          <Link 
+            to="/dashboard" 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.8rem 1.5rem',
+              background: '#f8f9fa',
+              color: '#764ba2',
+              textDecoration: 'none',
+              borderRadius: '8px',
+              border: '1px solid #e9ecef',
+              transition: 'all 0.2s',
+              fontWeight: '500'
+            }}
+            onMouseEnter={(e) => e.target.style.background = '#f3e8ff'}
+            onMouseLeave={(e) => e.target.style.background = '#f8f9fa'}
+          >
+            <span>📊</span>
+            Tableau de bord
+          </Link>
         </div>
       </div>
 
@@ -190,6 +205,21 @@ const BookPage = () => {
             📑 Chapitres
           </button>
           <button
+            onClick={() => setActiveTab('contributeurs')}
+            style={{
+              padding: '0.8rem 2rem',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'contributeurs' ? '3px solid #764ba2' : '3px solid transparent',
+              color: activeTab === 'contributeurs' ? '#764ba2' : '#666',
+              fontWeight: activeTab === 'contributeurs' ? 'bold' : 'normal',
+              cursor: 'pointer',
+              fontSize: '1.1rem'
+            }}
+          >
+            👥 Contributeurs
+          </button>
+          <button
             onClick={() => setActiveTab('config')}
             style={{
               padding: '0.8rem 2rem',
@@ -203,21 +233,6 @@ const BookPage = () => {
             }}
           >
             ⚙️ Configuration
-          </button>
-          <button
-            onClick={() => setActiveTab('apercu')}
-            style={{
-              padding: '0.8rem 2rem',
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === 'apercu' ? '3px solid #764ba2' : '3px solid transparent',
-              color: activeTab === 'apercu' ? '#764ba2' : '#666',
-              fontWeight: activeTab === 'apercu' ? 'bold' : 'normal',
-              cursor: 'pointer',
-              fontSize: '1.1rem'
-            }}
-          >
-            👁️ Aperçu
           </button>
         </div>
       </div>
@@ -242,83 +257,12 @@ const BookPage = () => {
           />
         )}
         
-        {activeTab === 'config' && (
-          <BookConfig
-            book={book}
-            onUpdateBook={handleUpdateBook}
-          />
+        {activeTab === 'contributeurs' && (
+          <ContributorsTab bookId={bookId} />
         )}
         
-        {activeTab === 'apercu' && (
-          <div style={{
-            background: 'white',
-            borderRadius: '10px',
-            padding: '2rem',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-            minHeight: '600px'
-          }}>
-            <h2 style={{ marginBottom: '2rem' }}>Aperçu du livre</h2>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '2rem'
-            }}>
-              {/* Aperçu couverture */}
-              <div>
-                <h3 style={{ color: '#b8924a' }}>Couverture</h3>
-                <div style={{
-                  background: book.cover_config?.color || '#8B4513',
-                  height: '200px',
-                  borderRadius: '5px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontFamily: book.cover_config?.font || 'Playfair Display',
-                  padding: '1rem',
-                  textAlign: 'center'
-                }}>
-                  {book.cover_config?.title || book.title}
-                </div>
-              </div>
-
-              {/* Aperçu chapitres */}
-              <div>
-                <h3 style={{ color: '#764ba2' }}>Chapitres</h3>
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                  {chapters.slice(0, 3).map((ch, i) => (
-                    <li key={ch.id} style={{
-                      padding: '0.5rem',
-                      borderBottom: '1px solid #eee'
-                    }}>
-                      {i+1}. {ch.title}
-                    </li>
-                  ))}
-                  {chapters.length > 3 && (
-                    <li style={{ padding: '0.5rem', color: '#999' }}>
-                      ... et {chapters.length - 3} autres
-                    </li>
-                  )}
-                </ul>
-              </div>
-
-              {/* Aperçu 4ème couverture */}
-              <div style={{ gridColumn: 'span 2' }}>
-                <h3 style={{ color: '#17a2b8' }}>4ème couverture</h3>
-                <div style={{
-                  background: book.back_cover_config?.color || '#f5f5f5',
-                  padding: '2rem',
-                  borderRadius: '5px',
-                  border: '1px solid #ddd'
-                }}>
-                  <p><strong>Contributors:</strong> {chapters.reduce((acc, ch) => acc + (ch.contributions?.[0]?.count || 0), 0)}</p>
-                  {book.back_cover_config?.custom_text && (
-                    <p style={{ fontStyle: 'italic' }}>"{book.back_cover_config.custom_text}"</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+        {activeTab === 'config' && (
+          <BookConfig book={book} onUpdateBook={handleUpdateBook} />
         )}
       </div>
     </div>

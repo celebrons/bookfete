@@ -1,6 +1,6 @@
 // C:\Users\USER\bookfete\frontend\src\components\create-book\CreateBookWizard.js
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import Step1Type from './Step1Type';
 import Step2Finition from './Step2Finition';
@@ -8,19 +8,44 @@ import Step3Recap from './Step3Recap';
 
 const CreateBookWizard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
+  // Récupérer le paramètre event de l'URL
+  const queryParams = new URLSearchParams(location.search);
+  const eventParam = queryParams.get('event');
+
+  // Mapping des paramètres URL vers les types d'événements
+  const eventMap = {
+    'pot-depart': 'depart',
+    'fin-projet': 'projet',
+    'mariage': 'mariage',
+    'vacances': 'vacances',
+    'anniversaire': 'anniversaire',
+    'retraite': 'retraite'
+  };
+
   // Données du livre
   const [bookData, setBookData] = useState({
     title: '',
-    event_type: 'generique',
+    event_type: eventParam && eventMap[eventParam] ? eventMap[eventParam] : 'generique',
     finition: 'classique',
     papier: 'mat',
     style_narratif: 'factuel',
     pages: 96,
     chapters: 24
   });
+
+  // Mettre à jour si le paramètre change
+  useEffect(() => {
+    if (eventParam && eventMap[eventParam]) {
+      setBookData(prev => ({
+        ...prev,
+        event_type: eventMap[eventParam]
+      }));
+    }
+  }, [eventParam]);
 
   // Templates de chapitres par type d'événement
   const chapterTemplates = {
@@ -63,6 +88,14 @@ const CreateBookWizard = () => {
       { title: 'Messages d\'au revoir', description: 'Les mots du cœur' },
       { title: 'Nouveau départ', description: 'Vœux pour la suite' },
       { title: 'On n\'oublie pas', description: 'Pour garder le lien' }
+    ],
+    projet: [
+      { title: 'Le début du projet', description: 'Comment tout a commencé' },
+      { title: 'Les étapes clés', description: 'Les moments importants' },
+      { title: 'Les défis relevés', description: 'Ce qu\'on a surmonté' },
+      { title: 'Les réussites', description: 'Ce dont on est fier' },
+      { title: 'L\'équipe', description: 'Ceux qui ont participé' },
+      { title: 'La suite', description: 'Les prochains défis' }
     ]
   };
 

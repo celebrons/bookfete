@@ -8,6 +8,7 @@ import ChapterDetails from './chapters/ChapterDetails';
 import ChapterEditor from './chapters/ChapterEditor';
 import QuestionsEditor from './chapters/QuestionsEditor';
 import ContributionsModeration from './chapters/ContributionsModeration';
+import InviteSelector from './contributors/InviteSelector';
 
 const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAddChapter, book, onUpdateBook }) => {
   const [editingChapter, setEditingChapter] = useState(null);
@@ -30,6 +31,10 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   const [showContributions, setShowContributions] = useState(false);
   const [chapterContributions, setChapterContributions] = useState([]);
   const [loadingContributions, setLoadingContributions] = useState(false);
+
+  // États pour le sélecteur d'invitations
+  const [showInviteSelector, setShowInviteSelector] = useState(false);
+  const [selectedChapterForInvite, setSelectedChapterForInvite] = useState(null);
 
   // États pour la couverture
   const [editingCover, setEditingCover] = useState(false);
@@ -262,52 +267,21 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
-  // ==================== FONCTION INVITATION ====================
-  const copyInviteLink = async (chapterId, e) => {
+  // ==================== FONCTIONS INVITATION ====================
+  const handleOpenInviteSelector = (chapter, e) => {
     e.stopPropagation();
+    console.log('📌 handleOpenInviteSelector appelé avec:', chapter);
+    console.log('📌 chapterId:', chapter?.id);
+    console.log('📌 chapter object complet:', chapter);
     
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      
-      if (!token) {
-        alert('Vous devez être connecté');
-        return;
-      }
-
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/chapter`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          chapterId: chapterId,
-          emails: ['invite@example.com'],
-          customMessage: ''
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur création invitation');
-      }
-
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://bookfete-front.onrender.com' 
-        : window.location.origin;
-      
-      const inviteLink = `${baseUrl}/invite/${data.invites[0].token}`;
-      
-      await navigator.clipboard.writeText(inviteLink);
-      setInviteSuccess(chapterId);
-      setTimeout(() => setInviteSuccess(null), 2000);
-      
-    } catch (err) {
-      console.error('❌ Erreur:', err);
-      alert(`Erreur: ${err.message}`);
+    if (!chapter || !chapter.id) {
+      console.error('❌ Erreur: chapter ou chapter.id manquant');
+      alert('Erreur: impossible d\'identifier le chapitre');
+      return;
     }
+    
+    setSelectedChapterForInvite(chapter);
+    setShowInviteSelector(true);
   };
 
   // ==================== FONCTIONS PHOTOS ====================
@@ -448,7 +422,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         onEditChapter={handleEdit}
         onEditQuestions={handleEditQuestions}
         onDeleteClick={handleDeleteClick}
-        onCopyInviteLink={copyInviteLink}
+        onCopyInviteLink={handleOpenInviteSelector}
         inviteSuccess={inviteSuccess}
         deleteConfirm={deleteConfirm}
         getStatusColor={getStatusColor}
@@ -607,7 +581,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
             onSubmitContribution={handleSubmitContribution}
             submitting={submitting}
             onLoadContributions={loadContributions}
-            onCopyInviteLink={copyInviteLink}
+            onCopyInviteLink={handleOpenInviteSelector}
             inviteSuccess={inviteSuccess}
           />
         )}
@@ -631,6 +605,23 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
           </div>
         )}
       </div>
+
+      {/* Modal d'invitation */}
+      {showInviteSelector && selectedChapterForInvite && (
+        <InviteSelector
+          chapterId={selectedChapterForInvite.id}
+          bookId={bookId}
+          onClose={() => {
+            console.log('🔚 Fermeture du sélecteur');
+            setShowInviteSelector(false);
+            setSelectedChapterForInvite(null);
+          }}
+          onInvitesSent={() => {
+            console.log('✅ Invitations envoyées');
+            // Optionnel: rafraîchir quelque chose
+          }}
+        />
+      )}
 
       {/* Style pour l'animation du spinner */}
       <style>{`

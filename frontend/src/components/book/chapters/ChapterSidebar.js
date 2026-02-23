@@ -20,6 +20,21 @@ const ChapterSidebar = ({
   showGuide,
   setShowGuide
 }) => {
+  
+  // Fonction pour gérer le clic sur le bouton d'invitation
+  const handleInviteClick = (chapter, e) => {
+    e.stopPropagation(); // Empêche la sélection du chapitre
+    console.log('📌 Chapitre cliqué pour invitation:', chapter);
+    
+    if (!chapter || !chapter.id) {
+      console.error('❌ Erreur: chapitre invalide', chapter);
+      return;
+    }
+    
+    // Appeler la fonction du parent avec le chapitre complet
+    onCopyInviteLink(chapter, e);
+  };
+
   return (
     <div style={{ 
       flex: 1,
@@ -175,7 +190,7 @@ const ChapterSidebar = ({
                     ❓
                   </button>
                   <button
-                    onClick={(e) => onCopyInviteLink(chapter.id, e)}
+                    onClick={(e) => handleInviteClick(chapter, e)}
                     style={{
                       padding: '0.2rem 0.5rem',
                       background: inviteSuccess === chapter.id ? '#28a745' : '#764ba2',
@@ -185,9 +200,9 @@ const ChapterSidebar = ({
                       cursor: 'pointer',
                       fontSize: '0.8rem'
                     }}
-                    title="Copier le lien d'invitation"
+                    title="Inviter des contributeurs"
                   >
-                    🔗
+                    👥
                   </button>
                   <button
                     onClick={(e) => onDeleteClick(chapter, e)}
@@ -217,7 +232,7 @@ const ChapterSidebar = ({
                   borderRadius: '3px',
                   fontSize: '0.7rem'
                 }}>
-                  Lien copié !
+                  Invitation envoyée !
                 </div>
               )}
             </div>
@@ -271,9 +286,9 @@ const ChapterSidebar = ({
             <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#666', fontSize: '0.9rem' }}>
               <li>📕 Cliquez sur COUVERTURE pour personnaliser</li>
               <li>📑 Cliquez sur un chapitre pour le gérer</li>
+              <li>👥 Cliquez sur 👥 pour inviter des contributeurs</li>
               <li>📘 Cliquez sur 4ÈME COUVERTURE pour la fin</li>
               <li>✏️ Modifier les titres et questions</li>
-              <li>🔗 Copier les liens d'invitation</li>
             </ul>
             <button
               onClick={() => setShowGuide(false)}

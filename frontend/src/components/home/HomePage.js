@@ -1,182 +1,182 @@
 // C:\Users\USER\bookfete\frontend\src\components\home\HomePage.js
 import React from 'react';
 import { Link } from 'react-router-dom';
-import HeroSection from './HeroSection';
-import CTASection from './CTASection';
-import Layout from '../layout/Layout';
 import './Home.css';
 
 const HomePage = () => {
+  // Liste des événements avec liens vers pages événements
   const events = [
     {
-      id: 'pot-depart',
-      icon: '🎉',
       title: 'Pot de départ',
-      description: 'Offrez un souvenir à un collègue qui part, avec les messages et photos de toute l\'équipe'
+      description: 'Offrez un souvenir à un collègue qui part, avec les messages et photos de votre équipe.',
+      icon: '🍾',
+      link: '/evenement/pot-depart'
     },
     {
-      id: 'fin-projet',
-      icon: '🚀',
       title: 'Fin de projet',
-      description: 'Immortalisez la réussite collective avec les témoignages de chaque membre'
+      description: 'Immortalisez la réussite collective avec les témoignages de chaque membre.',
+      icon: '🚀',
+      link: '/evenement/fin-projet'
     },
     {
-      id: 'mariage',
-      icon: '💍',
       title: 'Mariage',
-      description: 'Faites participer tous les invités pour un album de mariage unique'
+      description: 'Faites participer tous les invités pour un album de mariage unique.',
+      icon: '💍',
+      link: '/evenement/mariage'
     },
     {
-      id: 'vacances',
-      icon: '✈️',
       title: 'Souvenirs de vacances',
-      description: 'Partagez les meilleurs clichés et anecdotes entre voyageurs'
+      description: 'Partagez les meilleurs clichés et anecdotes de votre voyage.',
+      icon: '✈️',
+      link: '/evenement/vacances'
     },
     {
-      id: 'anniversaire',
-      icon: '🎂',
       title: 'Anniversaire',
-      description: 'Surprenez vos proches avec un livre cadeau personnalisé'
+      description: 'Surprenez vos proches avec un livre cadeau personnalisé.',
+      icon: '🎂',
+      link: '/evenement/anniversaire'
     },
     {
-      id: 'retraite',
-      icon: '🌅',
       title: 'Départ en retraite',
-      description: 'Un livre rempli de témoignages pour une nouvelle vie'
+      description: 'Un livre rempli de témoignages pour une nouvelle vie.',
+      icon: '🌅',
+      link: '/evenement/retraite'
     }
   ];
 
-  const testimonials = [
+  // Étapes
+  const steps = [
     {
-      id: 1,
-      text: "Nous avons offert ce livre à notre collègue Marie pour son départ. Toute l'équipe a participé, le résultat était magnifique !",
-      author: "Sophie, RH chez TechCorp",
-      rating: 5
+      number: '1️⃣',
+      title: 'Créez votre projet',
+      description: 'Choisissez votre événement, votre style et vos besoins pour une bonne prise en charge.'
     },
     {
-      id: 2,
-      text: "Pour notre mariage, tous nos invités ont pu laisser un message et des photos. C'est le plus beau souvenir de notre journée !",
-      author: "Julien & Aurélie",
-      rating: 5
+      number: '2️⃣',
+      title: 'Invitez vos proches',
+      description: 'Partagez les liens d\'invitation pour collecter messages et photos.'
     },
     {
-      id: 3,
-      text: "Après 2 ans de projet, ce livre a permis à toute l'équipe de se remémorer les moments clés. Un véritable trésor !",
-      author: "Thomas, Chef de projet",
-      rating: 5
+      number: '3️⃣',
+      title: 'Validez les contributions',
+      description: 'Approuvez les messages et photos avant l\'impression.'
+    },
+    {
+      number: '4️⃣',
+      title: 'Recevez votre livre',
+      description: 'Commandez votre livre et recevez-le chez vous.'
     }
   ];
 
   return (
-    <Layout>
-      {/* Hero Section */}
-      <section className="hero">
-        <div className="hero-content">
-          <h1>Transformez vos souvenirs en un livre unique</h1>
-          <p className="hero-subtitle">
-            Créez un livre souvenir collaboratif pour marquer tous vos événements importants
-          </p>
+    <div className="home-page">
+      {/* HERO SECTION */}
+      <section className="hero-section">
+        <div className="container">
+          <h1>Transformer vos souvenirs en un livre unique</h1>
+          <p>Créez un livre souvenir collaboratif pour marquer tous vos événements importants.</p>
           <div className="hero-buttons">
-            <Link to="/register" className="btn-primary">
-              Commencer gratuitement
-            </Link>
-            <Link to="/comment-ca-marche" className="btn-secondary">
-              Découvrir comment ça marche
-            </Link>
+            <Link to="/create-book" className="btn btn-primary">Commencez gratuitement</Link>
+            <a href="#how-it-works" className="btn btn-secondary">Découvrir comment ça marche</a>
           </div>
-        </div>
-        <div className="hero-image">
-          <img src="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800" alt="Livre souvenir" />
         </div>
       </section>
 
-      {/* Section Événements */}
-      <section className="offres">
-        <h2>Pour tous vos événements</h2>
-        <div className="offres-grid">
-          {events.map(event => (
-            <Link 
-              key={event.id}
-              to={`/evenement/${event.id}`}
-              className="offre-card-link"
-            >
-              <div className="offre-card">
-                <div className="offre-icon">{event.icon}</div>
-                <h3>{event.title}</h3>
-                <p>{event.description}</p>
+      {/* ÉVÉNEMENTS SECTION */}
+      <section className="events-section">
+        <div className="container">
+          <h2>Pour tous vos événements</h2>
+          <div className="events-grid">
+            {events.map((event, index) => (
+              <Link to={event.link} key={index} className="event-card-link">
+                <div className="event-card">
+                  <div className="event-icon">{event.icon}</div>
+                  <h3>{event.title}</h3>
+                  <p>{event.description}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION MARKETING - REMPLACE LES STATS */}
+      <section style={{
+        padding: '80px 0',
+        background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+        textAlign: 'center'
+      }}>
+        <div className="container" style={{ maxWidth: '800px', margin: '0 auto', padding: '0 20px' }}>
+          <h2 style={{
+            fontSize: '2.5rem',
+            color: '#333',
+            marginBottom: '1.5rem',
+            fontWeight: '700',
+            fontFamily: "'Playfair Display', serif"
+          }}>
+            Des souvenirs partagés,<br />immortalisés dans un livre unique.
+          </h2>
+          <p style={{
+            fontSize: '1.3rem',
+            color: '#666',
+            marginBottom: '2.5rem',
+            lineHeight: '1.6'
+          }}>
+            Offrez un cadeau qui reste à jamais.
+          </p>
+          <Link 
+            to="/create-book" 
+            style={{
+              display: 'inline-block',
+              padding: '1.2rem 3rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '50px',
+              fontSize: '1.2rem',
+              fontWeight: '600',
+              boxShadow: '0 10px 20px rgba(118, 75, 162, 0.3)',
+              transition: 'all 0.3s'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-3px)';
+              e.target.style.boxShadow = '0 15px 30px rgba(118, 75, 162, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 10px 20px rgba(118, 75, 162, 0.3)';
+            }}
+          >
+            Créer mon livre →
+          </Link>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS SECTION */}
+      <section id="how-it-works" className="how-it-works-section">
+        <div className="container">
+          <h2>Comment ça marche ?</h2>
+          <div className="steps-grid">
+            {steps.map((step, index) => (
+              <div key={index} className="step-card">
+                <div className="step-number">{step.number}</div>
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
               </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Section Témoignages */}
-      <section className="temoignages">
-        <h2>Ils nous ont fait confiance</h2>
-        <div className="temoignages-grid">
-          {testimonials.map(t => (
-            <div key={t.id} className="temoignage-card">
-              <div className="quote">"</div>
-              <p className="texte">{t.text}</p>
-              <div className="auteur">{t.author}</div>
-              <div className="notes">{'⭐'.repeat(t.rating)}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Section Statistiques */}
-      <section className="stats-section">
-        <div className="stats-container">
-          <div className="stat-item">
-            <div className="stat-number">1500+</div>
-            <div className="stat-label">livres créés</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">8500+</div>
-            <div className="stat-label">témoignages</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">15k+</div>
-            <div className="stat-label">photos partagées</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">98%</div>
-            <div className="stat-label">clients satisfaits</div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Section Comment ça marche */}
-      <section className="how-it-works">
-        <h2>Comment ça marche ?</h2>
-        <div className="steps-grid">
-          <div className="step-card">
-            <div className="step-number">1</div>
-            <h3>Créez votre livre</h3>
-            <p>Choisissez votre format, votre style et personnalisez votre livre en quelques clics</p>
-          </div>
-          <div className="step-card">
-            <div className="step-number">2</div>
-            <h3>Invitez vos proches</h3>
-            <p>Partagez des liens uniques par chapitre et collectez les témoignages de tous</p>
-          </div>
-          <div className="step-card">
-            <div className="step-number">3</div>
-            <h3>L'IA harmonise le tout</h3>
-            <p>Notre intelligence artificielle structure et met en forme toutes les contributions</p>
-          </div>
-          <div className="step-card">
-            <div className="step-number">4</div>
-            <h3>Commandez votre livre</h3>
-            <p>Recevez un livre imprimé de qualité professionnelle chez vous</p>
-          </div>
+      {/* CTA SECTION */}
+      <section className="cta-section">
+        <div className="container">
+          <h2>Prêt à créer des souvenirs inoubliables ?</h2>
+          <p>Inscrivez-vous gratuitement et créez votre premier projet en quelques minutes.</p>
+          <Link to="/register" className="btn btn-primary btn-large">Créez mon projet gratuitement</Link>
         </div>
       </section>
-
-      {/* Section CTA Final */}
-      <CTASection />
-    </Layout>
+    </div>
   );
 };
 

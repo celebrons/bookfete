@@ -8,17 +8,15 @@ import Layout from './components/layout/Layout';
 
 // Pages publiques
 import HomePage from './components/home/HomePage';
+import EventPages from './components/home/EventPages';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
-import EventPages from './components/home/EventPages';
-// PublicContributePage est supprimé, on garde seulement TokenContributePage
-import TokenContributePage from './components/contributeur/TokenContributePage';
+import InvitationPage from './components/contributeur/InvitationPage'; // Vérifie le nom
 
 // Pages organisateur
 import DashboardGeneral from './components/dashboard/DashboardGeneral';
 import CreateBookWizard from './components/create-book/CreateBookWizard';
-import BookPage from './components/book/BookPage'; // Vérifie que ce chemin est correct
-// ChapterPage n'est plus utilisé (tout est dans BookPage)
+import BookPage from './components/book/BookPage';
 
 // Composant de route protégée
 const ProtectedRoute = ({ children }) => {
@@ -46,43 +44,44 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <Router>
-      <Routes>
-        {/* ============================================
-            PAGES PUBLIQUES
-        ============================================ */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/evenement/:eventType" element={<EventPages />} />
-        {/* PublicContributePage supprimé, on garde uniquement TokenContributePage */}
-        <Route path="/invite/:token" element={<TokenContributePage />} />
+      <Layout>
+        <Routes>
+          {/* ============================================
+              PAGES PUBLIQUES
+          ============================================ */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/evenement/:eventType" element={<EventPages />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Route d'invitation - DOIT ÊTRE AVANT LA REDIRECTION 404 */}
+          <Route path="/invite/:token" element={<InvitationPage />} />
+          
+          {/* ============================================
+              PAGES PROTÉGÉES
+          ============================================ */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <DashboardGeneral />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/create-book" element={
+            <ProtectedRoute>
+              <CreateBookWizard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/book/:bookId" element={
+            <ProtectedRoute>
+              <BookPage />
+            </ProtectedRoute>
+          } />
 
-        {/* ============================================
-            PAGES PROTÉGÉES
-        ============================================ */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <DashboardGeneral />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/create-book" element={
-          <ProtectedRoute>
-            <CreateBookWizard />
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/book/:bookId" element={
-          <ProtectedRoute>
-            <BookPage />
-          </ProtectedRoute>
-        } />
-        
-        {/* ChapterPage supprimé - plus besoin */}
-
-        {/* Route par défaut */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+          {/* Redirection 404 - DOIT ÊTRE EN DERNIER */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Layout>
     </Router>
   );
 }
