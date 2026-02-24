@@ -1,208 +1,378 @@
 /* C:\Users\USER\bookfete\frontend\src\components\home\Home.css */
+
+/* ============================================
+   STYLES GÉNÉRAUX
+============================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 .home-page {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1e1e1e;
+  line-height: 1.6;
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
+  width: 100%;
 }
 
-/* Hero Section */
+/* ============================================
+   HERO SECTION
+============================================ */
 .hero-section {
-  min-height: 80vh;
+  min-height: 85vh;
   display: flex;
   align-items: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   text-align: center;
-  padding: 60px 0;
+  padding: 80px 0;
 }
 
 .hero-section h1 {
-  font-size: 3rem;
+  font-size: 3.2rem;
   margin-bottom: 20px;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .hero-section p {
   font-size: 1.2rem;
-  margin-bottom: 30px;
+  margin-bottom: 40px;
   opacity: 0.9;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
+/* BOUTONS DE LA HERO SECTION */
 .hero-buttons {
   display: flex;
-  gap: 20px;
+  gap: 15px;
   justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 30px;
 }
 
-.btn {
-  padding: 15px 30px;
-  border-radius: 50px;
+/* Bouton "Commencez gratuitement" - VIOLET */
+.hero-buttons a:first-child {
+  display: inline-block;
+  padding: 14px 32px;
+  border-radius: 40px;
   text-decoration: none;
   font-weight: 600;
-  transition: all 0.3s;
-}
-
-.btn-primary {
-  background: white;
-  color: #764ba2;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-}
-
-.btn-secondary {
-  background: rgba(255,255,255,0.2);
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background: #5a2e8a;  /* Violet foncé */
   color: white;
-  border: 1px solid white;
+  border: none;
 }
 
-.btn-secondary:hover {
-  background: rgba(255,255,255,0.3);
+.hero-buttons a:first-child:hover {
+  background: #4a2370;  /* Violet encore plus foncé au survol */
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(90, 46, 138, 0.3);
 }
 
-/* Events Section */
+/* Bouton "Découvrir comment ça marche" - TRANSPARENT */
+.hero-buttons a:last-child {
+  display: inline-block;
+  padding: 14px 32px;
+  border-radius: 40px;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255,255,255,0.5);
+}
+
+.hero-buttons a:last-child:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: white;
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   ÉVÉNEMENTS SECTION
+============================================ */
 .events-section {
   padding: 80px 0;
-  background: #f8f9fa;
+  background: #ffffff;
 }
 
 .events-section h2 {
   text-align: center;
   font-size: 2.5rem;
   margin-bottom: 50px;
-  color: #333;
+  color: #1e1e1e;
+  font-weight: 600;
 }
 
 .events-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
 }
 
 .event-card-link {
   text-decoration: none;
   color: inherit;
   display: block;
-  transition: transform 0.3s;
+  transition: transform 0.2s ease;
 }
 
 .event-card-link:hover {
-  transform: translateY(-5px);
+  transform: translateY(-4px);
 }
 
 .event-card {
   background: white;
   padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-  transition: all 0.3s;
-}
-
-.event-card:hover {
-  box-shadow: 0 15px 30px rgba(118, 75, 162, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.03);
+  border: 1px solid #f0f0f0;
+  height: 100%;
 }
 
 .event-icon {
-  font-size: 3rem;
-  margin-bottom: 20px;
+  font-size: 2.8rem;
+  margin-bottom: 16px;
 }
 
 .event-card h3 {
-  color: #333;
-  margin-bottom: 10px;
+  color: #1e1e1e;
+  margin-bottom: 12px;
+  font-size: 1.3rem;
+  font-weight: 600;
 }
 
 .event-card p {
   color: #666;
-  line-height: 1.6;
+  line-height: 1.5;
+  font-size: 0.95rem;
 }
 
-/* How It Works Section */
+/* ============================================
+   STATS SECTION
+============================================ */
+.stats-section {
+  padding: 60px 0;
+  background: #f8f9fa;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #764ba2;
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.stat-label {
+  color: #666;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* ============================================
+   HOW IT WORKS SECTION
+============================================ */
 .how-it-works-section {
   padding: 80px 0;
-  background: #f8f9fa;
+  background: white;
 }
 
 .how-it-works-section h2 {
   text-align: center;
   font-size: 2.5rem;
   margin-bottom: 50px;
-  color: #333;
+  color: #1e1e1e;
+  font-weight: 600;
 }
 
 .steps-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 30px;
+  gap: 20px;
 }
 
 .step-card {
   text-align: center;
-  padding: 30px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+  padding: 30px 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.step-card:hover {
+  background: #f3e8ff;
 }
 
 .step-number {
-  font-size: 3rem;
-  margin-bottom: 20px;
+  font-size: 2.8rem;
+  margin-bottom: 16px;
 }
 
 .step-card h3 {
-  color: #333;
-  margin-bottom: 10px;
+  color: #1e1e1e;
+  margin-bottom: 12px;
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .step-card p {
   color: #666;
-  line-height: 1.6;
+  line-height: 1.5;
+  font-size: 0.9rem;
 }
 
-/* CTA Section */
+/* ============================================
+   CTA SECTION (bas de page)
+============================================ */
 .cta-section {
   padding: 100px 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #764ba2;
   color: white;
   text-align: center;
 }
 
 .cta-section h2 {
   font-size: 2.5rem;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  font-weight: 600;
 }
 
 .cta-section p {
   font-size: 1.2rem;
-  margin-bottom: 30px;
   opacity: 0.9;
+  margin-bottom: 32px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.btn-large {
-  padding: 18px 40px;
-  font-size: 1.2rem;
+/* Bouton CTA - VIOLET */
+.cta-button {
+  display: inline-block;
+  padding: 14px 40px;
+  background: #5a2e8a;  /* Violet foncé */
+  color: white;
+  text-decoration: none;
+  border-radius: 40px;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.cta-button:hover {
+  background: #4a2370;  /* Violet encore plus foncé au survol */
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(90, 46, 138, 0.3);
+}
+
+/* ============================================
+   RESPONSIVE
+============================================ */
+@media (max-width: 1024px) {
+  .hero-section h1 {
+    font-size: 2.8rem;
+  }
+  
+  .steps-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
 }
 
 @media (max-width: 768px) {
+  .hero-section {
+    min-height: auto;
+    padding: 60px 0;
+  }
+  
   .hero-section h1 {
+    font-size: 2.2rem;
+  }
+  
+  .hero-section p {
+    font-size: 1.1rem;
+  }
+  
+  .events-section h2,
+  .how-it-works-section h2,
+  .cta-section h2 {
     font-size: 2rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .stat-value {
+    font-size: 2.5rem;
   }
   
   .steps-grid {
     grid-template-columns: 1fr;
   }
   
-  .hero-buttons {
-    flex-direction: column;
+  .cta-section {
+    padding: 60px 0;
   }
   
   .cta-section h2 {
     font-size: 2rem;
+  }
+  
+  .cta-section p {
+    font-size: 1rem;
+  }
+  
+  .cta-button {
+    padding: 12px 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-section h1 {
+    font-size: 1.8rem;
+  }
+  
+  .hero-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .hero-buttons a:first-child,
+  .hero-buttons a:last-child {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .events-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .event-card {
+    padding: 25px;
   }
 }

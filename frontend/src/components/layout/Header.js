@@ -45,7 +45,7 @@ const Header = () => {
           <Link to="/" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Accueil</Link>
           
           {/* Lien vers Comment ça marche */}
-          <a href="/how-it-works.html" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Comment ça marche</a>
+          <Link to="/how-it-works" className="nav-link">Comment ça marche</Link>
           
           <Link to="/tarifs" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Tarifs</Link>
           

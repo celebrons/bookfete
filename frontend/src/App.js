@@ -9,9 +9,10 @@ import Layout from './components/layout/Layout';
 // Pages publiques
 import HomePage from './components/home/HomePage';
 import EventPages from './components/home/EventPages';
+import HowItWorksPage from './components/home/HowItWorksPage';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
-import InvitationPage from './components/contributeur/InvitationPage'; // Vérifie le nom
+import InvitationPage from './components/contributeur/InvitationPage';
 
 // Pages organisateur
 import DashboardGeneral from './components/dashboard/DashboardGeneral';
@@ -51,12 +52,11 @@ function App() {
           ============================================ */}
           <Route path="/" element={<HomePage />} />
           <Route path="/evenement/:eventType" element={<EventPages />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          
-          {/* Route d'invitation - DOIT ÊTRE AVANT LA REDIRECTION 404 */}
           <Route path="/invite/:token" element={<InvitationPage />} />
-          
+
           {/* ============================================
               PAGES PROTÉGÉES
           ============================================ */}
@@ -78,7 +78,9 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Redirection 404 - DOIT ÊTRE EN DERNIER */}
+          {/* ============================================
+              REDIRECTION 404
+          ============================================ */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>
