@@ -2,21 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
-import Step1Type from './Step1Type';
-import Step2Finition from './Step2Finition';
-import Step3Recap from './Step3Recap';
+import Step1Config from './Step1Config';
+import Step2Recap from './Step2Recap';
 
 const CreateBookWizard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [generatedChapters, setGeneratedChapters] = useState([]);
   
-  // Récupérer le paramètre event de l'URL
   const queryParams = new URLSearchParams(location.search);
   const eventParam = queryParams.get('event');
 
-  // Mapping des paramètres URL vers les types d'événements
   const eventMap = {
     'pot-depart': 'depart',
     'fin-projet': 'projet',
@@ -26,18 +24,15 @@ const CreateBookWizard = () => {
     'retraite': 'retraite'
   };
 
-  // Données du livre
   const [bookData, setBookData] = useState({
     title: '',
     event_type: eventParam && eventMap[eventParam] ? eventMap[eventParam] : 'generique',
     finition: 'classique',
     papier: 'mat',
     style_narratif: 'factuel',
-    pages: 96,
-    chapters: 24
+    pages: 64,
   });
 
-  // Mettre à jour si le paramètre change
   useEffect(() => {
     if (eventParam && eventMap[eventParam]) {
       setBookData(prev => ({
@@ -47,64 +42,131 @@ const CreateBookWizard = () => {
     }
   }, [eventParam]);
 
-  // Templates de chapitres par type d'événement
-  const chapterTemplates = {
-    generique: [
-      { title: 'Introduction', description: 'Présentation et premiers souvenirs' },
-      { title: 'Souvenirs marquants', description: 'Les moments inoubliables' },
-      { title: 'Anecdotes', description: 'Les petites histoires qui font sourire' },
-      { title: 'Photos', description: 'Les images qui parlent' },
-      { title: 'Messages', description: 'Les mots du cœur' },
-      { title: 'Conclusion', description: 'Pour finir en beauté' }
-    ],
-    anniversaire: [
-      { title: 'Souvenirs d\'enfance', description: 'Les premières années' },
-      { title: 'Moments complices', description: 'Les fêtes partagées' },
-      { title: 'Ce que j\'aime chez toi', description: 'Les qualités qui comptent' },
-      { title: 'Nos meilleurs souvenirs', description: 'Les moments gravés' },
-      { title: 'Messages d\'anniversaire', description: 'Les mots doux' },
-      { title: 'Vœux pour l\'avenir', description: 'Ce qu\'on te souhaite' }
-    ],
-    mariage: [
-      { title: 'Leur rencontre', description: 'Comment ils se sont connus' },
-      { title: 'La demande', description: 'Le moment magique' },
-      { title: 'Les préparatifs', description: 'L\'avant-grand jour' },
-      { title: 'La cérémonie', description: 'Le jour J' },
-      { title: 'La fête', description: 'Les moments de joie' },
-      { title: 'Messages aux mariés', description: 'Vœux de bonheur' }
-    ],
-    naissance: [
-      { title: 'L\'annonce', description: 'Quand on a su' },
-      { title: 'L\'attente', description: 'Les mois avant' },
-      { title: 'L\'arrivée', description: 'Le grand jour' },
-      { title: 'Premiers moments', description: 'Les premières fois' },
-      { title: 'Messages de bienvenue', description: 'Ce qu\'on vous souhaite' },
-      { title: 'Rêves pour l\'avenir', description: 'Pour bébé' }
-    ],
-    depart: [
-      { title: 'Souvenirs partagés', description: 'Les meilleurs moments' },
-      { title: 'Ce qu\'on retient', description: 'Les qualités' },
-      { title: 'Anecdotes', description: 'Les histoires drôles' },
-      { title: 'Messages d\'au revoir', description: 'Les mots du cœur' },
-      { title: 'Nouveau départ', description: 'Vœux pour la suite' },
-      { title: 'On n\'oublie pas', description: 'Pour garder le lien' }
-    ],
-    projet: [
-      { title: 'Le début du projet', description: 'Comment tout a commencé' },
-      { title: 'Les étapes clés', description: 'Les moments importants' },
-      { title: 'Les défis relevés', description: 'Ce qu\'on a surmonté' },
-      { title: 'Les réussites', description: 'Ce dont on est fier' },
-      { title: 'L\'équipe', description: 'Ceux qui ont participé' },
-      { title: 'La suite', description: 'Les prochains défis' }
-    ]
+  // Fonction pour générer les chapitres avec l'IA
+  const generateChaptersWithIA = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const chaptersCount = Math.floor(bookData.pages / 8);
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-chapters`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          eventType: bookData.event_type,
+          style: bookData.style_narratif,
+          count: chaptersCount,
+          bookTitle: bookData.title
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur génération IA');
+      }
+
+      return data.chapters;
+    } catch (error) {
+      console.error('❌ Erreur IA, utilisation du fallback:', error);
+      // Fallback : génération basique
+      return generateFallbackChapters();
+    }
   };
 
-  const handleNext = () => {
-    setCurrentStep(prev => Math.min(prev + 1, 3));
+  // Fallback si l'IA ne répond pas
+  const generateFallbackChapters = () => {
+    const baseTitles = {
+      generique: [
+        'Introduction',
+        'Souvenirs marquants',
+        'Anecdotes', 
+        'Photos',
+        'Messages',
+        'Conclusion'
+      ],
+      anniversaire: [
+        'Souvenirs d\'enfance',
+        'Moments complices',
+        'Ce que j\'aime chez toi',
+        'Nos meilleurs souvenirs',
+        'Messages d\'anniversaire',
+        'Vœux pour l\'avenir'
+      ],
+      mariage: [
+        'Leur rencontre',
+        'La demande',
+        'Les préparatifs',
+        'La cérémonie',
+        'La fête',
+        'Messages aux mariés'
+      ],
+      naissance: [
+        'L\'annonce',
+        'L\'attente',
+        'L\'arrivée',
+        'Premiers moments',
+        'Messages de bienvenue',
+        'Rêves pour l\'avenir'
+      ],
+      depart: [
+        'Souvenirs partagés',
+        'Ce qu\'on retient',
+        'Anecdotes',
+        'Messages d\'au revoir',
+        'Nouveau départ',
+        'On n\'oublie pas'
+      ],
+      projet: [
+        'Le début du projet',
+        'Les étapes clés',
+        'Les défis relevés',
+        'Les réussites',
+        'L\'équipe',
+        'La suite'
+      ]
+    };
+
+    const titles = baseTitles[bookData.event_type] || baseTitles.generique;
+    const chaptersCount = Math.floor(bookData.pages / 8);
+    const chapters = [];
+
+    for (let i = 0; i < chaptersCount; i++) {
+      const baseIndex = i % titles.length;
+      let title = titles[baseIndex];
+      
+      if (i >= titles.length) {
+        const suffix = Math.floor(i / titles.length) + 1;
+        title = `${title} ${suffix}`;
+      }
+      
+      chapters.push({
+        title: title,
+        description: `Chapitre ${i + 1} - À personnaliser`,
+        order_index: i
+      });
+    }
+    
+    return chapters;
+  };
+
+  const handleNext = async () => {
+    setLoading(true);
+    // Générer les chapitres avec l'IA avant d'afficher l'étape 2
+    const chapters = await generateChaptersWithIA();
+    setGeneratedChapters(chapters);
+    setLoading(false);
+    setCurrentStep(2);
+    window.scrollTo(0, 0);
   };
 
   const handlePrevious = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    setCurrentStep(1);
+    window.scrollTo(0, 0);
   };
 
   const handleCreateBook = async () => {
@@ -118,7 +180,7 @@ const CreateBookWizard = () => {
         return;
       }
 
-      // 1. Créer le livre
+      // 1. Créer le livre SANS les colonnes qui posent problème
       const { data: book, error: bookError } = await supabase
         .from('books')
         .insert([{
@@ -129,8 +191,41 @@ const CreateBookWizard = () => {
           papier: bookData.papier,
           style_narratif: bookData.style_narratif,
           pages: bookData.pages,
-          chapters: bookData.chapters,
-          statut: 'en_cours',
+          statut: 'en_cours'
+        }])
+        .select()
+        .single();
+
+      if (bookError) {
+        console.error('❌ Erreur création livre:', bookError);
+        throw bookError;
+      }
+
+      // 2. Créer les chapitres générés par l'IA
+      const { error: chaptersError } = await supabase
+        .from('chapters')
+        .insert(generatedChapters.map((ch, index) => ({
+          book_id: book.id,
+          title: ch.title,
+          description: ch.description || `Chapitre ${index + 1}`,
+          order_index: index,
+          questions_ia: [
+            `Quel est votre plus beau souvenir lié à "${ch.title}" ?`,
+            `Que retenez-vous de ce moment ?`,
+            `Quelle émotion cela évoque-t-il ?`,
+            `Un détail qui vous a marqué ?`
+          ]
+        })));
+
+      if (chaptersError) {
+        console.error('❌ Erreur création chapitres:', chaptersError);
+        throw chaptersError;
+      }
+
+      // 3. Mettre à jour avec les configs (optionnel, après création)
+      await supabase
+        .from('books')
+        .update({
           cover_config: {
             title: bookData.title,
             template: 'classic',
@@ -142,52 +237,29 @@ const CreateBookWizard = () => {
             show_contributors: true,
             color: '#f5f5f5'
           }
-        }])
-        .select()
-        .single();
+        })
+        .eq('id', book.id);
 
-      if (bookError) throw bookError;
-
-      // 2. Créer les chapitres à partir du template
-      const templates = chapterTemplates[bookData.event_type] || chapterTemplates.generique;
-      const chaptersToCreate = templates.map((ch, index) => ({
-        book_id: book.id,
-        title: ch.title,
-        description: ch.description,
-        order_index: index,
-        questions_ia: [
-          `Quel est votre plus beau souvenir lié à "${ch.title}" ?`,
-          `Que retenez-vous de ce moment ?`,
-          `Quelle émotion cela évoque-t-il ?`,
-          `Un détail qui vous a marqué ?`
-        ]
-      }));
-
-      const { error: chaptersError } = await supabase
-        .from('chapters')
-        .insert(chaptersToCreate);
-
-      if (chaptersError) throw chaptersError;
-
-      // 3. Rediriger vers le livre
       navigate(`/book/${book.id}`);
 
     } catch (error) {
       console.error('❌ Erreur création:', error);
-      alert('Erreur lors de la création du livre');
+      alert(`Erreur lors de la création du livre: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Prix selon finition
   const getPrice = () => {
     const prices = {
       livret: 69,
       classique: 89,
       luxe: 129
     };
-    return prices[bookData.finition] || 89;
+    const basePrice = prices[bookData.finition] || 89;
+    const extraPages = Math.max(0, bookData.pages - 64);
+    const extraCost = extraPages * 0.25;
+    return basePrice + extraCost;
   };
 
   return (
@@ -212,13 +284,12 @@ const CreateBookWizard = () => {
         }}>
           <h1 style={{ margin: '0 0 1rem', fontSize: '2rem' }}>✨ Créez votre livre unique</h1>
           
-          {/* Barre de progression */}
           <div style={{
             display: 'flex',
             gap: '0.5rem',
             marginTop: '1rem'
           }}>
-            {[1, 2, 3].map(step => (
+            {[1, 2].map(step => (
               <div key={step} style={{ flex: 1 }}>
                 <div style={{
                   height: '4px',
@@ -231,7 +302,7 @@ const CreateBookWizard = () => {
                   fontSize: '0.9rem',
                   opacity: currentStep >= step ? 1 : 0.7
                 }}>
-                  Étape {step}
+                  Étape {step}/2
                 </div>
               </div>
             ))}
@@ -241,31 +312,22 @@ const CreateBookWizard = () => {
         {/* Contenu */}
         <div style={{ padding: '2rem' }}>
           {currentStep === 1 && (
-            <Step1Type
+            <Step1Config
               bookData={bookData}
               setBookData={setBookData}
-              chapterTemplates={chapterTemplates}
               onNext={handleNext}
+              loading={loading}
             />
           )}
 
           {currentStep === 2 && (
-            <Step2Finition
-              bookData={bookData}
-              setBookData={setBookData}
-              price={getPrice()}
-              onNext={handleNext}
-              onPrevious={handlePrevious}
-            />
-          )}
-
-          {currentStep === 3 && (
-            <Step3Recap
+            <Step2Recap
               bookData={bookData}
               price={getPrice()}
               loading={loading}
               onCreate={handleCreateBook}
               onPrevious={handlePrevious}
+              chapters={generatedChapters}
             />
           )}
         </div>

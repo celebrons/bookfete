@@ -1,5 +1,6 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\ChapterSidebar.js
 import React from 'react';
+import Tooltip from '../../ui/Tooltip';
 
 const ChapterSidebar = ({
   chapters,
@@ -21,9 +22,8 @@ const ChapterSidebar = ({
   setShowGuide
 }) => {
   
-  // Fonction pour gérer le clic sur le bouton d'invitation
   const handleInviteClick = (chapter, e) => {
-    e.stopPropagation(); // Empêche la sélection du chapitre
+    e.stopPropagation();
     console.log('📌 Chapitre cliqué pour invitation:', chapter);
     
     if (!chapter || !chapter.id) {
@@ -31,7 +31,6 @@ const ChapterSidebar = ({
       return;
     }
     
-    // Appeler la fonction du parent avec le chapitre complet
     onCopyInviteLink(chapter, e);
   };
 
@@ -87,32 +86,8 @@ const ChapterSidebar = ({
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
           
-          {/* COUVERTURE */}
-          <div
-            onClick={() => onSelectItem('cover', 'cover')}
-            style={{
-              padding: '1rem',
-              background: selectedType === 'cover' ? '#fff3e0' : '#f8f9fa',
-              border: selectedType === 'cover' ? '2px solid #b8924a' : '1px solid #e9ecef',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              borderLeft: '4px solid #b8924a',
-              position: 'relative'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>📕</span>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: '#b8924a' }}>
-                  COUVERTURE
-                </h4>
-                <small style={{ color: '#666' }}>
-                  {coverConfig?.title || book?.title || 'Titre personnalisable'}
-                </small>
-              </div>
-            </div>
-          </div>
+          {/* COUVERTURE SUPPRIMÉE - Conformément à la demande */}
+          {/* 4ÈME COUVERTURE SUPPRIMÉE - Conformément à la demande */}
 
           {/* CHAPITRES */}
           {chapters.map((chapter, index) => (
@@ -155,70 +130,78 @@ const ChapterSidebar = ({
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.3rem' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditChapter(chapter);
-                    }}
-                    style={{
-                      padding: '0.2rem 0.5rem',
-                      background: 'none',
-                      border: '1px solid #ddd',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem'
-                    }}
-                    title="Modifier le titre"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditQuestions(chapter);
-                    }}
-                    style={{
-                      padding: '0.2rem 0.5rem',
-                      background: 'none',
-                      border: '1px solid #ddd',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem'
-                    }}
-                    title="Modifier les questions"
-                  >
-                    ❓
-                  </button>
-                  <button
-                    onClick={(e) => handleInviteClick(chapter, e)}
-                    style={{
-                      padding: '0.2rem 0.5rem',
-                      background: inviteSuccess === chapter.id ? '#28a745' : '#764ba2',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem'
-                    }}
-                    title="Inviter des contributeurs"
-                  >
-                    👥
-                  </button>
-                  <button
-                    onClick={(e) => onDeleteClick(chapter, e)}
-                    style={{
-                      padding: '0.2rem 0.5rem',
-                      background: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem'
-                    }}
-                    title="Supprimer le chapitre"
-                  >
-                    🗑️
-                  </button>
+                  <Tooltip text="Modifier le titre du chapitre">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditChapter(chapter);
+                      }}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        background: 'none',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                      title=""
+                    >
+                      ✏️
+                    </button>
+                  </Tooltip>
+                  <Tooltip text="Modifier les questions générées par l'IA">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditQuestions(chapter);
+                      }}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        background: 'none',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                      title=""
+                    >
+                      ❓
+                    </button>
+                  </Tooltip>
+                  <Tooltip text="Inviter des contributeurs à ce chapitre">
+                    <button
+                      onClick={(e) => handleInviteClick(chapter, e)}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        background: inviteSuccess === chapter.id ? '#28a745' : '#764ba2',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                      title=""
+                    >
+                      👥
+                    </button>
+                  </Tooltip>
+                  <Tooltip text="Supprimer ce chapitre">
+                    <button
+                      onClick={(e) => onDeleteClick(chapter, e)}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        background: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                      title=""
+                    >
+                      🗑️
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
               {inviteSuccess === chapter.id && (
@@ -237,38 +220,10 @@ const ChapterSidebar = ({
               )}
             </div>
           ))}
-
-          {/* 4ÈME COUVERTURE */}
-          <div
-            onClick={() => onSelectItem('backcover', 'backcover')}
-            style={{
-              padding: '1rem',
-              background: selectedType === 'backcover' ? '#e8f4fd' : '#f8f9fa',
-              border: selectedType === 'backcover' ? '2px solid #17a2b8' : '1px solid #e9ecef',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              borderLeft: '4px solid #17a2b8',
-              position: 'relative',
-              marginTop: '0.5rem'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>📘</span>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: '#17a2b8' }}>
-                  4ÈME COUVERTURE
-                </h4>
-                <small style={{ color: '#666' }}>
-                  {contributors.length} contributeur{contributors.length > 1 ? 's' : ''}
-                </small>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Guide rapide */}
+      {/* Guide rapide avec tooltips */}
       {showGuide && (
         <div style={{
           marginTop: '1rem',
@@ -282,13 +237,26 @@ const ChapterSidebar = ({
             borderRadius: '8px',
             border: '1px solid #764ba2'
           }}>
-            <h4 style={{ margin: '0 0 0.5rem', color: '#764ba2' }}>✨ Guide rapide</h4>
+            <h4 style={{ margin: '0 0 0.5rem', color: '#764ba2' }}>✨ Comment ça marche ?</h4>
             <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#666', fontSize: '0.9rem' }}>
-              <li>📕 Cliquez sur COUVERTURE pour personnaliser</li>
-              <li>📑 Cliquez sur un chapitre pour le gérer</li>
-              <li>👥 Cliquez sur 👥 pour inviter des contributeurs</li>
-              <li>📘 Cliquez sur 4ÈME COUVERTURE pour la fin</li>
-              <li>✏️ Modifier les titres et questions</li>
+              <li style={{ marginBottom: '0.5rem' }}>
+                <strong>1. Ajoutez des contributeurs</strong> dans l'onglet "Contributeurs"
+                <Tooltip text="Remplissez votre liste de personnes à inviter">
+                  <span style={{ marginLeft: '0.3rem', cursor: 'help', fontSize: '0.9rem' }}>ⓘ</span>
+                </Tooltip>
+              </li>
+              <li style={{ marginBottom: '0.5rem' }}>
+                <strong>2. Invitez-les</strong> chapitre par chapitre
+                <Tooltip text="Cliquez sur 👥 pour sélectionner qui contribue à ce chapitre">
+                  <span style={{ marginLeft: '0.3rem', cursor: 'help', fontSize: '0.9rem' }}>ⓘ</span>
+                </Tooltip>
+              </li>
+              <li style={{ marginBottom: '0.5rem' }}>
+                <strong>3. Collectez</strong> les témoignages
+              </li>
+              <li style={{ marginBottom: '0.5rem' }}>
+                <strong>4. Lancez la rédaction IA</strong> quand tout est prêt
+              </li>
             </ul>
             <button
               onClick={() => setShowGuide(false)}

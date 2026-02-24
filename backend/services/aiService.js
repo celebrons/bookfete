@@ -91,6 +91,68 @@ Ne mets rien d'autre que le tableau JSON dans ta réponse.`;
 }
 
 /**
+ * Génère une citation inspirante pour un chapitre
+ * @param {string} chapterTitle - Titre du chapitre
+ * @param {string} eventType - Type d'événement
+ * @param {string} style - Style narratif
+ * @returns {Promise<string>} - Citation générée
+ */
+async function generateQuote(chapterTitle, eventType, style) {
+  try {
+    console.log('🤖 Génération de citation pour:', { chapterTitle, eventType, style });
+
+    const styleInstructions = {
+      poetique: "Utilise un langage imagé, émouvant et lyrique.",
+      factuel: "Sois direct, concret et pratique.",
+      intime: "Adopte un ton chaleureux, personnel et confidentiel."
+    };
+
+    const styleInstruction = styleInstructions[style] || styleInstructions.factuel;
+
+    const prompt = `Tu es un assistant qui aide à créer des citations pour un livre souvenir collaboratif.
+    
+Contexte :
+- Type d'événement : ${eventType}
+- Titre du chapitre : "${chapterTitle}"
+- Style narratif : ${style}
+
+${styleInstruction}
+
+Génère UNE SEULE citation inspirante et personnalisée pour ce chapitre.
+La citation doit être courte, mémorable et adaptée au contexte.
+Elle peut être une formule de vœux, un proverbe revisité, ou une phrase originale.
+
+Réponds UNIQUEMENT avec la citation, sans guillemets, sans texte additionnel.
+La citation doit faire entre 10 et 30 mots maximum.`;
+
+    const response = await mistral.chat.complete({
+      model: 'mistral-small-latest',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'Tu es un spécialiste des citations et des belles formules.' 
+        },
+        { 
+          role: 'user', 
+          content: prompt 
+        }
+      ],
+      temperature: 0.8,
+      maxTokens: 100
+    });
+
+    const quote = response.choices[0].message.content.trim();
+    console.log('📝 Citation générée:', quote);
+    
+    return quote;
+    
+  } catch (error) {
+    console.error('❌ Erreur génération citation:', error);
+    return getDefaultQuote(chapterTitle, eventType, style);
+  }
+}
+
+/**
  * Questions par défaut en cas d'échec de l'IA
  */
 function getDefaultQuestions(chapterTitle, eventType, style) {
@@ -123,6 +185,23 @@ function getDefaultQuestions(chapterTitle, eventType, style) {
   return baseQuestions;
 }
 
+/**
+ * Citation par défaut en cas d'échec de l'IA
+ */
+function getDefaultQuote(chapterTitle, eventType, style) {
+  const quotes = [
+    `Les plus beaux moments deviennent des souvenirs éternels.`,
+    `Chaque histoire mérite d'être racontée.`,
+    `La vie est une collection de moments précieux.`,
+    `Ce qui est partagé reste à jamais dans nos cœurs.`,
+    `Les souvenirs sont la richesse de l'âme.`
+  ];
+  return quotes[Math.floor(Math.random() * quotes.length)];
+}
+
+// Exporter les fonctions et l'instance mistral
 module.exports = {
-  generateQuestions
+  generateQuestions,
+  generateQuote,
+  mistral  // ← Important pour l'utiliser dans les routes
 };

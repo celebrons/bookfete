@@ -20,6 +20,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   const [newQuestion, setNewQuestion] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [user, setUser] = useState(null); // ← AJOUTÉ pour l'email
   
   // États pour la contribution
   const [contributionText, setContributionText] = useState('');
@@ -59,6 +60,13 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   );
   const [contributors, setContributors] = useState([]);
+
+  // Récupérer l'utilisateur connecté
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+  }, []);
 
   // Charger les contributeurs
   useEffect(() => {
@@ -271,8 +279,6 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   const handleOpenInviteSelector = (chapter, e) => {
     e.stopPropagation();
     console.log('📌 handleOpenInviteSelector appelé avec:', chapter);
-    console.log('📌 chapterId:', chapter?.id);
-    console.log('📌 chapter object complet:', chapter);
     
     if (!chapter || !chapter.id) {
       console.error('❌ Erreur: chapter ou chapter.id manquant');
@@ -583,6 +589,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
             onLoadContributions={loadContributions}
             onCopyInviteLink={handleOpenInviteSelector}
             inviteSuccess={inviteSuccess}
+            userEmail={user?.email} // ← AJOUTÉ pour gérer hasContributed
           />
         )}
 
@@ -600,7 +607,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
             <span style={{ fontSize: '4rem', marginBottom: '1rem' }}>📖</span>
             <h3>Sélectionnez un élément</h3>
             <p style={{ textAlign: 'center', maxWidth: '400px' }}>
-              Cliquez sur la couverture, un chapitre ou la 4ème couverture pour commencer
+              Cliquez sur un chapitre pour commencer
             </p>
           </div>
         )}
@@ -612,12 +619,10 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
           chapterId={selectedChapterForInvite.id}
           bookId={bookId}
           onClose={() => {
-            console.log('🔚 Fermeture du sélecteur');
             setShowInviteSelector(false);
             setSelectedChapterForInvite(null);
           }}
           onInvitesSent={() => {
-            console.log('✅ Invitations envoyées');
             // Optionnel: rafraîchir quelque chose
           }}
         />

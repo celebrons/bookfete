@@ -394,6 +394,27 @@ const InviteSelector = ({ chapterId, bookId, onClose, onInvitesSent }) => {
           <div><strong>Déjà invités:</strong> {invitedContributors.length}</div>
         </div>
 
+        {/* MESSAGE DE GUIDAGE - AJOUTÉ ICI */}
+        {availableContributors.length > 0 && (
+          <div style={{
+            background: '#e8f4fd',
+            padding: '1rem',
+            borderRadius: '8px',
+            marginBottom: '1.5rem',
+            border: '1px solid #17a2b8',
+            color: '#0c5460'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.2rem' }}>💡</span>
+              <strong>Sélectionnez les personnes à inviter pour ce chapitre :</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.95rem' }}>
+              Cochez les cases des contributeurs que vous souhaitez inviter. 
+              Ils recevront un email avec un lien unique pour contribuer à ce chapitre spécifique.
+            </p>
+          </div>
+        )}
+
         {/* Si aucun contributeur disponible */}
         {availableContributors.length === 0 && (
           <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>

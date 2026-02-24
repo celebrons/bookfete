@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comment ça marche - Mémoire Collective</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+        
+        /* Hero section */
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6rem 2rem;
+            text-align: center;
+            border-radius: 0 0 40px 40px;
+            margin-bottom: 4rem;
+        }
+        
+        .hero h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .hero p {
+            font-size: 1.3rem;
+            max-width: 700px;
+            margin: 0 auto 2rem;
+            opacity: 0.95;
+        }
+        
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 4rem;
+            margin-top: 3rem;
+        }
+        
+        .hero-stat {
+            text-align: center;
+        }
+        
+        .hero-stat .number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            display: block;
+        }
+        
+        .hero-stat .label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Section titre */
+        .section-title {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+        
+        .section-title h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.8rem;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .section-title p {
+            color: #666;
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* Timeline */
+        .timeline {
+            position: relative;
+            max-width: 1000px;
+            margin: 0 auto 5rem;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 100%;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            opacity: 0.3;
+        }
+        
+        .timeline-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4rem;
+            position: relative;
+        }
+        
+        .timeline-item:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+        
+        .timeline-content {
+            width: 45%;
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+            position: relative;
+        }
+        
+        .timeline-content::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-right: 2px solid #764ba2;
+            border-top: 2px solid #764ba2;
+        }
+        
+        .timeline-item:nth-child(odd) .timeline-content::before {
+            right: -10px;
+            transform: translateY(-50%) rotate(45deg);
+        }
+        
+        .timeline-item:nth-child(even) .timeline-content::before {
+            left: -10px;
+            transform: translateY(-50%) rotate(-135deg);
+        }
+        
+        .timeline-badge {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.8rem;
+            font-weight: bold;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2;
+            box-shadow: 0 10px 20px rgba(118, 75, 162, 0.3);
+        }
+        
+        .timeline-content h3 {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .timeline-content p {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        
+        .timeline-content .time {
+            display: inline-block;
+            padding: 0.3rem 1rem;
+            background: #f3e8ff;
+            color: #764ba2;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        /* Grille des fonctionnalités */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 2.5rem 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(118, 75, 162, 0.1);
+        }
+        
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2rem;
+            color: white;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        /* Témoignages */
+        .testimonials {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 4rem 0;
+            margin: 4rem 0;
+            border-radius: 40px;
+        }
+        
+        .testimonial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .testimonial-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+        
+        .testimonial-card p {
+            font-style: italic;
+            color: #555;
+            margin-bottom: 1.5rem;
+            line-height: 1.8;
+        }
+        
+        .testimonial-author {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .testimonial-author img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .testimonial-author h4 {
+            color: #333;
+            margin-bottom: 0.2rem;
+        }
+        
+        .testimonial-author p {
+            color: #999;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+        
+        /* CTA */
+        .cta {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5rem 2rem;
+            border-radius: 40px;
+            text-align: center;
+            margin: 4rem 0;
+        }
+        
+        .cta h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.8rem;
+            margin-bottom: 1rem;
+        }
+        
+        .cta p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+        }
+        
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 1.2rem 3rem;
+            background: white;
+            color: #764ba2;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+        }
+        
+        /* Questions fréquentes */
+        .faq-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .faq-item {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 20px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .faq-item h4 {
+            font-size: 1.2rem;
+            color: #333;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .faq-item p {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .hero-stats {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+            
+            .timeline::before {
+                left: 30px;
+            }
+            
+            .timeline-item,
+            .timeline-item:nth-child(even) {
+                flex-direction: column;
+                align-items: flex-start;
+                margin-left: 60px;
+            }
+            
+            .timeline-content {
+                width: 100%;
+            }
+            
+            .timeline-content::before {
+                display: none;
+            }
+            
+            .timeline-badge {
+                left: 0;
+                transform: none;
+            }
+            
+            .faq-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero section -->
+    <section class="hero">
+        <div class="container">
+            <h1>✨ Comment ça marche ?</h1>
+            <p>Créez un livre unique en 4 étapes simples, sans aucune compétence technique. L'IA s'occupe de tout !</p>
+            
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <span class="number">1500+</span>
+                    <span class="label">Livres créés</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="number">45 min</span>
+                    <span class="label">Temps actif</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="number">24h</span>
+                    <span class="label">Premières contributions</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Timeline des étapes -->
+    <section class="container">
+        <div class="section-title">
+            <h2>📋 En 4 étapes, votre livre prend vie</h2>
+            <p>De l'idée à la réalisation, suivez le guide</p>
+        </div>
+
+        <div class="timeline">
+            <!-- Étape 1 -->
+            <div class="timeline-item">
+                <div class="timeline-badge">1</div>
+                <div class="timeline-content">
+                    <h3>🎯 1. Créez votre projet</h3>
+                    <p>Choisissez votre événement (anniversaire, mariage, départ...), personnalisez la couverture et sélectionnez vos options (finition, papier, style).</p>
+                    <p><small>⏱️ 5 minutes</small></p>
+                    <span class="time">L'IA génère automatiquement les chapitres et questions</span>
+                </div>
+            </div>
+
+            <!-- Étape 2 -->
+            <div class="timeline-item">
+                <div class="timeline-badge">2</div>
+                <div class="timeline-content">
+                    <h3>👥 2. Invitez vos proches</h3>
+                    <p>Ajoutez les emails de vos contributeurs en quelques clics. Chaque personne reçoit une invitation personnalisée avec un lien unique.</p>
+                    <p><small>⏱️ 3 minutes</small></p>
+                    <span class="time">Gérez les invitations par chapitre</span>
+                </div>
+            </div>
+
+            <!-- Étape 3 -->
+            <div class="timeline-item">
+                <div class="timeline-badge">3</div>
+                <div class="timeline-content">
+                    <h3>💝 3. Collectez les témoignages</h3>
+                    <p>Les contributeurs arrivent sur une page élégante avec des questions guides générées par l'IA. Ils peuvent écrire leur message et ajouter jusqu'à 2 photos.</p>
+                    <p><small>⏱️ 2 semaines (selon vos proches)</small></p>
+                    <span class="time">Sauvegarde automatique des brouillons</span>
+                </div>
+            </div>
+
+            <!-- Étape 4 -->
+            <div class="timeline-item">
+                <div class="timeline-badge">4</div>
+                <div class="timeline-content">
+                    <h3>📖 4. Générez et commandez</h3>
+                    <p>L'IA assemble toutes les contributions dans une mise en page luxueuse. Validez, commandez et recevez votre livre chez vous en 2 semaines.</p>
+                    <p><small>⏱️ 5 minutes</small></p>
+                    <span class="time">Qualité d'impression professionnelle</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Ce qui rend le livre unique -->
+    <section class="container">
+        <div class="section-title">
+            <h2>🌟 Ce qui rend votre livre unique</h2>
+            <p>L'IA guide chaque étape pour un résultat professionnel</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Questions personnalisées</h3>
+                <p>L'IA génère 4 questions uniques par chapitre, adaptées à votre événement et au style choisi (intime, poétique ou factuel).</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📸</div>
+                <h3>Photos de qualité</h3>
+                <p>Jusqu'à 2 photos par contribution, optimisées pour l'impression. Chaque image est placée harmonieusement dans le livre.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">✨</div>
+                <h3>Mise en page luxueuse</h3>
+                <p>Typographie élégante, marges généreuses, papiers premium. Votre livre a l'allure d'un véritable ouvrage d'éditeur.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>IA invisible</h3>
+                <p>L'IA travaille en coulisses pour harmoniser les styles, corriger l'orthographe et suggérer des améliorations sans jamais s'imposer.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">⏱️</div>
+                <h3>Sauvegarde automatique</h3>
+                <p>Les contributeurs peuvent sauvegarder leur brouillon et revenir plus tard. Plus jamais de messages perdus !</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Suivi en temps réel</h3>
+                <p>Dans votre tableau de bord, voyez qui a répondu, relancez en un clic, et modérez les contributions facilement.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Témoignages -->
+    <section class="testimonials">
+        <div class="container">
+            <div class="section-title">
+                <h2>💬 Ils l'ont fait, ils racontent</h2>
+                <p>Des milliers de personnes ont déjà créé leur livre</p>
+            </div>
+
+            <div class="testimonial-grid">
+                <div class="testimonial-card">
+                    <p>"J'ai créé un livre pour les 60 ans de mon mari en seulement 20 minutes. Nos amis ont adoré contribuer, et le résultat est magnifique !"</p>
+                    <div class="testimonial-author">
+                        <img src="https://images.unsplash.com/photo-1494790108777-296ef5a2ec48?w=100&h=100&fit=crop" alt="Sophie">
+                        <div>
+                            <h4>Sophie</h4>
+                            <p>Les 60 ans de Gégé</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <p>"Pour le départ de notre collègue, on a rassemblé 25 témoignages. L'IA a fait un travail incroyable pour tout organiser. Le livre est splendide !"</p>
+                    <div class="testimonial-author">
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop" alt="Thomas">
+                        <div>
+                            <h4>Thomas</h4>
+                            <p>Pot de départ</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <p>"Notre livre de mariage est unique. Tous nos invités ont participé, et les photos sont magnifiques. Merci pour cette pépite !"</p>
+                    <div class="testimonial-author">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop" alt="Marie">
+                        <div>
+                            <h4>Marie & Pierre</h4>
+                            <p>Mariage</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Questions fréquentes -->
+    <section class="container">
+        <div class="section-title">
+            <h2>❓ Questions fréquentes</h2>
+            <p>Tout ce que vous devez savoir</p>
+        </div>
+
+        <div class="faq-grid">
+            <div class="faq-item">
+                <h4>📦 Combien de temps pour recevoir le livre ?</h4>
+                <p>Comptez 2 semaines entre votre commande et la réception. L'impression est réalisée en France avec des partenaires de confiance.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4>📸 Peut-on ajouter des photos ?</h4>
+                <p>Oui, chaque contributeur peut ajouter jusqu'à 2 photos. Elles sont optimisées automatiquement pour une qualité d'impression parfaite.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4>🤖 L'IA écrit-elle à ma place ?</h4>
+                <p>Non, l'IA guide et suggère, mais ce sont vos proches qui écrivent. Elle s'assure juste que l'ensemble soit harmonieux.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4>💳 Comment fonctionne le paiement ?</h4>
+                <p>Vous payez en ligne par carte bancaire (paiement sécurisé Stripe). Le livre n'est imprimé qu'après validation de votre commande.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4>📝 Peut-on modifier après validation ?</h4>
+                <p>Oui, chaque contribution peut être sauvegardée en brouillon. La validation est définitive uniquement quand vous le décidez.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4>🎁 Y a-t-il une version coffret ?</h4>
+                <p>Bientôt ! Nous travaillons sur des éditions encore plus luxueuses avec coffret et jaquette personnalisée.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Appel à l'action -->
+    <section class="container">
+        <div class="cta">
+            <h2>Prêt à créer des souvenirs inoubliables ?</h2>
+            <p>Rejoignez les 1500+ personnes qui ont déjà créé leur livre</p>
+            <a href="/create-book" class="cta-button">
+                ✨ Créer mon livre gratuitement
+                <span>→</span>
+            </a>
+            <p style="margin-top: 2rem; font-size: 0.9rem;">Sans engagement, vous ne payez qu'à la commande</p>
+        </div>
+    </section>
+</body>
+</html>

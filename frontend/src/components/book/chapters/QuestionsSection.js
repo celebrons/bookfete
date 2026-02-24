@@ -1,7 +1,23 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\QuestionsSection.js
-import React from 'react';
+import React, { useEffect } from 'react';
+import Tooltip from '../../ui/Tooltip';  // ← IMPORT AJOUTÉ
 
-const QuestionsSection = ({ questions, onGenerate, generating }) => {
+const QuestionsSection = ({ 
+  questions, 
+  onGenerate, 
+  generating, 
+  chapterTitle, 
+  eventType, 
+  style 
+}) => {
+  
+  // Régénérer automatiquement quand le titre change
+  useEffect(() => {
+    if (chapterTitle) {
+      onGenerate();
+    }
+  }, [chapterTitle]);
+
   return (
     <div style={{
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -10,9 +26,14 @@ const QuestionsSection = ({ questions, onGenerate, generating }) => {
       marginBottom: '2rem',
       color: 'white'
     }}>
-      <h3 style={{ margin: '0 0 1rem', color: 'white', fontSize: '1.1rem' }}>
-        ✨ QUESTIONS SUGGÉRÉES PAR L'IA
-      </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0, color: 'white', fontSize: '1.1rem' }}>
+          ✨ QUESTIONS SUGGÉRÉES PAR L'IA
+        </h3>
+        <Tooltip text="Les questions s'adaptent automatiquement au titre et au style">
+          <span style={{ color: 'white', cursor: 'help', fontSize: '1.2rem' }}>ⓘ</span>
+        </Tooltip>
+      </div>
       
       <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
         {questions && questions.length > 0 ? (
@@ -40,7 +61,7 @@ const QuestionsSection = ({ questions, onGenerate, generating }) => {
             opacity: generating ? 0.7 : 1
           }}
         >
-          {generating ? '✨ Génération...' : '🎲 Générer de nouvelles questions'}
+          {generating ? '✨ Génération...' : '🎲 Régénérer les questions'}
         </button>
       </div>
     </div>

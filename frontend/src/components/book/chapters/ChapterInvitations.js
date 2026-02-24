@@ -1,6 +1,7 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\ChapterInvitations.js
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import Tooltip from '../../ui/Tooltip';
 
 const ChapterInvitations = ({ chapterId }) => {
   const [invitations, setInvitations] = useState([]);
@@ -8,8 +9,10 @@ const ChapterInvitations = ({ chapterId }) => {
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
-    responded: 0
+    responded: 0,
+    approved: 0
   });
+  const [resending, setResending] = useState(null);
 
   useEffect(() => {
     if (chapterId) {
@@ -21,55 +24,47 @@ const ChapterInvitations = ({ chapterId }) => {
     try {
       setLoading(true);
       
+      // Récupérer les invitations avec les infos des contributeurs
       const { data, error } = await supabase
         .from('chapter_invites')
-        .select('*')
+        .select(`
+          *,
+          contributor:book_contributors(name, email)
+        `)
         .eq('chapter_id', chapterId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Filtrer les emails de test si nécessaire
-      const filteredData = (data || []).filter(invite => 
-        !invite.email.includes('invite@example.com')
-      );
-
-      const invitationsWithNames = await Promise.all(
-        filteredData.map(async (invite) => {
-          let contributorName = null;
-          
-          if (invite.contributor_id) {
-            const { data: contributor } = await supabase
-              .from('book_contributors')
-              .select('name, email')
-              .eq('id', invite.contributor_id)
-              .single();
-            
-            contributorName = contributor?.name || contributor?.email?.split('@')[0] || null;
-          }
-
+      // Récupérer les contributions pour chaque invitation
+      const invitationsWithContributions = await Promise.all(
+        (data || []).map(async (invite) => {
           const { data: contribution } = await supabase
             .from('contributions')
-            .select('approved')
+            .select('approved, created_at')
             .eq('chapter_id', chapterId)
             .eq('contributor_email', invite.email)
             .maybeSingle();
-
+          
           return {
             ...invite,
-            contributor_name: contributorName || invite.email?.split('@')[0] || 'Invité',
-            contribution: contribution || null
+            contribution: contribution ? [contribution] : null
           };
         })
       );
 
-      setInvitations(invitationsWithNames || []);
+      setInvitations(invitationsWithContributions || []);
       
-      const total = invitationsWithNames.length;
-      const responded = invitationsWithNames.filter(i => i.contributed).length;
+      const total = invitationsWithContributions.length;
+      const responded = invitationsWithContributions.filter(i => i.contributed).length;
+      const approved = invitationsWithContributions.filter(
+        i => i.contribution && i.contribution[0]?.approved
+      ).length;
+      
       setStats({
         total,
         responded,
+        approved,
         pending: total - responded
       });
 
@@ -86,187 +81,267 @@ const ChapterInvitations = ({ chapterId }) => {
     alert('✅ Lien copié dans le presse-papier');
   };
 
-  const getStatusColor = (contributed) => {
-    return contributed ? '#28a745' : '#ffc107';
+  const handleResend = async (inviteId) => {
+    setResending(inviteId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/resend/${inviteId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Erreur lors du renvoi');
+      
+      alert('✅ Invitation renvoyée avec succès');
+      await loadInvitations();
+      
+    } catch (error) {
+      console.error('❌ Erreur renvoi:', error);
+      alert('Erreur lors du renvoi de l\'invitation');
+    } finally {
+      setResending(null);
+    }
   };
 
-  const getStatusText = (contributed) => {
-    return contributed ? '✓ Répondu' : '⏳ En attente';
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Date inconnue';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusBadge = (invite) => {
+    if (invite.contributed) {
+      const isApproved = invite.contribution && invite.contribution[0]?.approved;
+      return {
+        text: isApproved ? '✓ Approuvée' : '⏳ En attente de validation',
+        color: isApproved ? '#28a745' : '#ffc107',
+        bgColor: isApproved ? '#d4edda' : '#fff3cd'
+      };
+    }
+    return {
+      text: '⏳ En attente',
+      color: '#856404',
+      bgColor: '#fff3cd'
+    };
   };
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <div className="spinner" style={{
-          border: '3px solid #f3f3f3',
-          borderTop: '3px solid #764ba2',
-          borderRadius: '50%',
-          width: '30px',
-          height: '30px',
-          animation: 'spin 1s linear infinite',
-          margin: '0 auto 1rem'
-        }} />
-        <p style={{ color: '#666' }}>Chargement des invitations...</p>
+      <div style={{ marginTop: '2rem' }}>
+        <div style={{ textAlign: 'center', padding: '1rem' }}>
+          <div className="spinner" style={{
+            border: '2px solid #f3f3f3',
+            borderTop: '2px solid #764ba2',
+            borderRadius: '50%',
+            width: '20px',
+            height: '20px',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto'
+          }} />
+        </div>
       </div>
     );
   }
 
   if (invitations.length === 0) {
     return (
-      <div style={{
-        background: '#f8f9fa',
-        padding: '2rem',
-        borderRadius: '10px',
-        textAlign: 'center',
-        color: '#666',
-        border: '1px dashed #ccc'
-      }}>
-        <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '1rem' }}>📭</span>
-        <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', color: '#333' }}>Aucune invitation</h3>
-        <p style={{ margin: 0, fontSize: '0.95rem', color: '#666' }}>
-          Utilisez le bouton <strong>👥</strong> dans la liste de gauche pour inviter des contributeurs
-        </p>
+      <div style={{ marginTop: '2rem' }}>
+        <div style={{
+          background: '#f8f9fa',
+          padding: '1.5rem',
+          borderRadius: '10px',
+          textAlign: 'center',
+          color: '#666',
+          border: '1px dashed #ccc'
+        }}>
+          <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>📭</span>
+          <p style={{ margin: 0, fontSize: '0.95rem' }}>
+            Aucune invitation pour ce chapitre
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      background: 'white',
-      borderRadius: '12px',
-      border: '1px solid #e9ecef',
-      overflow: 'hidden',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-    }}>
-      {/* En-tête avec stats */}
+    <div style={{ marginTop: '2rem' }}>
+      {/* En-tête compact avec stats */}
       <div style={{
-        padding: '1rem 1.5rem',
-        background: '#f8f9fa',
-        borderBottom: '1px solid #e9ecef',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem'
+        marginBottom: '1rem',
+        padding: '0.5rem 0',
+        borderBottom: '1px solid #e9ecef'
       }}>
-        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span>👥</span>
-          Invitations envoyées
-        </h3>
-        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
-          <span style={{ color: '#17a2b8', background: '#e8f4fd', padding: '0.2rem 0.8rem', borderRadius: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontWeight: 600, color: '#333' }}>📨 Invitations envoyées</span>
+          <Tooltip text="Total / Répondues / Approuvées / En attente">
+            <span style={{ color: '#666', cursor: 'help' }}>ⓘ</span>
+          </Tooltip>
+        </div>
+        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
+          <span style={{ color: '#17a2b8' }}>
             <strong>{stats.total}</strong> total
           </span>
-          <span style={{ color: '#ffc107', background: '#fff3cd', padding: '0.2rem 0.8rem', borderRadius: '20px' }}>
-            <strong>{stats.pending}</strong> en attente
+          <span style={{ color: '#28a745' }}>
+            <strong>{stats.responded}</strong> répondues
           </span>
-          <span style={{ color: '#28a745', background: '#d4edda', padding: '0.2rem 0.8rem', borderRadius: '20px' }}>
-            <strong>{stats.responded}</strong> répondu
+          <span style={{ color: '#28a745' }}>
+            <strong>{stats.approved}</strong> approuvées
           </span>
+          {stats.pending > 0 && (
+            <span style={{ color: '#ffc107' }}>
+              <strong>{stats.pending}</strong> en attente
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Liste des invitations */}
-      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-        {invitations.map((invite, index) => (
-          <div
-            key={invite.id}
-            style={{
-              padding: '1rem 1.5rem',
-              borderBottom: index < invitations.length - 1 ? '1px solid #e9ecef' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: invite.contributed ? '#f8f9fa' : 'white',
-              transition: 'background 0.2s'
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.75rem', 
-                marginBottom: '0.3rem',
-                flexWrap: 'wrap'
+      {/* Liste détaillée des invitations */}
+      <div style={{
+        background: '#f8f9fa',
+        borderRadius: '10px',
+        border: '1px solid #e9ecef',
+        overflow: 'hidden'
+      }}>
+        {invitations.map((invite, index) => {
+          const status = getStatusBadge(invite);
+          
+          return (
+            <div
+              key={invite.id}
+              style={{
+                padding: '1rem',
+                borderBottom: index < invitations.length - 1 ? '1px solid #e9ecef' : 'none',
+                background: invite.contributed ? '#f8f9fa' : 'white'
+              }}
+            >
+              {/* Ligne 1 : Nom + Statut + Actions */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.5rem',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
               }}>
-                <strong style={{ color: '#333' }}>
-                  {invite.contributor_name}
-                </strong>
-                <span style={{
-                  fontSize: '0.75rem',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '20px',
-                  background: invite.contributed ? '#d4edda' : '#fff3cd',
-                  color: invite.contributed ? '#155724' : '#856404',
-                  fontWeight: '500',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem'
-                }}>
-                  {getStatusText(invite.contributed)}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <strong style={{ color: '#333' }}>
+                    {invite.contributor?.name || invite.email?.split('@')[0] || 'Invité'}
+                  </strong>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '20px',
+                    background: status.bgColor,
+                    color: status.color,
+                    fontWeight: 500
+                  }}>
+                    {status.text}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {!invite.contributed && (
+                    <>
+                      <button
+                        onClick={() => copyInviteLink(invite.token)}
+                        style={{
+                          padding: '0.3rem 0.8rem',
+                          background: '#764ba2',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <span>🔗</span>
+                        Copier
+                      </button>
+                      <button
+                        onClick={() => handleResend(invite.id)}
+                        disabled={resending === invite.id}
+                        style={{
+                          padding: '0.3rem 0.8rem',
+                          background: resending === invite.id ? '#ccc' : '#ffc107',
+                          color: '#333',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '0.8rem',
+                          cursor: resending === invite.id ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <span>↻</span>
+                        {resending === invite.id ? '...' : 'Relancer'}
+                      </button>
+                    </>
+                  )}
+                  {invite.contributed && (
+                    <span style={{
+                      padding: '0.3rem 0.8rem',
+                      background: status.bgColor,
+                      color: status.color,
+                      borderRadius: '4px',
+                      fontSize: '0.8rem'
+                    }}>
+                      {status.text}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Ligne 2 : Email + Date d'envoi */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.85rem',
+                color: '#666',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
+              }}>
+                <span>{invite.email}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span>📅</span>
+                  {formatDate(invite.created_at)}
                 </span>
               </div>
-              
-              <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.3rem' }}>
-                {invite.email}
-              </div>
-              
-              {invite.contributed && invite.contribution && (
-                <div style={{ 
-                  fontSize: '0.85rem', 
-                  color: invite.contribution.approved ? '#28a745' : '#ffc107',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  marginTop: '0.3rem'
-                }}>
-                  <span>✓</span>
-                  Contribution {invite.contribution.approved ? 'approuvée' : 'en attente de validation'}
-                </div>
-              )}
 
-              {invite.contributed && !invite.contribution && (
-                <div style={{ 
-                  fontSize: '0.85rem', 
+              {/* Ligne 3 : Message de relance si déjà relancé */}
+              {invite.last_reminder_sent && (
+                <div style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.75rem',
                   color: '#ffc107',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.3rem',
-                  marginTop: '0.3rem'
+                  gap: '0.3rem'
                 }}>
-                  <span>⏳</span>
-                  En attente de soumission
+                  <span>↻</span>
+                  Dernière relance : {formatDate(invite.last_reminder_sent)}
                 </div>
               )}
             </div>
-            
-            {!invite.contributed && (
-              <button
-                onClick={() => copyInviteLink(invite.token)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#764ba2',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#5a3d80'}
-                onMouseLeave={(e) => e.target.style.background = '#764ba2'}
-                title="Copier le lien d'invitation"
-              >
-                <span style={{ fontSize: '0.9rem' }}>🔗</span>
-                Copier
-              </button>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
