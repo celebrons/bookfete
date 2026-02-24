@@ -11,16 +11,27 @@ const mistral = new Mistral({ apiKey: apiKey });
 
 /**
  * Génère des questions pour un chapitre
- * @param {string} chapterTitle - Titre du chapitre
- * @param {string} eventType - Type d'événement (anniversaire, mariage...)
- * @param {string} style - Style narratif (poétique, factuel, intime)
+ * @param {Object} params - Les paramètres
+ * @param {string} params.chapterTitle - Titre du chapitre
+ * @param {string} params.eventType - Type d'événement
+ * @param {string} params.style - Style narratif
+ * @param {string} params.bookTitle - Titre du livre
  * @returns {Promise<string[]>} - Tableau de 4 questions
  */
-async function generateQuestions(chapterTitle, eventType, style) {
+async function generateQuestions({ chapterTitle, eventType, style, bookTitle }) {
   try {
-    console.log('🤖 Génération de questions pour:', { chapterTitle, eventType, style });
+    console.log('='.repeat(60));
+    console.log('🎯 AI SERVICE - GÉNÉRATION DE QUESTIONS');
+    console.log('='.repeat(60));
+    console.log('📚 bookTitle reçu:', bookTitle);
+    console.log('📖 chapterTitle reçu:', chapterTitle);
+    console.log('🎉 eventType reçu:', eventType);
+    console.log('✍️ style reçu:', style);
+    
+    if (!bookTitle) {
+      console.log('⚠️ ATTENTION: bookTitle est vide ou null!');
+    }
 
-    // Adapter le prompt selon le style
     const styleInstructions = {
       poetique: "Utilise un langage imagé, émouvant et lyrique.",
       factuel: "Sois direct, concret et pratique.",
@@ -29,30 +40,49 @@ async function generateQuestions(chapterTitle, eventType, style) {
 
     const styleInstruction = styleInstructions[style] || styleInstructions.factuel;
 
+    // Extraire le nom de la personne du titre (ex: "Anniversaire de Yani" -> "Yani")
+    let personName = '';
+    if (bookTitle) {
+      const matches = bookTitle.match(/(?:anniversaire|mariage|naissance|départ) de (.*)/i);
+      personName = matches ? matches[1].trim() : '';
+    }
+
     const prompt = `Tu es un assistant qui aide à créer des questions pour un livre souvenir collaboratif.
     
-Contexte :
+Contexte du livre :
+- TITRE DU LIVRE : "${bookTitle || 'ce livre'}"
+- Personne célébrée : ${personName || 'la personne concernée'}
 - Type d'événement : ${eventType}
 - Titre du chapitre : "${chapterTitle}"
 - Style narratif : ${style}
 
 ${styleInstruction}
 
-Génère 4 questions ouvertes et inspirantes pour ce chapitre. 
-Les questions doivent aider les contributeurs à écrire des témoignages personnels et émouvants.
-Adapte le ton au style demandé (${style}).
+Génère 4 questions PERSONNALISÉES pour ce chapitre.
 
-Réponds UNIQUEMENT avec un tableau JSON de 4 chaînes de caractères.
-Exemple de format : ["Question 1", "Question 2", "Question 3", "Question 4"]
+RÈGLES IMPÉRATIVES :
+1. Chaque question doit mentionner "${personName || 'la personne'}" (le nom de la personne célébrée)
+2. Les questions doivent être adaptées au chapitre "${chapterTitle}"
+3. Utilise le style ${style}
 
-Ne mets rien d'autre que le tableau JSON dans ta réponse.`;
+Exemple pour un livre "Anniversaire de Yani", chapitre "Messages" :
+- "Quel message aimerais-tu adresser directement à Yani ?"
+- "Qu'est-ce que tu souhaites pour l'avenir de Yani ?"
+- "Quel souvenir avec Yani aimerais-tu partager ?"
+- "Quelle qualité de Yani veux-tu souligner ?"
+
+Réponds UNIQUEMENT avec un tableau JSON de 4 questions.
+
+Format : ["Question 1", "Question 2", "Question 3", "Question 4"]`;
+
+    console.log('📝 Prompt envoyé à Mistral');
 
     const response = await mistral.chat.complete({
       model: 'mistral-small-latest',
       messages: [
         { 
           role: 'system', 
-          content: 'Tu es un assistant spécialisé dans la création de livres souvenirs et de témoignages.' 
+          content: 'Tu es un assistant spécialisé dans la création de livres souvenirs.' 
         },
         { 
           role: 'user', 
@@ -64,38 +94,64 @@ Ne mets rien d'autre que le tableau JSON dans ta réponse.`;
     });
 
     const content = response.choices[0].message.content;
-    console.log('📝 Réponse Mistral:', content);
+    console.log('📝 Réponse Mistral reçue');
     
-    // Extraire le tableau JSON de la réponse
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       try {
         const questions = JSON.parse(jsonMatch[0]);
-        // Vérifier que c'est bien un tableau de 4 questions
-        if (Array.isArray(questions) && questions.length >= 4) {
-          return questions.slice(0, 4);
-        }
+        console.log('✅ Questions générées:', questions);
+        return questions.slice(0, 4);
       } catch (parseError) {
         console.error('❌ Erreur parsing JSON:', parseError);
       }
     }
     
-    // Fallback si l'IA ne répond pas correctement
     console.log('⚠️ Utilisation des questions par défaut');
-    return getDefaultQuestions(chapterTitle, eventType, style);
+    return getDefaultQuestions(bookTitle, chapterTitle, eventType, style, personName);
     
   } catch (error) {
     console.error('❌ Erreur génération questions:', error);
-    return getDefaultQuestions(chapterTitle, eventType, style);
+    return getDefaultQuestions(bookTitle, chapterTitle, eventType, style, personName);
   }
 }
 
 /**
+ * Questions par défaut (contextuelles)
+ */
+function getDefaultQuestions(bookTitle, chapterTitle, eventType, style, personName) {
+  const name = personName || 'la personne';
+  
+  const baseQuestions = [
+    `Quel souvenir lié à ${name} est le plus précieux pour vous ?`,
+    `Qu'est-ce qui rend ${name} unique à vos yeux ?`,
+    `Quel message souhaitez-vous adresser à ${name} ?`,
+    `Quelle qualité de ${name} aimeriez-vous souligner ?`
+  ];
+
+  if (style === 'poetique') {
+    return [
+      `Quels mots choisis-tu pour décrire la poésie de ${name} ?`,
+      `Si ${name} était un poème, quels vers écrirais-tu ?`,
+      `Quelle émotion ${name} éveille-t-elle en toi ?`,
+      `Quelle lumière ${name} apporte-t-elle dans ta vie ?`
+    ];
+  }
+  
+  if (style === 'intime') {
+    return [
+      `Raconte-nous ce que ${name} représente pour toi.`,
+      `Quel sentiment personnel ${name} évoque-t-il en toi ?`,
+      `Partage un détail intime sur ${name}.`,
+      `Qu'est-ce que tu aimerais que les autres retiennent de ${name} ?`
+    ];
+  }
+
+  return baseQuestions;
+}
+
+/**
  * Génère une citation inspirante pour un chapitre
- * @param {string} chapterTitle - Titre du chapitre
- * @param {string} eventType - Type d'événement
- * @param {string} style - Style narratif
- * @returns {Promise<string>} - Citation générée
  */
 async function generateQuote(chapterTitle, eventType, style) {
   try {
@@ -153,40 +209,7 @@ La citation doit faire entre 10 et 30 mots maximum.`;
 }
 
 /**
- * Questions par défaut en cas d'échec de l'IA
- */
-function getDefaultQuestions(chapterTitle, eventType, style) {
-  const baseQuestions = [
-    `Quel est votre plus beau souvenir lié à ce chapitre "${chapterTitle}" ?`,
-    `Qu'est-ce qui rend ce moment spécial pour vous ?`,
-    `Si vous deviez décrire cette expérience en trois mots, lesquels choisiriez-vous ?`,
-    `Quel conseil ou vœu souhaiteriez-vous partager ?`
-  ];
-
-  // Adapter selon le style
-  if (style === 'poetique') {
-    return [
-      `Quels mots choisis-tu pour décrire la magie de "${chapterTitle}" ?`,
-      `Si ce moment était un poème, quels vers écrirais-tu ?`,
-      `Quelle émotion te traverse quand tu penses à "${chapterTitle}" ?`,
-      `Quelle lumière garderas-tu de cette expérience ?`
-    ];
-  }
-  
-  if (style === 'intime') {
-    return [
-      `Raconte-nous ce que "${chapterTitle}" représente pour toi.`,
-      `Quel sentiment te vient en premier quand tu y penses ?`,
-      `Partage un détail, même petit, qui te tient à cœur.`,
-      `Qu'est-ce que tu aimerais que les autres retiennent de ce moment ?`
-    ];
-  }
-
-  return baseQuestions;
-}
-
-/**
- * Citation par défaut en cas d'échec de l'IA
+ * Citation par défaut
  */
 function getDefaultQuote(chapterTitle, eventType, style) {
   const quotes = [
@@ -199,9 +222,8 @@ function getDefaultQuote(chapterTitle, eventType, style) {
   return quotes[Math.floor(Math.random() * quotes.length)];
 }
 
-// Exporter les fonctions et l'instance mistral
 module.exports = {
   generateQuestions,
   generateQuote,
-  mistral  // ← Important pour l'utiliser dans les routes
+  mistral
 };

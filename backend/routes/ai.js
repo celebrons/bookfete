@@ -7,11 +7,26 @@ const authenticate = require('../middleware/auth');
 // Route pour générer des questions
 router.post('/generate-questions', authenticate, async (req, res) => {
   try {
-    const { chapterTitle, eventType, style } = req.body;
+    const { chapterTitle, bookTitle, eventType, style } = req.body;
     
-    console.log('📝 Génération de questions pour:', { chapterTitle, eventType, style });
-    
-    const questions = await aiService.generateQuestions(chapterTitle, eventType, style);
+    console.log('📝 Route /generate-questions appelée avec:', { 
+      chapterTitle, 
+      bookTitle, 
+      eventType, 
+      style 
+    });
+
+    if (!chapterTitle) {
+      return res.status(400).json({ error: 'chapterTitle est requis' });
+    }
+
+    // Appel avec un objet contenant tous les paramètres
+    const questions = await aiService.generateQuestions({
+      chapterTitle,
+      bookTitle: bookTitle || 'ce livre',
+      eventType: eventType || 'evenement',
+      style: style || 'intime'
+    });
     
     res.json({ questions });
   } catch (error) {
@@ -90,14 +105,11 @@ Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
     
     let titles = [];
     
-    // Essayer de parser la réponse
     try {
-      // Nettoyer la réponse (enlever les markdown éventuels)
       const cleanContent = content.replace(/```json|```/g, '').trim();
       titles = JSON.parse(cleanContent);
     } catch (e) {
       console.log('⚠️ Premier parsing échoué, tentative avec regex...');
-      // Si le parsing échoue, on essaie d'extraire un tableau avec regex
       const match = content.match(/\[[\s\S]*\]/);
       if (match) {
         try {
@@ -108,22 +120,17 @@ Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
       }
     }
 
-    // Vérifier que titles est bien un tableau
     if (!Array.isArray(titles) || titles.length === 0) {
       console.log('⚠️ Pas de titres valides, utilisation du fallback');
-      // Fallback : générer des titres basiques
       titles = generateFallbackTitles(eventType, count);
     }
 
-    // S'assurer qu'on a le bon nombre de titres
     while (titles.length < count) {
       titles.push(`Chapitre ${titles.length + 1}`);
     }
     
-    // Limiter au nombre demandé
     titles = titles.slice(0, count);
 
-    // Transformer en objets chapitres
     const chapters = titles.map((title, index) => ({
       title: title,
       description: `Chapitre ${index + 1} - Partagez vos souvenirs`,
@@ -136,7 +143,6 @@ Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
   } catch (error) {
     console.error('❌ Erreur génération chapitres:', error);
     
-    // Fallback en cas d'erreur
     const fallbackChapters = generateFallbackTitles(req.body.eventType, req.body.count || 8)
       .map((title, index) => ({
         title: title,
@@ -300,7 +306,6 @@ function generateFallbackTitles(eventType, count) {
     const baseIndex = i % titles.length;
     let title = titles[baseIndex];
     
-    // Ajouter un suffixe si on dépasse le nombre de titres de base
     if (i >= titles.length) {
       const suffix = Math.floor(i / titles.length) + 1;
       title = `${title} ${suffix}`;

@@ -310,7 +310,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
               fontSize: '14px'
             }}
           >
-            Mettre à jour
+            Valider les modifications
           </button>
         </div>
       </div>

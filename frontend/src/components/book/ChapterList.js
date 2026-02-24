@@ -20,7 +20,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   const [newQuestion, setNewQuestion] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
-  const [user, setUser] = useState(null); // ← AJOUTÉ pour l'email
+  const [user, setUser] = useState(null);
   
   // États pour la contribution
   const [contributionText, setContributionText] = useState('');
@@ -170,6 +170,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
+  // ==================== FONCTION IA MODIFIÉE ====================
   const generateAIQuestions = async (chapter) => {
     try {
       setGeneratingQuestions(true);
@@ -182,6 +183,13 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         return;
       }
 
+      console.log('🤖 Génération IA avec:', {
+        chapterTitle: chapter.title,
+        bookTitle: book?.title,
+        eventType: book?.event_type,
+        style: book?.style_narratif
+      });
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-questions`, {
         method: 'POST',
         headers: {
@@ -190,6 +198,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         },
         body: JSON.stringify({
           chapterTitle: chapter.title,
+          bookTitle: book?.title,
           eventType: book?.event_type || 'default',
           style: book?.style_narratif || 'factuel'
         })
@@ -209,6 +218,8 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         ...prev,
         questions_ia: data.questions
       }));
+
+
 
     } catch (error) {
       console.error('❌ Erreur:', error);
@@ -589,7 +600,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
             onLoadContributions={loadContributions}
             onCopyInviteLink={handleOpenInviteSelector}
             inviteSuccess={inviteSuccess}
-            userEmail={user?.email} // ← AJOUTÉ pour gérer hasContributed
+            userEmail={user?.email}
           />
         )}
 

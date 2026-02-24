@@ -10,6 +10,7 @@ const InviteSelector = ({ chapterId, bookId, onClose, onInvitesSent }) => {
   const [error, setError] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState(null);
+  const [showInvited, setShowInvited] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -127,11 +128,13 @@ const InviteSelector = ({ chapterId, bookId, onClose, onInvitesSent }) => {
         throw new Error(data.error || `Erreur ${response.status}`);
       }
 
-      // Afficher le résultat avec les liens
+      // Recharger les données pour mettre à jour les statuts
+      await loadData();
+      
+      // Afficher le résultat
       setResult({
         success: true,
-        message: `${toInvite.length} invitation(s) envoyée(s)`,
-        invites: data.invites || []
+        message: `${toInvite.length} invitation(s) envoyée(s)`
       });
       setShowResult(true);
       
@@ -157,138 +160,20 @@ const InviteSelector = ({ chapterId, bookId, onClose, onInvitesSent }) => {
     return (
       <div style={modalStyle}>
         <div style={modalContentStyle}>
-          <h2 style={{ 
-            marginBottom: '1.5rem', 
-            color: result.success ? '#28a745' : '#dc3545',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            {result.success ? '✅' : '❌'} 
-            {result.success ? 'Invitations envoyées' : 'Erreur'}
-          </h2>
-          
-          {result.success ? (
-            <>
-              <p style={{ marginBottom: '1.5rem', color: '#666' }}>{result.message}</p>
-              
-              {/* Liste des liens d'invitation */}
-              {result.invites && result.invites.length > 0 && (
-                <div style={{ marginBottom: '2rem' }}>
-                  <h3 style={{ 
-                    marginBottom: '1rem', 
-                    fontSize: '1rem', 
-                    color: '#333',
-                    fontWeight: '600'
-                  }}>
-                    🔗 Liens d'invitation (pour tests) :
-                  </h3>
-                  <div style={{ 
-                    background: '#f8f9fa', 
-                    padding: '1rem', 
-                    borderRadius: '8px',
-                    maxHeight: '300px',
-                    overflowY: 'auto'
-                  }}>
-                    {result.invites.map((invite, idx) => {
-                      const link = `${window.location.origin}/invite/${invite.token}`;
-                      const contributor = contributors.find(c => c.id === invite.contributor_id);
-                      return (
-                        <div key={idx} style={{ 
-                          marginBottom: '1rem',
-                          padding: '1rem',
-                          background: 'white',
-                          borderRadius: '8px',
-                          border: '1px solid #e9ecef',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                        }}>
-                          <div style={{ 
-                            fontWeight: 'bold', 
-                            marginBottom: '0.5rem',
-                            color: '#764ba2'
-                          }}>
-                            👤 {contributor?.name || contributor?.email?.split('@')[0] || 'Invité'}
-                          </div>
-                          <div style={{ 
-                            display: 'flex', 
-                            gap: '0.5rem', 
-                            alignItems: 'center',
-                            flexWrap: 'wrap'
-                          }}>
-                            <input
-                              type="text"
-                              value={link}
-                              readOnly
-                              style={{
-                                flex: 1,
-                                minWidth: '250px',
-                                padding: '0.6rem',
-                                border: '1px solid #dee2e6',
-                                borderRadius: '6px',
-                                fontSize: '0.9rem',
-                                background: '#f8f9fa',
-                                color: '#495057'
-                              }}
-                            />
-                            <button
-                              onClick={() => copyToClipboard(link)}
-                              style={{
-                                padding: '0.6rem 1.2rem',
-                                background: '#764ba2',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '0.9rem',
-                                fontWeight: '500',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.3rem'
-                              }}
-                            >
-                              📋 Copier
-                            </button>
-                            <a
-                              href={link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                padding: '0.6rem 1.2rem',
-                                background: '#28a745',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                textDecoration: 'none',
-                                fontSize: '0.9rem',
-                                fontWeight: '500',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem'
-                              }}
-                            >
-                              🔗 Tester
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div style={{ 
-              background: '#fff3cd', 
-              padding: '1rem', 
-              borderRadius: '8px',
-              color: '#856404',
-              marginBottom: '1.5rem'
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontSize: '3rem',
+              marginBottom: '1rem',
+              color: result.success ? '#28a745' : '#dc3545'
             }}>
-              <p style={{ margin: 0 }}>{result.error}</p>
+              {result.success ? '✅' : '❌'}
             </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
+            <h3 style={{ marginBottom: '1rem', color: '#333' }}>
+              {result.success ? 'Invitations envoyées' : 'Erreur'}
+            </h3>
+            <p style={{ marginBottom: '1.5rem', color: '#666' }}>
+              {result.success ? result.message : result.error}
+            </p>
             <button
               onClick={() => {
                 setShowResult(false);
@@ -304,28 +189,11 @@ const InviteSelector = ({ chapterId, bookId, onClose, onInvitesSent }) => {
                 border: 'none',
                 borderRadius: '6px',
                 fontSize: '1rem',
-                fontWeight: '500',
                 cursor: 'pointer'
               }}
             >
               {result.success ? 'Fermer' : 'Réessayer'}
             </button>
-            {!result.success && (
-              <button 
-                onClick={() => setShowResult(false)} 
-                style={{
-                  padding: '0.8rem 2rem',
-                  background: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '1rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Annuler
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -346,7 +214,7 @@ const InviteSelector = ({ chapterId, bookId, onClose, onInvitesSent }) => {
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1rem'
             }} />
-            <p>Chargement des contributeurs...</p>
+            <p>Chargement...</p>
           </div>
         </div>
       </div>
@@ -358,7 +226,7 @@ const InviteSelector = ({ chapterId, bookId, onClose, onInvitesSent }) => {
       <div style={modalStyle}>
         <div style={modalContentStyle}>
           <h3 style={{ color: '#dc3545', marginBottom: '1rem' }}>❌ Erreur</h3>
-          <p style={{ marginBottom: '1rem' }}>{error}</p>
+          <p style={{ marginBottom: '1.5rem' }}>{error}</p>
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
             <button onClick={onClose} style={buttonStyle.secondary}>
               Fermer
@@ -377,199 +245,240 @@ const InviteSelector = ({ chapterId, bookId, onClose, onInvitesSent }) => {
 
   return (
     <div style={modalStyle}>
-      <div style={modalContentStyle}>
-        <h2 style={{ marginBottom: '1.5rem' }}>Inviter des contributeurs</h2>
-
-        {/* Stats rapides */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '1rem', 
+      <div style={{
+        ...modalContentStyle,
+        maxWidth: '500px',
+        padding: '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        maxHeight: '80vh', // Hauteur fixe
+        overflow: 'hidden' // PAS DE SCROLL GLOBAL
+      }}>
+        {/* En-tête fixe */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           marginBottom: '1.5rem',
-          padding: '1rem',
-          background: '#f8f9fa',
-          borderRadius: '8px'
+          flexShrink: 0
         }}>
-          <div><strong>Total:</strong> {contributors.length}</div>
-          <div><strong>Disponibles:</strong> {availableContributors.length}</div>
-          <div><strong>Déjà invités:</strong> {invitedContributors.length}</div>
+          <h2 style={{ margin: 0, fontSize: '1.3rem', color: '#333' }}>
+            👥 Inviter des contributeurs
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '1.5rem',
+              cursor: 'pointer',
+              color: '#999'
+            }}
+          >
+            ✕
+          </button>
         </div>
 
-        {/* MESSAGE DE GUIDAGE - AJOUTÉ ICI */}
-        {availableContributors.length > 0 && (
-          <div style={{
-            background: '#e8f4fd',
-            padding: '1rem',
-            borderRadius: '8px',
-            marginBottom: '1.5rem',
-            border: '1px solid #17a2b8',
-            color: '#0c5460'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <span style={{ fontSize: '1.2rem' }}>💡</span>
-              <strong>Sélectionnez les personnes à inviter pour ce chapitre :</strong>
-            </div>
-            <p style={{ margin: 0, fontSize: '0.95rem' }}>
-              Cochez les cases des contributeurs que vous souhaitez inviter. 
-              Ils recevront un email avec un lien unique pour contribuer à ce chapitre spécifique.
-            </p>
-          </div>
-        )}
+        {/* Message de guidage - fixe */}
+        <div style={{
+          background: '#f0f7ff',
+          padding: '0.8rem 1rem',
+          borderRadius: '8px',
+          marginBottom: '1.5rem',
+          fontSize: '0.9rem',
+          color: '#0066cc',
+          border: '1px solid #b8daff',
+          flexShrink: 0
+        }}>
+          <span style={{ fontWeight: 'bold' }}>💡</span> Sélectionnez les personnes à inviter pour ce chapitre
+        </div>
 
-        {/* Si aucun contributeur disponible */}
-        {availableContributors.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-            <p style={{ marginBottom: '1rem' }}>Aucun contributeur disponible à inviter.</p>
-            {invitedContributors.length > 0 && (
-              <>
-                <p style={{ fontSize: '0.9rem', color: '#28a745', marginBottom: '1rem' }}>
-                  ✓ {invitedContributors.length} contributeur(s) déjà invité(s)
-                </p>
-                
-                {/* Afficher les liens des déjà invités */}
-                <details style={{ marginBottom: '1rem', textAlign: 'left' }}>
-                  <summary style={{ color: '#764ba2', cursor: 'pointer', fontWeight: '500' }}>
-                    Voir les liens d'invitation existants
-                  </summary>
-                  <div style={{ marginTop: '1rem' }}>
-                    {invitedContributors.map(contributor => (
-                      <div key={contributor.id} style={{
-                        marginBottom: '1rem',
-                        padding: '1rem',
-                        background: '#f8f9fa',
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef'
-                      }}>
-                        <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#333' }}>
-                          {contributor.name || contributor.email.split('@')[0]}
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <input
-                            type="text"
-                            value={`${window.location.origin}/invite/${contributor.token}`}
-                            readOnly
-                            style={{
-                              flex: 1,
-                              minWidth: '200px',
-                              padding: '0.5rem',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              fontSize: '0.9rem',
-                              background: 'white'
-                            }}
-                          />
-                          <button
-                            onClick={() => copyToClipboard(`${window.location.origin}/invite/${contributor.token}`)}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              background: '#764ba2',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.9rem'
-                            }}
-                          >
-                            Copier
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              </>
-            )}
-            <button onClick={onClose} style={{ ...buttonStyle.secondary, marginTop: '1rem' }}>
-              Fermer
-            </button>
-          </div>
-        )}
+        {/* Stats compactes - fixes */}
+        <div style={{
+          display: 'flex',
+          gap: '1rem',
+          marginBottom: '1.5rem',
+          fontSize: '0.9rem',
+          flexShrink: 0
+        }}>
+          <span style={{ color: '#17a2b8' }}>
+            <strong>{contributors.length}</strong> total
+          </span>
+          <span style={{ color: '#28a745' }}>
+            <strong>{availableContributors.length}</strong> disponibles
+          </span>
+          {invitedContributors.length > 0 && (
+            <span 
+              onClick={() => setShowInvited(!showInvited)}
+              style={{
+                color: '#6c757d',
+                cursor: 'pointer',
+                textDecoration: 'underline dotted'
+              }}
+            >
+              <strong>{invitedContributors.length}</strong> déjà invités
+            </span>
+          )}
+        </div>
 
-        {/* Liste des contributeurs disponibles */}
-        {availableContributors.length > 0 && (
-          <>
-            {/* Tout sélectionner */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem',
-              padding: '1rem',
-              background: '#f8f9fa',
-              borderRadius: '8px',
-              marginBottom: '1rem'
-            }}>
-              <input
-                type="checkbox"
-                checked={selectedIds.length === availableContributors.length}
-                onChange={handleToggleAll}
-                style={{ width: '18px', height: '18px' }}
-              />
-              <label style={{ fontWeight: 'bold' }}>Tous sélectionner</label>
-              <span style={{ color: '#666' }}>
-                ({selectedIds.length}/{availableContributors.length} sélectionnés)
-              </span>
-            </div>
+        {/* Zone scrollable UNIQUEMENT pour la liste */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto', // SEUL SCROLL ICI
+          minHeight: 0, // Important pour flex
+          marginBottom: '1.5rem',
+          paddingRight: '0.5rem'
+        }}>
+          {availableContributors.length > 0 ? (
+            <>
+              {/* Tout sélectionner */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.8rem',
+                padding: '0.5rem 0',
+                borderBottom: '1px solid #eee',
+                marginBottom: '0.5rem',
+                position: 'sticky',
+                top: 0,
+                background: 'white',
+                zIndex: 1
+              }}>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.length === availableContributors.length}
+                  onChange={handleToggleAll}
+                  style={{ width: '16px', height: '16px' }}
+                />
+                <label style={{ fontWeight: 500, fontSize: '0.95rem' }}>
+                  Tous sélectionner ({selectedIds.length}/{availableContributors.length})
+                </label>
+              </div>
 
-            {/* Liste des contributeurs disponibles */}
-            <div style={{ 
-              maxHeight: '300px', 
-              overflowY: 'auto',
-              marginBottom: '2rem',
-              border: '1px solid #e9ecef',
-              borderRadius: '8px'
-            }}>
+              {/* Liste des disponibles */}
               {availableContributors.map(contributor => (
                 <div
                   key={contributor.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '1rem',
-                    padding: '1rem',
-                    borderBottom: '1px solid #e9ecef',
-                    background: selectedIds.includes(contributor.id) ? '#f3e8ff' : 'white',
-                    transition: 'background 0.2s'
+                    gap: '0.8rem',
+                    padding: '0.6rem 0.5rem',
+                    borderBottom: '1px solid #f0f0f0',
+                    background: selectedIds.includes(contributor.id) ? '#f8f9fa' : 'white'
                   }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedIds.includes(contributor.id)}
                     onChange={() => handleToggle(contributor.id)}
-                    style={{ width: '18px', height: '18px' }}
+                    style={{ width: '16px', height: '16px' }}
                   />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 'bold', color: '#333' }}>
+                    <div style={{ fontWeight: 500, fontSize: '0.95rem' }}>
                       {contributor.name || contributor.email.split('@')[0]}
                     </div>
-                    <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#666' }}>
                       {contributor.email}
                     </div>
                   </div>
                 </div>
               ))}
+            </>
+          ) : (
+            <div style={{
+              textAlign: 'center',
+              padding: '2rem',
+              color: '#666'
+            }}>
+              <p>Aucun contributeur disponible</p>
             </div>
+          )}
 
-            {/* Boutons */}
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-              <button
-                onClick={onClose}
-                style={buttonStyle.secondary}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleSendInvites}
-                disabled={sending || selectedIds.length === 0}
-                style={{
-                  ...buttonStyle.primary,
-                  opacity: sending || selectedIds.length === 0 ? 0.5 : 1,
-                  cursor: sending || selectedIds.length === 0 ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {sending ? 'Envoi...' : `Inviter (${selectedIds.length})`}
-              </button>
+          {/* Section des déjà invités (dans le scroll si visible) */}
+          {invitedContributors.length > 0 && showInvited && (
+            <div style={{
+              marginTop: '1rem',
+              borderTop: '1px solid #eee',
+              paddingTop: '1rem'
+            }}>
+              <h4 style={{ fontSize: '0.9rem', marginBottom: '0.8rem', color: '#666' }}>
+                Déjà invités ({invitedContributors.length})
+              </h4>
+              {invitedContributors.map(contributor => (
+                <div
+                  key={contributor.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.5rem',
+                    borderBottom: '1px solid #eee',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  <span>{contributor.name || contributor.email.split('@')[0]}</span>
+                  <button
+                    onClick={() => copyToClipboard(`${window.location.origin}/invite/${contributor.token}`)}
+                    style={{
+                      padding: '0.2rem 0.5rem',
+                      background: 'none',
+                      border: '1px solid #764ba2',
+                      color: '#764ba2',
+                      borderRadius: '4px',
+                      fontSize: '0.7rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Copier
+                  </button>
+                </div>
+              ))}
             </div>
-          </>
-        )}
+          )}
+        </div>
+
+        {/* Boutons fixes en bas */}
+        <div style={{
+          display: 'flex',
+          gap: '1rem',
+          borderTop: '1px solid #eee',
+          paddingTop: '1.5rem',
+          flexShrink: 0
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: '0.8rem',
+              background: 'white',
+              color: '#666',
+              border: '1px solid #ddd',
+              borderRadius: '6px',
+              fontSize: '0.95rem',
+              cursor: 'pointer'
+            }}
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleSendInvites}
+            disabled={sending || selectedIds.length === 0}
+            style={{
+              flex: 2,
+              padding: '0.8rem',
+              background: sending || selectedIds.length === 0 ? '#ccc' : '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '0.95rem',
+              fontWeight: 500,
+              cursor: sending || selectedIds.length === 0 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {sending ? 'Envoi...' : `Inviter ${selectedIds.length} personne${selectedIds.length > 1 ? 's' : ''}`}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -592,36 +501,29 @@ const modalStyle = {
 
 const modalContentStyle = {
   background: 'white',
-  padding: '2rem',
-  borderRadius: '16px',
-  maxWidth: '700px',
+  borderRadius: '12px',
   width: '90%',
-  maxHeight: '80vh',
-  overflowY: 'auto',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+  boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
 };
 
 const buttonStyle = {
   primary: {
-    padding: '0.8rem 2rem',
+    padding: '0.6rem 1.5rem',
     background: '#28a745',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.2s'
+    borderRadius: '6px',
+    fontSize: '0.95rem',
+    cursor: 'pointer'
   },
   secondary: {
-    padding: '0.8rem 2rem',
+    padding: '0.6rem 1.5rem',
     background: '#6c757d',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    transition: 'all 0.2s'
+    borderRadius: '6px',
+    fontSize: '0.95rem',
+    cursor: 'pointer'
   }
 };
 
