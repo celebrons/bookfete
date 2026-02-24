@@ -262,7 +262,11 @@ const BookPage = () => {
         )}
         
         {activeTab === 'config' && (
-          <BookConfig book={book} onUpdateBook={handleUpdateBook} />
+          <BookConfig 
+            book={book} 
+            onUpdateBook={handleUpdateBook}
+            chaptersCount={chapters.length}  // ← LIGNE AJOUTÉE
+          />
         )}
       </div>
     </div>

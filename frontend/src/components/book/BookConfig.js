@@ -1,14 +1,29 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\BookConfig.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const BookConfig = ({ book, onUpdateBook }) => {
+const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     title: book.title,
     finition: book.finition,
     papier: book.papier,
-    style_narratif: book.style_narratif
+    style_narratif: book.style_narratif,
+    pages: book.pages || chaptersCount * 8
   });
+
+  // Constantes
+  const MIN_PAGES = 32;
+  const DEFAULT_PAGES_PER_CHAPTER = 8;
+
+  // Recalculer quand le nombre de chapitres change
+  useEffect(() => {
+    if (!isEditing) {
+      setFormData(prev => ({
+        ...prev,
+        pages: book.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER
+      }));
+    }
+  }, [chaptersCount, book.pages, isEditing]);
 
   // Options
   const finitions = [
@@ -29,15 +44,14 @@ const BookConfig = ({ book, onUpdateBook }) => {
     { id: 'intime', label: 'Intime' }
   ];
 
-  // Calculs
-  const pages = book.pages || 96;
-  const chapters = book.chapters || 24;
+  // Calcul du nombre de chapitres basé sur les pages
+  const calculatedChapters = Math.max(4, Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER));
   
   // Calcul du prix
   const calculatePrice = () => {
-    const base = book.finition === 'luxe' ? 85 : book.finition === 'classique' ? 55 : 29;
-    const perPage = book.finition === 'luxe' ? 0.50 : book.finition === 'classique' ? 0.35 : 0.25;
-    return Math.round(base + (pages * perPage));
+    const base = formData.finition === 'luxe' ? 85 : formData.finition === 'classique' ? 55 : 29;
+    const perPage = formData.finition === 'luxe' ? 0.50 : formData.finition === 'classique' ? 0.35 : 0.25;
+    return Math.round(base + (formData.pages * perPage));
   };
 
   const handleSave = () => {
@@ -201,6 +215,74 @@ const BookConfig = ({ book, onUpdateBook }) => {
           </div>
         </div>
 
+        {/* Section Pagination avec lien vers les chapitres */}
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <label style={{
+              fontSize: '11px',
+              textTransform: 'uppercase',
+              letterSpacing: '1.5px',
+              color: '#888',
+              fontWeight: '600'
+            }}>
+              4. Pagination
+            </label>
+            <span style={{
+              fontSize: '12px',
+              color: '#764ba2',
+              background: '#f3e8ff',
+              padding: '4px 12px',
+              borderRadius: '20px'
+            }}>
+              {calculatedChapters} chapitres • 8 pages/chapitre
+            </span>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '10px' }}>
+            <span style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: '32px',
+              color: '#b8924a',
+              fontWeight: '700'
+            }}>
+              {formData.pages}
+            </span>
+            <span style={{ color: '#666' }}>pages</span>
+          </div>
+
+          <input
+            type="range"
+            min={MIN_PAGES}
+            max="216"
+            step="8"
+            value={formData.pages}
+            onChange={(e) => setFormData({ ...formData, pages: parseInt(e.target.value) })}
+            style={{
+              width: '100%',
+              height: '4px',
+              borderRadius: '2px',
+              background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+              outline: 'none',
+              cursor: 'pointer',
+              marginBottom: '10px'
+            }}
+          />
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '11px', color: '#999' }}>{MIN_PAGES} pages (min)</span>
+            <span style={{ fontSize: '11px', color: '#999' }}>216 pages (max)</span>
+          </div>
+
+          <p style={{
+            fontSize: '11px',
+            color: '#764ba2',
+            marginTop: '10px',
+            fontStyle: 'italic'
+          }}>
+            💡 Adapté à vos {chaptersCount} chapitres ({chaptersCount * 8} pages recommandées)
+          </p>
+        </div>
+
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
           <button
             onClick={() => setIsEditing(false)}
@@ -235,7 +317,7 @@ const BookConfig = ({ book, onUpdateBook }) => {
     );
   }
 
-  // MODE VISUALISATION - EXACTEMENT COMME LE HTML
+  // MODE VISUALISATION
   return (
     <div className="configurator-card" style={{
       background: 'white',
@@ -409,24 +491,40 @@ const BookConfig = ({ book, onUpdateBook }) => {
           ))}
         </div>
 
-        {/* 4. Pagination */}
-        <label style={{
-          display: 'block',
-          fontSize: '11px',
-          textTransform: 'uppercase',
-          letterSpacing: '1.5px',
-          marginBottom: '15px',
-          color: '#888',
-          fontWeight: '600'
-        }}>
-          4. Pagination : <span style={{
+        {/* 4. Pagination - CORRIGÉ */}
+        <div style={{ marginBottom: '15px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{
+              fontSize: '11px',
+              textTransform: 'uppercase',
+              letterSpacing: '1.5px',
+              color: '#888',
+              fontWeight: '600'
+            }}>
+              4. Pagination
+            </label>
+            <span style={{
+              fontSize: '12px',
+              color: '#764ba2',
+              background: '#f3e8ff',
+              padding: '4px 12px',
+              borderRadius: '20px'
+            }}>
+              {/* CORRECTION : Utiliser chaptersCount au lieu de calculer */}
+              {chaptersCount} chapitres • 8 pages/chapitre
+            </span>
+          </div>
+          <span style={{
             fontFamily: "'Playfair Display', serif",
             fontSize: '32px',
             color: '#b8924a',
-            fontWeight: '700'
-          }}>{pages}</span> pages
-        </label>
-        
+            fontWeight: '700',
+            display: 'block',
+            marginTop: '5px'
+          }}>{book.pages || chaptersCount * 8}</span>
+          <span style={{ fontSize: '11px', color: '#999', marginLeft: '5px' }}>pages</span>
+        </div>
+
         {/* Slider (simulé) */}
         <div style={{
           width: '100%',
@@ -436,7 +534,7 @@ const BookConfig = ({ book, onUpdateBook }) => {
           position: 'relative'
         }}>
           <div style={{
-            width: `${(pages / 216) * 100}%`,
+            width: `${((book.pages || chaptersCount * 8) / 216) * 100}%`,
             height: '4px',
             background: '#b8924a',
             position: 'absolute'
@@ -467,7 +565,7 @@ const BookConfig = ({ book, onUpdateBook }) => {
                 fontWeight: '700',
                 color: '#1f1f1f',
                 display: 'block'
-              }}>{chapters} Chapitres</span>
+              }}>{chaptersCount} Chapitres</span>
             </div>
             <div>
               <span style={{
