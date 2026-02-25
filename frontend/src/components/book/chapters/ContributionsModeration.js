@@ -7,8 +7,26 @@ const ContributionsModeration = ({
   loading,
   onApprove,
   onDelete,
-  onBack
+  onBack,
+  organizerEmail
 }) => {
+  
+  // Filtrer les contributions pour exclure celles de l'organisateur
+  const filteredContributions = contributions.filter(
+    c => c.contributor_email !== organizerEmail
+  );
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -43,7 +61,7 @@ const ContributionsModeration = ({
           }} />
           <p>Chargement des contributions...</p>
         </div>
-      ) : contributions.length === 0 ? (
+      ) : filteredContributions.length === 0 ? (
         <div style={{
           textAlign: 'center',
           padding: '3rem',
@@ -52,12 +70,12 @@ const ContributionsModeration = ({
           color: '#666'
         }}>
           <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📭</span>
-          <h3>Aucune contribution pour ce chapitre</h3>
-          <p>Les contributions apparaîtront ici une fois que les invités auront répondu.</p>
+          <h3>Aucune contribution des invités pour ce chapitre</h3>
+          <p>Les contributions des invités apparaîtront ici.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {contributions.map(contribution => (
+          {filteredContributions.map(contribution => (
             <div
               key={contribution.id}
               style={{
@@ -69,62 +87,47 @@ const ContributionsModeration = ({
                 position: 'relative'
               }}
             >
+              {/* En-tête avec nom, date et statut */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '1rem'
+                marginBottom: '1rem',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
               }}>
                 <div>
                   <strong>{contribution.contributor_name}</strong>
                   <span style={{ color: '#666', marginLeft: '1rem', fontSize: '0.9rem' }}>
-                    {new Date(contribution.created_at).toLocaleDateString('fr-FR')}
+                    {formatDate(contribution.created_at)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {!contribution.approved && (
-                    <button
-                      onClick={() => onApprove(contribution.id)}
-                      style={{
-                        padding: '0.3rem 0.8rem',
-                        background: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      ✓ Approuver
-                    </button>
-                  )}
-                  <button
-                    onClick={() => onDelete(contribution.id)}
-                    style={{
-                      padding: '0.3rem 0.8rem',
-                      background: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '5px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem'
-                    }}
-                  >
-                    🗑️ Supprimer
-                  </button>
-                </div>
+                
+                {/* Badge de statut */}
+                <span style={{
+                  padding: '0.2rem 0.8rem',
+                  borderRadius: '20px',
+                  fontSize: '0.8rem',
+                  fontWeight: '500',
+                  background: contribution.approved ? '#d4edda' : '#fff3cd',
+                  color: contribution.approved ? '#155724' : '#856404'
+                }}>
+                  {contribution.approved ? '✓ Approuvée' : '⏳ En attente'}
+                </span>
               </div>
 
+              {/* Message */}
               <p style={{ margin: '0 0 1rem', lineHeight: '1.6' }}>
                 {contribution.message}
               </p>
 
+              {/* Photos */}
               {contribution.photo_urls && contribution.photo_urls.length > 0 && (
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
                   gap: '0.5rem',
-                  marginTop: '1rem'
+                  marginBottom: '1.5rem'
                 }}>
                   {contribution.photo_urls.map((url, idx) => (
                     <img
@@ -144,20 +147,54 @@ const ContributionsModeration = ({
                 </div>
               )}
 
-              {!contribution.approved && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '-5px',
-                  background: '#ffc107',
-                  color: '#333',
-                  padding: '0.2rem 0.5rem',
-                  borderRadius: '3px',
-                  fontSize: '0.8rem'
-                }}>
-                  En attente
-                </span>
-              )}
+              {/* Boutons de modération en bas */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                justifyContent: 'flex-end',
+                borderTop: '1px solid rgba(0,0,0,0.05)',
+                paddingTop: '1rem',
+                marginTop: '0.5rem'
+              }}>
+                {!contribution.approved && (
+                  <button
+                    onClick={() => onApprove(contribution.id)}
+                    style={{
+                      padding: '0.5rem 1.2rem',
+                      background: '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                  >
+                    <span>✓</span>
+                    Approuver
+                  </button>
+                )}
+                <button
+                  onClick={() => onDelete(contribution.id)}
+                  style={{
+                    padding: '0.5rem 1.2rem',
+                    background: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem'
+                  }}
+                >
+                  <span>🗑️</span>
+                  Supprimer
+                </button>
+              </div>
             </div>
           ))}
         </div>

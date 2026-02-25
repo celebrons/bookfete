@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import BookCard from './BookCard';
-import StatsCards from './StatsCards';
 import Loading from '../common/Loading';
 
 const DashboardGeneral = () => {
@@ -13,12 +12,12 @@ const DashboardGeneral = () => {
   const [archivedBooks, setArchivedBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
+  
+  // Stats globales
   const [stats, setStats] = useState({
-    enCours: 0,
-    termines: 0,
-    archives: 0,
-    totalChapitres: 0,
-    totalContributions: 0
+    enCours: { count: 0, chapitres: 0, contributions: 0 },
+    termines: { count: 0, chapitres: 0, contributions: 0 },
+    archives: { count: 0, chapitres: 0, contributions: 0 }
   });
 
   // États pour les modals
@@ -33,7 +32,7 @@ const DashboardGeneral = () => {
     show: false,
     bookId: null,
     bookTitle: '',
-    duration: 3, // 3 mois par défaut
+    duration: 3,
     archiving: false
   });
 
@@ -95,27 +94,57 @@ const DashboardGeneral = () => {
       setBooks(booksData || []);
       setArchivedBooks(archivedData || []);
 
-      // Calculer les stats
-      const enCours = booksData?.filter(b => b.statut === 'en_cours').length || 0;
-      const termines = booksData?.filter(b => b.statut === 'termine').length || 0;
-      const archives = archivedData?.length || 0;
+      // Calculer les stats pour les livres en cours
+      const enCoursLivres = booksData?.filter(b => b.statut === 'en_cours') || [];
+      const terminesLivres = booksData?.filter(b => b.statut === 'termine') || [];
       
-      let totalChapitres = 0;
-      let totalContributions = 0;
+      let chapitresEnCours = 0;
+      let contributionsEnCours = 0;
+      let chapitresTermines = 0;
+      let contributionsTermines = 0;
 
-      [...(booksData || []), ...(archivedData || [])].forEach(book => {
-        totalChapitres += book.chapters?.[0]?.count || 0;
+      // Calculer pour les livres en cours
+      enCoursLivres.forEach(book => {
+        chapitresEnCours += book.chapters?.[0]?.count || 0;
         book.contributions?.forEach(chapter => {
-          totalContributions += chapter.contributions?.[0]?.count || 0;
+          contributionsEnCours += chapter.contributions?.[0]?.count || 0;
+        });
+      });
+
+      // Calculer pour les livres terminés
+      terminesLivres.forEach(book => {
+        chapitresTermines += book.chapters?.[0]?.count || 0;
+        book.contributions?.forEach(chapter => {
+          contributionsTermines += chapter.contributions?.[0]?.count || 0;
+        });
+      });
+
+      // Stats pour les archives
+      let chapitresArchives = 0;
+      let contributionsArchives = 0;
+      archivedData?.forEach(book => {
+        chapitresArchives += book.chapters?.[0]?.count || 0;
+        book.contributions?.forEach(chapter => {
+          contributionsArchives += chapter.contributions?.[0]?.count || 0;
         });
       });
 
       setStats({
-        enCours,
-        termines,
-        archives,
-        totalChapitres,
-        totalContributions
+        enCours: {
+          count: enCoursLivres.length,
+          chapitres: chapitresEnCours,
+          contributions: contributionsEnCours
+        },
+        termines: {
+          count: terminesLivres.length,
+          chapitres: chapitresTermines,
+          contributions: contributionsTermines
+        },
+        archives: {
+          count: archivedData?.length || 0,
+          chapitres: chapitresArchives,
+          contributions: contributionsArchives
+        }
       });
 
     } catch (error) {
@@ -154,11 +183,9 @@ const DashboardGeneral = () => {
       const bookId = archiveModal.bookId;
       const months = archiveModal.duration;
       
-      // Calculer la date de suppression automatique
       const autoDeleteDate = new Date();
       autoDeleteDate.setMonth(autoDeleteDate.getMonth() + months);
 
-      // Archiver le livre
       const { error } = await supabase
         .from('books')
         .update({
@@ -170,17 +197,26 @@ const DashboardGeneral = () => {
 
       if (error) throw error;
 
-      // Mettre à jour les listes
       const archivedBook = books.find(b => b.id === bookId);
+      
+      // Mettre à jour les stats avant de déplacer le livre
+      const newStats = { ...stats };
+      
+      if (archivedBook.statut === 'en_cours') {
+        newStats.enCours.count -= 1;
+        newStats.enCours.chapitres -= archivedBook.chapters?.[0]?.count || 0;
+        // Note: on ne peut pas facilement soustraire les contributions ici
+      } else if (archivedBook.statut === 'termine') {
+        newStats.termines.count -= 1;
+        newStats.termines.chapitres -= archivedBook.chapters?.[0]?.count || 0;
+      }
+      
+      newStats.archives.count += 1;
+      // On ajoutera les chapitres/contributions lors du prochain rechargement
+      
+      setStats(newStats);
       setBooks(prev => prev.filter(b => b.id !== bookId));
       setArchivedBooks(prev => [{ ...archivedBook, status: 'archive' }, ...prev]);
-      
-      // Mettre à jour les stats
-      setStats(prev => ({
-        ...prev,
-        enCours: prev.enCours - 1,
-        archives: prev.archives + 1
-      }));
 
       closeArchiveModal();
       alert(`✅ Livre archivé pour ${months} mois. Il sera automatiquement supprimé le ${autoDeleteDate.toLocaleDateString('fr-FR')}.`);
@@ -205,17 +241,21 @@ const DashboardGeneral = () => {
 
       if (error) throw error;
 
-      // Mettre à jour les listes
       const restoredBook = archivedBooks.find(b => b.id === bookId);
-      setArchivedBooks(prev => prev.filter(b => b.id !== bookId));
-      setBooks(prev => [{ ...restoredBook, status: 'actif' }, ...prev]);
       
       // Mettre à jour les stats
-      setStats(prev => ({
-        ...prev,
-        enCours: prev.enCours + 1,
-        archives: prev.archives - 1
-      }));
+      const newStats = { ...stats };
+      newStats.archives.count -= 1;
+      
+      if (restoredBook.statut === 'en_cours') {
+        newStats.enCours.count += 1;
+      } else if (restoredBook.statut === 'termine') {
+        newStats.termines.count += 1;
+      }
+      
+      setStats(newStats);
+      setArchivedBooks(prev => prev.filter(b => b.id !== bookId));
+      setBooks(prev => [{ ...restoredBook, status: 'actif' }, ...prev]);
 
       alert('✅ Livre restauré avec succès');
       
@@ -251,7 +291,6 @@ const DashboardGeneral = () => {
     try {
       const bookId = deleteModal.bookId;
       
-      // 1. Récupérer tous les chapitres
       const { data: chapters, error: chaptersError } = await supabase
         .from('chapters')
         .select('id')
@@ -261,7 +300,6 @@ const DashboardGeneral = () => {
 
       const chapterIds = chapters.map(ch => ch.id);
 
-      // 2. Supprimer les contributions
       if (chapterIds.length > 0) {
         const { error: contributionsError } = await supabase
           .from('contributions')
@@ -270,7 +308,6 @@ const DashboardGeneral = () => {
 
         if (contributionsError) throw contributionsError;
 
-        // 3. Supprimer les invitations
         const { error: invitesError } = await supabase
           .from('chapter_invites')
           .delete()
@@ -279,7 +316,6 @@ const DashboardGeneral = () => {
         if (invitesError) throw invitesError;
       }
 
-      // 4. Supprimer les chapitres
       const { error: deleteChaptersError } = await supabase
         .from('chapters')
         .delete()
@@ -287,7 +323,6 @@ const DashboardGeneral = () => {
 
       if (deleteChaptersError) throw deleteChaptersError;
 
-      // 5. Supprimer les contributeurs du livre
       const { error: contributorsError } = await supabase
         .from('book_contributors')
         .delete()
@@ -295,7 +330,6 @@ const DashboardGeneral = () => {
 
       if (contributorsError) throw contributorsError;
 
-      // 6. Enfin, supprimer le livre
       const { error: bookError } = await supabase
         .from('books')
         .delete()
@@ -303,14 +337,30 @@ const DashboardGeneral = () => {
 
       if (bookError) throw bookError;
 
-      // Mettre à jour la liste
-      setArchivedBooks(prev => prev.filter(b => b.id !== bookId));
+      const isActive = books.some(b => b.id === bookId);
       
-      // Mettre à jour les stats
-      setStats(prev => ({
-        ...prev,
-        archives: prev.archives - 1
-      }));
+      if (isActive) {
+        const deletedBook = books.find(b => b.id === bookId);
+        setBooks(prev => prev.filter(b => b.id !== bookId));
+        
+        const newStats = { ...stats };
+        if (deletedBook.statut === 'en_cours') {
+          newStats.enCours.count -= 1;
+        } else if (deletedBook.statut === 'termine') {
+          newStats.termines.count -= 1;
+        }
+        setStats(newStats);
+        
+      } else {
+        setArchivedBooks(prev => prev.filter(b => b.id !== bookId));
+        setStats(prev => ({
+          ...prev,
+          archives: {
+            ...prev.archives,
+            count: prev.archives.count - 1
+          }
+        }));
+      }
 
       closeDeleteModal();
       alert('✅ Livre supprimé définitivement');
@@ -333,16 +383,81 @@ const DashboardGeneral = () => {
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         {/* En-tête */}
         <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{ margin: '0 0 0.5rem', color: '#333' }}>
+          <h1 style={{ margin: '0 0 0.5rem', color: '#333', fontSize: '2rem' }}>
             Bonjour {user?.user_metadata?.full_name || user?.email} 🎉
           </h1>
           <p style={{ color: '#666', margin: 0 }}>
-            Gérez vos livres et suivez l'avancement des contributions
+            Gérez vos livres et suivez leur avancement
           </p>
         </div>
 
-        {/* Statistiques */}
-        <StatsCards stats={stats} />
+        {/* Statistiques épurées */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '1.5rem',
+          marginBottom: '2rem'
+        }}>
+          {/* Livres en cours */}
+          <div style={{
+            background: 'white',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            border: '1px solid #e9ecef'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.8rem' }}>📖</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: '500', color: '#333' }}>
+                {stats.enCours.count} livre{stats.enCours.count > 1 ? 's' : ''} en cours
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: '#666', marginLeft: '2.6rem' }}>
+              <span>📑 {stats.enCours.chapitres} chapitre{stats.enCours.chapitres > 1 ? 's' : ''}</span>
+              <span>💬 {stats.enCours.contributions} contribution{stats.enCours.contributions > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+
+          {/* Livres terminés */}
+          <div style={{
+            background: 'white',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            border: '1px solid #e9ecef'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.8rem' }}>✅</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: '500', color: '#333' }}>
+                {stats.termines.count} livre{stats.termines.count > 1 ? 's' : ''} terminé{stats.termines.count > 1 ? 's' : ''}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: '#666', marginLeft: '2.6rem' }}>
+              <span>📑 {stats.termines.chapitres} chapitre{stats.termines.chapitres > 1 ? 's' : ''}</span>
+              <span>💬 {stats.termines.contributions} contribution{stats.termines.contributions > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+
+          {/* Livres archivés */}
+          <div style={{
+            background: 'white',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            border: '1px solid #e9ecef'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.8rem' }}>📦</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: '500', color: '#333' }}>
+                {stats.archives.count} livre{stats.archives.count > 1 ? 's' : ''} archivé{stats.archives.count > 1 ? 's' : ''}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: '#666', marginLeft: '2.6rem' }}>
+              <span>📑 {stats.archives.chapitres} chapitre{stats.archives.chapitres > 1 ? 's' : ''}</span>
+              <span>💬 {stats.archives.contributions} contribution{stats.archives.contributions > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Actions rapides */}
         <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -352,39 +467,42 @@ const DashboardGeneral = () => {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.5rem',
-              padding: '1rem 2rem',
+              padding: '0.8rem 1.5rem',
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: 'white',
               textDecoration: 'none',
               borderRadius: '8px',
-              fontWeight: 'bold',
-              boxShadow: '0 10px 20px rgba(118, 75, 162, 0.3)',
-              transition: 'all 0.3s'
+              fontWeight: '500',
+              fontSize: '0.95rem',
+              boxShadow: '0 4px 10px rgba(118, 75, 162, 0.2)',
+              transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+            onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
             onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
           >
             <span>✨</span>
-            Créer un nouveau livre
+            Nouveau livre
           </Link>
 
-          {stats.archives > 0 && (
+          {stats.archives.count > 0 && (
             <button
               onClick={() => setShowArchived(!showArchived)}
               style={{
-                padding: '1rem 2rem',
-                background: showArchived ? '#764ba2' : '#f8f9fa',
+                padding: '0.8rem 1.5rem',
+                background: showArchived ? '#764ba2' : 'white',
                 color: showArchived ? 'white' : '#333',
                 border: '1px solid #e9ecef',
                 borderRadius: '8px',
                 cursor: 'pointer',
+                fontSize: '0.95rem',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.5rem'
+                gap: '0.5rem',
+                transition: 'all 0.2s'
               }}
             >
               <span>📦</span>
-              {showArchived ? 'Masquer les archives' : `Voir les archives (${stats.archives})`}
+              {showArchived ? 'Masquer archives' : `Archives (${stats.archives.count})`}
             </button>
           )}
         </div>
@@ -392,7 +510,9 @@ const DashboardGeneral = () => {
         {/* Livres actifs */}
         {!showArchived && (
           <div>
-            <h2 style={{ marginBottom: '1.5rem', color: '#333' }}>📚 Mes livres</h2>
+            <h2 style={{ marginBottom: '1.5rem', color: '#333', fontSize: '1.3rem', fontWeight: '500' }}>
+              📚 Mes livres
+            </h2>
             
             {books.length === 0 ? (
               <div style={{
@@ -400,19 +520,21 @@ const DashboardGeneral = () => {
                 padding: '3rem',
                 borderRadius: '10px',
                 textAlign: 'center',
-                color: '#666'
+                color: '#666',
+                border: '1px dashed #e9ecef'
               }}>
-                <span style={{ fontSize: '4rem', display: 'block', marginBottom: '1rem' }}>📖</span>
-                <h3>Vous n'avez pas encore de livre</h3>
-                <p style={{ marginBottom: '2rem' }}>Créez votre premier livre pour commencer</p>
+                <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📖</span>
+                <h3 style={{ fontWeight: '400', marginBottom: '0.5rem' }}>Vous n'avez pas encore de livre</h3>
+                <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem' }}>Créez votre premier livre pour commencer</p>
                 <Link
                   to="/create-book"
                   style={{
-                    padding: '1rem 2rem',
+                    padding: '0.8rem 2rem',
                     background: '#764ba2',
                     color: 'white',
                     textDecoration: 'none',
-                    borderRadius: '5px'
+                    borderRadius: '6px',
+                    fontSize: '0.95rem'
                   }}
                 >
                   Créer un livre
@@ -441,7 +563,9 @@ const DashboardGeneral = () => {
         {/* Livres archivés */}
         {showArchived && (
           <div>
-            <h2 style={{ marginBottom: '1.5rem', color: '#666' }}>📦 Livres archivés</h2>
+            <h2 style={{ marginBottom: '1.5rem', color: '#666', fontSize: '1.3rem', fontWeight: '500' }}>
+              📦 Livres archivés
+            </h2>
             
             {archivedBooks.length === 0 ? (
               <div style={{
@@ -449,11 +573,12 @@ const DashboardGeneral = () => {
                 padding: '3rem',
                 borderRadius: '10px',
                 textAlign: 'center',
-                color: '#666'
+                color: '#666',
+                border: '1px dashed #e9ecef'
               }}>
-                <span style={{ fontSize: '4rem', display: 'block', marginBottom: '1rem' }}>📦</span>
-                <h3>Aucun livre archivé</h3>
-                <p>Les livres que vous archivez apparaîtront ici</p>
+                <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📦</span>
+                <h3 style={{ fontWeight: '400', marginBottom: '0.5rem' }}>Aucun livre archivé</h3>
+                <p style={{ fontSize: '0.9rem' }}>Les livres que vous archivez apparaîtront ici</p>
               </div>
             ) : (
               <div style={{
@@ -497,110 +622,64 @@ const DashboardGeneral = () => {
             background: 'white',
             padding: '2rem',
             borderRadius: '16px',
-            maxWidth: '450px',
+            maxWidth: '400px',
             width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: '#ffc107',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem',
-              fontSize: '2rem',
-              color: 'white'
-            }}>
-              📦
-            </div>
-
-            <h2 style={{ textAlign: 'center', marginBottom: '1rem', color: '#333' }}>
-              Archiver ce livre ?
-            </h2>
-
-            <p style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#666' }}>
-              Le livre <strong>"{archiveModal.bookTitle}"</strong> sera déplacé dans les archives.
+            <h3 style={{ marginBottom: '1rem' }}>Archiver le livre</h3>
+            <p style={{ marginBottom: '1.5rem', color: '#666' }}>
+              Voulez-vous archiver "{archiveModal.bookTitle}" ?
             </p>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                Durée d'archivage avant suppression automatique :
-              </label>
-              <select
-                value={archiveModal.duration}
-                onChange={(e) => setArchiveModal({ ...archiveModal, duration: parseInt(e.target.value) })}
-                style={{
-                  width: '100%',
-                  padding: '0.8rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '1rem'
-                }}
-              >
-                <option value={3}>3 mois</option>
-                <option value={6}>6 mois</option>
-                <option value={12}>1 an</option>
-              </select>
-            </div>
-
-            <div style={{
-              background: '#fff3cd',
-              padding: '1rem',
-              borderRadius: '8px',
-              marginBottom: '1.5rem',
-              color: '#856404',
-              fontSize: '0.9rem'
-            }}>
-              <p style={{ margin: 0 }}>
-                ⚠️ Après cette période, le livre sera définitivement supprimé.
-                Vous pourrez le restaurer à tout moment depuis les archives.
-              </p>
-            </div>
-
+            <select
+              value={archiveModal.duration}
+              onChange={(e) => setArchiveModal({ ...archiveModal, duration: parseInt(e.target.value) })}
+              style={{
+                width: '100%',
+                padding: '0.8rem',
+                marginBottom: '1.5rem',
+                border: '1px solid #ddd',
+                borderRadius: '8px'
+              }}
+            >
+              <option value={3}>3 mois</option>
+              <option value={6}>6 mois</option>
+              <option value={12}>1 an</option>
+            </select>
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button
                 onClick={closeArchiveModal}
-                disabled={archiveModal.archiving}
                 style={{
                   flex: 1,
-                  padding: '1rem',
+                  padding: '0.8rem',
                   background: '#6c757d',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '1rem',
-                  cursor: archiveModal.archiving ? 'not-allowed' : 'pointer',
-                  opacity: archiveModal.archiving ? 0.5 : 1
+                  cursor: 'pointer'
                 }}
               >
                 Annuler
               </button>
               <button
                 onClick={handleArchiveBook}
-                disabled={archiveModal.archiving}
                 style={{
                   flex: 1,
-                  padding: '1rem',
-                  background: archiveModal.archiving ? '#ccc' : '#ffc107',
+                  padding: '0.8rem',
+                  background: '#ffc107',
                   color: '#333',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: archiveModal.archiving ? 'not-allowed' : 'pointer',
-                  opacity: archiveModal.archiving ? 0.5 : 1
+                  cursor: 'pointer'
                 }}
               >
-                {archiveModal.archiving ? 'Archivage...' : 'Archiver'}
+                Archiver
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de suppression (identique à avant) */}
+      {/* Modal de suppression */}
       {deleteModal.show && (
         <div style={{
           position: 'fixed',
@@ -619,85 +698,42 @@ const DashboardGeneral = () => {
             background: 'white',
             padding: '2rem',
             borderRadius: '16px',
-            maxWidth: '450px',
+            maxWidth: '400px',
             width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: '#dc3545',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem',
-              fontSize: '2rem',
-              color: 'white'
-            }}>
-              ⚠️
-            </div>
-
-            <h2 style={{ textAlign: 'center', marginBottom: '1rem', color: '#333' }}>
-              Supprimer définitivement ?
-            </h2>
-
-            <div style={{
-              background: '#fff3cd',
-              border: '1px solid #ffeeba',
-              borderRadius: '8px',
-              padding: '1rem',
-              marginBottom: '1.5rem',
-              color: '#856404'
-            }}>
-              <p style={{ margin: '0 0 0.5rem', fontWeight: 'bold' }}>
-                ⚠️ Attention ! Cette action est irréversible.
-              </p>
-              <p style={{ margin: 0, fontSize: '0.95rem' }}>
-                La suppression du livre <strong>"{deleteModal.bookTitle}"</strong> entraînera la perte définitive de :
-              </p>
-              <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.5rem' }}>
-                <li>Tous ses chapitres</li>
-                <li>Toutes les invitations envoyées</li>
-                <li>Toutes les contributions reçues</li>
-              </ul>
-            </div>
-
+            <h3 style={{ marginBottom: '1rem', color: '#dc3545' }}>Supprimer définitivement ?</h3>
+            <p style={{ marginBottom: '1.5rem', color: '#666' }}>
+              Êtes-vous sûr de vouloir supprimer "{deleteModal.bookTitle}" ? Cette action est irréversible.
+            </p>
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button
                 onClick={closeDeleteModal}
-                disabled={deleteModal.deleting}
                 style={{
                   flex: 1,
-                  padding: '1rem',
+                  padding: '0.8rem',
                   background: '#6c757d',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '1rem',
-                  cursor: deleteModal.deleting ? 'not-allowed' : 'pointer',
-                  opacity: deleteModal.deleting ? 0.5 : 1
+                  cursor: 'pointer'
                 }}
               >
                 Annuler
               </button>
               <button
                 onClick={handleDeleteBook}
-                disabled={deleteModal.deleting}
                 style={{
                   flex: 1,
-                  padding: '1rem',
-                  background: deleteModal.deleting ? '#ccc' : '#dc3545',
+                  padding: '0.8rem',
+                  background: '#dc3545',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: deleteModal.deleting ? 'not-allowed' : 'pointer',
-                  opacity: deleteModal.deleting ? 0.5 : 1
+                  cursor: 'pointer'
                 }}
               >
-                {deleteModal.deleting ? 'Suppression...' : 'Supprimer définitivement'}
+                Supprimer
               </button>
             </div>
           </div>

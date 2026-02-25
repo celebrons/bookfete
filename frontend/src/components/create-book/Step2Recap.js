@@ -43,8 +43,11 @@ const Step2Recap = ({ bookData, price, loading, onCreate, onPrevious, chapters }
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
           <div>
-            <div style={{ color: '#666', fontSize: '0.9rem' }}>Titre</div>
-            <div style={{ fontWeight: 'bold' }}>{bookData.title}</div>
+            <div style={{ color: '#666', fontSize: '0.9rem' }}>Destinataire</div>
+            <div style={{ fontWeight: 'bold' }}>{bookData.recipient_name}</div>
+            {bookData.recipient_age && (
+              <div style={{ fontSize: '0.9rem', color: '#666' }}>{bookData.recipient_age} ans</div>
+            )}
           </div>
           <div>
             <div style={{ color: '#666', fontSize: '0.9rem' }}>Événement</div>
@@ -69,7 +72,7 @@ const Step2Recap = ({ bookData, price, loading, onCreate, onPrevious, chapters }
         </div>
       </div>
 
-      {/* Aperçu des chapitres qui seront créés */}
+      {/* Aperçu des chapitres */}
       <div style={{
         background: 'white',
         border: '1px solid #e9ecef',
@@ -80,9 +83,6 @@ const Step2Recap = ({ bookData, price, loading, onCreate, onPrevious, chapters }
         <h3 style={{ margin: '0 0 1rem', color: '#764ba2' }}>
           📖 {chapters.length} chapitres seront créés
         </h3>
-        <p style={{ marginBottom: '1rem', color: '#666' }}>
-          Après validation, votre livre contiendra ces chapitres :
-        </p>
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
@@ -108,7 +108,7 @@ const Step2Recap = ({ bookData, price, loading, onCreate, onPrevious, chapters }
         </p>
       </div>
 
-      {/* Prix final */}
+      {/* Prix final calculé avec les 4 critères */}
       <div style={{
         background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
         padding: '2rem',
@@ -120,6 +120,9 @@ const Step2Recap = ({ bookData, price, loading, onCreate, onPrevious, chapters }
         <div style={{ fontSize: '1.1rem', opacity: 0.9 }}>Total à payer</div>
         <div style={{ fontSize: '4rem', fontWeight: 'bold', lineHeight: '1.2' }}>{Math.round(price)}€</div>
         <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>TTC • Livraison offerte</div>
+        <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>
+          (basé sur la finition, le papier, le style et le nombre de pages)
+        </div>
       </div>
 
       {/* Boutons */}

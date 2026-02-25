@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import './Home.css';
 
 const HomePage = () => {
-  // Liste des événements
+  // Liste des événements avec liens vers création de livre
   const events = [
     {
       title: 'Pot de départ',
@@ -42,13 +42,6 @@ const HomePage = () => {
       icon: '🌅',
       link: '/create-book?event=retraite'
     }
-  ];
-
-  // Statistiques
-  const stats = [
-    { value: '1500+', label: 'LIVRES CRÉÉS' },
-    { value: '8500+', label: 'TÉMOIGNAGES' },
-    { value: '15k+', label: 'PHOTOS PARTAGÉES' }
   ];
 
   // Étapes
@@ -107,17 +100,55 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* STATS SECTION */}
-      <section className="stats-section">
-        <div className="container">
-          <div className="stats-grid">
-            {stats.map((stat, index) => (
-              <div key={index} className="stat-item">
-                <div className="stat-value">{stat.value}</div>
-                <div className="stat-label">{stat.label}</div>
-              </div>
-            ))}
-          </div>
+      {/* SECTION MARKETING */}
+      <section style={{
+        padding: '80px 0',
+        background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+        textAlign: 'center'
+      }}>
+        <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <h2 style={{
+            fontSize: '2.5rem',
+            color: '#333',
+            marginBottom: '1.5rem',
+            fontWeight: '700',
+            fontFamily: "'Playfair Display', serif"
+          }}>
+            Des souvenirs partagés,<br />immortalisés dans un livre unique.
+          </h2>
+          <p style={{
+            fontSize: '1.3rem',
+            color: '#666',
+            marginBottom: '2.5rem',
+            lineHeight: '1.6'
+          }}>
+            Offrez un cadeau qui reste à jamais.
+          </p>
+          <Link 
+            to="/create-book" 
+            style={{
+              display: 'inline-block',
+              padding: '1.2rem 3rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '50px',
+              fontSize: '1.2rem',
+              fontWeight: '600',
+              boxShadow: '0 10px 20px rgba(118, 75, 162, 0.3)',
+              transition: 'all 0.3s'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-3px)';
+              e.target.style.boxShadow = '0 15px 30px rgba(118, 75, 162, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 10px 20px rgba(118, 75, 162, 0.3)';
+            }}
+          >
+            Créer mon livre →
+          </Link>
         </div>
       </section>
 

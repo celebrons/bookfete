@@ -170,7 +170,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
-  // ==================== FONCTION IA MODIFIÉE ====================
+  // ==================== FONCTION IA ====================
   const generateAIQuestions = async (chapter) => {
     try {
       setGeneratingQuestions(true);
@@ -218,8 +218,6 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
         ...prev,
         questions_ia: data.questions
       }));
-
-
 
     } catch (error) {
       console.error('❌ Erreur:', error);
@@ -579,6 +577,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
             onApprove={approveContribution}
             onDelete={deleteContribution}
             onBack={() => setShowContributions(false)}
+            organizerEmail={user?.email}  // ← AJOUT ICI
           />
         )}
 

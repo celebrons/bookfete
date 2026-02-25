@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@mistralai/mistralai": "^1.14.0",
+    "@sendgrid/mail": "^8.1.6",
     "@supabase/supabase-js": "^2.38.0",
     "axios": "^1.13.5",
     "cors": "^2.8.5",

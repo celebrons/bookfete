@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import Tooltip from '../../ui/Tooltip';
 
-const ChapterInvitations = ({ chapterId }) => {
+const ChapterInvitations = ({ chapterId, onLoadContributions }) => {
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -24,7 +24,6 @@ const ChapterInvitations = ({ chapterId }) => {
     try {
       setLoading(true);
       
-      // Récupérer les invitations avec les infos des contributeurs
       const { data, error } = await supabase
         .from('chapter_invites')
         .select(`
@@ -175,6 +174,45 @@ const ChapterInvitations = ({ chapterId }) => {
 
   return (
     <div style={{ marginTop: '2rem' }}>
+      {/* Bouton pour voir toutes les contributions */}
+      {onLoadContributions && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center',
+          marginBottom: '1.5rem'
+        }}>
+          <button
+            onClick={() => onLoadContributions(chapterId)}
+            style={{
+              padding: '0.6rem 2rem',
+              background: 'white',
+              color: '#764ba2',
+              border: '2px solid #764ba2',
+              borderRadius: '30px',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 8px rgba(118, 75, 162, 0.1)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = '#764ba2';
+              e.target.style.color = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'white';
+              e.target.style.color = '#764ba2';
+            }}
+          >
+            <span style={{ fontSize: '1.1rem' }}>👁️</span>
+            Voir et modérer les contributions
+          </button>
+        </div>
+      )}
+
       {/* En-tête compact avec stats */}
       <div style={{
         display: 'flex',

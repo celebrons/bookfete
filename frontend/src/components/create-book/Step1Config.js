@@ -1,7 +1,7 @@
 // C:\Users\USER\bookfete\frontend\src\components\create-book\Step1Config.js
 import React from 'react';
 
-const Step1Config = ({ bookData, setBookData, onNext }) => {
+const Step1Config = ({ bookData, setBookData, onNext, loading }) => {
   const eventTypes = [
     { id: 'generique', label: 'Générique', icon: '📚' },
     { id: 'anniversaire', label: 'Anniversaire', icon: '🎂' },
@@ -11,9 +11,9 @@ const Step1Config = ({ bookData, setBookData, onNext }) => {
   ];
 
   const finitions = [
-    { id: 'livret', label: 'Livret', price: 69, description: 'Souple' },
-    { id: 'classique', label: 'Classique', price: 89, description: 'Rigide' },
-    { id: 'luxe', label: 'Luxe', price: 129, description: 'Toilé' }
+    { id: 'livret', label: 'Livret', description: 'Souple' },
+    { id: 'classique', label: 'Classique', description: 'Rigide' },
+    { id: 'luxe', label: 'Luxe', description: 'Toilé' }
   ];
 
   const papiers = [
@@ -27,14 +27,6 @@ const Step1Config = ({ bookData, setBookData, onNext }) => {
     { id: 'factuel', label: 'Factuel', description: 'Direct et concret' },
     { id: 'intime', label: 'Intime', description: 'Chaleureux et personnel' }
   ];
-
-  // Calcul du prix avec 8 pages par chapitre (base 64 pages = 8 chapitres)
-  const calculatePrice = () => {
-    const basePrice = finitions.find(f => f.id === bookData.finition)?.price || 89;
-    const extraPages = Math.max(0, bookData.pages - 64); // 64 pages de base (8 chapitres × 8 pages)
-    const extraCost = extraPages * 0.25;
-    return basePrice + extraCost;
-  };
 
   // Calcul du nombre de chapitres (8 pages par chapitre)
   const chaptersCount = Math.floor(bookData.pages / 8);
@@ -86,7 +78,7 @@ const Step1Config = ({ bookData, setBookData, onNext }) => {
         />
       </div>
 
-      {/* Finition */}
+      {/* Finition - SANS PRIX */}
       <div style={{ marginBottom: '2rem' }}>
         <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '1rem' }}>
           Finition
@@ -107,9 +99,8 @@ const Step1Config = ({ bookData, setBookData, onNext }) => {
               }}
             >
               <strong>{f.label}</strong>
-              <div style={{ fontSize: '0.9rem', color: '#666' }}>{f.description}</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#764ba2', marginTop: '0.5rem' }}>
-                {f.price}€
+              <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.3rem' }}>
+                {f.description}
               </div>
             </div>
           ))}
@@ -136,7 +127,9 @@ const Step1Config = ({ bookData, setBookData, onNext }) => {
               }}
             >
               <strong>{p.label}</strong>
-              <div style={{ fontSize: '0.9rem', color: '#666' }}>{p.description}</div>
+              <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.3rem' }}>
+                {p.description}
+              </div>
             </div>
           ))}
         </div>
@@ -162,7 +155,9 @@ const Step1Config = ({ bookData, setBookData, onNext }) => {
               }}
             >
               <strong>{s.label}</strong>
-              <div style={{ fontSize: '0.9rem', color: '#666' }}>{s.description}</div>
+              <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.3rem' }}>
+                {s.description}
+              </div>
             </div>
           ))}
         </div>
@@ -208,41 +203,25 @@ const Step1Config = ({ bookData, setBookData, onNext }) => {
         </div>
       </div>
 
-      {/* Prix estimé */}
-      <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '1.5rem',
-        borderRadius: '10px',
-        color: 'white',
-        marginBottom: '2rem',
-        textAlign: 'center'
-      }}>
-        <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Prix estimé</div>
-        <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{Math.round(calculatePrice())}€</div>
-        <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>
-          {bookData.pages > 64 
-            ? `dont ${bookData.pages - 64} pages supplémentaires (${(bookData.pages - 64) / 8} chapitres supplémentaires)` 
-            : 'prix de base (8 chapitres)'}
-        </div>
-      </div>
+      {/* Note : le prix n'est plus affiché ici, il sera calculé dans le récapitulatif */}
 
       {/* Bouton suivant */}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button
           onClick={onNext}
-          disabled={!bookData.title}
+          disabled={loading || !bookData.title}
           style={{
             padding: '1rem 3rem',
-            background: bookData.title ? '#28a745' : '#ccc',
+            background: loading || !bookData.title ? '#ccc' : '#28a745',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
             fontSize: '1.1rem',
             fontWeight: 'bold',
-            cursor: bookData.title ? 'pointer' : 'not-allowed'
+            cursor: loading || !bookData.title ? 'not-allowed' : 'pointer'
           }}
         >
-          Continuer →
+          {loading ? 'Génération...' : 'Continuer →'}
         </button>
       </div>
     </div>

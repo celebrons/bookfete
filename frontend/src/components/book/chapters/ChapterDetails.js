@@ -41,7 +41,7 @@ const ChapterDetails = ({
       setHasContributed(false);
       setIsEditing(false);
       setExistingContribution(null);
-      setContributionText(''); // ← IMPORTANT : vider le texte
+      setContributionText('');
       checkUserContribution();
     } else {
       console.log('⚠️ Pas de vérification - manque:', { 
@@ -49,7 +49,7 @@ const ChapterDetails = ({
         userEmail: !!userEmail 
       });
     }
-  }, [chapter?.id, userEmail]); // ← Se déclenche quand l'ID du chapitre change
+  }, [chapter?.id, userEmail]);
 
   const checkUserContribution = async () => {
     try {
@@ -137,35 +137,11 @@ const ChapterDetails = ({
 
   return (
     <>
-      {/* Titre du chapitre avec sous-titre */}
+      {/* Titre du chapitre avec sous-titre - SANS LE BOUTON VOIR/MODÉRER */}
       <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <h2 style={{ margin: 0, color: '#333' }}>
-            {chapter.title}
-          </h2>
-          <button
-            onClick={() => onLoadContributions(chapter.id)}
-            style={{
-              padding: '0.6rem 1.2rem',
-              background: '#17a2b8',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.2s',
-              fontWeight: '500'
-            }}
-            onMouseEnter={(e) => e.target.style.background = '#138496'}
-            onMouseLeave={(e) => e.target.style.background = '#17a2b8'}
-          >
-            <span>👁️</span>
-            Voir/Modérer ({chapter.contributions?.[0]?.count || 0})
-          </button>
-        </div>
+        <h2 style={{ margin: 0, color: '#333' }}>
+          {chapter.title}
+        </h2>
         <p style={{ margin: '0.5rem 0 0', color: '#666', fontSize: '0.9rem' }}>
           ALBUM PRESTIGE • {chaptersCount} CHAPITRES
         </p>
@@ -198,7 +174,7 @@ const ChapterDetails = ({
             hasContributed={false}
             onEdit={handleEdit}
             existingPhotos={existingContribution?.photo_urls || []}
-            chapterTitle={chapter.title} // ← Pour debug
+            chapterTitle={chapter.title}
           />
         )
       ) : (
@@ -215,14 +191,17 @@ const ChapterDetails = ({
             hasContributed={true}
             onEdit={handleEdit}
             existingPhotos={existingContribution?.photo_urls || []}
-            chapterTitle={chapter.title} // ← Pour debug
+            chapterTitle={chapter.title}
           />
         )
       )}
 
-      {/* SECTION INVITATIONS */}
+      {/* SECTION INVITATIONS avec bouton de modération */}
       <div style={{ marginTop: '2.5rem' }}>
-        <ChapterInvitations chapterId={chapter.id} />
+        <ChapterInvitations 
+          chapterId={chapter.id} 
+          onLoadContributions={onLoadContributions}
+        />
       </div>
     </>
   );

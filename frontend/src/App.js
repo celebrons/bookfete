@@ -8,15 +8,14 @@ import Layout from './components/layout/Layout';
 
 // Pages publiques
 import HomePage from './components/home/HomePage';
-import EventPages from './components/home/EventPages';
 import HowItWorksPage from './components/home/HowItWorksPage';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import InvitationPage from './components/contributeur/InvitationPage';
+import CreateBookWizard from './components/create-book/CreateBookWizard'; // ← PUBLIC
 
-// Pages organisateur
+// Pages organisateur (protégées)
 import DashboardGeneral from './components/dashboard/DashboardGeneral';
-import CreateBookWizard from './components/create-book/CreateBookWizard';
 import BookPage from './components/book/BookPage';
 
 // Composant de route protégée
@@ -51,11 +50,11 @@ function App() {
               PAGES PUBLIQUES
           ============================================ */}
           <Route path="/" element={<HomePage />} />
-          <Route path="/evenement/:eventType" element={<EventPages />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/invite/:token" element={<InvitationPage />} />
+          <Route path="/create-book" element={<CreateBookWizard />} /> {/* ← PUBLIC */}
 
           {/* ============================================
               PAGES PROTÉGÉES
@@ -63,12 +62,6 @@ function App() {
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <DashboardGeneral />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/create-book" element={
-            <ProtectedRoute>
-              <CreateBookWizard />
             </ProtectedRoute>
           } />
           
