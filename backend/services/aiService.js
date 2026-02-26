@@ -11,15 +11,21 @@ const mistral = new Mistral({ apiKey: apiKey });
 
 /**
  * Génère des questions pour un chapitre
- * @param {Object} params - Les paramètres
- * @param {string} params.chapterTitle - Titre du chapitre
- * @param {string} params.eventType - Type d'événement
- * @param {string} params.style - Style narratif
- * @param {string} params.bookTitle - Titre du livre
- * @returns {Promise<string[]>} - Tableau de 4 questions
+ * @param {Object} params - TOUS les paramètres dans un objet
  */
-async function generateQuestions({ chapterTitle, eventType, style, bookTitle }) {
+async function generateQuestions(params) {
   try {
+    // Extraire toutes les données de l'objet params
+    const { 
+      chapterTitle, 
+      eventType, 
+      style, 
+      bookTitle,
+      recipientName,
+      recipientAge,
+      recipientGender 
+    } = params;
+
     console.log('='.repeat(60));
     console.log('🎯 AI SERVICE - GÉNÉRATION DE QUESTIONS');
     console.log('='.repeat(60));
@@ -27,9 +33,40 @@ async function generateQuestions({ chapterTitle, eventType, style, bookTitle }) 
     console.log('📖 chapterTitle reçu:', chapterTitle);
     console.log('🎉 eventType reçu:', eventType);
     console.log('✍️ style reçu:', style);
+    console.log('👤 recipientName reçu:', recipientName);
+    console.log('📅 recipientAge reçu:', recipientAge);
+    console.log('⚥ recipientGender reçu:', recipientGender);
+
+    // Valeurs par défaut
+    const name = recipientName || 
+                (bookTitle ? bookTitle.split(' ').pop() : 'la personne');
+    const age = recipientAge || 'non spécifié';
+    const gender = recipientGender || 'non spécifié';
+
+    // Déterminer les pronoms selon le genre
+    let pronoun = 'la personne';
+    let possessive = 'sa';
+    let subjectPronoun = 'elle';
     
-    if (!bookTitle) {
-      console.log('⚠️ ATTENTION: bookTitle est vide ou null!');
+    if (gender === 'homme') {
+      pronoun = 'cet homme';
+      possessive = 'son';
+      subjectPronoun = 'il';
+    } else if (gender === 'femme') {
+      pronoun = 'cette femme';
+      possessive = 'sa';
+      subjectPronoun = 'elle';
+    }
+
+    // Adapter selon l'âge
+    let ageContext = '';
+    if (age !== 'non spécifié') {
+      const ageNum = parseInt(age);
+      if (ageNum < 18) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un jeune garçon' : 'une jeune fille'} de ${ageNum} ans)`;
+      else if (ageNum < 30) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un jeune homme' : 'une jeune femme'} de ${ageNum} ans)`;
+      else if (ageNum < 50) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un adulte' : 'une adulte'} de ${ageNum} ans)`;
+      else if (ageNum < 70) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un senior' : 'une senior'} de ${ageNum} ans)`;
+      else ageContext = `(${pronoun} est ${gender === 'homme' ? 'un vétéran' : 'une vétérane'} de ${ageNum} ans)`;
     }
 
     const styleInstructions = {
@@ -40,49 +77,45 @@ async function generateQuestions({ chapterTitle, eventType, style, bookTitle }) 
 
     const styleInstruction = styleInstructions[style] || styleInstructions.factuel;
 
-    // Extraire le nom de la personne du titre (ex: "Anniversaire de Yani" -> "Yani")
-    let personName = '';
-    if (bookTitle) {
-      const matches = bookTitle.match(/(?:anniversaire|mariage|naissance|départ) de (.*)/i);
-      personName = matches ? matches[1].trim() : '';
-    }
-
     const prompt = `Tu es un assistant qui aide à créer des questions pour un livre souvenir collaboratif.
     
-Contexte du livre :
-- TITRE DU LIVRE : "${bookTitle || 'ce livre'}"
-- Personne célébrée : ${personName || 'la personne concernée'}
+Contexte DÉTAILLÉ du livre :
+- Titre du livre : "${bookTitle || 'Notre livre de souvenirs'}"
 - Type d'événement : ${eventType}
 - Titre du chapitre : "${chapterTitle}"
 - Style narratif : ${style}
+- Personne célébrée : ${name}
+- Âge : ${age} ans ${ageContext}
+- Sexe : ${gender}
 
 ${styleInstruction}
 
-Génère 4 questions PERSONNALISÉES pour ce chapitre.
-
 RÈGLES IMPÉRATIVES :
-1. Chaque question doit mentionner "${personName || 'la personne'}" (le nom de la personne célébrée)
-2. Les questions doivent être adaptées au chapitre "${chapterTitle}"
-3. Utilise le style ${style}
+1. Chaque question doit mentionner le prénom "${name}" ou un pronom adapté (${pronoun})
+2. Les questions doivent être en lien avec le titre du chapitre "${chapterTitle}"
+3. Adapte le ton à l'âge (${age} ans) et au sexe (${gender})
+4. Utilise le style ${style}
 
-Exemple pour un livre "Anniversaire de Yani", chapitre "Messages" :
-- "Quel message aimerais-tu adresser directement à Yani ?"
-- "Qu'est-ce que tu souhaites pour l'avenir de Yani ?"
-- "Quel souvenir avec Yani aimerais-tu partager ?"
-- "Quelle qualité de Yani veux-tu souligner ?"
+Exemples adaptés au contexte :
+- Pour un homme de 60 ans, chapitre "Sagesse": "Quel conseil précieux ${name} vous a-t-il donné ?"
+- Pour une femme de 30 ans, chapitre "Carrière": "Comment ${name} a-t-elle construit sa carrière ?"
+- Pour un enfant de 10 ans, chapitre "Enfance": "Quel est ton plus beau souvenir avec ${name} ?"
 
-Réponds UNIQUEMENT avec un tableau JSON de 4 questions.
+Génère 4 questions ouvertes et inspirantes pour ce chapitre.
 
-Format : ["Question 1", "Question 2", "Question 3", "Question 4"]`;
+Réponds UNIQUEMENT avec un tableau JSON de 4 chaînes de caractères.
+Exemple de format : ["Question 1", "Question 2", "Question 3", "Question 4"]
 
-    console.log('📝 Prompt envoyé à Mistral');
+Ne mets rien d'autre que le tableau JSON dans ta réponse.`;
+
+    console.log('📝 Prompt envoyé à Mistral (extrait):', prompt.substring(0, 300) + '...');
 
     const response = await mistral.chat.complete({
       model: 'mistral-small-latest',
       messages: [
         { 
           role: 'system', 
-          content: 'Tu es un assistant spécialisé dans la création de livres souvenirs.' 
+          content: 'Tu es un assistant spécialisé dans la création de livres souvenirs et de témoignages.' 
         },
         { 
           role: 'user', 
@@ -108,42 +141,46 @@ Format : ["Question 1", "Question 2", "Question 3", "Question 4"]`;
     }
     
     console.log('⚠️ Utilisation des questions par défaut');
-    return getDefaultQuestions(bookTitle, chapterTitle, eventType, style, personName);
+    return getDefaultQuestions(bookTitle, chapterTitle, eventType, style, name, age, gender);
     
   } catch (error) {
     console.error('❌ Erreur génération questions:', error);
-    return getDefaultQuestions(bookTitle, chapterTitle, eventType, style, personName);
+    return getDefaultQuestions(bookTitle, chapterTitle, eventType, style, name, age, gender);
   }
 }
 
 /**
  * Questions par défaut (contextuelles)
  */
-function getDefaultQuestions(bookTitle, chapterTitle, eventType, style, personName) {
-  const name = personName || 'la personne';
+function getDefaultQuestions(bookTitle, chapterTitle, eventType, style, recipientName, recipientAge, recipientGender) {
+  const name = recipientName || 'la personne';
+  
+  // Adapter les pronoms
+  const pronoun = recipientGender === 'femme' ? 'elle' : recipientGender === 'homme' ? 'lui' : 'cette personne';
+  const possessive = recipientGender === 'femme' ? 'sa' : recipientGender === 'homme' ? 'son' : 'sa';
   
   const baseQuestions = [
-    `Quel souvenir lié à ${name} est le plus précieux pour vous ?`,
-    `Qu'est-ce qui rend ${name} unique à vos yeux ?`,
-    `Quel message souhaitez-vous adresser à ${name} ?`,
-    `Quelle qualité de ${name} aimeriez-vous souligner ?`
+    `En lien avec "${bookTitle}", quel souvenir lié à "${chapterTitle}" est le plus précieux pour vous concernant ${name} ?`,
+    `Qu'est-ce qui rend ce moment "${chapterTitle}" unique dans l'histoire de ${name} ?`,
+    `Si vous deviez décrire ${chapterTitle} en trois mots pour ce livre, lesquels choisiriez-vous ?`,
+    `Quel message ou conseil souhaitez-vous partager dans ce chapitre "${chapterTitle}" avec ${name} ?`
   ];
 
   if (style === 'poetique') {
     return [
-      `Quels mots choisis-tu pour décrire la poésie de ${name} ?`,
-      `Si ${name} était un poème, quels vers écrirais-tu ?`,
-      `Quelle émotion ${name} éveille-t-elle en toi ?`,
-      `Quelle lumière ${name} apporte-t-elle dans ta vie ?`
+      `Quels mots choisis-tu pour décrire la poésie de "${chapterTitle}" dans la vie de ${name} ?`,
+      `Si "${chapterTitle}" de ${name} était un poème, quels vers écrirais-tu ?`,
+      `Quelle émotion ${name} éveille-t-${pronoun} en toi quand tu penses à "${chapterTitle}" ?`,
+      `Quelle lumière garderas-tu de ce chapitre sur ${name} ?`
     ];
   }
   
   if (style === 'intime') {
     return [
-      `Raconte-nous ce que ${name} représente pour toi.`,
-      `Quel sentiment personnel ${name} évoque-t-il en toi ?`,
-      `Partage un détail intime sur ${name}.`,
-      `Qu'est-ce que tu aimerais que les autres retiennent de ${name} ?`
+      `Raconte-nous ce que "${chapterTitle}" représente pour toi dans la vie de ${name}.`,
+      `Quel sentiment personnel ${name} évoque-t-${pronoun} en toi quand tu penses à "${chapterTitle}" ?`,
+      `Partage un détail intime, même petit, sur "${chapterTitle}" de ${name}.`,
+      `Qu'est-ce que tu aimerais que les autres retiennent de ${name} à travers ce chapitre ?`
     ];
   }
 

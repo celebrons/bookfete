@@ -1,6 +1,6 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\QuestionsSection.js
 import React, { useEffect } from 'react';
-import Tooltip from '../../ui/Tooltip';  // ← IMPORT AJOUTÉ
+import Tooltip from '../../ui/Tooltip';
 
 const QuestionsSection = ({ 
   questions, 
@@ -11,12 +11,21 @@ const QuestionsSection = ({
   style 
 }) => {
   
-  // Régénérer automatiquement quand le titre change
+  // Log au chargement du composant
   useEffect(() => {
-    if (chapterTitle) {
+    console.log('📦 QuestionsSection chargée pour le chapitre:', chapterTitle);
+  }, [chapterTitle]);
+
+  // Log quand les questions changent
+  useEffect(() => {
+    console.log('📝 Questions actuelles:', questions);
+  }, [questions]);
+
+  const handleGenerateClick = () => {
+    if (onGenerate) {
       onGenerate();
     }
-  }, [chapterTitle]);
+  };
 
   return (
     <div style={{
@@ -47,22 +56,40 @@ const QuestionsSection = ({
 
       <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center' }}>
         <button
-          onClick={onGenerate}
+          onClick={handleGenerateClick}
           disabled={generating}
           style={{
             padding: '0.6rem 1.2rem',
-            background: 'white',
+            background: generating ? '#ccc' : 'white',
             color: '#764ba2',
             border: 'none',
             borderRadius: '5px',
             fontSize: '0.9rem',
             fontWeight: 'bold',
             cursor: generating ? 'not-allowed' : 'pointer',
-            opacity: generating ? 0.7 : 1
+            opacity: generating ? 0.7 : 1,
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            if (!generating) {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 5px 15px rgba(0,0,0,0.2)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!generating) {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
+            }
           }}
         >
-          {generating ? '✨ Génération...' : '🎲 Régénérer les questions'}
+          {generating ? '✨ Génération...' : '🎲 Générer de nouvelles questions'}
         </button>
+      </div>
+
+      {/* Message de debug */}
+      <div style={{ marginTop: '1rem', fontSize: '0.8rem', textAlign: 'center', opacity: 0.7 }}>
+        {chapterTitle && <span>Chapitre: {chapterTitle}</span>}
       </div>
     </div>
   );

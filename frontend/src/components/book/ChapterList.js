@@ -61,6 +61,52 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   );
   const [contributors, setContributors] = useState([]);
 
+  // ==================== LOGS DE DÉBUG ====================
+
+  // LOG 1: Vérifier ce que reçoit ChapterList comme props
+  useEffect(() => {
+    console.log('%c📦 LOG 1 - ChapterList PROPS REÇUES:', 'background: #764ba2; color: white; padding: 5px;');
+    console.log('bookId:', bookId);
+    console.log('book reçu:', {
+      title: book?.title,
+      recipient_name: book?.recipient_name,
+      recipient_age: book?.recipient_age,
+      recipient_gender: book?.recipient_gender,
+      event_type: book?.event_type,
+      style_narratif: book?.style_narratif
+    });
+    console.log('chapters:', chapters?.length);
+  }, [book, bookId, chapters]);
+
+  // LOG 2: Requête directe à la base de données
+  const refreshBookData = async () => {
+    try {
+      console.log('%c🔍 LOG 2 - RECHERCHE DIRECTE EN BASE', 'background: #ffc107; color: black; padding: 5px;');
+      console.log('bookId recherché:', bookId);
+      
+      const { data, error } = await supabase
+        .from('books')
+        .select('recipient_name, recipient_age, recipient_gender, title')
+        .eq('id', bookId)
+        .single();
+      
+      if (error) {
+        console.error('❌ Erreur recherche base:', error);
+      } else {
+        console.log('✅ Données trouvées en base:', data);
+      }
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+    }
+  };
+
+  // Appeler la recherche directe au montage
+  useEffect(() => {
+    if (bookId) {
+      refreshBookData();
+    }
+  }, [bookId]);
+
   // Récupérer l'utilisateur connecté
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -169,64 +215,73 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
       });
     }
   };
-
-  // ==================== FONCTION IA ====================
-  const generateAIQuestions = async (chapter) => {
-    try {
-      setGeneratingQuestions(true);
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      
-      if (!token) {
-        alert('Vous devez être connecté');
-        return;
-      }
-
-      console.log('🤖 Génération IA avec:', {
-        chapterTitle: chapter.title,
-        bookTitle: book?.title,
-        eventType: book?.event_type,
-        style: book?.style_narratif
-      });
-
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-questions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          chapterTitle: chapter.title,
-          bookTitle: book?.title,
-          eventType: book?.event_type || 'default',
-          style: book?.style_narratif || 'factuel'
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur génération IA');
-      }
-
-      await onUpdateChapter(chapter.id, {
-        questions_ia: data.questions
-      });
-
-      setSelectedItem(prev => ({
-        ...prev,
-        questions_ia: data.questions
-      }));
-
-    } catch (error) {
-      console.error('❌ Erreur:', error);
-      alert('Erreur lors de la génération des questions');
-    } finally {
-      setGeneratingQuestions(false);
+// ==================== VERSION FINALE AVEC FRESHBOOKDATA ====================
+const generateAIQuestions = async (chapter) => {
+  try {
+    setGeneratingQuestions(true);
+    
+    // 1. Récupérer les dernières données du livre DIRECTEMENT depuis la base
+    const { data: freshBookData, error } = await supabase
+      .from('books')
+      .select('recipient_name, recipient_age, recipient_gender, title, event_type, style_narratif')
+      .eq('id', bookId)
+      .single();
+    
+    if (error) {
+      console.error('❌ Erreur récupération livre:', error);
+      alert('Erreur lors de la récupération des données');
+      return;
     }
-  };
 
+    console.log('📦 Données fraîches de la base:', freshBookData);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    
+    if (!token) {
+      alert('Vous devez être connecté');
+      return;
+    }
+
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-questions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        chapterTitle: chapter.title,
+        bookTitle: freshBookData.title,
+        eventType: freshBookData.event_type || 'default',
+        style: freshBookData.style_narratif || 'factuel',
+        recipientName: freshBookData.recipient_name,
+        recipientAge: freshBookData.recipient_age,
+        recipientGender: freshBookData.recipient_gender
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Erreur génération IA');
+    }
+
+    await onUpdateChapter(chapter.id, {
+      questions_ia: data.questions
+    });
+
+    setSelectedItem(prev => ({
+      ...prev,
+      questions_ia: data.questions
+    }));
+
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    alert('Erreur lors de la génération des questions');
+  } finally {
+    setGeneratingQuestions(false);
+  }
+};
   // ==================== FONCTIONS CONTRIBUTIONS ====================
   const loadContributions = async (chapterId) => {
     setLoadingContributions(true);
@@ -577,7 +632,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
             onApprove={approveContribution}
             onDelete={deleteContribution}
             onBack={() => setShowContributions(false)}
-            organizerEmail={user?.email}  // ← AJOUT ICI
+            organizerEmail={user?.email}
           />
         )}
 

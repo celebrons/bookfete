@@ -15,6 +15,7 @@ const BookPage = () => {
   const [activeTab, setActiveTab] = useState('chapitres');
 
   useEffect(() => {
+    console.log('📚 BookPage - Chargement du livre ID:', bookId);
     loadBookAndChapters();
   }, [bookId]);
 
@@ -22,6 +23,7 @@ const BookPage = () => {
     try {
       setLoading(true);
       
+      console.log('🔍 BookPage - Récupération du livre...');
       const { data: bookData, error: bookError } = await supabase
         .from('books')
         .select('*')
@@ -29,8 +31,20 @@ const BookPage = () => {
         .single();
 
       if (bookError) throw bookError;
+      
+      console.log('✅ BookPage - Livre chargé:', {
+        id: bookData.id,
+        title: bookData.title,
+        recipient_name: bookData.recipient_name,
+        recipient_age: bookData.recipient_age,
+        recipient_gender: bookData.recipient_gender,
+        event_type: bookData.event_type,
+        style_narratif: bookData.style_narratif
+      });
+      
       setBook(bookData);
 
+      console.log('🔍 BookPage - Récupération des chapitres...');
       const { data: chaptersData, error: chaptersError } = await supabase
         .from('chapters')
         .select(`
@@ -41,6 +55,7 @@ const BookPage = () => {
         .order('order_index', { ascending: true });
 
       if (chaptersError) throw chaptersError;
+      console.log(`✅ BookPage - ${chaptersData?.length || 0} chapitres chargés`);
       setChapters(chaptersData || []);
 
     } catch (error) {
@@ -125,6 +140,16 @@ const BookPage = () => {
 
   if (loading) return <Loading message="Chargement du livre..." />;
   if (!book) return <div>Livre non trouvé</div>;
+  
+  console.log('📦 BookPage - ENVOI à ChapterList:', {
+  bookId: bookId,
+  book: {
+    title: book?.title,
+    recipient_name: book?.recipient_name,
+    recipient_age: book?.recipient_age,
+    recipient_gender: book?.recipient_gender
+  }
+});
 
   return (
     <div style={{
@@ -156,7 +181,6 @@ const BookPage = () => {
             </div>
           </div>
           
-          {/* Lien vers tableau de bord */}
           <Link 
             to="/dashboard" 
             style={{
@@ -265,7 +289,7 @@ const BookPage = () => {
           <BookConfig 
             book={book} 
             onUpdateBook={handleUpdateBook}
-            chaptersCount={chapters.length}  // ← LIGNE AJOUTÉE
+            chaptersCount={chapters.length}
           />
         )}
       </div>

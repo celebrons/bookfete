@@ -15,7 +15,7 @@ const ChapterDetails = ({
   photos,
   photoPreviews,
   onPhotoChange,
-  onRemovePhoto,
+  onRemovePhoto,  // ← C'est bien cette prop qu'il faut utiliser
   onSubmitContribution,
   submitting,
   onLoadContributions,
@@ -28,10 +28,19 @@ const ChapterDetails = ({
   const [loading, setLoading] = useState(true);
   const [existingContribution, setExistingContribution] = useState(null);
 
-  console.log('🔍 ===== NOUVEAU CHAPITRE =====');
-  console.log('🔍 ChapterDetails - userEmail reçu:', userEmail);
-  console.log('🔍 ChapterDetails - chapter ID:', chapter?.id);
-  console.log('🔍 ChapterDetails - chapter title:', chapter?.title);
+  // TOUS LES useEffect DOIVENT ÊTRE DÉCLARÉS AVANT LE RETURN
+  useEffect(() => {
+    console.log('🔍 ===== NOUVEAU CHAPITRE =====');
+    console.log('🔍 ChapterDetails - userEmail reçu:', userEmail);
+    console.log('🔍 ChapterDetails - chapter ID:', chapter?.id);
+    console.log('🔍 ChapterDetails - chapter title:', chapter?.title);
+  }, [chapter, userEmail]);
+
+  // LOG POUR VÉRIFIER LA FONCTION
+  useEffect(() => {
+    console.log('📦 ChapterDetails - onGenerateQuestions est-elle définie ?', 
+      onGenerateQuestions ? 'OUI' : 'NON');
+  }, [onGenerateQuestions]);
 
   // Vérifier si l'utilisateur a déjà contribué à CE chapitre précis
   useEffect(() => {
@@ -115,6 +124,7 @@ const ChapterDetails = ({
     }, 1000);
   };
 
+  // NE PAS METTRE DE HOOK APRÈS CETTE LIGNE
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -151,7 +161,14 @@ const ChapterDetails = ({
       {(!hasContributed || isEditing) && (
         <QuestionsSection
           questions={chapter.questions_ia}
-          onGenerate={() => onGenerateQuestions(chapter)}
+          onGenerate={() => {
+            console.log('🔄 Appel de onGenerateQuestions depuis QuestionsSection');
+            if (onGenerateQuestions) {
+              onGenerateQuestions(chapter);
+            } else {
+              console.error('❌ onGenerateQuestions est undefined au moment de l\'appel!');
+            }
+          }}
           generating={generatingQuestions}
           chapterTitle={chapter.title}
           eventType={chapter.event_type}
@@ -168,7 +185,7 @@ const ChapterDetails = ({
             photos={photos}
             photoPreviews={photoPreviews}
             onPhotoChange={onPhotoChange}
-            onRemovePhoto={onRemovePhoto}
+            onRemovePhoto={onRemovePhoto}  // ← CORRIGÉ: onRemovePhoto au lieu de removePhoto
             onSubmit={handleSubmit}
             submitting={submitting}
             hasContributed={false}
@@ -185,7 +202,7 @@ const ChapterDetails = ({
             photos={photos}
             photoPreviews={photoPreviews}
             onPhotoChange={onPhotoChange}
-            onRemovePhoto={onRemovePhoto}
+            onRemovePhoto={onRemovePhoto}  // ← CORRIGÉ: onRemovePhoto au lieu de removePhoto
             onSubmit={handleSubmit}
             submitting={submitting}
             hasContributed={true}
