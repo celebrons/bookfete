@@ -9,17 +9,13 @@ import ChapterEditor from './chapters/ChapterEditor';
 import QuestionsEditor from './chapters/QuestionsEditor';
 import ContributionsModeration from './chapters/ContributionsModeration';
 import InviteSelector from './contributors/InviteSelector';
+import { useChapterActions } from './chapters/hooks/useChapterActions';
 
 const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAddChapter, book, onUpdateBook }) => {
-  const [editingChapter, setEditingChapter] = useState(null);
-  const [editingQuestions, setEditingQuestions] = useState(null);
-  const [inviteSuccess, setInviteSuccess] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedType, setSelectedType] = useState('chapter');
   const [showGuide, setShowGuide] = useState(true);
   const [newQuestion, setNewQuestion] = useState('');
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [generatingQuestions, setGeneratingQuestions] = useState(false);
   const [user, setUser] = useState(null);
   
   // États pour la contribution
@@ -61,51 +57,22 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   );
   const [contributors, setContributors] = useState([]);
 
-  // ==================== LOGS DE DÉBUG ====================
-
-  // LOG 1: Vérifier ce que reçoit ChapterList comme props
-  useEffect(() => {
-    console.log('%c📦 LOG 1 - ChapterList PROPS REÇUES:', 'background: #764ba2; color: white; padding: 5px;');
-    console.log('bookId:', bookId);
-    console.log('book reçu:', {
-      title: book?.title,
-      recipient_name: book?.recipient_name,
-      recipient_age: book?.recipient_age,
-      recipient_gender: book?.recipient_gender,
-      event_type: book?.event_type,
-      style_narratif: book?.style_narratif
-    });
-    console.log('chapters:', chapters?.length);
-  }, [book, bookId, chapters]);
-
-  // LOG 2: Requête directe à la base de données
-  const refreshBookData = async () => {
-    try {
-      console.log('%c🔍 LOG 2 - RECHERCHE DIRECTE EN BASE', 'background: #ffc107; color: black; padding: 5px;');
-      console.log('bookId recherché:', bookId);
-      
-      const { data, error } = await supabase
-        .from('books')
-        .select('recipient_name, recipient_age, recipient_gender, title')
-        .eq('id', bookId)
-        .single();
-      
-      if (error) {
-        console.error('❌ Erreur recherche base:', error);
-      } else {
-        console.log('✅ Données trouvées en base:', data);
-      }
-    } catch (error) {
-      console.error('❌ Erreur:', error);
-    }
-  };
-
-  // Appeler la recherche directe au montage
-  useEffect(() => {
-    if (bookId) {
-      refreshBookData();
-    }
-  }, [bookId]);
+  // Hooks personnalisés pour les actions des chapitres
+  const {
+    editingChapter,
+    editingQuestions,
+    generatingQuestions,
+    deleteConfirm,
+    setEditingChapter,
+    setEditingQuestions,
+    setDeleteConfirm,
+    handleEdit,
+    handleEditQuestions,
+    handleDeleteClick,
+    handleSaveEdit,
+    handleSaveQuestions,
+    generateAIQuestions
+  } = useChapterActions(bookId, onUpdateChapter, setSelectedItem);
 
   // Récupérer l'utilisateur connecté
   useEffect(() => {
@@ -142,60 +109,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   };
 
-  // ==================== FONCTIONS DES CHAPITRES ====================
-  const handleEdit = (chapter) => {
-    setEditingChapter({
-      id: chapter.id,
-      title: chapter.title,
-      description: chapter.description || ''
-    });
-  };
-
-  const handleEditQuestions = (chapter) => {
-    setEditingQuestions({
-      id: chapter.id,
-      questions: chapter.questions_ia || []
-    });
-  };
-
-  const handleDeleteClick = (chapter, e) => {
-    e.stopPropagation();
-    setDeleteConfirm(chapter);
-  };
-
-  const confirmDelete = async () => {
-    if (deleteConfirm) {
-      await onDeleteChapter(deleteConfirm.id);
-      setDeleteConfirm(null);
-      if (selectedItem?.id === deleteConfirm.id) {
-        setSelectedItem(null);
-      }
-    }
-  };
-
-  const cancelDelete = () => {
-    setDeleteConfirm(null);
-  };
-
-  const handleSaveEdit = async () => {
-    if (editingChapter) {
-      await onUpdateChapter(editingChapter.id, {
-        title: editingChapter.title,
-        description: editingChapter.description
-      });
-      setEditingChapter(null);
-    }
-  };
-
-  const handleSaveQuestions = async () => {
-    if (editingQuestions) {
-      await onUpdateChapter(editingQuestions.id, {
-        questions_ia: editingQuestions.questions
-      });
-      setEditingQuestions(null);
-    }
-  };
-
+  // Fonctions pour les questions
   const addQuestion = () => {
     if (newQuestion.trim() && editingQuestions) {
       setEditingQuestions({
@@ -215,74 +129,8 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
       });
     }
   };
-// ==================== VERSION FINALE AVEC FRESHBOOKDATA ====================
-const generateAIQuestions = async (chapter) => {
-  try {
-    setGeneratingQuestions(true);
-    
-    // 1. Récupérer les dernières données du livre DIRECTEMENT depuis la base
-    const { data: freshBookData, error } = await supabase
-      .from('books')
-      .select('recipient_name, recipient_age, recipient_gender, title, event_type, style_narratif')
-      .eq('id', bookId)
-      .single();
-    
-    if (error) {
-      console.error('❌ Erreur récupération livre:', error);
-      alert('Erreur lors de la récupération des données');
-      return;
-    }
 
-    console.log('📦 Données fraîches de la base:', freshBookData);
-
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    
-    if (!token) {
-      alert('Vous devez être connecté');
-      return;
-    }
-
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-questions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        chapterTitle: chapter.title,
-        bookTitle: freshBookData.title,
-        eventType: freshBookData.event_type || 'default',
-        style: freshBookData.style_narratif || 'factuel',
-        recipientName: freshBookData.recipient_name,
-        recipientAge: freshBookData.recipient_age,
-        recipientGender: freshBookData.recipient_gender
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Erreur génération IA');
-    }
-
-    await onUpdateChapter(chapter.id, {
-      questions_ia: data.questions
-    });
-
-    setSelectedItem(prev => ({
-      ...prev,
-      questions_ia: data.questions
-    }));
-
-  } catch (error) {
-    console.error('❌ Erreur:', error);
-    alert('Erreur lors de la génération des questions');
-  } finally {
-    setGeneratingQuestions(false);
-  }
-};
-  // ==================== FONCTIONS CONTRIBUTIONS ====================
+  // Fonctions pour les contributions
   const loadContributions = async (chapterId) => {
     setLoadingContributions(true);
     try {
@@ -311,7 +159,6 @@ const generateAIQuestions = async (chapter) => {
         .eq('id', contributionId);
 
       if (error) throw error;
-
       setChapterContributions(prev =>
         prev.map(c => c.id === contributionId ? { ...c, approved: true } : c)
       );
@@ -331,7 +178,6 @@ const generateAIQuestions = async (chapter) => {
         .eq('id', contributionId);
 
       if (error) throw error;
-
       setChapterContributions(prev => prev.filter(c => c.id !== contributionId));
     } catch (error) {
       console.error('❌ Erreur suppression:', error);
@@ -339,25 +185,20 @@ const generateAIQuestions = async (chapter) => {
     }
   };
 
-  // ==================== FONCTIONS INVITATION ====================
+  // Fonctions d'invitation
   const handleOpenInviteSelector = (chapter, e) => {
     e.stopPropagation();
-    console.log('📌 handleOpenInviteSelector appelé avec:', chapter);
-    
     if (!chapter || !chapter.id) {
-      console.error('❌ Erreur: chapter ou chapter.id manquant');
       alert('Erreur: impossible d\'identifier le chapitre');
       return;
     }
-    
     setSelectedChapterForInvite(chapter);
     setShowInviteSelector(true);
   };
 
-  // ==================== FONCTIONS PHOTOS ====================
+  // Fonctions photos
   const handlePhotoChange = (e) => {
     const files = Array.from(e.target.files);
-    
     if (photos.length + files.length > 2) {
       alert('Maximum 2 photos');
       return;
@@ -365,9 +206,7 @@ const generateAIQuestions = async (chapter) => {
 
     const validFiles = files.filter(file => {
       const isValid = file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024;
-      if (!isValid) {
-        alert(`${file.name} : format invalide ou trop volumineux (max 5MB)`);
-      }
+      if (!isValid) alert(`${file.name} : format invalide ou trop volumineux (max 5MB)`);
       return isValid;
     });
 
@@ -407,15 +246,11 @@ const generateAIQuestions = async (chapter) => {
           .from('contribution-photos')
           .upload(fileName, photo);
 
-        if (uploadError) {
-          console.error('❌ Erreur upload:', uploadError);
-          continue;
-        }
+        if (uploadError) continue;
 
         const { data: { publicUrl } } = supabase.storage
           .from('contribution-photos')
           .getPublicUrl(fileName);
-
         photoUrls.push(publicUrl);
       }
 
@@ -445,7 +280,7 @@ const generateAIQuestions = async (chapter) => {
     }
   };
 
-  // ==================== FONCTIONS COUVERTURE ====================
+  // Fonctions couverture
   const handleSaveCover = async () => {
     await onUpdateBook({ cover_config: coverConfig });
     setEditingCover(false);
@@ -493,7 +328,7 @@ const generateAIQuestions = async (chapter) => {
         onEditQuestions={handleEditQuestions}
         onDeleteClick={handleDeleteClick}
         onCopyInviteLink={handleOpenInviteSelector}
-        inviteSuccess={inviteSuccess}
+        inviteSuccess={false}
         deleteConfirm={deleteConfirm}
         getStatusColor={getStatusColor}
         coverConfig={coverConfig}
@@ -513,7 +348,7 @@ const generateAIQuestions = async (chapter) => {
         overflowY: 'auto',
         position: 'relative'
       }}>
-        {/* Modal de confirmation de suppression */}
+        {/* Modals et contenu */}
         {deleteConfirm && (
           <div style={{
             position: 'absolute',
@@ -536,46 +371,17 @@ const generateAIQuestions = async (chapter) => {
               textAlign: 'center'
             }}>
               <span style={{ fontSize: '3rem', marginBottom: '1rem', display: 'block' }}>⚠️</span>
-              <h3 style={{ marginBottom: '1rem' }}>Supprimer le chapitre ?</h3>
-              <p style={{ marginBottom: '1rem', color: '#666' }}>
-                Êtes-vous sûr de vouloir supprimer le chapitre <strong>"{deleteConfirm.title}"</strong> ?
-              </p>
-              <p style={{ marginBottom: '2rem', color: '#dc3545', fontSize: '0.9rem' }}>
-                Cette action est irréversible. Toutes les contributions associées seront également supprimées.
-              </p>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                <button
-                  onClick={cancelDelete}
-                  style={{
-                    padding: '0.8rem 1.5rem',
-                    background: '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  style={{
-                    padding: '0.8rem 1.5rem',
-                    background: '#dc3545',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Supprimer définitivement
-                </button>
+              <h3>Supprimer le chapitre ?</h3>
+              <p>{deleteConfirm.title}</p>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button onClick={() => setDeleteConfirm(null)}>Annuler</button>
+                <button onClick={() => onDeleteChapter(deleteConfirm.id)}>Supprimer</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ========== COUVERTURE ========== */}
+        {/* Éditeurs */}
         {selectedType === 'cover' && (
           <CoverEditor
             coverConfig={coverConfig}
@@ -587,7 +393,6 @@ const generateAIQuestions = async (chapter) => {
           />
         )}
 
-        {/* ========== 4ÈME COUVERTURE ========== */}
         {selectedType === 'backcover' && (
           <BackCoverEditor
             backCoverConfig={backCoverConfig}
@@ -599,7 +404,6 @@ const generateAIQuestions = async (chapter) => {
           />
         )}
 
-        {/* ========== CHAPITRES - MODE ÉDITION TITRE ========== */}
         {selectedType === 'chapter' && editingChapter && (
           <ChapterEditor
             editingChapter={editingChapter}
@@ -609,7 +413,6 @@ const generateAIQuestions = async (chapter) => {
           />
         )}
 
-        {/* ========== CHAPITRES - MODE ÉDITION QUESTIONS ========== */}
         {selectedType === 'chapter' && editingQuestions && !editingChapter && (
           <QuestionsEditor
             editingQuestions={editingQuestions}
@@ -623,7 +426,6 @@ const generateAIQuestions = async (chapter) => {
           />
         )}
 
-        {/* ========== CHAPITRES - MODE MODÉRATION ========== */}
         {selectedType === 'chapter' && showContributions && !editingChapter && !editingQuestions && (
           <ContributionsModeration
             chapterTitle={selectedItem?.title}
@@ -636,7 +438,6 @@ const generateAIQuestions = async (chapter) => {
           />
         )}
 
-        {/* ========== CHAPITRES - MODE NORMAL ========== */}
         {selectedType === 'chapter' && selectedItem && !editingChapter && !editingQuestions && !showContributions && (
           <ChapterDetails
             chapter={selectedItem}
@@ -653,27 +454,18 @@ const generateAIQuestions = async (chapter) => {
             submitting={submitting}
             onLoadContributions={loadContributions}
             onCopyInviteLink={handleOpenInviteSelector}
-            inviteSuccess={inviteSuccess}
+            inviteSuccess={false}
             userEmail={user?.email}
+            user={user}
+            book={book}
+			onEditQuestions={handleEditQuestions}
           />
         )}
 
-        {/* ========== AUCUNE SÉLECTION ========== */}
         {!selectedItem && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '400px',
-            color: '#999',
-            height: '100%'
-          }}>
-            <span style={{ fontSize: '4rem', marginBottom: '1rem' }}>📖</span>
-            <h3>Sélectionnez un élément</h3>
-            <p style={{ textAlign: 'center', maxWidth: '400px' }}>
-              Cliquez sur un chapitre pour commencer
-            </p>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>
+            <span style={{ fontSize: '4rem' }}>📖</span>
+            <h3>Sélectionnez un chapitre</h3>
           </div>
         )}
       </div>
@@ -687,19 +479,8 @@ const generateAIQuestions = async (chapter) => {
             setShowInviteSelector(false);
             setSelectedChapterForInvite(null);
           }}
-          onInvitesSent={() => {
-            // Optionnel: rafraîchir quelque chose
-          }}
         />
       )}
-
-      {/* Style pour l'animation du spinner */}
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };

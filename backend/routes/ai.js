@@ -158,16 +158,30 @@ Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
 // ============================================
 
 // Route pour générer des questions
+// backend/routes/ai.js - Route /generate-questions
 router.post('/generate-questions', authenticate, async (req, res) => {
   try {
-    const { chapterTitle, bookTitle, eventType, style } = req.body;
-    
-    console.log('📝 Route /generate-questions appelée avec:', { 
+    const { 
       chapterTitle, 
       bookTitle, 
       eventType, 
-      style 
-    });
+      style,
+      recipientName,
+      recipientAge,
+      recipientGender 
+    } = req.body;
+    
+    console.log('='.repeat(60));
+    console.log('📦 ROUTE AI - DONNÉES REÇUES DU FRONTEND');
+    console.log('='.repeat(60));
+    console.log('📚 bookTitle:', bookTitle);
+    console.log('📖 chapterTitle:', chapterTitle);
+    console.log('🎉 eventType:', eventType);
+    console.log('✍️ style:', style);
+    console.log('👤 recipientName:', recipientName);
+    console.log('📅 recipientAge:', recipientAge, 'type:', typeof recipientAge);
+    console.log('⚥ recipientGender:', recipientGender);
+    console.log('='.repeat(60));
 
     if (!chapterTitle) {
       return res.status(400).json({ error: 'chapterTitle est requis' });
@@ -177,7 +191,10 @@ router.post('/generate-questions', authenticate, async (req, res) => {
       chapterTitle,
       bookTitle: bookTitle || 'ce livre',
       eventType: eventType || 'evenement',
-      style: style || 'intime'
+      style: style || 'intime',
+      recipientName,
+      recipientAge,
+      recipientGender
     });
     
     res.json({ questions });
@@ -186,7 +203,6 @@ router.post('/generate-questions', authenticate, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 // Route pour générer une citation
 router.post('/generate-quote', authenticate, async (req, res) => {
   try {

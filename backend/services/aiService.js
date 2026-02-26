@@ -37,13 +37,14 @@ async function generateQuestions(params) {
     console.log('📅 recipientAge reçu:', recipientAge);
     console.log('⚥ recipientGender reçu:', recipientGender);
 
-    // Valeurs par défaut
+    // UTILISATION DES VRAIES VALEURS DE LA BASE
+    // Si les valeurs sont undefined, on utilise le titre comme fallback
     const name = recipientName || 
                 (bookTitle ? bookTitle.split(' ').pop() : 'la personne');
     const age = recipientAge || 'non spécifié';
     const gender = recipientGender || 'non spécifié';
 
-    // Déterminer les pronoms selon le genre
+    // Déterminer les pronoms selon le genre (basé sur les vraies données)
     let pronoun = 'la personne';
     let possessive = 'sa';
     let subjectPronoun = 'elle';
@@ -58,7 +59,7 @@ async function generateQuestions(params) {
       subjectPronoun = 'elle';
     }
 
-    // Adapter selon l'âge
+    // Adapter selon l'âge (basé sur les vraies données)
     let ageContext = '';
     if (age !== 'non spécifié') {
       const ageNum = parseInt(age);
@@ -97,9 +98,9 @@ RÈGLES IMPÉRATIVES :
 4. Utilise le style ${style}
 
 Exemples adaptés au contexte :
-- Pour un homme de 60 ans, chapitre "Sagesse": "Quel conseil précieux ${name} vous a-t-il donné ?"
-- Pour une femme de 30 ans, chapitre "Carrière": "Comment ${name} a-t-elle construit sa carrière ?"
-- Pour un enfant de 10 ans, chapitre "Enfance": "Quel est ton plus beau souvenir avec ${name} ?"
+- Pour un homme de 67 ans : "Quel souvenir précieux avec papa vous a le plus marqué ?"
+- Pour une femme de 30 ans : "Comment maman a-t-elle changé votre vie ?"
+- Pour un enfant de 10 ans : "Quel est ton meilleur souvenir avec [prénom] ?"
 
 Génère 4 questions ouvertes et inspirantes pour ce chapitre.
 
@@ -109,6 +110,12 @@ Exemple de format : ["Question 1", "Question 2", "Question 3", "Question 4"]
 Ne mets rien d'autre que le tableau JSON dans ta réponse.`;
 
     console.log('📝 Prompt envoyé à Mistral (extrait):', prompt.substring(0, 300) + '...');
+	
+	console.log('='.repeat(80));
+console.log('📝 PROMPT COMPLET ENVOYÉ À L\'IA');
+console.log('='.repeat(80));
+console.log(prompt);
+console.log('='.repeat(80));
 
     const response = await mistral.chat.complete({
       model: 'mistral-small-latest',

@@ -1,30 +1,30 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\QuestionsSection.js
-import React, { useEffect } from 'react';
+import React from 'react';
 import Tooltip from '../../ui/Tooltip';
 
 const QuestionsSection = ({ 
   questions, 
   onGenerate, 
   generating, 
-  chapterTitle, 
-  eventType, 
-  style 
+  onEdit,
+  isOrganizer,
+  questionsValidated,
+  onValidate
 }) => {
   
-  // Log au chargement du composant
-  useEffect(() => {
-    console.log('📦 QuestionsSection chargée pour le chapitre:', chapterTitle);
-  }, [chapterTitle]);
+  const handleGenerate = () => {
+    console.log('🖱️ Clic sur Regénérer');
+    onGenerate();
+  };
 
-  // Log quand les questions changent
-  useEffect(() => {
-    console.log('📝 Questions actuelles:', questions);
-  }, [questions]);
+  const handleEdit = () => {
+    console.log('🖱️ Clic sur Modifier/Ajouter');
+    onEdit();
+  };
 
-  const handleGenerateClick = () => {
-    if (onGenerate) {
-      onGenerate();
-    }
+  const handleValidate = () => {
+    console.log('🖱️ Clic sur Valider');
+    onValidate();
   };
 
   return (
@@ -37,9 +37,9 @@ const QuestionsSection = ({
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <h3 style={{ margin: 0, color: 'white', fontSize: '1.1rem' }}>
-          ✨ QUESTIONS SUGGÉRÉES PAR L'IA
+          💡 Questions suggérées pour vous inspirer et inspirer les contributeurs
         </h3>
-        <Tooltip text="Les questions s'adaptent automatiquement au titre et au style">
+        <Tooltip text="Ces questions seront envoyées aux invités pour les guider dans leur contribution">
           <span style={{ color: 'white', cursor: 'help', fontSize: '1.2rem' }}>ⓘ</span>
         </Tooltip>
       </div>
@@ -54,9 +54,9 @@ const QuestionsSection = ({
         )}
       </ul>
 
-      <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
         <button
-          onClick={handleGenerateClick}
+          onClick={handleGenerate}
           disabled={generating}
           style={{
             padding: '0.6rem 1.2rem',
@@ -70,26 +70,54 @@ const QuestionsSection = ({
             opacity: generating ? 0.7 : 1,
             transition: 'all 0.2s'
           }}
-          onMouseEnter={(e) => {
-            if (!generating) {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 5px 15px rgba(0,0,0,0.2)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!generating) {
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = 'none';
-            }
+        >
+          {generating ? '✨ Génération...' : '🎲 Regénérer'}
+        </button>
+        
+        <button
+          onClick={handleEdit}
+          style={{
+            padding: '0.6rem 1.2rem',
+            background: '#17a2b8',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            fontSize: '0.9rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
           }}
         >
-          {generating ? '✨ Génération...' : '🎲 Générer de nouvelles questions'}
+          ✏️ Modifier/Ajouter
         </button>
+
+        {isOrganizer && !questionsValidated && (
+          <button
+            onClick={handleValidate}
+            style={{
+              padding: '0.6rem 1.2rem',
+              background: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            ✅ Valider
+          </button>
+        )}
       </div>
 
-      {/* Message de debug */}
-      <div style={{ marginTop: '1rem', fontSize: '0.8rem', textAlign: 'center', opacity: 0.7 }}>
-        {chapterTitle && <span>Chapitre: {chapterTitle}</span>}
+      <p style={{ marginTop: '1rem', fontSize: '0.9rem', textAlign: 'center', opacity: 0.9 }}>
+        Ces questions seront envoyées aux invités pour les guider dans leur contribution.
+      </p>
+
+      {/* Message de debug temporaire */}
+      <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', textAlign: 'center', opacity: 0.5 }}>
+        {questions?.length || 0} questions • {isOrganizer ? 'Organisateur' : 'Invité'}
       </div>
     </div>
   );
