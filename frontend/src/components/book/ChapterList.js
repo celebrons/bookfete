@@ -184,6 +184,35 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
       alert('Erreur lors de la suppression');
     }
   };
+  
+  const requestRevision = async (contributionId, feedback) => {
+  try {
+    const { error } = await supabase
+      .from('contributions')
+      .update({ 
+        needs_revision: true,
+        moderation_feedback: feedback,
+        approved: false 
+      })
+      .eq('id', contributionId);
+
+    if (error) throw error;
+
+    // Mettre à jour l'état local
+    setChapterContributions(prev =>
+      prev.map(c => 
+        c.id === contributionId 
+          ? { ...c, needs_revision: true, moderation_feedback: feedback } 
+          : c
+      )
+    );
+
+    alert('✅ Demande de modification envoyée au contributeur');
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    alert('Erreur lors de la demande de modification');
+  }
+};
 
   // Fonctions d'invitation
   const handleOpenInviteSelector = (chapter, e) => {
@@ -435,6 +464,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
             onDelete={deleteContribution}
             onBack={() => setShowContributions(false)}
             organizerEmail={user?.email}
+			onRequestRevision={requestRevision} 
           />
         )}
 

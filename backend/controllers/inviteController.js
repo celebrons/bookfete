@@ -4,9 +4,9 @@ const { v4: uuidv4 } = require('uuid');
 const { sendInviteEmail } = require('../services/emailService');
 
 // ============================================
-// INVITER À UN CHAPITRE (ancienne méthode individuelle)
+// INVITER À UN CHAPITRE
 // ============================================
-exports.inviteToChapter = async (req, res) => {
+const inviteToChapter = async (req, res) => {
   const { chapterId, emails, customMessage } = req.body;
 
   try {
@@ -16,7 +16,6 @@ exports.inviteToChapter = async (req, res) => {
     console.log('🔹 Chapter ID:', chapterId);
     console.log('🔹 Emails:', emails);
 
-    // Vérifier que le chapitre existe
     const { data: chapter, error: chapterError } = await supabase
       .from('chapters')
       .select('*, book:books(*)')
@@ -27,12 +26,10 @@ exports.inviteToChapter = async (req, res) => {
       return res.status(404).json({ error: 'Chapitre non trouvé' });
     }
 
-    // Vérifier que l'utilisateur est propriétaire
     if (chapter.book.owner_id !== req.user.id) {
       return res.status(403).json({ error: 'Non autorisé' });
     }
 
-    // Créer les invitations
     const invites = [];
     for (const email of emails) {
       const token = uuidv4();
@@ -44,7 +41,7 @@ exports.inviteToChapter = async (req, res) => {
         contributed: false
       });
 
-      const inviteLink = `${process.env.FRONTEND_URL}/invitation/${token}`;
+      const inviteLink = `${process.env.FRONTEND_URL}/invite/${token}`;
       await sendInviteEmail({
         to: email,
         bookTitle: chapter.book.title,
@@ -77,23 +74,20 @@ exports.inviteToChapter = async (req, res) => {
 };
 
 // ============================================
-// ENVOI BATCH D'INVITATIONS (NOUVELLE MÉTHODE)
+// ENVOI BATCH D'INVITATIONS
 // ============================================
-exports.sendBatchInvites = async (req, res) => {
+const sendBatchInvites = async (req, res) => {
   const { chapterId, contributorIds } = req.body;
 
   try {
     console.log('\n' + '='.repeat(60));
     console.log('📨 ENVOI BATCH INVITATIONS');
     console.log('='.repeat(60));
-    console.log('🔹 Chapter ID:', chapterId);
-    console.log('🔹 Contributeurs:', contributorIds);
 
     if (!chapterId || !contributorIds || contributorIds.length === 0) {
       return res.status(400).json({ error: 'Paramètres manquants' });
     }
 
-    // Vérifier que le chapitre existe
     const { data: chapter, error: chapterError } = await supabase
       .from('chapters')
       .select('*, book:books(*)')
@@ -104,12 +98,10 @@ exports.sendBatchInvites = async (req, res) => {
       return res.status(404).json({ error: 'Chapitre non trouvé' });
     }
 
-    // Vérifier que l'utilisateur est propriétaire
     if (chapter.book.owner_id !== req.user.id) {
       return res.status(403).json({ error: 'Non autorisé' });
     }
 
-    // Récupérer les infos des contributeurs
     const { data: contributors, error: contribError } = await supabase
       .from('book_contributors')
       .select('*')
@@ -124,19 +116,16 @@ exports.sendBatchInvites = async (req, res) => {
       return res.status(404).json({ error: 'Aucun contributeur trouvé' });
     }
 
-    // Récupérer les infos du chapitre et du livre pour les emails
     const { data: chapterInfo, error: chapterInfoError } = await supabase
       .from('chapters')
       .select('title, book:books(title)')
       .eq('id', chapterId)
       .single();
 
-    // Créer les invitations
     const invites = [];
     for (const contributor of contributors) {
       const token = uuidv4();
       
-      // Vérifier si une invitation existe déjà
       const { data: existing } = await supabase
         .from('chapter_invites')
         .select('id')
@@ -161,7 +150,6 @@ exports.sendBatchInvites = async (req, res) => {
       return res.status(400).json({ error: 'Tous les contributeurs ont déjà été invités' });
     }
 
-    // Insérer en base
     const { data: savedInvites, error: insertError } = await supabase
       .from('chapter_invites')
       .insert(invites)
@@ -172,7 +160,6 @@ exports.sendBatchInvites = async (req, res) => {
       return res.status(500).json({ error: insertError.message });
     }
 
-    // Envoyer les emails
     for (let i = 0; i < savedInvites.length; i++) {
       const invite = savedInvites[i];
       const contributor = contributors.find(c => c.email === invite.email);
@@ -189,7 +176,6 @@ exports.sendBatchInvites = async (req, res) => {
       });
     }
 
-    // Marquer les contributeurs comme invités dans book_contributors
     await supabase
       .from('book_contributors')
       .update({ invited: true })
@@ -211,7 +197,7 @@ exports.sendBatchInvites = async (req, res) => {
 // ============================================
 // VÉRIFIER UN TOKEN D'INVITATION
 // ============================================
-exports.checkInviteToken = async (req, res) => {
+const checkInviteToken = async (req, res) => {
   const { token } = req.params;
 
   try {
@@ -231,6 +217,41 @@ exports.checkInviteToken = async (req, res) => {
       return res.status(404).json({ error: 'Lien invalide ou expiré' });
     }
 
+    // Vérifier la contribution existante
+    const { data: existingContribution } = await supabase
+      .from('contributions')
+      .select('*')
+      .eq('chapter_id', invite.chapter_id)
+      .eq('contributor_email', invite.email)
+      .maybeSingle();
+
+    // Si une contribution existe et qu'elle n'est PAS approuvée, on autorise la modification
+    if (existingContribution) {
+      if (existingContribution.approved) {
+        return res.status(400).json({ error: 'Cette contribution a déjà été approuvée' });
+      }
+      
+      return res.json({
+        valid: true,
+        bookTitle: invite.chapter.book.title,
+        chapterTitle: invite.chapter.title,
+        chapterId: invite.chapter.id,
+        email: invite.email,
+        eventType: invite.chapter.book.event_type || 'evenement',
+        recipientName: invite.chapter.book.recipient_name,
+        organizerName: invite.chapter.book.owner_name,
+        questions: invite.chapter.questions_validated ? invite.chapter.questions_ia : [],
+        questionsValidated: invite.chapter.questions_validated,
+        existingContribution: {
+          id: existingContribution.id,
+          message: existingContribution.message,
+          photo_urls: existingContribution.photo_urls,
+          needs_revision: existingContribution.needs_revision,
+          moderation_feedback: existingContribution.moderation_feedback
+        }
+      });
+    }
+
     if (invite.contributed) {
       console.log('⚠️ Token déjà utilisé');
       return res.status(400).json({ error: 'Vous avez déjà contribué' });
@@ -242,7 +263,11 @@ exports.checkInviteToken = async (req, res) => {
       chapterTitle: invite.chapter.title,
       chapterId: invite.chapter.id,
       email: invite.email,
-      eventType: invite.chapter.book.event_type || 'evenement'
+      eventType: invite.chapter.book.event_type || 'evenement',
+      recipientName: invite.chapter.book.recipient_name,
+      organizerName: invite.chapter.book.owner_name,
+      questions: invite.chapter.questions_validated ? invite.chapter.questions_ia : [],
+      questionsValidated: invite.chapter.questions_validated
     });
 
   } catch (error) {
@@ -254,9 +279,9 @@ exports.checkInviteToken = async (req, res) => {
 // ============================================
 // UTILISER UN TOKEN (SOUMETTRE UNE CONTRIBUTION)
 // ============================================
-exports.useInviteToken = async (req, res) => {
+const useInviteToken = async (req, res) => {
   const { token } = req.params;
-  const { name, message, photoUrls } = req.body;
+  const { name, message, photoUrls, contributionId } = req.body;
 
   try {
     console.log('\n' + '='.repeat(60));
@@ -264,8 +289,8 @@ exports.useInviteToken = async (req, res) => {
     console.log('='.repeat(60));
     console.log('🔹 Token:', token);
     console.log('🔹 Nom:', name);
+    console.log('🔹 ContributionId:', contributionId);
 
-    // Récupérer l'invitation
     const { data: invite, error: inviteError } = await supabase
       .from('chapter_invites')
       .select('*')
@@ -276,11 +301,39 @@ exports.useInviteToken = async (req, res) => {
       return res.status(404).json({ error: 'Lien invalide' });
     }
 
-    if (invite.contributed) {
-      return res.status(400).json({ error: 'Vous avez déjà contribué' });
+    // Vérifier s'il y a une contribution existante
+    const { data: existingContribution } = await supabase
+      .from('contributions')
+      .select('*')
+      .eq('chapter_id', invite.chapter_id)
+      .eq('contributor_email', invite.email)
+      .maybeSingle();
+
+    if (existingContribution) {
+      // Mise à jour de la contribution existante
+      if (existingContribution.approved) {
+        return res.status(400).json({ error: 'Cette contribution ne peut plus être modifiée' });
+      }
+
+      const { error: updateError } = await supabase
+        .from('contributions')
+        .update({
+          message,
+          photo_urls: photoUrls || [],
+          needs_revision: false,
+          moderation_feedback: null
+        })
+        .eq('id', existingContribution.id);
+
+      if (updateError) throw updateError;
+
+      return res.json({
+        success: true,
+        message: 'Contribution mise à jour avec succès'
+      });
     }
 
-    // Créer la contribution
+    // Créer une nouvelle contribution
     const { data: contribution, error: contribError } = await supabase
       .from('contributions')
       .insert([{
@@ -289,21 +342,19 @@ exports.useInviteToken = async (req, res) => {
         contributor_email: invite.email,
         message,
         photo_urls: photoUrls || [],
-        approved: false
+        approved: false,
+        needs_revision: false
       }])
       .select()
       .single();
 
-    if (contribError) {
-      console.error('❌ Erreur création contribution:', contribError);
-      throw contribError;
-    }
+    if (contribError) throw contribError;
 
     // Marquer l'invitation comme utilisée
     await supabase
       .from('chapter_invites')
       .update({ 
-        contributed: true,
+        contributed: true, 
         contributed_at: new Date().toISOString() 
       })
       .eq('id', invite.id);
@@ -322,7 +373,7 @@ exports.useInviteToken = async (req, res) => {
 // ============================================
 // RÉCUPÉRER LES INVITATIONS D'UN CHAPITRE
 // ============================================
-exports.getChapterInvites = async (req, res) => {
+const getChapterInvites = async (req, res) => {
   const { chapterId } = req.params;
 
   try {
@@ -351,7 +402,7 @@ exports.getChapterInvites = async (req, res) => {
 // ============================================
 // RENVOYER UNE INVITATION
 // ============================================
-exports.resendInvite = async (req, res) => {
+const resendInvite = async (req, res) => {
   const { inviteId } = req.params;
 
   try {
@@ -379,7 +430,6 @@ exports.resendInvite = async (req, res) => {
       customMessage: ''
     });
 
-    // Mettre à jour la date du dernier rappel
     await supabase
       .from('chapter_invites')
       .update({ last_reminder_sent: new Date().toISOString() })
@@ -399,7 +449,7 @@ exports.resendInvite = async (req, res) => {
 // ============================================
 // SUPPRIMER UNE INVITATION
 // ============================================
-exports.deleteInvite = async (req, res) => {
+const deleteInvite = async (req, res) => {
   const { inviteId } = req.params;
 
   try {
@@ -421,7 +471,7 @@ exports.deleteInvite = async (req, res) => {
 // ============================================
 // DEBUG : VOIR TOUTES LES INVITATIONS
 // ============================================
-exports.debugInvites = async (req, res) => {
+const debugInvites = async (req, res) => {
   const { token } = req.params;
   
   try {
@@ -429,14 +479,12 @@ exports.debugInvites = async (req, res) => {
     console.log('🔍 DEBUG INVITATIONS');
     console.log('='.repeat(60));
     
-    // 1. Toutes les invitations
     const { data: allInvites, error: allError } = await supabase
       .from('chapter_invites')
       .select('*');
       
     console.log('📋 Toutes les invitations:', allInvites);
     
-    // 2. Chercher spécifiquement le token
     const { data: tokenSearch, error: tokenError } = await supabase
       .from('chapter_invites')
       .select('*, chapter:chapters(*)')
@@ -461,21 +509,18 @@ exports.debugInvites = async (req, res) => {
 // ============================================
 // DEBUG SIMPLE (sans token)
 // ============================================
-exports.debugSimple = async (req, res) => {
+const debugSimple = async (req, res) => {
   try {
-    // 1. Compter les invitations
     const { count, error: countError } = await supabase
       .from('chapter_invites')
       .select('*', { count: 'exact', head: true });
     
-    // 2. Les 10 dernières
     const { data: recent, error: recentError } = await supabase
       .from('chapter_invites')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(10);
     
-    // 3. Vérifier la structure
     const { data: sample, error: sampleError } = await supabase
       .from('chapter_invites')
       .select('*')
@@ -493,4 +538,19 @@ exports.debugSimple = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+
+// ============================================
+// EXPORTS - VERSION FINALE
+// ============================================
+module.exports = {
+  inviteToChapter,
+  sendBatchInvites,
+  checkInviteToken,
+  useInviteToken,
+  getChapterInvites,
+  resendInvite,
+  deleteInvite,
+  debugInvites,
+  debugSimple
 };

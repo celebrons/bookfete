@@ -17,6 +17,9 @@ const InvitationPage = () => {
   });
   const [questions, setQuestions] = useState([]);
   const [deadline, setDeadline] = useState(null);
+  const [existingContribution, setExistingContribution] = useState(null);
+  const [isRevision, setIsRevision] = useState(false);
+  const [moderationFeedback, setModerationFeedback] = useState('');
   
   // États pour les photos
   const [photos, setPhotos] = useState([]);
@@ -81,13 +84,29 @@ const InvitationPage = () => {
           name: data.email ? data.email.split('@')[0] : ''
         }));
 
-        // Deadline (7 jours)
+        if (data.existingContribution) {
+          setExistingContribution(data.existingContribution);
+          setFormData(prev => ({
+            ...prev,
+            name: data.email.split('@')[0],
+            message: data.existingContribution.message || ''
+          }));
+          setIsRevision(data.existingContribution.needs_revision || false);
+          setModerationFeedback(data.existingContribution.moderation_feedback || '');
+          
+          // Charger les photos existantes
+          if (data.existingContribution.photo_urls) {
+            // Note: on ne peut pas pré-remplir les photos facilement
+          }
+        }
+
+        if (data.questions && data.questions.length > 0) {
+          setQuestions(data.questions);
+        }
+
         const deadlineDate = new Date();
         deadlineDate.setDate(deadlineDate.getDate() + 7);
         setDeadline(deadlineDate);
-
-        // Questions
-        generateQuestions(data);
 
       } catch (err) {
         setError(err.message);
@@ -112,37 +131,6 @@ const InvitationPage = () => {
       console.error('Erreur auto-sauvegarde:', error);
     }
   };
-
-  const generateQuestions = async (inviteData) => {
-    try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const response = await fetch(`${apiUrl}/ai/generate-questions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chapterTitle: inviteData.chapterTitle,
-          eventType: inviteData.eventType || 'evenement',
-          style: 'intime',
-          count: 3
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setQuestions(data.questions || []);
-      } else {
-        setQuestions(defaultQuestions);
-      }
-    } catch (error) {
-      setQuestions(defaultQuestions);
-    }
-  };
-
-  const defaultQuestions = [
-    "Quel est votre plus beau souvenir lié à cette personne ?",
-    "Qu'est-ce qui la rend unique à vos yeux ?",
-    "Quel message souhaitez-vous lui transmettre ?"
-  ];
 
   const handlePhotoChange = (e) => {
     const files = Array.from(e.target.files);
@@ -235,7 +223,8 @@ const InvitationPage = () => {
         body: JSON.stringify({
           name: formData.name,
           message: formData.message,
-          photoUrls
+          photoUrls,
+          contributionId: existingContribution?.id
         })
       });
 
@@ -304,7 +293,7 @@ const InvitationPage = () => {
   return (
     <div style={containerStyle}>
       <div style={mainCardStyle}>
-        {/* En-tête avec badge */}
+        {/* En-tête */}
         <div style={headerStyle}>
           <div style={bookIconStyle}>📖</div>
           <h1 style={bookTitleStyle}>{invitation?.bookTitle}</h1>
@@ -313,7 +302,26 @@ const InvitationPage = () => {
           </h2>
         </div>
 
-        {/* Message contextuel élégant */}
+        {/* Message de révision */}
+        {isRevision && moderationFeedback && (
+          <div style={{
+            background: '#fff3cd',
+            border: '1px solid #ffeeba',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            color: '#856404'
+          }}>
+            <strong style={{ display: 'block', marginBottom: '0.5rem' }}>
+              ✏️ Demande de modification de l'organisateur :
+            </strong>
+            <p style={{ margin: 0, fontStyle: 'italic' }}>
+              "{moderationFeedback}"
+            </p>
+          </div>
+        )}
+
+        {/* Message contextuel */}
         <div style={contextMessageStyle}>
           <p style={contextTextStyle}>
             <span style={highlightStyle}>{invitation?.organizerName || "L'organisateur"}</span> vous a invité à contribuer 
@@ -322,7 +330,7 @@ const InvitationPage = () => {
           </p>
         </div>
 
-        {/* Deadline avec design */}
+        {/* Deadline */}
         {deadline && (
           <div style={deadlineStyle}>
             <span style={deadlineIconStyle}>⏰</span>
@@ -347,6 +355,21 @@ const InvitationPage = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Message si pas de questions */}
+        {questions.length === 0 && (
+          <div style={{
+            background: '#f8f9fa',
+            padding: '1.5rem',
+            borderRadius: '8px',
+            marginBottom: '2rem',
+            textAlign: 'center',
+            color: '#999',
+            fontStyle: 'italic'
+          }}>
+            L'organisateur prépare les questions pour vous guider...
           </div>
         )}
 
@@ -477,9 +500,8 @@ const InvitationPage = () => {
 };
 
 // ============================================
-// STYLES ÉLÉGANTS
+// STYLES
 // ============================================
-
 const containerStyle = {
   minHeight: '100vh',
   display: 'flex',
@@ -833,7 +855,6 @@ const termsNoteStyle = {
   marginTop: '1.5rem'
 };
 
-// Styles pour les états
 const loadingCardStyle = {
   ...mainCardStyle,
   textAlign: 'center',

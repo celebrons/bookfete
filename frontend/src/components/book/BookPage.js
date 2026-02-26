@@ -39,7 +39,8 @@ const BookPage = () => {
         recipient_age: bookData.recipient_age,
         recipient_gender: bookData.recipient_gender,
         event_type: bookData.event_type,
-        style_narratif: bookData.style_narratif
+        style_narratif: bookData.style_narratif,
+        pages: bookData.pages
       });
       
       setBook(bookData);
@@ -138,18 +139,102 @@ const BookPage = () => {
     }
   };
 
+  // ============================================
+  // GESTION DE LA MISE À JOUR DES CHAPITRES SELON LES PAGES
+  // ============================================
+  const handleUpdateChaptersFromPages = async (newPages) => {
+    try {
+      // Calculer le nouveau nombre de chapitres (8 pages par chapitre)
+      const newChaptersCount = Math.floor(newPages / 8);
+      const currentChaptersCount = chapters.length;
+      
+      console.log('📊 Mise à jour chapitres:', { 
+        newPages, 
+        newChaptersCount, 
+        currentChaptersCount 
+      });
+      
+      if (newChaptersCount > currentChaptersCount) {
+        // Ajouter des chapitres
+        const chaptersToAdd = newChaptersCount - currentChaptersCount;
+        console.log(`➕ Ajout de ${chaptersToAdd} chapitres`);
+        
+        // Générer les nouveaux titres avec l'IA
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-chapters`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            eventType: book.event_type,
+            style: book.style_narratif,
+            count: chaptersToAdd,
+            bookTitle: book.title,
+            recipientName: book.recipient_name,
+            recipientAge: book.recipient_age,
+            recipientGender: book.recipient_gender
+          })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Créer les nouveaux chapitres
+          const newChapters = data.chapters.map((ch, index) => ({
+            book_id: bookId,
+            title: ch.title,
+            description: ch.description || `Chapitre ${currentChaptersCount + index + 1}`,
+            order_index: currentChaptersCount + index,
+            questions_ia: [
+              `Quel est votre plus beau souvenir lié à "${ch.title}" ?`,
+              `Que retenez-vous de ce moment ?`,
+              `Quelle émotion cela évoque-t-il ?`,
+              `Un détail qui vous a marqué ?`
+            ]
+          }));
+
+          const { error: insertError } = await supabase
+            .from('chapters')
+            .insert(newChapters);
+
+          if (insertError) throw insertError;
+
+          console.log(`✅ ${chaptersToAdd} chapitres ajoutés avec succès`);
+          
+          // Recharger les chapitres
+          await loadBookAndChapters();
+        }
+      } else if (newChaptersCount < currentChaptersCount) {
+        // Supprimer des chapitres (les derniers)
+        const chaptersToRemove = currentChaptersCount - newChaptersCount;
+        console.log(`➖ Suppression de ${chaptersToRemove} chapitres`);
+        
+        const chaptersToDelete = chapters.slice(-chaptersToRemove).map(ch => ch.id);
+
+        const { error: deleteError } = await supabase
+          .from('chapters')
+          .delete()
+          .in('id', chaptersToDelete);
+
+        if (deleteError) throw deleteError;
+
+        console.log(`✅ ${chaptersToRemove} chapitres supprimés`);
+        
+        // Recharger les chapitres
+        await loadBookAndChapters();
+      }
+    } catch (error) {
+      console.error('❌ Erreur mise à jour chapitres:', error);
+      alert('Erreur lors de la mise à jour des chapitres');
+    }
+  };
+
   if (loading) return <Loading message="Chargement du livre..." />;
   if (!book) return <div>Livre non trouvé</div>;
-  
-  console.log('📦 BookPage - ENVOI à ChapterList:', {
-  bookId: bookId,
-  book: {
-    title: book?.title,
-    recipient_name: book?.recipient_name,
-    recipient_age: book?.recipient_age,
-    recipient_gender: book?.recipient_gender
-  }
-});
 
   return (
     <div style={{
@@ -290,6 +375,7 @@ const BookPage = () => {
             book={book} 
             onUpdateBook={handleUpdateBook}
             chaptersCount={chapters.length}
+            onPagesChange={handleUpdateChaptersFromPages}
           />
         )}
       </div>

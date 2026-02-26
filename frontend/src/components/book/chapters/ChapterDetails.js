@@ -1,8 +1,6 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\ChapterDetails.js
 import React, { useState, useEffect } from 'react';
-import QuestionsSection from './QuestionsSection';
-import ContributionForm from './ContributionForm';
-import ChapterInvitations from './ChapterInvitations';
+import ChapterWorkflow from './ChapterWorkflow';
 import { supabase } from '../../../services/supabaseClient';
 
 const ChapterDetails = ({
@@ -24,13 +22,32 @@ const ChapterDetails = ({
   userEmail,
   user,
   book,
-  onEditQuestions  // ← AJOUTÉ
+  onEditQuestions
 }) => {
   const [hasContributed, setHasContributed] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [existingContribution, setExistingContribution] = useState(null);
   const [questionsValidated, setQuestionsValidated] = useState(false);
+  const [isFinalized, setIsFinalized] = useState(false);
+  const [invitations, setInvitations] = useState([]);
+
+  // Charger les invitations
+  useEffect(() => {
+    loadInvitations();
+  }, [chapter.id]);
+
+  const loadInvitations = async () => {
+    try {
+      const { data } = await supabase
+        .from('chapter_invites')
+        .select('*')
+        .eq('chapter_id', chapter.id);
+      setInvitations(data || []);
+    } catch (error) {
+      console.error('❌ Erreur chargement invitations:', error);
+    }
+  };
 
   // Vérifier si l'utilisateur est l'organisateur
   const isOrganizer = user && book && user.id === book.owner_id;
@@ -94,7 +111,7 @@ const ChapterDetails = ({
       
       const { data, error } = await supabase
         .from('contributions')
-        .select('id, message, photo_urls, created_at')
+        .select('id, message, photo_urls, created_at, is_finalized')
         .eq('chapter_id', chapter.id)
         .eq('contributor_email', userEmail)
         .order('created_at', { ascending: false });
@@ -105,10 +122,12 @@ const ChapterDetails = ({
         setHasContributed(true);
         setExistingContribution(data[0]);
         setContributionText(data[0].message || '');
+        setIsFinalized(data[0].is_finalized || false);
       } else {
         setHasContributed(false);
         setExistingContribution(null);
         setContributionText('');
+        setIsFinalized(false);
       }
       
     } catch (error) {
@@ -130,6 +149,28 @@ const ChapterDetails = ({
     }, 1000);
   };
 
+  const handleFinalizeContribution = async () => {
+    try {
+      if (!existingContribution) return;
+      
+      const { error } = await supabase
+        .from('contributions')
+        .update({ is_finalized: true })
+        .eq('id', existingContribution.id);
+
+      if (error) throw error;
+      
+      setIsFinalized(true);
+      await checkUserContribution();
+      
+      alert('✅ Contribution finalisée avec succès !');
+      
+    } catch (error) {
+      console.error('❌ Erreur finalisation:', error);
+      alert('Erreur lors de la finalisation');
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -149,97 +190,42 @@ const ChapterDetails = ({
 
   return (
     <>
-      {/* Titre du chapitre */}
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ margin: 0, color: '#333' }}>
-          {chapter.title}
-        </h2>
+        <h2 style={{ margin: 0, color: '#333' }}>{chapter.title}</h2>
         <p style={{ margin: '0.5rem 0 0', color: '#666', fontSize: '0.9rem' }}>
           ALBUM PRESTIGE • {chaptersCount} CHAPITRES
         </p>
       </div>
 
-      {/* Message si questions validées (pour l'organisateur) */}
-      {isOrganizer && questionsValidated && (
-        <div style={{
-          background: '#d4edda',
-          border: '1px solid #c3e6cb',
-          borderRadius: '10px',
-          padding: '1rem',
-          marginBottom: '2rem',
-          color: '#155724',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <span>✅</span>
-          <span>Questions validées - elles seront envoyées aux invités</span>
-        </div>
-      )}
-
-      {/* UN SEUL PAVÉ : Questions suggérées */}
-      {(!hasContributed || isEditing) && (
-        <QuestionsSection
-          questions={chapter.questions_ia}
-          onGenerate={() => {
-            console.log('🔄 Appel de onGenerateQuestions');
-            onGenerateQuestions(chapter);
-          }}
-          generating={generatingQuestions}
-          onEdit={() => {
-            console.log('✏️ Ouverture de l\'éditeur pour le chapitre:', chapter.id);
-            if (onEditQuestions) {
-              onEditQuestions(chapter);
-            } else {
-              console.error('❌ onEditQuestions non définie');
-            }
-          }}
-          isOrganizer={isOrganizer}
-          questionsValidated={questionsValidated}
-          onValidate={validateQuestions}
-        />
-      )}
-
-      {/* MA CONTRIBUTION PERSONNELLE */}
-      {(!hasContributed || isEditing) ? (
-        <ContributionForm
-          contributionText={contributionText}
-          setContributionText={setContributionText}
-          photos={photos}
-          photoPreviews={photoPreviews}
-          onPhotoChange={onPhotoChange}
-          onRemovePhoto={onRemovePhoto}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-          hasContributed={false}
-          onEdit={handleEdit}
-          existingPhotos={existingContribution?.photo_urls || []}
-          chapterTitle={chapter.title}
-        />
-      ) : (
-        <ContributionForm
-          contributionText={existingContribution?.message || ''}
-          setContributionText={setContributionText}
-          photos={photos}
-          photoPreviews={photoPreviews}
-          onPhotoChange={onPhotoChange}
-          onRemovePhoto={onRemovePhoto}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-          hasContributed={true}
-          onEdit={handleEdit}
-          existingPhotos={existingContribution?.photo_urls || []}
-          chapterTitle={chapter.title}
-        />
-      )}
-
-      {/* SECTION INVITATIONS */}
-      <div style={{ marginTop: '2.5rem' }}>
-        <ChapterInvitations 
-          chapterId={chapter.id} 
-          onLoadContributions={onLoadContributions}
-        />
-      </div>
+      <ChapterWorkflow
+        chapter={chapter}
+        chaptersCount={chaptersCount}
+        onGenerateQuestions={onGenerateQuestions}
+        generatingQuestions={generatingQuestions}
+        contributionText={contributionText}
+        setContributionText={setContributionText}
+        photos={photos}
+        photoPreviews={photoPreviews}
+        onPhotoChange={onPhotoChange}
+        onRemovePhoto={onRemovePhoto}
+        onSubmitContribution={handleSubmit}
+        submitting={submitting}
+        onLoadContributions={onLoadContributions}
+        onCopyInviteLink={onCopyInviteLink}
+        inviteSuccess={inviteSuccess}
+        userEmail={userEmail}
+        user={user}
+        book={book}
+        onEditQuestions={onEditQuestions}
+        onValidateQuestions={validateQuestions}
+        questionsValidated={questionsValidated}
+        hasContributed={hasContributed}
+        onEditContribution={handleEdit}
+        invitations={invitations}
+        isFinalized={isFinalized}
+        onFinalizeContribution={handleFinalizeContribution}
+        existingContribution={existingContribution}
+      />
     </>
   );
 };

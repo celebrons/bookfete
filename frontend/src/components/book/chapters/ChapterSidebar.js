@@ -34,6 +34,30 @@ const ChapterSidebar = ({
     onCopyInviteLink(chapter, e);
   };
 
+  // Calculer la progression d'un chapitre
+  const calculateProgress = (chapter) => {
+    // Étape 1: Questions validées ? (25%)
+    // Étape 2: Organisateur a contribué ? (25%)
+    // Étape 3: Invitations envoyées ? (25%)
+    // Étape 4: Contributions reçues/validées ? (25%)
+
+    let progress = 0;
+    
+    // Étape 1: Questions validées
+    if (chapter.questions_validated) progress += 25;
+    
+    // Étape 2: Organisateur a contribué
+    if (chapter.hasOrganizerContributed) progress += 25;
+    
+    // Étape 3: Au moins une invitation envoyée
+    if (chapter.invitationCount && chapter.invitationCount > 0) progress += 25;
+    
+    // Étape 4: Au moins une contribution validée
+    if (chapter.validatedContributionsCount && chapter.validatedContributionsCount > 0) progress += 25;
+    
+    return progress;
+  };
+
   return (
     <div style={{ 
       flex: 1,
@@ -87,183 +111,226 @@ const ChapterSidebar = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
           
           {/* CHAPITRES */}
-          {chapters.map((chapter, index) => (
-            <div
-              key={chapter.id}
-              onClick={() => onSelectItem(chapter, 'chapter')}
-              style={{
-                padding: '1rem',
-                background: selectedType === 'chapter' && selectedItem?.id === chapter.id ? '#f3e8ff' : '#f8f9fa',
-                border: selectedType === 'chapter' && selectedItem?.id === chapter.id ? '2px solid #764ba2' : '1px solid #e9ecef',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                borderLeft: `4px solid ${getStatusColor(chapter.contributions)}`,
-                position: 'relative',
-                opacity: deleteConfirm?.id === chapter.id ? 0.5 : 1
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>
-                      {index + 1}. {chapter.title}
-                    </h4>
-                    {chapter.is_default && (
-                      <span style={{
-                        background: '#e8f4fd',
-                        color: '#0c5460',
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '3px',
-                        fontSize: '0.7rem'
-                      }}>
-                        Suggestion
-                      </span>
-                    )}
+          {chapters.map((chapter, index) => {
+            const progress = calculateProgress(chapter);
+            
+            return (
+              <div
+                key={chapter.id}
+                onClick={() => onSelectItem(chapter, 'chapter')}
+                style={{
+                  padding: '1rem',
+                  background: selectedType === 'chapter' && selectedItem?.id === chapter.id ? '#f3e8ff' : '#f8f9fa',
+                  border: selectedType === 'chapter' && selectedItem?.id === chapter.id ? '2px solid #764ba2' : '1px solid #e9ecef',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  borderLeft: `4px solid ${getStatusColor(chapter.contributions)}`,
+                  position: 'relative',
+                  opacity: deleteConfirm?.id === chapter.id ? 0.5 : 1
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    {/* Titre avec pourcentage intégré */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem' }}>
+                        {index + 1}. {chapter.title}
+                      </h4>
+                      
+                      {/* Pourcentage à côté du titre */}
+                      {progress > 0 && progress < 100 && (
+                        <span style={{
+                          fontSize: '0.65rem',
+                          color: '#764ba2',
+                          background: '#f3e8ff',
+                          padding: '0.1rem 0.3rem',
+                          borderRadius: '3px',
+                          fontWeight: '600',
+                          lineHeight: '1.2'
+                        }}>
+                          {progress}%
+                        </span>
+                      )}
+                      {progress === 100 && (
+                        <span style={{
+                          fontSize: '0.65rem',
+                          color: '#28a745',
+                          background: '#d4edda',
+                          padding: '0.1rem 0.3rem',
+                          borderRadius: '3px',
+                          fontWeight: '600',
+                          lineHeight: '1.2'
+                        }}>
+                          ✓
+                        </span>
+                      )}
+                      
+                      {chapter.is_default && (
+                        <span style={{
+                          background: '#e8f4fd',
+                          color: '#0c5460',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '3px',
+                          fontSize: '0.7rem'
+                        }}>
+                          Suggestion
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Stats compactes */}
+                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
+                      <span>💬 {chapter.contributions?.[0]?.count || 0}</span>
+                      <span>📝 {chapter.questions_ia?.length || 0} questions</span>
+                      {chapter.questions_validated && (
+                        <span style={{ color: '#28a745' }}>✓</span>
+                      )}
+                    </div>
+
+                    {/* Barre de progression discrète */}
+                    <div style={{
+                      width: '100%',
+                      height: '3px',
+                      background: '#e9ecef',
+                      borderRadius: '2px',
+                      overflow: 'hidden',
+                      marginTop: '0.3rem'
+                    }}>
+                      <div style={{
+                        width: `${progress}%`,
+                        height: '100%',
+                        background: progress === 100 ? '#28a745' : '#764ba2',
+                        borderRadius: '2px',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: '#666' }}>
-                    <span>💬 {chapter.contributions?.[0]?.count || 0}</span>
-                    <span>📝 {chapter.questions_ia?.length || 0} questions</span>
-                  </div>
-                </div>
-                
-                {/* Icônes épurées */}
-                <div style={{ display: 'flex', gap: '0.2rem' }}>
-                  <Tooltip text="Modifier le titre">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditChapter(chapter);
-                      }}
-                      style={{
-                        padding: '0.2rem 0.4rem',
-                        background: 'none',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        color: '#666',
-                        opacity: 0.7,
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.opacity = 1;
-                        e.target.style.color = '#764ba2';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.opacity = 0.7;
-                        e.target.style.color = '#666';
-                      }}
-                    >
-                      ✎
-                    </button>
-                  </Tooltip>
                   
-                  <Tooltip text="Modifier les questions">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditQuestions(chapter);
-                      }}
-                      style={{
-                        padding: '0.2rem 0.4rem',
-                        background: 'none',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        color: '#666',
-                        opacity: 0.7,
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.opacity = 1;
-                        e.target.style.color = '#17a2b8';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.opacity = 0.7;
-                        e.target.style.color = '#666';
-                      }}
-                    >
-                      ?
-                    </button>
-                  </Tooltip>
-                  
-                  <Tooltip text="Inviter des contributeurs">
-                    <button
-                      onClick={(e) => handleInviteClick(chapter, e)}
-                      style={{
-                        padding: '0.2rem 0.4rem',
-                        background: 'none',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        color: inviteSuccess === chapter.id ? '#28a745' : '#666',
-                        opacity: inviteSuccess === chapter.id ? 1 : 0.7,
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!inviteSuccess === chapter.id) {
+                  {/* Icônes d'action */}
+                  <div style={{ display: 'flex', gap: '0.2rem' }}>
+                    <Tooltip text="Modifier le titre">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditChapter(chapter);
+                        }}
+                        style={{
+                          padding: '0.2rem 0.4rem',
+                          background: 'none',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          color: '#666',
+                          opacity: 0.7,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
                           e.target.style.opacity = 1;
-                          e.target.style.color = '#28a745';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!inviteSuccess === chapter.id) {
+                          e.target.style.color = '#764ba2';
+                        }}
+                        onMouseLeave={(e) => {
                           e.target.style.opacity = 0.7;
                           e.target.style.color = '#666';
-                        }
-                      }}
-                    >
-                      👥
-                    </button>
-                  </Tooltip>
-                  
-                  <Tooltip text="Supprimer">
-                    <button
-                      onClick={(e) => onDeleteClick(chapter, e)}
-                      style={{
-                        padding: '0.2rem 0.4rem',
-                        background: 'none',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        color: '#666',
-                        opacity: 0.7,
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.opacity = 1;
-                        e.target.style.color = '#dc3545';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.opacity = 0.7;
-                        e.target.style.color = '#666';
-                      }}
-                    >
-                      🗑
-                    </button>
-                  </Tooltip>
+                        }}
+                      >
+                        ✎
+                      </button>
+                    </Tooltip>
+                    
+                    <Tooltip text="Modifier les questions">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditQuestions(chapter);
+                        }}
+                        style={{
+                          padding: '0.2rem 0.4rem',
+                          background: 'none',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          color: '#666',
+                          opacity: 0.7,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.opacity = 1;
+                          e.target.style.color = '#17a2b8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.opacity = 0.7;
+                          e.target.style.color = '#666';
+                        }}
+                      >
+                        ?
+                      </button>
+                    </Tooltip>
+                    
+                    <Tooltip text="Inviter des contributeurs">
+                      <button
+                        onClick={(e) => handleInviteClick(chapter, e)}
+                        style={{
+                          padding: '0.2rem 0.4rem',
+                          background: 'none',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          color: inviteSuccess === chapter.id ? '#28a745' : '#666',
+                          opacity: inviteSuccess === chapter.id ? 1 : 0.7,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!inviteSuccess === chapter.id) {
+                            e.target.style.opacity = 1;
+                            e.target.style.color = '#28a745';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!inviteSuccess === chapter.id) {
+                            e.target.style.opacity = 0.7;
+                            e.target.style.color = '#666';
+                          }
+                        }}
+                      >
+                        👥
+                      </button>
+                    </Tooltip>
+                    
+                    <Tooltip text="Supprimer">
+                      <button
+                        onClick={(e) => onDeleteClick(chapter, e)}
+                        style={{
+                          padding: '0.2rem 0.4rem',
+                          background: 'none',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          color: '#666',
+                          opacity: 0.7,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.opacity = 1;
+                          e.target.style.color = '#dc3545';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.opacity = 0.7;
+                          e.target.style.color = '#666';
+                        }}
+                      >
+                        🗑
+                      </button>
+                    </Tooltip>
+                  </div>
                 </div>
               </div>
-              {inviteSuccess === chapter.id && (
-                <div style={{
-                  position: 'absolute',
-                  top: '-20px',
-                  right: '0',
-                  background: '#28a745',
-                  color: 'white',
-                  padding: '0.2rem 0.5rem',
-                  borderRadius: '3px',
-                  fontSize: '0.7rem'
-                }}>
-                  Invitation envoyée !
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

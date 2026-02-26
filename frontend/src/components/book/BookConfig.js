@@ -1,7 +1,7 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\BookConfig.js
 import React, { useState, useEffect } from 'react';
 
-const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
+const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     title: book.title,
@@ -27,31 +27,55 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
 
   // Options
   const finitions = [
-    { id: 'livret', label: 'Livret', description: 'Souple' },
-    { id: 'classique', label: 'Classique', description: 'Rigide' },
-    { id: 'luxe', label: 'Luxe', description: 'Toilé' }
+    { id: 'livret', label: 'Livret', description: 'Souple', basePrice: 69 },
+    { id: 'classique', label: 'Classique', description: 'Rigide', basePrice: 89 },
+    { id: 'luxe', label: 'Luxe', description: 'Toilé', basePrice: 129 }
   ];
 
   const papiers = [
-    { id: 'satine', label: 'Satiné' },
-    { id: 'mat', label: 'Mat' },
-    { id: 'verge', label: 'Vergé Ivoire' }
+    { id: 'satine', label: 'Satiné', description: 'Brillant et lisse', multiplier: 1.0 },
+    { id: 'mat', label: 'Mat', description: 'Doux et élégant', multiplier: 1.0 },
+    { id: 'verge', label: 'Vergé Ivoire', description: 'Texturé et noble', multiplier: 1.15 }
   ];
 
   const styles = [
-    { id: 'poetique', label: 'Poétique' },
-    { id: 'factuel', label: 'Factuel' },
-    { id: 'intime', label: 'Intime' }
+    { id: 'poetique', label: 'Poétique', description: 'Langage imagé et émouvant', multiplier: 1.0 },
+    { id: 'factuel', label: 'Factuel', description: 'Direct et concret', multiplier: 1.0 },
+    { id: 'intime', label: 'Intime', description: 'Chaleureux et personnel', multiplier: 1.0 }
   ];
+
+  // Calcul du prix en direct
+  const calculateLivePrice = () => {
+    const finition = finitions.find(f => f.id === formData.finition) || finitions[1];
+    let price = finition.basePrice;
+    
+    const extraPages = Math.max(0, formData.pages - 64);
+    price += extraPages * 0.25;
+    
+    const papier = papiers.find(p => p.id === formData.papier) || papiers[1];
+    price = price * papier.multiplier;
+    
+    const style = styles.find(s => s.id === formData.style_narratif) || styles[1];
+    price = price * style.multiplier;
+    
+    return Math.round(price);
+  };
 
   // Calcul du nombre de chapitres basé sur les pages
   const calculatedChapters = Math.max(4, Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER));
   
-  // Calcul du prix
+  // Calcul du prix pour l'affichage statique
   const calculatePrice = () => {
     const base = formData.finition === 'luxe' ? 85 : formData.finition === 'classique' ? 55 : 29;
     const perPage = formData.finition === 'luxe' ? 0.50 : formData.finition === 'classique' ? 0.35 : 0.25;
     return Math.round(base + (formData.pages * perPage));
+  };
+
+  const handlePagesChange = (newPages) => {
+    setFormData({ ...formData, pages: newPages });
+    if (onPagesChange) {
+      onPagesChange(newPages);
+    }
   };
 
   const handleSave = () => {
@@ -215,7 +239,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
           </div>
         </div>
 
-        {/* Section Pagination avec lien vers les chapitres */}
+        {/* Section Pagination */}
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <label style={{
@@ -256,7 +280,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
             max="216"
             step="8"
             value={formData.pages}
-            onChange={(e) => setFormData({ ...formData, pages: parseInt(e.target.value) })}
+            onChange={(e) => handlePagesChange(parseInt(e.target.value))}
             style={{
               width: '100%',
               height: '4px',
@@ -281,6 +305,27 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
           }}>
             💡 Adapté à vos {chaptersCount} chapitres ({chaptersCount * 8} pages recommandées)
           </p>
+        </div>
+
+        {/* PRIX EN DIRECT */}
+        <div style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          padding: '1.5rem',
+          borderRadius: '10px',
+          color: 'white',
+          marginBottom: '2rem',
+          textAlign: 'center',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+        }}>
+          <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '0.3rem' }}>
+            Prix estimé en direct
+          </div>
+          <div style={{ fontSize: '3rem', fontWeight: 'bold', lineHeight: '1.2' }}>
+            {calculateLivePrice()}€
+          </div>
+          <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.3rem' }}>
+            (selon finition, papier, style et nombre de pages)
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
@@ -491,7 +536,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
           ))}
         </div>
 
-        {/* 4. Pagination - CORRIGÉ */}
+        {/* 4. Pagination */}
         <div style={{ marginBottom: '15px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <label style={{
@@ -510,8 +555,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
               padding: '4px 12px',
               borderRadius: '20px'
             }}>
-              {/* CORRECTION : Utiliser chaptersCount au lieu de calculer */}
-              {chaptersCount} chapitres • 8 pages/chapitre
+              {Math.floor((book.pages || chaptersCount * 8) / 8)} chapitres • 8 pages/chapitre
             </span>
           </div>
           <span style={{
@@ -541,7 +585,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6 }) => {
           }} />
         </div>
 
-        {/* Effort Card */}
+        {/* Effort Card - CORRIGÉ avec chaptersCount */}
         <div style={{
           background: '#fafafa',
           border: '1px solid #eee',
