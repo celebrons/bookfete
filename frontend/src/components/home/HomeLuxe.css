@@ -1,0 +1,19 @@
+// C:\Users\USER\bookfete\frontend\src\components\home\HomeLuxe.css
+/* Styles spécifiques à la HomePage luxe */
+/* La plupart des styles sont déjà dans luxe-theme.css */
+
+.home-luxe {
+  background-color: var(--white);
+}
+
+/* Animation subtile au scroll */
+.fade-in-section {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-section.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
