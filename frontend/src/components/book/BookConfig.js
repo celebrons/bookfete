@@ -8,7 +8,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
     finition: book.finition,
     papier: book.papier,
     style_narratif: book.style_narratif,
-    pages: book.pages || chaptersCount * 8
+    pages: book.pages || chaptersCount * 8  // Par défaut = chapitres actuels × 8
   });
 
   // Constantes
@@ -71,17 +71,35 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
     return Math.round(base + (formData.pages * perPage));
   };
 
+  // Gestion du changement de pages - juste mise à jour locale
   const handlePagesChange = (newPages) => {
     setFormData({ ...formData, pages: newPages });
-    if (onPagesChange) {
-      onPagesChange(newPages);
+    // Ne fait rien d'autre - pas de préparation immédiate
+  };
+
+  // Validation finale - appel au parent pour appliquer les modifications
+  const handleValidateChanges = () => {
+    // Vérifier si le nombre de chapitres change
+    const newChaptersCount = Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER);
+    if (newChaptersCount !== chaptersCount) {
+      // Appeler le parent pour préparer ET appliquer les modifications
+      onPagesChange(formData.pages);
+    } else {
+      // Si pas de changement de chapitres, juste mettre à jour les pages
+      onUpdateBook({ pages: formData.pages });
     }
   };
 
   const handleSave = () => {
+    // D'abord appliquer les modifications de pages si nécessaire
+    handleValidateChanges();
+    // Ensuite sauvegarder les autres modifications
     onUpdateBook(formData);
     setIsEditing(false);
   };
+
+  // Déterminer si le nombre de chapitres va changer
+  const willChaptersChange = Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER) !== chaptersCount;
 
   if (isEditing) {
     return (
@@ -297,13 +315,41 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
             <span style={{ fontSize: '11px', color: '#999' }}>216 pages (max)</span>
           </div>
 
+          {/* Message d'avertissement si changement de chapitres */}
+          {willChaptersChange && (
+            <div style={{
+              marginTop: '20px',
+              padding: '16px',
+              background: '#fff3cd',
+              border: '1px solid #ffeeba',
+              borderRadius: '8px',
+              color: '#856404'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <span style={{ fontSize: '20px' }}>⚠️</span>
+                <div>
+                  <p style={{ margin: '0 0 5px', fontWeight: 'bold' }}>
+                    Modification du nombre de chapitres
+                  </p>
+                  <p style={{ margin: 0, fontSize: '14px' }}>
+                    Actuellement : <strong>{chaptersCount} chapitres</strong><br />
+                    Après validation : <strong>{calculatedChapters} chapitres</strong>
+                  </p>
+                  <p style={{ margin: '10px 0 0', fontSize: '13px', fontStyle: 'italic' }}>
+                    Les modifications seront appliquées en cliquant sur "Valider les modifications"
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <p style={{
             fontSize: '11px',
             color: '#764ba2',
             marginTop: '10px',
             fontStyle: 'italic'
           }}>
-            💡 Adapté à vos {chaptersCount} chapitres ({chaptersCount * 8} pages recommandées)
+            💡 Actuellement {chaptersCount} chapitres ({chaptersCount * 8} pages)
           </p>
         </div>
 
@@ -362,7 +408,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
     );
   }
 
-  // MODE VISUALISATION
+  // MODE VISUALISATION (inchangé)
   return (
     <div className="configurator-card" style={{
       background: 'white',
@@ -389,7 +435,7 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
       
       {/* Partie gauche - Sélections */}
       <div className="selection-area">
-        {/* 1. Finition & Teinte */}
+        {/* ... (contenu inchangé) ... */}
         <label style={{
           display: 'block',
           fontSize: '11px',
@@ -425,7 +471,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           ))}
         </div>
 
-        {/* Sélecteur de couleur (optionnel) */}
         <div style={{
           display: 'flex',
           gap: '15px',
@@ -462,7 +507,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           }} />
         </div>
 
-        {/* 2. Papier d'Art */}
         <label style={{
           display: 'block',
           fontSize: '11px',
@@ -499,7 +543,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           ))}
         </div>
 
-        {/* 3. Style Narratif de l'IA */}
         <label style={{
           display: 'block',
           fontSize: '11px',
@@ -536,7 +579,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           ))}
         </div>
 
-        {/* 4. Pagination */}
         <div style={{ marginBottom: '15px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <label style={{
@@ -569,7 +611,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           <span style={{ fontSize: '11px', color: '#999', marginLeft: '5px' }}>pages</span>
         </div>
 
-        {/* Slider (simulé) */}
         <div style={{
           width: '100%',
           height: '4px',
@@ -585,7 +626,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           }} />
         </div>
 
-        {/* Effort Card - CORRIGÉ avec chaptersCount */}
         <div style={{
           background: '#fafafa',
           border: '1px solid #eee',
@@ -647,7 +687,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
         padding: '20px',
         borderRadius: '4px'
       }}>
-        {/* Book Container */}
         <div style={{
           width: '100%',
           height: '280px',
@@ -684,7 +723,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           }} />
         </div>
 
-        {/* Prix */}
         <div style={{
           fontFamily: "'Playfair Display', serif",
           fontSize: '48px',
@@ -694,7 +732,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           {calculatePrice()}€
         </div>
 
-        {/* Badge IA */}
         <div style={{
           padding: '5px 12px',
           background: '#b8924a',
@@ -707,7 +744,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           MÉTHODE ÉDITORIALE IA
         </div>
 
-        {/* Validation */}
         <div style={{
           fontSize: '10px',
           color: '#b8924a',
@@ -720,7 +756,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           🔒 Contrôle & Validation finale par vos soins
         </div>
 
-        {/* Légende */}
         <p style={{
           fontSize: '11px',
           color: '#999',
@@ -731,7 +766,6 @@ const BookConfig = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) =>
           Finition {finitions.find(f => f.id === book.finition)?.label}, Style {styles.find(s => s.id === book.style_narratif)?.label}, Papier {papiers.find(p => p.id === book.papier)?.label}.
         </p>
 
-        {/* Boutons d'action */}
         <div style={{
           display: 'flex',
           gap: '1rem',
