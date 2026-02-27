@@ -1,0 +1,344 @@
+/* C:\Users\USER\bookfete\frontend\src\components\create-book\CreateBookSteps.css */
+
+.step-container {
+  animation: fadeIn 0.6s ease;
+}
+
+.step-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: var(--space-xl);
+  color: var(--ink);
+  text-align: center;
+}
+
+/* ===== CONFIGURATION CARDS ===== */
+.config-section {
+  margin-bottom: var(--space-xl);
+}
+
+.config-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  display: block;
+  margin-bottom: var(--space-md);
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-md);
+}
+
+.config-card {
+  padding: var(--space-lg);
+  border: var(--border-fine);
+  border-radius: var(--radius);
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  background: var(--white);
+}
+
+.config-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-luxe);
+}
+
+.config-card.selected {
+  border: 2px solid var(--gold);
+  background: var(--gold-light);
+}
+
+.config-card strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: var(--space-xs);
+}
+
+.config-card small {
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+/* ===== SLIDER ===== */
+.slider-container {
+  margin-bottom: var(--space-xl);
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.slider-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.slider-units {
+  font-size: 14px;
+  color: var(--text-light);
+  margin-left: var(--space-xs);
+}
+
+.slider-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.slider-stat {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.slider-input {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold) 0%, var(--gold-light) 100%);
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--gold);
+  cursor: pointer;
+  border: 2px solid var(--white);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.slider-input::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--gold);
+  cursor: pointer;
+  border: 2px solid var(--white);
+}
+
+.slider-minmax {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-xs);
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+/* ===== RECAP CARD ===== */
+.recap-card {
+  background: var(--silk);
+  border: var(--border-fine);
+  border-radius: var(--radius);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+}
+
+.recap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
+}
+
+.recap-item {
+  border-bottom: var(--border-fine);
+  padding-bottom: var(--space-sm);
+}
+
+.recap-item-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+.recap-item-value {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.recap-item-sub {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+/* ===== CHAPTERS PREVIEW ===== */
+.chapters-preview {
+  background: var(--white);
+  border: var(--border-fine);
+  border-radius: var(--radius);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+}
+
+.chapters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.chapters-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.chapters-count {
+  background: var(--gold-light);
+  color: var(--gold);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chapters-list {
+  max-height: 250px;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  background: var(--silk);
+  border-radius: var(--radius);
+}
+
+.chapter-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: var(--border-fine);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.chapter-item:last-child {
+  border-bottom: none;
+}
+
+.chapter-number {
+  color: var(--gold);
+  font-weight: 600;
+  min-width: 30px;
+}
+
+.chapter-note {
+  margin-top: var(--space-md);
+  font-size: 12px;
+  color: var(--text-light);
+  font-style: italic;
+}
+
+/* ===== PRICE CARD ===== */
+.price-card {
+  background: linear-gradient(135deg, var(--ink) 0%, #2d2d2d 100%);
+  padding: var(--space-xl);
+  border-radius: var(--radius);
+  color: var(--white);
+  text-align: center;
+  margin-bottom: var(--space-xl);
+  border: var(--border-fine);
+}
+
+.price-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.7;
+  margin-bottom: var(--space-sm);
+}
+
+.price-amount {
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: var(--space-xs);
+  color: var(--gold);
+}
+
+.price-details {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-bottom: var(--space-xs);
+}
+
+.price-note {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* ===== ACTION BUTTONS ===== */
+.action-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.btn-back {
+  padding: 14px 28px !important;
+  background: transparent !important;
+  border: 1px solid var(--gold) !important;
+  color: var(--gold) !important;
+  transition: var(--transition-fast);
+}
+
+.btn-back:hover {
+  background: var(--gold-light) !important;
+}
+
+.btn-next, .btn-create {
+  padding: 14px 32px !important;
+  min-width: 200px;
+}
+
+.btn-next:disabled, .btn-create:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .recap-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+  
+  .config-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .btn-back, .btn-next, .btn-create {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
+}

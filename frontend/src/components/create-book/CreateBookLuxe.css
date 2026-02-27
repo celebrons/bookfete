@@ -1,0 +1,279 @@
+/* C:\Users\USER\bookfete\frontend\src\components\create-book\CreateBookLuxe.css */
+
+.wizard-container {
+  min-height: calc(100vh - 200px);
+  background: linear-gradient(135deg, var(--white) 0%, var(--silk) 100%);
+  padding: var(--space-xl);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.wizard-card {
+  max-width: 1000px;
+  width: 100%;
+  background: var(--white);
+  border: var(--border-fine);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-elevated);
+  overflow: hidden;
+  animation: fadeIn 0.6s ease;
+}
+
+/* En-tête avec progression */
+.wizard-header {
+  background: linear-gradient(135deg, var(--ink) 0%, #2d2d2d 100%);
+  padding: var(--space-xl);
+  color: var(--white);
+  border-bottom: var(--border-fine);
+}
+
+.wizard-header h1 {
+  color: var(--white);
+  margin: 0 0 var(--space-md);
+  font-size: clamp(28px, 5vw, 36px);
+}
+
+.event-badge {
+  display: inline-block;
+  background: var(--gold);
+  color: var(--white);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: var(--space-md);
+}
+
+/* Barre de progression */
+.progress-steps {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-lg);
+}
+
+.progress-step {
+  flex: 1;
+}
+
+.progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  margin-bottom: var(--space-xs);
+  transition: var(--transition-fast);
+}
+
+.progress-bar.active {
+  background: var(--gold);
+}
+
+.progress-label {
+  font-size: 12px;
+  opacity: 0.7;
+  transition: var(--transition-fast);
+}
+
+.progress-label.active {
+  opacity: 1;
+  color: var(--gold);
+}
+
+/* Contenu */
+.wizard-content {
+  padding: var(--space-xl);
+}
+
+/* Formulaire étape 0 */
+.form-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: var(--space-xl);
+  color: var(--ink);
+}
+
+.form-group {
+  margin-bottom: var(--space-lg);
+}
+
+.form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: var(--space-xs);
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 12px 16px;
+  border: var(--border-fine);
+  border-radius: var(--radius);
+  font-size: 15px;
+  transition: var(--transition-fast);
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-light);
+}
+
+.radio-group {
+  display: flex;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.radio-label input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gold);
+}
+
+/* Boutons */
+.button-primary {
+  width: 100%;
+  padding: 16px !important;
+  font-size: 14px !important;
+}
+
+.button-secondary {
+  padding: 12px 24px !important;
+  background: var(--ink) !important;
+  color: var(--white) !important;
+  border: none !important;
+  border-radius: var(--radius) !important;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.button-secondary:hover {
+  background: #333 !important;
+}
+
+.button-back {
+  margin-top: var(--space-lg);
+  text-align: left;
+}
+
+/* Modal de connexion */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  background: var(--white);
+  padding: var(--space-xl);
+  border-radius: var(--radius);
+  max-width: 400px;
+  width: 90%;
+  box-shadow: var(--shadow-elevated);
+  text-align: center;
+  border: var(--border-fine);
+}
+
+.modal-icon {
+  width: 60px;
+  height: 60px;
+  background: var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-lg);
+  font-size: 28px;
+  color: var(--white);
+}
+
+.modal-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+  color: var(--ink);
+}
+
+.modal-text {
+  color: var(--text-light);
+  margin-bottom: var(--space-xl);
+  line-height: 1.6;
+}
+
+.modal-actions {
+  display: flex;
+  gap: var(--space-md);
+  flex-direction: column;
+}
+
+.modal-button {
+  width: 100%;
+  padding: 14px !important;
+}
+
+.modal-link {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  margin-top: var(--space-sm);
+  font-size: 13px;
+  transition: color var(--transition-fast);
+}
+
+.modal-link:hover {
+  color: var(--gold);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .wizard-container {
+    padding: var(--space-md);
+  }
+  
+  .wizard-header {
+    padding: var(--space-lg);
+  }
+  
+  .wizard-content {
+    padding: var(--space-lg);
+  }
+  
+  .radio-group {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .wizard-header h1 {
+    font-size: 24px;
+  }
+  
+  .progress-label {
+    font-size: 10px;
+  }
+}

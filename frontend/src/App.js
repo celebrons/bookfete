@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './services/supabaseClient';
+import ScrollToTop from './components/common/ScrollToTop'; // ← AJOUTER
 
 // Layout
 import Layout from './components/layout/Layout';
@@ -9,10 +10,10 @@ import Layout from './components/layout/Layout';
 // Pages
 import HomePageLuxe from './components/home/HomePageLuxe';
 import HowItWorksLuxe from './components/home/HowItWorksLuxe';
-import LoginLuxe from './components/auth/LoginLuxe';        // ← Changé ici
-import RegisterLuxe from './components/auth/RegisterLuxe';  // ← Changé ici
+import LoginLuxe from './components/auth/LoginLuxe';
+import RegisterLuxe from './components/auth/RegisterLuxe';
 import InvitationPage from './components/contributeur/InvitationPage';
-import CreateBookWizard from './components/create-book/CreateBookWizard';
+import CreateBookWizardLuxe from './components/create-book/CreateBookWizardLuxe';
 import DashboardGeneral from './components/dashboard/DashboardGeneral';
 import BookPage from './components/book/BookPage';
 
@@ -55,6 +56,7 @@ function App() {
   
   return (
     <Router>
+      <ScrollToTop /> {/* ← AJOUTER ICI, avant Layout */}
       <Layout>
         <Routes>
           {/* ============================================
@@ -62,10 +64,11 @@ function App() {
           ============================================ */}
           <Route path="/" element={<HomePageLuxe />} />
           <Route path="/how-it-works" element={<HowItWorksLuxe />} />
-          <Route path="/login" element={<LoginLuxe />} />        {/* ← Changé ici */}
-          <Route path="/register" element={<RegisterLuxe />} />  {/* ← Changé ici */}
+          <Route path="/login" element={<LoginLuxe />} />
+          <Route path="/register" element={<RegisterLuxe />} />
           <Route path="/invite/:token" element={<InvitationPage />} />
-          <Route path="/create-book" element={<CreateBookWizard />} />
+          <Route path="/create-book" element={<CreateBookWizardLuxe />} />
+
 
           {/* ============================================
               PAGES PROTÉGÉES
