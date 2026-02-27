@@ -2,22 +2,29 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './services/supabaseClient';
-import ScrollToTop from './components/common/ScrollToTop'; // ← AJOUTER
+
+import './styles/luxe-theme.css';
 
 // Layout
 import Layout from './components/layout/Layout';
 
-// Pages
+// Pages - VERSIONS LUXE
 import HomePageLuxe from './components/home/HomePageLuxe';
 import HowItWorksLuxe from './components/home/HowItWorksLuxe';
 import LoginLuxe from './components/auth/LoginLuxe';
 import RegisterLuxe from './components/auth/RegisterLuxe';
 import InvitationPage from './components/contributeur/InvitationPage';
 import CreateBookWizardLuxe from './components/create-book/CreateBookWizardLuxe';
-import DashboardGeneral from './components/dashboard/DashboardGeneral';
-import BookPage from './components/book/BookPage';
+import DashboardGeneralLuxe from './components/dashboard/DashboardGeneralLuxe';
+import BookPageLuxe  from './components/book/BookPageLuxe';
 
-// Composant de route protégée
+
+
+import ScrollToTop from './components/common/ScrollToTop';
+
+// ============================================
+// COMPOSANT DE ROUTE PROTÉGÉE
+// ============================================
 const ProtectedRoute = ({ children }) => {
   const [user, setUser] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -51,14 +58,18 @@ const ProtectedRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
+// ============================================
+// COMPOSANT PRINCIPAL
+// ============================================
 function App() {
   console.log('🚀 App démarrée - Version Luxe');
   
   return (
     <Router>
-      <ScrollToTop /> {/* ← AJOUTER ICI, avant Layout */}
+      <ScrollToTop />
       <Layout>
         <Routes>
+  
           {/* ============================================
               PAGES PUBLIQUES
           ============================================ */}
@@ -69,19 +80,18 @@ function App() {
           <Route path="/invite/:token" element={<InvitationPage />} />
           <Route path="/create-book" element={<CreateBookWizardLuxe />} />
 
-
           {/* ============================================
               PAGES PROTÉGÉES
           ============================================ */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
-              <DashboardGeneral />
+              <DashboardGeneralLuxe />
             </ProtectedRoute>
           } />
           
           <Route path="/book/:bookId" element={
             <ProtectedRoute>
-              <BookPage />
+              <BookPageLuxe  />
             </ProtectedRoute>
           } />
 

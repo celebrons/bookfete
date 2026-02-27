@@ -1,16 +1,15 @@
-// C:\Users\USER\bookfete\frontend\src\components\book\ChapterList.js
+// C:\Users\USER\bookfete\frontend\src\components\book\ChapterListLuxe.js
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
-import ChapterSidebar from './chapters/ChapterSidebar';
-// import CoverEditor from './cover/CoverEditor';        // ← COMMENTÉ
-// import BackCoverEditor from './backcover/BackCoverEditor'; // ← COMMENTÉ
-import ChapterDetails from './chapters/ChapterDetails';
-import ChapterEditor from './chapters/ChapterEditor';
-import QuestionsEditor from './chapters/QuestionsEditor';
-import ContributionsModeration from './chapters/ContributionsModeration';
-import InviteSelector from './contributors/InviteSelector';
+import ChapterSidebarLuxe from './chapters/ChapterSidebarLuxe';
+import ChapterDetailsLuxe from './chapters/ChapterDetailsLuxe';
+import ChapterEditorLuxe from './chapters/ChapterEditorLuxe';
+import QuestionsEditorLuxe from './chapters/QuestionsEditorLuxe';
+import ContributionsModerationLuxe from './chapters/ContributionsModerationLuxe';
+import InviteSelectorLuxe from './contributors/InviteSelectorLuxe';
+import './BookLuxe.css';
 
-const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAddChapter, book, onUpdateBook }) => {
+const ChapterListLuxe = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAddChapter, book, onUpdateBook }) => {
   const [editingChapter, setEditingChapter] = useState(null);
   const [editingQuestions, setEditingQuestions] = useState(null);
   const [inviteSuccess, setInviteSuccess] = useState(null);
@@ -37,7 +36,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   const [showInviteSelector, setShowInviteSelector] = useState(false);
   const [selectedChapterForInvite, setSelectedChapterForInvite] = useState(null);
 
-  // États pour la couverture (optionnels)
+  // États pour la couverture (optionnels, à garder pour l'instant)
   const [coverConfig] = useState(
     book?.cover_config || {
       title: book?.title || '',
@@ -48,7 +47,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
     }
   );
 
-  // États pour la 4ème couverture (optionnels)
+  // États pour la 4ème couverture (optionnels, à garder pour l'instant)
   const [backCoverConfig] = useState(
     book?.back_cover_config || {
       template: 'classic',
@@ -382,9 +381,9 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
 
   const getStatusColor = (contributions) => {
     const count = contributions?.[0]?.count || 0;
-    if (count === 0) return '#ffc107';
-    if (count < 3) return '#17a2b8';
-    return '#28a745';
+    if (count === 0) return 'var(--gold)';
+    if (count < 3) return 'var(--ink)';
+    return 'var(--gold)';
   };
 
   const handleSelectItem = (item, type) => {
@@ -396,15 +395,9 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   };
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      gap: '2rem',
-      height: '100%',
-      minHeight: '600px',
-      alignItems: 'stretch'
-    }}>
+    <div className="chapters-container">
       {/* Sidebar gauche */}
-      <ChapterSidebar
+      <ChapterSidebarLuxe
         chapters={chapters}
         book={book}
         selectedType={selectedType}
@@ -425,70 +418,28 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
       />
 
       {/* Colonne droite */}
-      <div style={{ 
-        flex: 2,
-        background: 'white',
-        borderRadius: '10px',
-        padding: '2rem',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        height: '100%',
-        overflowY: 'auto',
-        position: 'relative'
-      }}>
+      <div className="right-panel">
         {/* Modal de confirmation de suppression */}
         {deleteConfirm && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div style={{
-              background: 'white',
-              padding: '2rem',
-              borderRadius: '10px',
-              maxWidth: '400px',
-              textAlign: 'center'
-            }}>
-              <span style={{ fontSize: '3rem', marginBottom: '1rem', display: 'block' }}>⚠️</span>
-              <h3 style={{ marginBottom: '1rem' }}>Supprimer le chapitre ?</h3>
-              <p style={{ marginBottom: '1rem', color: '#666' }}>
+          <div className="delete-confirm">
+            <div className="delete-confirm-card">
+              <div className="delete-confirm-icon">⚠️</div>
+              <h3 className="delete-confirm-title">Supprimer le chapitre ?</h3>
+              <p className="delete-confirm-text">
                 Êtes-vous sûr de vouloir supprimer le chapitre <strong>"{deleteConfirm.title}"</strong> ?
-              </p>
-              <p style={{ marginBottom: '2rem', color: '#dc3545', fontSize: '0.9rem' }}>
+                <br />
                 Cette action est irréversible. Toutes les contributions associées seront également supprimées.
               </p>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <div className="delete-confirm-actions">
                 <button
                   onClick={cancelDelete}
-                  style={{
-                    padding: '0.8rem 1.5rem',
-                    background: '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer'
-                  }}
+                  className="modal-btn modal-btn-secondary"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={confirmDelete}
-                  style={{
-                    padding: '0.8rem 1.5rem',
-                    background: '#dc3545',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer'
-                  }}
+                  className="modal-btn modal-btn-danger"
                 >
                   Supprimer définitivement
                 </button>
@@ -499,7 +450,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
 
         {/* ========== CHAPITRES - MODE ÉDITION TITRE ========== */}
         {selectedType === 'chapter' && editingChapter && (
-          <ChapterEditor
+          <ChapterEditorLuxe
             editingChapter={editingChapter}
             setEditingChapter={setEditingChapter}
             onSave={handleSaveEdit}
@@ -509,7 +460,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
 
         {/* ========== CHAPITRES - MODE ÉDITION QUESTIONS ========== */}
         {selectedType === 'chapter' && editingQuestions && !editingChapter && (
-          <QuestionsEditor
+          <QuestionsEditorLuxe
             editingQuestions={editingQuestions}
             setEditingQuestions={setEditingQuestions}
             newQuestion={newQuestion}
@@ -523,7 +474,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
 
         {/* ========== CHAPITRES - MODE MODÉRATION ========== */}
         {selectedType === 'chapter' && showContributions && !editingChapter && !editingQuestions && (
-          <ContributionsModeration
+          <ContributionsModerationLuxe
             chapterTitle={selectedItem?.title}
             contributions={chapterContributions}
             loading={loadingContributions}
@@ -535,7 +486,7 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
 
         {/* ========== CHAPITRES - MODE NORMAL ========== */}
         {selectedType === 'chapter' && selectedItem && !editingChapter && !editingQuestions && !showContributions && (
-          <ChapterDetails
+          <ChapterDetailsLuxe
             chapter={selectedItem}
             chaptersCount={chapters.length}
             onGenerateQuestions={generateAIQuestions}
@@ -557,27 +508,17 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
 
         {/* ========== AUCUNE SÉLECTION ========== */}
         {!selectedItem && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '400px',
-            color: '#999',
-            height: '100%'
-          }}>
-            <span style={{ fontSize: '4rem', marginBottom: '1rem' }}>📖</span>
+          <div className="empty-state">
+            <div className="empty-state-icon">📖</div>
             <h3>Sélectionnez un élément</h3>
-            <p style={{ textAlign: 'center', maxWidth: '400px' }}>
-              Cliquez sur un chapitre pour commencer
-            </p>
+            <p>Cliquez sur un chapitre pour commencer</p>
           </div>
         )}
       </div>
 
       {/* Modal d'invitation */}
       {showInviteSelector && selectedChapterForInvite && (
-        <InviteSelector
+        <InviteSelectorLuxe
           chapterId={selectedChapterForInvite.id}
           bookId={bookId}
           onClose={() => {
@@ -593,4 +534,4 @@ const ChapterList = ({ chapters, bookId, onUpdateChapter, onDeleteChapter, onAdd
   );
 };
 
-export default ChapterList;
+export default ChapterListLuxe;

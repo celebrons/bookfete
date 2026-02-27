@@ -1,0 +1,102 @@
+/* C:\Users\USER\bookfete\frontend\src\components\book\BookLuxe.css */
+
+.book-container {
+  min-height: calc(100vh - 200px);
+  background-color: var(--silk);
+  padding: var(--space-xl);
+}
+
+.book-header {
+  background: var(--white);
+  border: var(--border-fine);
+  padding: var(--space-lg) var(--space-xl);
+  margin-bottom: var(--space-xl);
+}
+
+.book-header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.book-title h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 var(--space-xs);
+  color: var(--ink);
+}
+
+.book-meta {
+  display: flex;
+  gap: var(--space-md);
+  color: var(--text-light);
+  font-size: 13px;
+}
+
+.book-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dashboard-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 10px 20px;
+  background: var(--silk);
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: var(--radius);
+  border: var(--border-fine);
+  transition: var(--transition-fast);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.dashboard-link:hover {
+  background: var(--gold-light);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.tabs-container {
+  max-width: 1400px;
+  margin: 0 auto var(--space-xl);
+  padding: 0 var(--space-xl);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-md);
+  border-bottom: var(--border-fine);
+}
+
+.tab {
+  padding: var(--space-md) var(--space-lg);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-light);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.tab:hover {
+  color: var(--gold);
+}
+
+.tab.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+.book-main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--space-xl) var(--space-xl);
+  min-height: 600px;
+}
