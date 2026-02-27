@@ -8,9 +8,9 @@ import Layout from './components/layout/Layout';
 
 // Pages
 import HomePageLuxe from './components/home/HomePageLuxe';
-import HowItWorksPage from './components/home/HowItWorksPage';
-import Login from './components/auth/Login';
-import Register from './components/auth/Register';
+import HowItWorksLuxe from './components/home/HowItWorksLuxe';
+import LoginLuxe from './components/auth/LoginLuxe';        // ← Changé ici
+import RegisterLuxe from './components/auth/RegisterLuxe';  // ← Changé ici
 import InvitationPage from './components/contributeur/InvitationPage';
 import CreateBookWizard from './components/create-book/CreateBookWizard';
 import DashboardGeneral from './components/dashboard/DashboardGeneral';
@@ -61,9 +61,9 @@ function App() {
               PAGES PUBLIQUES
           ============================================ */}
           <Route path="/" element={<HomePageLuxe />} />
-          <Route path="/how-it-works" element={<HowItWorksPage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/how-it-works" element={<HowItWorksLuxe />} />
+          <Route path="/login" element={<LoginLuxe />} />        {/* ← Changé ici */}
+          <Route path="/register" element={<RegisterLuxe />} />  {/* ← Changé ici */}
           <Route path="/invite/:token" element={<InvitationPage />} />
           <Route path="/create-book" element={<CreateBookWizard />} />
 
