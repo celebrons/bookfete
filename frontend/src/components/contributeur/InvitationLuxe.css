@@ -1,0 +1,102 @@
+/* C:\Users\USER\bookfete\frontend\src\components\contributeur\InvitationLuxe.css */
+
+.invitation-container {
+  min-height: calc(100vh - 200px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  background: linear-gradient(135deg, var(--white) 0%, var(--silk) 100%);
+}
+
+.invitation-card {
+  max-width: 800px;
+  width: 100%;
+  background: var(--white);
+  border: var(--border-fine);
+  border-radius: var(--radius);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-elevated);
+  animation: fadeIn 0.6s ease;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Scrollbar stylée */
+.invitation-card::-webkit-scrollbar {
+  width: 8px;
+}
+
+.invitation-card::-webkit-scrollbar-track {
+  background: var(--mist);
+  border-radius: 4px;
+}
+
+.invitation-card::-webkit-scrollbar-thumb {
+  background: var(--gold);
+  border-radius: 4px;
+}
+
+.form-group {
+  margin-bottom: var(--space-lg);
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.photo-item {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  aspect-ratio: 1;
+  box-shadow: var(--shadow-luxe);
+}
+
+.photo-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #dc3545;
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: var(--transition-fast);
+}
+
+.photo-remove:hover {
+  background: #c82333;
+  transform: scale(1.1);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

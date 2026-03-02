@@ -153,7 +153,8 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
   if (showResult) {
     return (
       <div className="modal-overlay">
-        <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
+        <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', position: 'relative' }}>
+          <button onClick={onClose} className="modal-close">✕</button>
           <div style={{
             fontSize: '48px',
             marginBottom: 'var(--space-lg)',
@@ -175,7 +176,7 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
                 onClose();
               }
             }}
-            className="modal-btn modal-btn-primary"
+            className="btn btn-primary"
           >
             {result.success ? 'Fermer' : 'Réessayer'}
           </button>
@@ -206,14 +207,15 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
   if (error) {
     return (
       <div className="modal-overlay">
-        <div className="modal-content">
+        <div className="modal-content" style={{ position: 'relative' }}>
+          <button onClick={onClose} className="modal-close">✕</button>
           <h3 className="modal-title" style={{ color: '#dc3545' }}>❌ Erreur</h3>
           <p className="modal-text">{error}</p>
           <div className="modal-actions">
-            <button onClick={onClose} className="modal-btn modal-btn-secondary">
+            <button onClick={onClose} className="btn btn-outline">
               Fermer
             </button>
-            <button onClick={loadData} className="modal-btn modal-btn-primary">
+            <button onClick={loadData} className="btn btn-primary">
               Réessayer
             </button>
           </div>
@@ -227,95 +229,123 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: '500px' }}>
-        <div className="modal-header">
-          <h3 className="modal-title">👥 Inviter des contributeurs</h3>
+      <div className="modal-content" style={{ 
+        maxWidth: '500px', 
+        maxHeight: '80vh',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: 0
+      }}>
+        {/* En-tête minimal */}
+        <div style={{
+          padding: 'var(--space-md) var(--space-lg)',
+          borderBottom: 'var(--border-fine)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'var(--white)'
+        }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--ink)' }}>
+            👥 Inviter des contributeurs
+          </h3>
           <button onClick={onClose} className="modal-close">✕</button>
         </div>
 
-        <div className="modal-body">
-          <div className="card" style={{ marginBottom: 'var(--space-lg)', background: 'var(--gold-light)' }}>
-            <p style={{ fontSize: '13px', color: 'var(--ink)', margin: 0 }}>
-              <strong>💡</strong> Sélectionnez les personnes à inviter pour ce chapitre
-            </p>
+        {/* Stats compactes */}
+        <div style={{
+          padding: 'var(--space-sm) var(--space-lg)',
+          borderBottom: 'var(--border-fine)',
+          display: 'flex',
+          gap: 'var(--space-md)',
+          fontSize: '12px',
+          background: 'var(--silk)'
+        }}>
+          <span><strong>{contributors.length}</strong> total</span>
+          <span style={{ color: 'var(--gold)' }}><strong>{availableContributors.length}</strong> disponibles</span>
+          {invitedContributors.length > 0 && (
+            <span 
+              onClick={() => setShowInvited(!showInvited)}
+              style={{
+                color: 'var(--text-light)',
+                cursor: 'pointer',
+                textDecoration: 'underline dotted',
+                marginLeft: 'auto',
+                fontSize: '11px'
+              }}
+            >
+              {showInvited ? 'Masquer' : `Voir ${invitedContributors.length} invités`}
+            </span>
+          )}
+        </div>
+
+        {/* Zone scrollable - occupe tout l'espace disponible */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: 'var(--space-md) var(--space-lg)',
+          minHeight: 0,
+          maxHeight: '500px'
+        }}>
+          {/* Tout sélectionner - collé en haut */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-sm)',
+            padding: 'var(--space-xs) 0 var(--space-sm)',
+            borderBottom: 'var(--border-fine)',
+            marginBottom: 'var(--space-sm)',
+            position: 'sticky',
+            top: 0,
+            background: 'var(--white)',
+            zIndex: 1
+          }}>
+            <input
+              type="checkbox"
+              checked={selectedIds.length === availableContributors.length}
+              onChange={handleToggleAll}
+              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+            />
+            <label style={{ fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+              Tous sélectionner ({selectedIds.length}/{availableContributors.length})
+            </label>
           </div>
 
-          <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
-            <span style={{ color: 'var(--ink)' }}>
-              <strong>{contributors.length}</strong> total
-            </span>
-            <span style={{ color: 'var(--gold)' }}>
-              <strong>{availableContributors.length}</strong> disponibles
-            </span>
-            {invitedContributors.length > 0 && (
-              <span 
-                onClick={() => setShowInvited(!showInvited)}
-                style={{
-                  color: 'var(--text-light)',
-                  cursor: 'pointer',
-                  textDecoration: 'underline dotted'
-                }}
-              >
-                <strong>{invitedContributors.length}</strong> déjà invités
-              </span>
-            )}
-          </div>
-
-          {availableContributors.length > 0 && (
-            <>
-              <div style={{
+          {/* Liste des disponibles - plus compacte */}
+          {availableContributors.map(contributor => (
+            <div
+              key={contributor.id}
+              style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'var(--space-sm)',
-                padding: 'var(--space-sm) 0',
+                padding: 'var(--space-xs) var(--space-sm)',
                 borderBottom: 'var(--border-fine)',
-                marginBottom: 'var(--space-sm)'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={selectedIds.length === availableContributors.length}
-                  onChange={handleToggleAll}
-                  style={{ width: '16px', height: '16px' }}
-                />
-                <label style={{ fontSize: '13px' }}>
-                  Tous sélectionner ({selectedIds.length}/{availableContributors.length})
-                </label>
-              </div>
-
-              {availableContributors.map(contributor => (
-                <div
-                  key={contributor.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-sm)',
-                    padding: 'var(--space-sm)',
-                    borderBottom: 'var(--border-fine)',
-                    background: selectedIds.includes(contributor.id) ? 'var(--gold-light)' : 'white'
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(contributor.id)}
-                    onChange={() => handleToggle(contributor.id)}
-                    style={{ width: '16px', height: '16px' }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '500', fontSize: '14px' }}>
-                      {contributor.name || contributor.email.split('@')[0]}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                      {contributor.email}
-                    </div>
-                  </div>
+                background: selectedIds.includes(contributor.id) ? 'var(--gold-light)' : 'transparent',
+                borderRadius: 'var(--radius)',
+                marginBottom: '2px'
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(contributor.id)}
+                onChange={() => handleToggle(contributor.id)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '500', fontSize: '13px', color: 'var(--ink)' }}>
+                  {contributor.name || contributor.email.split('@')[0]}
                 </div>
-              ))}
-            </>
-          )}
+                <div style={{ fontSize: '11px', color: 'var(--text-light)' }}>
+                  {contributor.email}
+                </div>
+              </div>
+            </div>
+          ))}
 
-          {invitedContributors.length > 0 && showInvited && (
-            <div style={{ marginTop: 'var(--space-lg)' }}>
-              <h4 style={{ fontSize: '14px', marginBottom: 'var(--space-sm)', color: 'var(--ink)' }}>
+          {/* Section des déjà invités (si visible) */}
+          {showInvited && invitedContributors.length > 0 && (
+            <div style={{ marginTop: 'var(--space-md)' }}>
+              <h4 style={{ fontSize: '12px', marginBottom: 'var(--space-xs)', color: 'var(--ink)' }}>
                 Déjà invités ({invitedContributors.length})
               </h4>
               {invitedContributors.map(contributor => (
@@ -325,19 +355,27 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: 'var(--space-sm)',
-                    borderBottom: 'var(--border-fine)'
+                    padding: 'var(--space-xs) var(--space-sm)',
+                    borderBottom: 'var(--border-fine)',
+                    background: 'var(--silk)',
+                    borderRadius: 'var(--radius)',
+                    marginBottom: '2px'
                   }}
                 >
-                  <span style={{ fontSize: '13px' }}>
-                    {contributor.name || contributor.email.split('@')[0]}
-                  </span>
+                  <div>
+                    <div style={{ fontWeight: '500', fontSize: '12px', color: 'var(--ink)' }}>
+                      {contributor.name || contributor.email.split('@')[0]}
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-light)' }}>
+                      {contributor.email}
+                    </div>
+                  </div>
                   <button
                     onClick={() => copyToClipboard(`${window.location.origin}/invite/${contributor.token}`)}
-                    className="btn-outline"
-                    style={{ padding: '2px 8px', fontSize: '11px' }}
+                    className="btn btn-outline"
+                    style={{ padding: '2px 6px', fontSize: '10px' }}
                   >
-                    Copier
+                    🔗 Copier
                   </button>
                 </div>
               ))}
@@ -345,14 +383,22 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
           )}
         </div>
 
-        <div className="modal-footer">
-          <button onClick={onClose} className="modal-btn modal-btn-secondary">
+        {/* Boutons fixes en bas */}
+        <div style={{
+          padding: 'var(--space-md) var(--space-lg)',
+          borderTop: 'var(--border-fine)',
+          display: 'flex',
+          gap: 'var(--space-md)',
+          background: 'var(--white)'
+        }}>
+          <button onClick={onClose} className="btn btn-outline" style={{ flex: 1, padding: '10px' }}>
             Annuler
           </button>
           <button
             onClick={handleSendInvites}
             disabled={sending || selectedIds.length === 0}
-            className="modal-btn modal-btn-primary"
+            className="btn btn-primary"
+            style={{ flex: 2, padding: '10px' }}
           >
             {sending ? 'Envoi...' : `Inviter ${selectedIds.length} personne${selectedIds.length > 1 ? 's' : ''}`}
           </button>

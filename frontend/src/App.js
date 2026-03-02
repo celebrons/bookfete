@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './services/supabaseClient';
 
+
 import './styles/luxe-theme.css';
 
 // Layout
@@ -13,10 +14,13 @@ import HomePageLuxe from './components/home/HomePageLuxe';
 import HowItWorksLuxe from './components/home/HowItWorksLuxe';
 import LoginLuxe from './components/auth/LoginLuxe';
 import RegisterLuxe from './components/auth/RegisterLuxe';
-import InvitationPage from './components/contributeur/InvitationPage';
 import CreateBookWizardLuxe from './components/create-book/CreateBookWizardLuxe';
 import DashboardGeneralLuxe from './components/dashboard/DashboardGeneralLuxe';
 import BookPageLuxe  from './components/book/BookPageLuxe';
+import InvitationPageLuxe from './components/contributeur/InvitationPageLuxe';
+import TokenContributePageLuxe from './components/contributeur/TokenContributePageLuxe';
+
+
 
 
 
@@ -77,8 +81,11 @@ function App() {
           <Route path="/how-it-works" element={<HowItWorksLuxe />} />
           <Route path="/login" element={<LoginLuxe />} />
           <Route path="/register" element={<RegisterLuxe />} />
-          <Route path="/invite/:token" element={<InvitationPage />} />
           <Route path="/create-book" element={<CreateBookWizardLuxe />} />
+		  <Route path="/invite/:token" element={<InvitationPageLuxe />} />
+		  <Route path="/contribute/:token" element={<TokenContributePageLuxe />} />
+
+
 
           {/* ============================================
               PAGES PROTÉGÉES

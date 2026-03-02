@@ -101,18 +101,36 @@ const ContributorsTabLuxe = ({ bookId }) => {
 
   return (
     <div className="card" style={{ position: 'relative', minHeight: '500px' }}>
-      {/* Message de bienvenue / tutoriel */}
+      {/* Message de bienvenue / tutoriel - VERSION STYLISÉE */}
       {showWelcome && (
-        <div className="guide-card" style={{ top: 'var(--space-lg)', left: 'var(--space-lg)', right: 'var(--space-lg)' }}>
+        <div className="guide-card">
           <button onClick={dismissWelcome} className="guide-close">✕</button>
           <div className="guide-title">🎯 Bienvenue dans la gestion des contributeurs !</div>
-          <p><strong>Voici comment ça marche :</strong></p>
-          <ul className="guide-steps">
-            <li>📧 <strong>Ajoutez les emails</strong> de toutes les personnes que vous souhaitez inviter</li>
-            <li>📋 <strong>Retournez dans l'onglet "Chapitres"</strong></li>
-            <li>👥 <strong>Cliquez sur l'icône 👥</strong> à côté d'un chapitre pour choisir qui inviter</li>
-            <li>✉️ <strong>Les invitations sont envoyées automatiquement</strong> avec un lien unique</li>
-          </ul>
+          
+          <div style={{ marginBottom: 'var(--space-lg)' }}>
+            <p style={{ fontWeight: '600', marginBottom: 'var(--space-sm)' }}>
+              Voici comment ça marche :
+            </p>
+            <ul className="guide-steps">
+              <li>
+                <span className="guide-step-icon">📧</span>
+                <span><strong>Ajoutez les emails</strong> de toutes les personnes que vous souhaitez inviter</span>
+              </li>
+              <li>
+                <span className="guide-step-icon">📋</span>
+                <span><strong>Retournez dans l'onglet "Chapitres"</strong></span>
+              </li>
+              <li>
+                <span className="guide-step-icon">👥</span>
+                <span><strong>Cliquez sur l'icône 👥</strong> à côté d'un chapitre pour choisir qui inviter</span>
+              </li>
+              <li>
+                <span className="guide-step-icon">✉️</span>
+                <span><strong>Les invitations sont envoyées automatiquement</strong> avec un lien unique</span>
+              </li>
+            </ul>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button onClick={dismissWelcome} className="btn btn-primary">
               J'ai compris !

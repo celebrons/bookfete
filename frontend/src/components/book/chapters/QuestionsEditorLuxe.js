@@ -10,7 +10,8 @@ const QuestionsEditorLuxe = ({
   onAddQuestion,
   onRemoveQuestion,
   onSave,
-  onCancel
+  onCancel,
+  onValidate
 }) => {
   return (
     <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
@@ -71,12 +72,24 @@ const QuestionsEditorLuxe = ({
         </div>
       </div>
       
-      <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
-        <button onClick={onCancel} className="modal-btn modal-btn-secondary">
-          Annuler
-        </button>
-        <button onClick={onSave} className="modal-btn modal-btn-primary">
-          Enregistrer les questions
+      {/* Boutons sur la même ligne */}
+      <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+          <button onClick={onCancel} className="modal-btn modal-btn-secondary">
+            Annuler
+          </button>
+          <button onClick={onSave} className="modal-btn modal-btn-primary">
+            Enregistrer les questions
+          </button>
+        </div>
+        
+        {/* Bouton Valider déporté à droite */}
+        <button 
+          onClick={onValidate} 
+          className="modal-btn modal-btn-primary" 
+          style={{ background: 'var(--gold)' }}
+        >
+          ✅ Valider définitivement
         </button>
       </div>
     </div>

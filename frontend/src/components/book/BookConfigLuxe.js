@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import './BookLuxe.css';
 import '../../styles/luxe-theme.css';
 
-const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6 }) => {
+const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     title: book.title,
@@ -12,6 +12,10 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6 }) => {
     style_narratif: book.style_narratif,
     pages: book.pages || chaptersCount * 8
   });
+
+  // État pour savoir si le nombre de chapitres va changer
+  const [willChaptersChange, setWillChaptersChange] = useState(false);
+  const [newChaptersCount, setNewChaptersCount] = useState(chaptersCount);
 
   // Constantes
   const MIN_PAGES = 32;
@@ -27,37 +31,67 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6 }) => {
     }
   }, [chaptersCount, book.pages, isEditing]);
 
+  // Mettre à jour le message quand les pages changent
+  useEffect(() => {
+    const calculated = Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER);
+    setNewChaptersCount(calculated);
+    setWillChaptersChange(calculated !== chaptersCount);
+  }, [formData.pages, chaptersCount]);
+
   // Options
   const finitions = [
-    { id: 'livret', label: 'Livret', description: 'Souple' },
-    { id: 'classique', label: 'Classique', description: 'Rigide' },
-    { id: 'luxe', label: 'Luxe', description: 'Toilé' }
+    { id: 'livret', label: 'Livret', description: 'Souple', basePrice: 29 },
+    { id: 'classique', label: 'Classique', description: 'Rigide', basePrice: 55 },
+    { id: 'luxe', label: 'Luxe', description: 'Toilé', basePrice: 85 }
   ];
 
   const papiers = [
-    { id: 'satine', label: 'Satiné', description: 'Brillant et lisse' },
-    { id: 'mat', label: 'Mat', description: 'Doux et élégant' },
-    { id: 'verge', label: 'Vergé Ivoire', description: 'Texturé et noble' }
+    { id: 'satine', label: 'Satiné', description: 'Brillant et lisse', multiplier: 1.0 },
+    { id: 'mat', label: 'Mat', description: 'Doux et élégant', multiplier: 1.0 },
+    { id: 'verge', label: 'Vergé Ivoire', description: 'Texturé et noble', multiplier: 1.15 }
   ];
 
   const styles = [
-    { id: 'poetique', label: 'Poétique', description: 'Langage imagé et émouvant' },
-    { id: 'factuel', label: 'Factuel', description: 'Direct et concret' },
-    { id: 'intime', label: 'Intime', description: 'Chaleureux et personnel' }
+    { id: 'poetique', label: 'Poétique', description: 'Langage imagé et émouvant', multiplier: 1.0 },
+    { id: 'factuel', label: 'Factuel', description: 'Direct et concret', multiplier: 1.0 },
+    { id: 'intime', label: 'Intime', description: 'Chaleureux et personnel', multiplier: 1.0 }
   ];
+
+  // Calcul du prix en direct
+  const calculateLivePrice = () => {
+    const finition = finitions.find(f => f.id === formData.finition) || finitions[1];
+    let price = finition.basePrice;
+    
+    const extraPages = Math.max(0, formData.pages - 64);
+    price += extraPages * 0.25;
+    
+    const papier = papiers.find(p => p.id === formData.papier) || papiers[1];
+    price = price * papier.multiplier;
+    
+    const style = styles.find(s => s.id === formData.style_narratif) || styles[1];
+    price = price * style.multiplier;
+    
+    return Math.round(price);
+  };
 
   // Calcul du nombre de chapitres basé sur les pages
   const calculatedChapters = Math.max(4, Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER));
   
-  // Calcul du prix
-  const calculatePrice = () => {
-    const base = formData.finition === 'luxe' ? 85 : formData.finition === 'classique' ? 55 : 29;
-    const perPage = formData.finition === 'luxe' ? 0.50 : formData.finition === 'classique' ? 0.35 : 0.25;
-    return Math.round(base + (formData.pages * perPage));
+  // Gestion du changement de pages
+  const handlePagesChange = (newPages) => {
+    setFormData({ ...formData, pages: newPages });
   };
 
-  const handleSave = () => {
+  // Validation des modifications
+  const handleValidate = () => {
+    // Mettre à jour le livre
     onUpdateBook(formData);
+    
+    // Si le nombre de chapitres change, appeler onPagesChange
+    if (willChaptersChange) {
+      onPagesChange(formData.pages);
+    }
+    
     setIsEditing(false);
   };
 
@@ -195,7 +229,7 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6 }) => {
             max="216"
             step="8"
             value={formData.pages}
-            onChange={(e) => setFormData({ ...formData, pages: parseInt(e.target.value) })}
+            onChange={(e) => handlePagesChange(parseInt(e.target.value))}
             className="slider-input"
           />
           
@@ -205,19 +239,51 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6 }) => {
           </div>
 
           <p className="chapter-note" style={{ marginTop: 'var(--space-md)' }}>
-            💡 Adapté à vos {chaptersCount} chapitres ({chaptersCount * 8} pages recommandées)
+            💡 Actuellement {chaptersCount} chapitres
           </p>
+
+          {/* Message si le nombre de chapitres change */}
+          {willChaptersChange && (
+            <div style={{
+              marginTop: 'var(--space-lg)',
+              padding: 'var(--space-md)',
+              background: newChaptersCount > chaptersCount ? '#d4edda' : '#fff3cd',
+              border: `1px solid ${newChaptersCount > chaptersCount ? '#c3e6cb' : '#ffeeba'}`,
+              borderRadius: 'var(--radius)',
+              color: newChaptersCount > chaptersCount ? '#155724' : '#856404'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+                <span style={{ fontSize: '20px' }}>
+                  {newChaptersCount > chaptersCount ? '➕' : '➖'}
+                </span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: '600' }}>
+                    {newChaptersCount > chaptersCount 
+                      ? `${newChaptersCount - chaptersCount} chapitre(s) seront ajoutés`
+                      : `${chaptersCount - newChaptersCount} chapitre(s) seront supprimés`
+                    }
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px' }}>
+                    {newChaptersCount > chaptersCount 
+                      ? 'De nouveaux chapitres seront créés automatiquement.'
+                      : 'Les derniers chapitres seront supprimés avec leurs contributions.'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Prix */}
         <div className="price-card" style={{ marginBottom: 'var(--space-xl)' }}>
           <div className="price-label">Prix estimé</div>
-          <div className="price-amount">{calculatePrice()}€</div>
+          <div className="price-amount">{calculateLivePrice()}€</div>
           <div className="price-details">TTC</div>
         </div>
 
         {/* Boutons */}
-        <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+        <div className="modal-actions" style={{ justifyContent: 'flex-end', gap: 'var(--space-md)' }}>
           <button
             onClick={() => setIsEditing(false)}
             className="modal-btn modal-btn-secondary"
@@ -225,7 +291,7 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6 }) => {
             Annuler
           </button>
           <button
-            onClick={handleSave}
+            onClick={handleValidate}
             className="modal-btn modal-btn-primary"
           >
             Valider les modifications
@@ -385,7 +451,7 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6 }) => {
 
           {/* Prix */}
           <div className="price-card" style={{ width: '100%', marginBottom: 'var(--space-lg)' }}>
-            <div className="price-amount" style={{ fontSize: '48px' }}>{calculatePrice()}€</div>
+            <div className="price-amount" style={{ fontSize: '48px' }}>{calculateLivePrice()}€</div>
           </div>
 
           {/* Badge IA */}

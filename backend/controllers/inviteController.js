@@ -3,6 +3,28 @@ const supabase = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
 const { sendInviteEmail } = require('../services/emailService');
 
+const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
+
+const areContributionsClosed = (workflowState) =>
+  workflowState === 'contributions_closed' || workflowState === 'closed';
+
+const getChapterWorkflowState = async (chapterId) => {
+  const { data, error } = await supabase
+    .from('contributions')
+    .select('message')
+    .eq('chapter_id', chapterId)
+    .eq('contributor_email', CHAPTER_STATE_EMAIL)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.message || null;
+};
+
 // ============================================
 // INVITER À UN CHAPITRE
 // ============================================
@@ -217,6 +239,24 @@ const checkInviteToken = async (req, res) => {
       return res.status(404).json({ error: 'Lien invalide ou expiré' });
     }
 
+    const workflowState = await getChapterWorkflowState(invite.chapter_id);
+
+    if (areContributionsClosed(workflowState)) {
+      return res.status(400).json({
+        error: 'Les contributions pour ce chapitre sont closes'
+      });
+    }
+
+    const { data: organizerProfile } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', invite.chapter.book.owner_id)
+      .maybeSingle();
+
+    const organizerName = organizerProfile?.full_name
+      || organizerProfile?.email?.split('@')[0]
+      || "L'organisateur";
+
     // Vérifier la contribution existante
     const { data: existingContribution } = await supabase
       .from('contributions')
@@ -230,6 +270,12 @@ const checkInviteToken = async (req, res) => {
       if (existingContribution.approved) {
         return res.status(400).json({ error: 'Cette contribution a déjà été approuvée' });
       }
+
+      if (existingContribution.is_finalized && !existingContribution.needs_revision) {
+        return res.status(400).json({
+          error: 'Cette contribution a déjà été envoyée et ne peut plus être modifiée'
+        });
+      }
       
       return res.json({
         valid: true,
@@ -239,13 +285,14 @@ const checkInviteToken = async (req, res) => {
         email: invite.email,
         eventType: invite.chapter.book.event_type || 'evenement',
         recipientName: invite.chapter.book.recipient_name,
-        organizerName: invite.chapter.book.owner_name,
+        organizerName,
         questions: invite.chapter.questions_validated ? invite.chapter.questions_ia : [],
         questionsValidated: invite.chapter.questions_validated,
         existingContribution: {
           id: existingContribution.id,
           message: existingContribution.message,
           photo_urls: existingContribution.photo_urls,
+          is_finalized: existingContribution.is_finalized,
           needs_revision: existingContribution.needs_revision,
           moderation_feedback: existingContribution.moderation_feedback
         }
@@ -265,7 +312,7 @@ const checkInviteToken = async (req, res) => {
       email: invite.email,
       eventType: invite.chapter.book.event_type || 'evenement',
       recipientName: invite.chapter.book.recipient_name,
-      organizerName: invite.chapter.book.owner_name,
+      organizerName,
       questions: invite.chapter.questions_validated ? invite.chapter.questions_ia : [],
       questionsValidated: invite.chapter.questions_validated
     });
@@ -281,7 +328,8 @@ const checkInviteToken = async (req, res) => {
 // ============================================
 const useInviteToken = async (req, res) => {
   const { token } = req.params;
-  const { name, message, photoUrls, contributionId } = req.body;
+  const { name, message, photoUrls, contributionId, isDraft } = req.body;
+  const isFinalized = !isDraft;
 
   try {
     console.log('\n' + '='.repeat(60));
@@ -301,6 +349,14 @@ const useInviteToken = async (req, res) => {
       return res.status(404).json({ error: 'Lien invalide' });
     }
 
+    const workflowState = await getChapterWorkflowState(invite.chapter_id);
+
+    if (areContributionsClosed(workflowState)) {
+      return res.status(400).json({
+        error: 'Les contributions pour ce chapitre sont closes'
+      });
+    }
+
     // Vérifier s'il y a une contribution existante
     const { data: existingContribution } = await supabase
       .from('contributions')
@@ -315,21 +371,42 @@ const useInviteToken = async (req, res) => {
         return res.status(400).json({ error: 'Cette contribution ne peut plus être modifiée' });
       }
 
-      const { error: updateError } = await supabase
+      if (existingContribution.is_finalized && !existingContribution.needs_revision) {
+        return res.status(400).json({
+          error: 'Cette contribution a déjà été envoyée et ne peut plus être modifiée'
+        });
+      }
+
+      const { data: updatedContribution, error: updateError } = await supabase
         .from('contributions')
         .update({
           message,
           photo_urls: photoUrls || [],
+          is_finalized: isFinalized,
           needs_revision: false,
           moderation_feedback: null
         })
-        .eq('id', existingContribution.id);
+        .eq('id', existingContribution.id)
+        .select()
+        .single();
 
       if (updateError) throw updateError;
 
+      await supabase
+        .from('chapter_invites')
+        .update({
+          contributed: isFinalized,
+          contributed_at: isFinalized ? new Date().toISOString() : null
+        })
+        .eq('id', invite.id);
+
       return res.json({
         success: true,
-        message: 'Contribution mise à jour avec succès'
+        message: isFinalized
+          ? 'Contribution mise à jour avec succès'
+          : 'Brouillon sauvegardé avec succès',
+        contributionId: updatedContribution.id,
+        isDraft: !isFinalized
       });
     }
 
@@ -343,6 +420,7 @@ const useInviteToken = async (req, res) => {
         message,
         photo_urls: photoUrls || [],
         approved: false,
+        is_finalized: isFinalized,
         needs_revision: false
       }])
       .select()
@@ -354,18 +432,122 @@ const useInviteToken = async (req, res) => {
     await supabase
       .from('chapter_invites')
       .update({ 
-        contributed: true, 
-        contributed_at: new Date().toISOString() 
+        contributed: isFinalized, 
+        contributed_at: isFinalized ? new Date().toISOString() : null
       })
       .eq('id', invite.id);
 
     res.json({
       success: true,
-      message: 'Contribution enregistrée avec succès'
+      message: isFinalized
+        ? 'Contribution enregistrée avec succès'
+        : 'Brouillon sauvegardé avec succès',
+      contributionId: contribution.id,
+      isDraft: !isFinalized
     });
 
   } catch (error) {
     console.error('❌ Erreur:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ============================================
+// DEMANDER UNE MODIFICATION
+// ============================================
+const requestRevision = async (req, res) => {
+  const { contributionId, feedback } = req.body;
+
+  try {
+    if (!contributionId || !feedback || !feedback.trim()) {
+      return res.status(400).json({ error: 'Paramètres manquants' });
+    }
+
+    const { data: contribution, error: contributionError } = await supabase
+      .from('contributions')
+      .select(`
+        *,
+        chapter:chapters(
+          id,
+          title,
+          book:books(
+            id,
+            title,
+            owner_id
+          )
+        )
+      `)
+      .eq('id', contributionId)
+      .single();
+
+    if (contributionError || !contribution) {
+      return res.status(404).json({ error: 'Contribution introuvable' });
+    }
+
+    if (contribution.chapter?.book?.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Non autorisé' });
+    }
+
+    const { data: invite, error: inviteError } = await supabase
+      .from('chapter_invites')
+      .select('*')
+      .eq('chapter_id', contribution.chapter_id)
+      .eq('email', contribution.contributor_email)
+      .maybeSingle();
+
+    if (inviteError) {
+      throw inviteError;
+    }
+
+    const { error: updateContributionError } = await supabase
+      .from('contributions')
+      .update({
+        needs_revision: true,
+        moderation_feedback: feedback.trim(),
+        approved: false,
+        is_finalized: false
+      })
+      .eq('id', contributionId);
+
+    if (updateContributionError) {
+      throw updateContributionError;
+    }
+
+    if (invite) {
+      const { error: updateInviteError } = await supabase
+        .from('chapter_invites')
+        .update({
+          contributed: false,
+          contributed_at: null
+        })
+        .eq('id', invite.id);
+
+      if (updateInviteError) {
+        throw updateInviteError;
+      }
+    }
+
+    const inviteLink = invite
+      ? `${process.env.FRONTEND_URL}/invite/${invite.token}`
+      : null;
+
+    if (invite && inviteLink) {
+      await sendInviteEmail({
+        to: contribution.contributor_email,
+        bookTitle: contribution.chapter?.book?.title || 'Votre livre',
+        chapterTitle: contribution.chapter?.title || 'Chapitre',
+        inviteLink,
+        customMessage: `Modification demandée : ${feedback.trim()}`
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Demande de modification envoyée',
+      inviteLink
+    });
+  } catch (error) {
+    console.error('❌ Erreur demande de modification:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -414,6 +596,12 @@ const resendInvite = async (req, res) => {
 
     if (inviteError || !invite) {
       return res.status(404).json({ error: 'Invitation non trouvée' });
+    }
+
+    const workflowState = await getChapterWorkflowState(invite.chapter_id);
+
+    if (areContributionsClosed(workflowState)) {
+      return res.status(400).json({ error: 'Les contributions pour ce chapitre sont closes' });
     }
 
     if (invite.contributed) {
@@ -548,6 +736,7 @@ module.exports = {
   sendBatchInvites,
   checkInviteToken,
   useInviteToken,
+  requestRevision,
   getChapterInvites,
   resendInvite,
   deleteInvite,

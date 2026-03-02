@@ -1,5 +1,5 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\ContributionFormLuxe.js
-import React, { useState } from 'react';
+import React from 'react';
 import Tooltip from '../../ui/Tooltip';
 import '../BookLuxe.css';
 
@@ -8,54 +8,61 @@ const ContributionFormLuxe = ({
   setContributionText,
   photos,
   photoPreviews,
+  uploadedPhotoUrls,
   onPhotoChange,
   onRemovePhoto,
   onSubmit,
   submitting,
   hasContributed,
   onEdit,
-  existingPhotos = []
+  existingPhotos = [],
+  isFinalized,
+  onFinalize,
+  contributionId,
+  chapterTitle
 }) => {
-  const [showEditConfirm, setShowEditConfirm] = useState(false);
 
-  // Si l'utilisateur a déjà contribué et n'est pas en mode édition
+  console.log('🔵 ===== ContributionFormLuxe =====');
+  console.log('🔵 hasContributed:', hasContributed);
+  console.log('🔵 isFinalized:', isFinalized);
+  console.log('🔵 uploadedPhotoUrls:', uploadedPhotoUrls);
+
+  // Si l'utilisateur a déjà contribué (brouillon ou finalisé)
   if (hasContributed) {
     return (
       <div className="contribution-thanks">
-        <div className="thanks-icon">✅</div>
-        <h3 className="thanks-title">Contribution enregistrée !</h3>
+        <div className="thanks-icon">{isFinalized ? '✅' : '📝'}</div>
+        <h3 className="thanks-title">
+          {isFinalized ? 'Contribution finalisée !' : 'Brouillon sauvegardé'}
+        </h3>
         <p style={{ color: 'var(--text-light)', marginBottom: 'var(--space-lg)' }}>
-          Votre message a bien été ajouté à ce chapitre
+          {isFinalized 
+            ? 'Votre contribution a été validée définitivement.'
+            : 'Votre contribution est sauvegardée en brouillon. Validez-la définitivement quand vous serez prêt.'}
         </p>
 
         {/* Aperçu du message */}
         {contributionText && (
-          <div className="card" style={{ marginBottom: 'var(--space-lg)', textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', marginBottom: 'var(--space-sm)' }}>
+          <div className="message-preview">
+            <div className="message-preview-header">
               <span style={{ color: 'var(--gold)' }}>📝</span>
               <span className="label-gold">Votre message</span>
             </div>
-            <p style={{
-              fontStyle: 'italic',
-              padding: 'var(--space-md)',
-              background: 'var(--silk)',
-              borderRadius: 'var(--radius)',
-              borderLeft: '4px solid var(--gold)'
-            }}>
+            <div className="message-preview-content">
               "{contributionText}"
-            </p>
+            </div>
           </div>
         )}
 
-        {/* Aperçu des photos */}
-        {existingPhotos.length > 0 && (
-          <div className="card" style={{ marginBottom: 'var(--space-lg)', textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', marginBottom: 'var(--space-sm)' }}>
+        {/* Aperçu des photos uploadées */}
+        {uploadedPhotoUrls.length > 0 && (
+          <div className="photos-preview">
+            <div className="photos-preview-header">
               <span style={{ color: 'var(--gold)' }}>📸</span>
-              <span className="label-gold">Photos jointes ({existingPhotos.length})</span>
+              <span className="label-gold">Photos ({uploadedPhotoUrls.length})</span>
             </div>
             <div className="photo-grid">
-              {existingPhotos.map((url, idx) => (
+              {uploadedPhotoUrls.map((url, idx) => (
                 <div key={idx} className="photo-item">
                   <img src={url} alt={`Photo ${idx + 1}`} />
                 </div>
@@ -64,57 +71,32 @@ const ContributionFormLuxe = ({
           </div>
         )}
 
-        {/* Bouton Modifier */}
-        <button
-          onClick={() => setShowEditConfirm(true)}
-          className="btn btn-outline"
-          style={{ padding: '12px 32px' }}
-        >
-          <span>✏️</span>
-          Modifier ma contribution
-        </button>
-
-        {/* Modal de confirmation pour modification */}
-        {showEditConfirm && (
-          <div className="modal-overlay">
-            <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
-              <div className="thanks-icon" style={{ background: 'var(--gold)', marginBottom: 'var(--space-lg)' }}>✏️</div>
-              <h3 className="modal-title">Modifier votre contribution ?</h3>
-              <p className="modal-text">
-                Votre précédente contribution sera remplacée par la nouvelle.
-              </p>
-              <div className="modal-actions">
-                <button
-                  onClick={() => setShowEditConfirm(false)}
-                  className="modal-btn modal-btn-secondary"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={() => {
-                    setShowEditConfirm(false);
-                    onEdit();
-                  }}
-                  className="modal-btn modal-btn-primary"
-                >
-                  Modifier
-                </button>
-              </div>
-            </div>
+        {!isFinalized ? (
+          <div className="contribution-actions">
+            <button onClick={onEdit} className="btn btn-outline">
+              ✏️ Modifier
+            </button>
+            <button onClick={onFinalize} className="btn btn-primary" style={{ background: 'var(--gold)' }}>
+              ✅ Valider définitivement
+            </button>
+          </div>
+        ) : (
+          <div className="finalized-message">
+            <p style={{ color: '#28a745', fontWeight: '600' }}>
+              ✓ Contribution finalisée - Elle sera incluse dans le livre
+            </p>
           </div>
         )}
       </div>
     );
   }
 
-  // Formulaire de contribution (actif)
+  // Formulaire de contribution (actif - pas encore de contribution)
   return (
     <div className="contribution-form">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', marginBottom: 'var(--space-lg)' }}>
-        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--ink)' }}>
-          MA CONTRIBUTION PERSONNELLE
-        </h3>
-        <Tooltip text="Répondez aux questions en une seule fois. Vous ne pourrez plus modifier après validation.">
+      <div className="contribution-header">
+        <h3>MA CONTRIBUTION PERSONNELLE</h3>
+        <Tooltip text="Rédigez votre message. Vous pourrez le modifier plus tard tant qu'il n'est pas validé définitivement.">
           <span style={{ color: 'var(--gold)', cursor: 'help' }}>ⓘ</span>
         </Tooltip>
       </div>
@@ -127,41 +109,28 @@ const ContributionFormLuxe = ({
         className="contribution-textarea"
       />
 
-      {/* Photos existantes (affichées en mode édition) */}
-      {existingPhotos.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-lg)' }}>
-          <span className="label-gold" style={{ marginBottom: 'var(--space-sm)' }}>
-            Photos déjà jointes
-          </span>
+      {/* Photos déjà uploadées */}
+      {uploadedPhotoUrls.length > 0 && (
+        <div className="existing-photos">
+          <span className="label-gold">Photos uploadées</span>
           <div className="photo-grid">
-            {existingPhotos.map((url, index) => (
+            {uploadedPhotoUrls.map((url, index) => (
               <div key={index} className="photo-item" style={{ border: '2px solid var(--gold)' }}>
-                <img src={url} alt={`Photo existante ${index + 1}`} />
-                <div style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  background: 'var(--gold)',
-                  color: 'white',
-                  width: '20px',
-                  height: '20px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px'
-                }}>
-                  ✓
-                </div>
+                <img src={url} alt={`Photo ${index + 1}`} />
+                <button
+                  type="button"
+                  onClick={() => onRemovePhoto(index)}
+                  className="photo-remove"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-light)', marginTop: 'var(--space-xs)' }}>
-            Ces photos seront conservées. Pour les supprimer, soumettez une nouvelle contribution sans elles.
-          </p>
         </div>
       )}
 
+      {/* Upload nouvelles photos */}
       <div className="photo-upload">
         <input
           type="file"
@@ -181,11 +150,11 @@ const ContributionFormLuxe = ({
             cursor: photos.length >= 2 ? 'not-allowed' : 'pointer'
           }}
         >
-          📷 Ajouter des photos supplémentaires (max 2)
+          📷 Ajouter des photos (max 2)
         </label>
         
-        <p style={{ margin: 'var(--space-xs) 0 0', fontSize: '12px', color: 'var(--text-light)' }}>
-          {photos.length}/2 nouvelles photos
+        <p className="photo-count">
+          {photos.length}/2 photos
         </p>
       </div>
 
@@ -196,6 +165,7 @@ const ContributionFormLuxe = ({
             <div key={index} className="photo-item">
               <img src={preview} alt={`Aperçu ${index + 1}`} />
               <button
+                type="button"
                 onClick={() => onRemovePhoto(index)}
                 className="photo-remove"
               >
@@ -209,20 +179,13 @@ const ContributionFormLuxe = ({
       <button
         onClick={onSubmit}
         disabled={submitting || !contributionText.trim()}
-        className="btn-submit"
+        className="btn-save"
       >
-        {submitting ? 'Envoi en cours...' : 'VALIDER MA CONTRIBUTION'}
+        {submitting ? 'Enregistrement...' : '💾 Enregistrer le brouillon'}
       </button>
       
-      <p style={{ 
-        marginTop: 'var(--space-md)', 
-        fontSize: '11px', 
-        color: 'var(--text-light)', 
-        textAlign: 'center',
-        fontStyle: 'italic'
-      }}>
-        ⚠️ Une fois validée, votre contribution ne pourra plus être modifiée directement.
-        Un bouton "Modifier" apparaîtra si vous changez d'avis.
+      <p className="contribution-note">
+        ℹ️ Votre contribution sera sauvegardée en brouillon. Vous pourrez la modifier jusqu'à la validation définitive.
       </p>
     </div>
   );

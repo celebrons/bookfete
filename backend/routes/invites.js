@@ -43,6 +43,13 @@ if (inviteController.deleteInvite) {
   console.log('❌ deleteInvite manquant');
 }
 
+if (inviteController.requestRevision) {
+  router.post('/request-revision', authenticate, inviteController.requestRevision);
+  console.log('✅ POST /api/invites/request-revision');
+} else {
+  console.log('❌ requestRevision manquant');
+}
+
 // Routes publiques (pour les contributeurs)
 if (inviteController.checkInviteToken) {
   router.get('/token/:token', inviteController.checkInviteToken);
