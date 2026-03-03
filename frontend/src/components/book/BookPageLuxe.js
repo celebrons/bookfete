@@ -36,6 +36,8 @@ const BookPageLuxe = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('chapitres');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [generatingDraft, setGeneratingDraft] = useState(false);
+  const [draftPreview, setDraftPreview] = useState(null);
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -84,6 +86,9 @@ const BookPageLuxe = () => {
   const decorateChapter = (chapter) => {
     const contributions = Array.isArray(chapter?.contributions) ? chapter.contributions : [];
     const chapterInvites = Array.isArray(chapter?.chapter_invites) ? chapter.chapter_invites : [];
+    const respondedInvitesCount = chapterInvites.filter(
+      (invite) => invite?.accepted || invite?.contributed
+    ).length;
     const stateContribution = contributions
       .filter((contribution) => contribution?.contributor_email === CHAPTER_STATE_EMAIL)
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
@@ -107,7 +112,7 @@ const BookPageLuxe = () => {
       currentUserContribution,
       hasContributed: Boolean(currentUserContribution),
       isFinalized: Boolean(currentUserContribution?.is_finalized),
-      contributionsCount: visibleContributions.length,
+      contributionsCount: Math.max(visibleContributions.length, respondedInvitesCount),
       invitationsCount: Array.isArray(chapter?.chapter_invites)
         ? chapterInvites.length
         : chapter?.invitationsCount || 0
@@ -427,6 +432,41 @@ const BookPageLuxe = () => {
     }
   };
 
+  const handleGenerateDraft = async () => {
+    try {
+      setGeneratingDraft(true);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Session introuvable');
+      }
+
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+      const response = await fetch(`${apiUrl}/books/${bookId}/generate-draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la generation du brouillon');
+      }
+
+      setDraftPreview(data);
+    } catch (error) {
+      console.error('Erreur generation brouillon:', error);
+      alert(error.message || 'Erreur lors de la generation du brouillon');
+    } finally {
+      setGeneratingDraft(false);
+    }
+  };
+
   const handleUpdateChaptersFromPages = async (newPages) => {
     try {
       const newChaptersCount = Math.floor(newPages / 8);
@@ -513,10 +553,20 @@ const BookPageLuxe = () => {
               <span>✍️ {book.style_narratif || 'Factuel'}</span>
             </div>
           </div>
+          <div className="book-header-actions">
+          <button
+            type="button"
+            className="btn btn-outline book-generate-btn"
+            onClick={handleGenerateDraft}
+            disabled={generatingDraft}
+          >
+            {generatingDraft ? 'Generation...' : 'Generer mon livre brouillon'}
+          </button>
           <Link to="/dashboard" className="dashboard-link">
             <span>📊</span>
             Tableau de bord
           </Link>
+          </div>
         </div>
       </div>
 
@@ -612,6 +662,54 @@ const BookPageLuxe = () => {
           />
         )}
       </div>
+
+      {draftPreview && (
+        <div className="modal-overlay">
+          <div className="modal-content book-draft-modal">
+            <div className="book-draft-modal-header">
+              <div>
+                <div className="label-gold">Apercu HTML grand format</div>
+                <h3 className="book-draft-modal-title">Brouillon du livre</h3>
+                {draftPreview.generatedAt && (
+                  <div className="book-draft-modal-meta">
+                    Genere le {new Date(draftPreview.generatedAt).toLocaleString('fr-FR')}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setDraftPreview(null)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="book-draft-modal-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleGenerateDraft}
+                disabled={generatingDraft}
+              >
+                {generatingDraft ? 'Generation...' : 'Regenerer'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setDraftPreview(null)}
+              >
+                Fermer
+              </button>
+            </div>
+
+            <div
+              className="book-draft-preview"
+              dangerouslySetInnerHTML={{ __html: draftPreview.html }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -11,7 +11,7 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
   const [error, setError] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState(null);
-  const [showInvited, setShowInvited] = useState(false);
+  const [showInvited] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -36,20 +36,35 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
 
       const { data: invited, error: inviteError } = await supabase
         .from('chapter_invites')
-        .select('contributor_id, token')
+        .select('contributor_id, token, email')
         .eq('chapter_id', chapterId);
 
       if (inviteError) throw inviteError;
 
-      const invitedMap = (invited || []).reduce((acc, i) => {
-        acc[i.contributor_id] = i.token;
+      const invitedMapById = (invited || []).reduce((acc, i) => {
+        if (i.contributor_id) {
+          acc[i.contributor_id] = i.token;
+        }
+        return acc;
+      }, {});
+
+      const invitedMapByEmail = (invited || []).reduce((acc, i) => {
+        if (i.email) {
+          acc[i.email.trim().toLowerCase()] = i.token;
+        }
         return acc;
       }, {});
       
       const contributorsWithStatus = (allContributors || []).map(c => ({
         ...c,
-        alreadyInvited: invitedMap[c.id] ? true : false,
-        token: invitedMap[c.id] || null
+        alreadyInvited: Boolean(
+          invitedMapById[c.id] ||
+          invitedMapByEmail[c.email?.trim().toLowerCase()]
+        ),
+        token:
+          invitedMapById[c.id] ||
+          invitedMapByEmail[c.email?.trim().toLowerCase()] ||
+          null
       }));
 
       setContributors(contributorsWithStatus);
@@ -226,6 +241,7 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
 
   const availableContributors = contributors.filter(c => !c.alreadyInvited);
   const invitedContributors = contributors.filter(c => c.alreadyInvited);
+  const orderedContributors = [...invitedContributors, ...availableContributors];
 
   return (
     <div className="modal-overlay">
@@ -257,18 +273,21 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
           borderBottom: 'var(--border-fine)',
           display: 'flex',
           gap: 'var(--space-md)',
+          flexWrap: 'wrap',
           fontSize: '12px',
           background: 'var(--silk)'
         }}>
           <span><strong>{contributors.length}</strong> total</span>
           <span style={{ color: 'var(--gold)' }}><strong>{availableContributors.length}</strong> disponibles</span>
           {invitedContributors.length > 0 && (
+            <span style={{ color: 'var(--text-light)', marginLeft: 'auto', fontSize: '11px' }}>
+              <strong>{invitedContributors.length}</strong> deja invites
+            </span>
+          )}
+          {false && invitedContributors.length > 0 && (
             <span 
-              onClick={() => setShowInvited(!showInvited)}
               style={{
                 color: 'var(--text-light)',
-                cursor: 'pointer',
-                textDecoration: 'underline dotted',
                 marginLeft: 'auto',
                 fontSize: '11px'
               }}
@@ -310,8 +329,8 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
             </label>
           </div>
 
-          {/* Liste des disponibles - plus compacte */}
-          {availableContributors.map(contributor => (
+          {/* Liste des contributeurs */}
+          {orderedContributors.map(contributor => (
             <div
               key={contributor.id}
               style={{
@@ -320,7 +339,9 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
                 gap: 'var(--space-sm)',
                 padding: 'var(--space-xs) var(--space-sm)',
                 borderBottom: 'var(--border-fine)',
-                background: selectedIds.includes(contributor.id) ? 'var(--gold-light)' : 'transparent',
+                background: contributor.alreadyInvited
+                  ? 'var(--silk)'
+                  : (selectedIds.includes(contributor.id) ? 'var(--gold-light)' : 'transparent'),
                 borderRadius: 'var(--radius)',
                 marginBottom: '2px'
               }}
@@ -328,22 +349,48 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
               <input
                 type="checkbox"
                 checked={selectedIds.includes(contributor.id)}
+                disabled={contributor.alreadyInvited}
                 onChange={() => handleToggle(contributor.id)}
                 style={{ width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: '500', fontSize: '13px', color: 'var(--ink)' }}>
-                  {contributor.name || contributor.email.split('@')[0]}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {contributor.alreadyInvited && (
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        color: 'var(--gold)',
+                        background: 'var(--gold-light)',
+                        borderRadius: '999px',
+                        padding: '2px 6px'
+                      }}
+                    >
+                      Deja invitee
+                    </span>
+                  )}
+                  <span style={{ fontWeight: '500', fontSize: '13px', color: 'var(--ink)' }}>
+                    {contributor.name || contributor.email.split('@')[0]}
+                  </span>
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-light)' }}>
                   {contributor.email}
                 </div>
               </div>
+              {contributor.alreadyInvited && contributor.token && (
+                <button
+                  onClick={() => copyToClipboard(`${window.location.origin}/invite/${contributor.token}`)}
+                  className="btn btn-outline"
+                  style={{ padding: '2px 6px', fontSize: '10px' }}
+                >
+                  Copier
+                </button>
+              )}
             </div>
           ))}
 
           {/* Section des déjà invités (si visible) */}
-          {showInvited && invitedContributors.length > 0 && (
+          {false && showInvited && invitedContributors.length > 0 && (
             <div style={{ marginTop: 'var(--space-md)' }}>
               <h4 style={{ fontSize: '12px', marginBottom: 'var(--space-xs)', color: 'var(--ink)' }}>
                 Déjà invités ({invitedContributors.length})
@@ -363,8 +410,22 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: '500', fontSize: '12px', color: 'var(--ink)' }}>
-                      {contributor.name || contributor.email.split('@')[0]}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: '600',
+                          color: 'var(--gold)',
+                          background: 'var(--gold-light)',
+                          borderRadius: '999px',
+                          padding: '2px 6px'
+                        }}
+                      >
+                        Deja invitee
+                      </span>
+                      <span style={{ fontWeight: '500', fontSize: '12px', color: 'var(--ink)' }}>
+                        {contributor.name || contributor.email.split('@')[0]}
+                      </span>
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-light)' }}>
                       {contributor.email}

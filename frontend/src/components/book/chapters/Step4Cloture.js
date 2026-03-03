@@ -1,5 +1,6 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\Step4Cloture.js
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../../../services/supabaseClient';
 import '../BookLuxe.css';
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
@@ -15,17 +16,13 @@ const Step4Cloture = ({
 }) => {
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState('');
+  const [summary, setSummary] = useState(null);
 
   const isOrganizer = user && book && user.id === book.owner_id;
   const contributionsClosed = chapter?.contributionsClosed || false;
   const questionsReady = Boolean(chapter?.questions_validated ?? questionsValidated);
   const contributionReady = Boolean(chapter?.hasContributed ?? hasContributed);
-  const invitationsCount = typeof chapter?.invitationsCount === 'number'
-    ? chapter.invitationsCount
-    : (Array.isArray(invitations) ? invitations.length : 0);
-  const invitationsReady = invitationsCount > 0;
-  const isClosed = chapter?.isChapterClosed || false;
-  const visibleContributions = Array.isArray(chapter?.contributions)
+  const fallbackVisibleContributions = Array.isArray(chapter?.contributions)
     ? chapter.contributions.filter(
         (contribution) =>
           contribution.contributor_email !== user?.email &&
@@ -33,9 +30,75 @@ const Step4Cloture = ({
           contribution.is_finalized !== false
       )
     : [];
-  const pendingValidationCount = visibleContributions.filter(
-    (contribution) => !contribution.approved && !contribution.needs_revision
-  ).length;
+  const fallbackInvitationsCount = typeof chapter?.invitationsCount === 'number'
+    ? chapter.invitationsCount
+    : (
+        Array.isArray(chapter?.chapter_invites)
+          ? chapter.chapter_invites.length
+          : (Array.isArray(invitations) ? invitations.length : 0)
+      );
+  const invitationsCount = typeof summary?.invitationsCount === 'number'
+    ? summary.invitationsCount
+    : fallbackInvitationsCount;
+  const invitationsReady = invitationsCount > 0;
+  const isClosed = chapter?.isChapterClosed || false;
+  const visibleContributionsCount = typeof summary?.receivedCount === 'number'
+    ? summary.receivedCount
+    : fallbackVisibleContributions.length;
+  const visibleContributions = Array.from({ length: visibleContributionsCount });
+  const pendingValidationCount = typeof summary?.pendingValidationCount === 'number'
+    ? summary.pendingValidationCount
+    : fallbackVisibleContributions.filter(
+        (contribution) => !contribution.approved && !contribution.needs_revision
+      ).length;
+
+  useEffect(() => {
+    const loadSummary = async () => {
+      if (!chapter?.id) {
+        setSummary(null);
+        return;
+      }
+
+      try {
+        const [{ data: invitesData, error: invitesError }, { data: contributionsData, error: contributionsError }] = await Promise.all([
+          supabase
+            .from('chapter_invites')
+            .select('accepted, contributed')
+            .eq('chapter_id', chapter.id),
+          supabase
+            .from('contributions')
+            .select('contributor_email, approved, needs_revision, is_finalized')
+            .eq('chapter_id', chapter.id)
+        ]);
+
+        if (invitesError) throw invitesError;
+        if (contributionsError) throw contributionsError;
+
+        const externalContributions = (contributionsData || []).filter(
+          (contribution) =>
+            contribution.contributor_email !== user?.email &&
+            contribution.contributor_email !== CHAPTER_STATE_EMAIL &&
+            contribution.is_finalized !== false
+        );
+        const respondedInvitesCount = (invitesData || []).filter(
+          (invite) => invite.accepted || invite.contributed
+        ).length;
+
+        setSummary({
+          invitationsCount: (invitesData || []).length,
+          receivedCount: Math.max(externalContributions.length, respondedInvitesCount),
+          pendingValidationCount: externalContributions.filter(
+            (contribution) => !contribution.approved && !contribution.needs_revision
+          ).length
+        });
+      } catch (loadError) {
+        console.error('Erreur chargement recap chapitre:', loadError);
+        setSummary(null);
+      }
+    };
+
+    loadSummary();
+  }, [chapter?.id, chapter?.workflowState, user?.email]);
 
   const handleClose = async () => {
     if (isClosed) {

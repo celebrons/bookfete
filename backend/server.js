@@ -20,7 +20,6 @@ app.use(express.json());
 const authRoutes = require('./routes/auth');
 const bookRoutes = require('./routes/books'); // À créer si nécessaire
 const chapterRoutes = require('./routes/chapters');
-const contributionRoutes = require('./routes/contributions');
 const inviteRoutes = require('./routes/invites');
 const aiRoutes = require('./routes/ai');
 
@@ -36,7 +35,6 @@ const aiRoutes = require('./routes/ai');
 app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/chapters', chapterRoutes);
-app.use('/api/contributions', contributionRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/ai', aiRoutes);
 
@@ -62,7 +60,6 @@ app.listen(PORT, () => {
   console.log(`   - /api/auth`);
   console.log(`   - /api/books`);
   console.log(`   - /api/chapters`);
-  console.log(`   - /api/contributions`);
   console.log(`   - /api/invites`);
   console.log(`   - /api/ai`);
   console.log(`   - /api/health`);

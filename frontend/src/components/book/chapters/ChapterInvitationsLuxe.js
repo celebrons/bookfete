@@ -4,7 +4,7 @@ import { supabase } from '../../../services/supabaseClient';
 import Tooltip from '../../ui/Tooltip';
 import '../BookLuxe.css';
 
-const ChapterInvitationsLuxe = ({ chapterId, isClosed = false }) => {
+const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshToken = 0 }) => {
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -20,7 +20,7 @@ const ChapterInvitationsLuxe = ({ chapterId, isClosed = false }) => {
     if (chapterId) {
       loadInvitations();
     }
-  }, [chapterId]);
+  }, [chapterId, bookId, refreshToken]);
 
   useEffect(() => {
     if (!chapterId) {
@@ -51,6 +51,30 @@ const ChapterInvitationsLuxe = ({ chapterId, isClosed = false }) => {
 
       if (error) throw error;
 
+      let contributorsById = {};
+      let contributorsByEmail = {};
+
+      if (bookId) {
+        const { data: contributorsData, error: contributorsError } = await supabase
+          .from('book_contributors')
+          .select('id, name, email')
+          .eq('book_id', bookId);
+
+        if (contributorsError) throw contributorsError;
+
+        contributorsById = (contributorsData || []).reduce((acc, contributor) => {
+          acc[contributor.id] = contributor;
+          return acc;
+        }, {});
+
+        contributorsByEmail = (contributorsData || []).reduce((acc, contributor) => {
+          if (contributor.email) {
+            acc[contributor.email.toLowerCase()] = contributor;
+          }
+          return acc;
+        }, {});
+      }
+
       const invitationsWithContributions = await Promise.all(
         (data || []).map(async (invite) => {
           const { data: contribution } = await supabase
@@ -61,6 +85,12 @@ const ChapterInvitationsLuxe = ({ chapterId, isClosed = false }) => {
             .maybeSingle();
 
           const isRevisionRequested = Boolean(contribution?.needs_revision);
+          const resolvedContributorName =
+            invite.contributor?.name ||
+            contributorsById[invite.contributor_id]?.name ||
+            contributorsByEmail[invite.email?.toLowerCase()]?.name ||
+            invite.email?.split('@')[0] ||
+            'Invite';
           const hasSubmittedContribution = Boolean(
             contribution &&
             !isRevisionRequested &&
@@ -73,6 +103,10 @@ const ChapterInvitationsLuxe = ({ chapterId, isClosed = false }) => {
 
           return {
             ...invite,
+            contributor: {
+              ...(invite.contributor || {}),
+              name: resolvedContributorName
+            },
             contribution: contribution ? [contribution] : null,
             hasSubmittedContribution,
             isRevisionRequested

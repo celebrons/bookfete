@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import ChapterInvitationsLuxe from './ChapterInvitationsLuxe';
+import InviteSelectorLuxe from '../contributors/InviteSelectorLuxe';
 import '../BookLuxe.css';
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
@@ -17,6 +18,8 @@ const Step3Invitations = ({
   const [loading, setLoading] = useState(true);
   const [closing, setClosing] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showInviteSelector, setShowInviteSelector] = useState(false);
+  const [inviteRefreshToken, setInviteRefreshToken] = useState(0);
   const [error, setError] = useState('');
 
   const isOrganizer = user && book && user.id === book.owner_id;
@@ -91,6 +94,11 @@ const Step3Invitations = ({
     }
   };
 
+  const handleInvitesSent = async () => {
+    setInviteRefreshToken((prev) => prev + 1);
+    await loadInvitations();
+  };
+
   if (!hasContributed) {
     return (
       <div className="workflow-content" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
@@ -118,11 +126,19 @@ const Step3Invitations = ({
   return (
     <div className="workflow-content">
       {isOrganizer && (
-        <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: '15px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: '15px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowInviteSelector(true)}
+            disabled={contributionsClosed || !book?.id}
+            className="btn btn-outline"
+            style={{ flex: 1, minWidth: '190px' }}
+          >
+            Inviter des contributeurs
+          </button>
           <button
             onClick={() => onLoadContributions(chapter.id)}
             className="btn btn-outline"
-            style={{ flex: 1 }}
+            style={{ flex: 1, minWidth: '170px' }}
           >
             Voir les contributions ({respondedCount})
           </button>
@@ -132,6 +148,7 @@ const Step3Invitations = ({
             className="btn btn-primary"
             style={{
               flex: 1,
+              minWidth: '190px',
               background: contributionsClosed ? '#1f7a3d' : '#dc3545',
               opacity: (closing || contributionsClosed) ? 0.8 : 1
             }}
@@ -143,7 +160,9 @@ const Step3Invitations = ({
 
       <ChapterInvitationsLuxe
         chapterId={chapter.id}
+        bookId={book?.id}
         isClosed={contributionsClosed}
+        refreshToken={inviteRefreshToken}
       />
 
       {showCloseModal && (
@@ -229,6 +248,15 @@ const Step3Invitations = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showInviteSelector && book?.id && (
+        <InviteSelectorLuxe
+          chapterId={chapter.id}
+          bookId={book.id}
+          onClose={() => setShowInviteSelector(false)}
+          onInvitesSent={handleInvitesSent}
+        />
       )}
     </div>
   );

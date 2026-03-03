@@ -1,7 +1,10 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\chapters\ChapterDetailsLuxe.js
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../services/supabaseClient';
 import ChapterWorkflowLuxe from './ChapterWorkflowLuxe';
 import '../BookLuxe.css';
+
+const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 
 const ChapterDetailsLuxe = ({
   chapter,
@@ -31,12 +34,59 @@ const ChapterDetailsLuxe = ({
   invitations
 }) => {
   const [loading, setLoading] = useState(true);
+  const [moderationCount, setModerationCount] = useState(chapter?.contributionsCount || 0);
 
   useEffect(() => {
     if (chapter?.id) {
       setLoading(false);
     }
   }, [chapter?.id]);
+
+  useEffect(() => {
+    const loadModerationCount = async () => {
+      if (!chapter?.id) {
+        setModerationCount(0);
+        return;
+      }
+
+      const fallbackCount = chapter?.contributionsCount || 0;
+      setModerationCount(fallbackCount);
+
+      try {
+        const [{ data: invitesData, error: invitesError }, { data: contributionsData, error: contributionsError }] = await Promise.all([
+          supabase
+            .from('chapter_invites')
+            .select('accepted, contributed')
+            .eq('chapter_id', chapter.id),
+          supabase
+            .from('contributions')
+            .select('contributor_email, is_finalized')
+            .eq('chapter_id', chapter.id)
+        ]);
+
+        if (invitesError) throw invitesError;
+        if (contributionsError) throw contributionsError;
+
+        const externalContributionsCount = (contributionsData || []).filter(
+          (contribution) =>
+            contribution.contributor_email !== user?.email &&
+            contribution.contributor_email !== CHAPTER_STATE_EMAIL &&
+            contribution.is_finalized !== false
+        ).length;
+        const respondedInvitesCount = (invitesData || []).filter(
+          (invite) => invite.accepted || invite.contributed
+        ).length;
+
+        setModerationCount(
+          Math.max(fallbackCount, externalContributionsCount, respondedInvitesCount)
+        );
+      } catch (countError) {
+        console.error('Erreur chargement compteur contributions:', countError);
+      }
+    };
+
+    loadModerationCount();
+  }, [chapter?.id, chapter?.workflowState, chapter?.contributionsCount, user?.email]);
 
   if (loading) {
     return (
@@ -63,7 +113,7 @@ const ChapterDetailsLuxe = ({
           onClick={() => onLoadContributions(chapter.id)}
           className="btn-moderate"
         >
-          <span>👁️</span> Voir les contributions ({chapter.contributionsCount || 0})
+          <span>👁️</span> Voir les contributions ({moderationCount})
         </button>
       </div>
       
