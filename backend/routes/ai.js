@@ -19,6 +19,7 @@ router.post('/generate-chapters-public', async (req, res) => {
       recipientName, 
       recipientAge, 
       recipientGender,
+      projectBrief,
       prompt 
     } = req.body;
     
@@ -32,7 +33,8 @@ router.post('/generate-chapters-public', async (req, res) => {
       bookTitle, 
       recipientName, 
       recipientAge, 
-      recipientGender
+      recipientGender,
+      projectBrief
     });
 
     if (!count || count < 1) {
@@ -49,6 +51,7 @@ Contexte :
 - Personne célébrée : ${recipientName || 'la personne'}
 - Âge : ${recipientAge || 'non spécifié'} ans
 - Sexe : ${recipientGender || 'non spécifié'}
+- Intention éditoriale : ${projectBrief || 'non renseignée'}
 
 Les titres doivent être :
 - Créatifs et originaux, adaptés à l'événement et à la personne
@@ -230,6 +233,7 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
       recipientName, 
       recipientAge, 
       recipientGender,
+      projectBrief,
       prompt 
     } = req.body;
     
@@ -240,7 +244,8 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
       bookTitle, 
       recipientName, 
       recipientAge, 
-      recipientGender
+      recipientGender,
+      projectBrief
     });
 
     if (!count || count < 1) {
@@ -257,6 +262,7 @@ Contexte :
 - Personne célébrée : ${recipientName || 'la personne'}
 - Âge : ${recipientAge || 'non spécifié'} ans
 - Sexe : ${recipientGender || 'non spécifié'}
+- Intention éditoriale : ${projectBrief || 'non renseignée'}
 
 Les titres doivent être :
 - Créatifs et originaux, adaptés à l'événement et à la personne

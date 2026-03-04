@@ -6,15 +6,18 @@ import AddContributorFormLuxe from './AddContributorFormLuxe';
 import GuidedTooltip from '../../ui/GuidedTooltip';
 import '../BookLuxe.css';
 
-const ContributorsTabLuxe = ({ bookId }) => {
+const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
   const [contributors, setContributors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [updatingSoloMode, setUpdatingSoloMode] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     invited: 0,
     pending: 0
   });
+
+  const isSoloMode = Boolean(book?.cover_config?.soloMode);
 
   useEffect(() => {
     loadContributors();
@@ -99,10 +102,30 @@ const ContributorsTabLuxe = ({ bookId }) => {
     localStorage.setItem('contributors_guide_seen', 'true');
   };
 
+  const handleSoloModeChange = async (event) => {
+    if (typeof onUpdateBook !== 'function') {
+      return;
+    }
+
+    const checked = event.target.checked;
+    const nextCoverConfig = {
+      ...(book?.cover_config || {}),
+      soloMode: checked
+    };
+
+    setUpdatingSoloMode(true);
+
+    try {
+      await onUpdateBook({ cover_config: nextCoverConfig });
+    } finally {
+      setUpdatingSoloMode(false);
+    }
+  };
+
   return (
     <div className="card" style={{ position: 'relative', minHeight: '500px' }}>
       {/* Message de bienvenue / tutoriel - VERSION STYLISÉE */}
-      {showWelcome && (
+      {showWelcome && !isSoloMode && (
         <div className="guide-card">
           <button onClick={dismissWelcome} className="guide-close">✕</button>
           <div className="guide-title">🎯 Bienvenue dans la gestion des contributeurs !</div>
@@ -139,7 +162,39 @@ const ContributorsTabLuxe = ({ bookId }) => {
         </div>
       )}
 
+      <div
+        className="card"
+        style={{
+          marginBottom: 'var(--space-xl)',
+          background: isSoloMode ? '#eef6ee' : 'var(--white)',
+          borderColor: isSoloMode ? '#d5e8d4' : 'var(--mist)'
+        }}
+      >
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-sm)',
+            cursor: updatingSoloMode ? 'wait' : 'pointer'
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={isSoloMode}
+            onChange={handleSoloModeChange}
+            disabled={updatingSoloMode}
+          />
+          <span style={{ fontWeight: '600', color: 'var(--ink)' }}>
+            Je souhaite créer le livre seul
+          </span>
+        </label>
+        <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--text-light)' }}>
+          En mode solo, tout ce qui concerne les contributeurs et les invitations est masqué.
+        </p>
+      </div>
+
       {/* En-tête avec stats */}
+      {!isSoloMode && (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-xl)', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
           <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '600' }}>👥 Gestion des contributeurs</h2>
@@ -168,12 +223,27 @@ const ContributorsTabLuxe = ({ bookId }) => {
           </span>
         </div>
       </div>
+      )}
 
       {/* Formulaire d'ajout */}
-      <AddContributorFormLuxe onAdd={handleAddContributor} />
+      {!isSoloMode && <AddContributorFormLuxe onAdd={handleAddContributor} />}
 
       {/* Liste des contributeurs */}
-      {loading ? (
+      {isSoloMode ? (
+        <div
+          className="card"
+          style={{
+            textAlign: 'center',
+            background: '#fcfbf8',
+            borderColor: 'var(--mist)'
+          }}
+        >
+          <h3 style={{ marginTop: 0 }}>Mode solo activé</h3>
+          <p style={{ margin: 0, color: 'var(--text-light)' }}>
+            Les listes de contributeurs, les invitations et les relances sont masquées tant que cette option reste cochée.
+          </p>
+        </div>
+      ) : loading ? (
         <div className="empty-state">
           <div className="spinner" style={{
             border: '2px solid var(--mist)',

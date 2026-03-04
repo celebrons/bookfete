@@ -10,6 +10,8 @@ import '../../styles/luxe-theme.css';
 import './BookLuxe.css';
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
+const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
+const MAX_CHAPTERS = 12;
 const WRITING_GUIDE_STEPS = [
   {
     title: 'Questions',
@@ -28,6 +30,36 @@ const WRITING_GUIDE_STEPS = [
     text: 'Ajustez les options du livre et le nombre de pages depuis l\'onglet dedie.'
   }
 ];
+
+const getSoloMode = (book) => Boolean(book?.cover_config?.soloMode);
+
+const parseChapterDraftState = (rawValue) => {
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    return {
+      version: parsed.version || 1,
+      status: parsed.status || 'draft',
+      generationCount: Number(parsed.generationCount || 0),
+      maxGenerations: Number(parsed.maxGenerations || 3),
+      title: parsed.title || '',
+      summary: parsed.summary || '',
+      html: parsed.html || '',
+      lastGeneratedAt: parsed.lastGeneratedAt || null,
+      lastEditedAt: parsed.lastEditedAt || null,
+      finalizedAt: parsed.finalizedAt || null
+    };
+  } catch (error) {
+    return null;
+  }
+};
 
 const BookPageLuxe = () => {
   const { bookId } = useParams();
@@ -61,14 +93,14 @@ const BookPageLuxe = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'contributions' },
         () => {
-          loadBookAndChapters();
+          loadBookAndChapters({ silent: true });
         }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'chapter_invites' },
         () => {
-          loadBookAndChapters();
+          loadBookAndChapters({ silent: true });
         }
       )
       .subscribe();
@@ -83,6 +115,8 @@ const BookPageLuxe = () => {
     setUser(user);
   };
 
+  const getApiBaseUrl = () => process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+
   const decorateChapter = (chapter) => {
     const contributions = Array.isArray(chapter?.contributions) ? chapter.contributions : [];
     const chapterInvites = Array.isArray(chapter?.chapter_invites) ? chapter.chapter_invites : [];
@@ -92,11 +126,16 @@ const BookPageLuxe = () => {
     const stateContribution = contributions
       .filter((contribution) => contribution?.contributor_email === CHAPTER_STATE_EMAIL)
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
+    const draftContribution = contributions
+      .filter((contribution) => contribution?.contributor_email === CHAPTER_DRAFT_EMAIL)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
     const workflowState = stateContribution?.message || null;
+    const chapterDraft = parseChapterDraftState(draftContribution?.message);
     const visibleContributions = contributions.filter(
       (contribution) =>
         contribution.contributor_email !== user?.email &&
         contribution.contributor_email !== CHAPTER_STATE_EMAIL &&
+        contribution.contributor_email !== CHAPTER_DRAFT_EMAIL &&
         contribution.is_finalized !== false
     );
     const matchingContributions = contributions
@@ -107,6 +146,7 @@ const BookPageLuxe = () => {
     return {
       ...chapter,
       workflowState,
+      chapterDraft,
       contributionsClosed: workflowState === 'contributions_closed' || workflowState === 'closed',
       isChapterClosed: workflowState === 'closed',
       currentUserContribution,
@@ -119,20 +159,50 @@ const BookPageLuxe = () => {
     };
   };
 
+  const normalizeChaptersForState = (chapterList) => (
+    [...(chapterList || [])]
+      .sort((a, b) => (a?.order_index || 0) - (b?.order_index || 0))
+      .map((chapter, index) => decorateChapter({
+        ...chapter,
+        order_index: index,
+        title: index === 0 ? 'Introduction' : (chapter?.title || `Chapitre ${index + 1}`)
+      }))
+  );
+
   const updateChapterInState = (chapterId, updater) => {
     setChapters((prevChapters) =>
-      prevChapters.map((chapter) => {
+      normalizeChaptersForState(prevChapters.map((chapter) => {
         if (chapter.id !== chapterId) {
           return chapter;
         }
 
-        const nextChapter = typeof updater === 'function'
+        return typeof updater === 'function'
           ? updater(chapter)
           : { ...chapter, ...updater };
-
-        return decorateChapter(nextChapter);
-      })
+      }))
     );
+  };
+
+  const mergeContributionIntoChapterState = (chapterId, contribution) => {
+    if (!contribution?.id) {
+      return;
+    }
+
+    updateChapterInState(chapterId, (chapter) => {
+      const contributions = Array.isArray(chapter?.contributions) ? [...chapter.contributions] : [];
+      const existingIndex = contributions.findIndex((item) => item.id === contribution.id);
+
+      if (existingIndex >= 0) {
+        contributions[existingIndex] = contribution;
+      } else {
+        contributions.push(contribution);
+      }
+
+      return {
+        ...chapter,
+        contributions
+      };
+    });
   };
 
   const persistChapterWorkflowState = async (chapterId, nextState) => {
@@ -203,9 +273,11 @@ const BookPageLuxe = () => {
     return savedStateContribution;
   };
 
-  const loadBookAndChapters = async () => {
+  const loadBookAndChapters = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       
       const { data: bookData, error: bookError } = await supabase
         .from('books')
@@ -229,36 +301,45 @@ const BookPageLuxe = () => {
 
       if (chaptersError) throw chaptersError;
 
-      const chaptersWithStatus = chaptersData.map((chapter) => decorateChapter(chapter));
-
-      setChapters(chaptersWithStatus || []);
+      setChapters(normalizeChaptersForState(chaptersData || []));
 
     } catch (error) {
       console.error('❌ Erreur chargement:', error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
   const handleUpdateChapter = async (chapterId, updates) => {
     try {
       const { status, ...chapterUpdates } = updates || {};
+      const currentChapterIndex = chapters.findIndex((chapter) => chapter.id === chapterId);
+      const safeChapterUpdates = { ...chapterUpdates };
+
+      if (
+        currentChapterIndex === 0 &&
+        Object.prototype.hasOwnProperty.call(safeChapterUpdates, 'title')
+      ) {
+        safeChapterUpdates.title = 'Introduction';
+      }
 
       if (status === 'contributions_closed' || status === 'closed') {
         await persistChapterWorkflowState(chapterId, status);
 
-        if (Object.keys(chapterUpdates).length === 0) {
+        if (Object.keys(safeChapterUpdates).length === 0) {
           return { workflowState: status };
         }
       }
 
-      if (Object.keys(chapterUpdates).length === 0) {
+      if (Object.keys(safeChapterUpdates).length === 0) {
         return null;
       }
 
       const { data, error } = await supabase
         .from('chapters')
-        .update(chapterUpdates)
+        .update(safeChapterUpdates)
         .eq('id', chapterId)
         .select()
         .single();
@@ -371,6 +452,99 @@ const BookPageLuxe = () => {
     }
   };
 
+  const handleGenerateChapterDraft = async (chapterId) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Session introuvable');
+      }
+
+      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/chapters/${chapterId}/generate-draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la generation du chapitre');
+      }
+
+      mergeContributionIntoChapterState(chapterId, data.draftContribution);
+      return data;
+    } catch (error) {
+      console.error('Erreur generation chapitre:', error);
+      throw error;
+    }
+  };
+
+  const handleSaveChapterDraft = async (chapterId, html) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Session introuvable');
+      }
+
+      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/chapters/${chapterId}/save-draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ html })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la sauvegarde du chapitre');
+      }
+
+      mergeContributionIntoChapterState(chapterId, data.draftContribution);
+      return data;
+    } catch (error) {
+      console.error('Erreur sauvegarde chapitre:', error);
+      throw error;
+    }
+  };
+
+  const handleFinalizeChapterDraft = async (chapterId, html) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Session introuvable');
+      }
+
+      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/chapters/${chapterId}/finalize-draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ html })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la validation finale');
+      }
+
+      mergeContributionIntoChapterState(chapterId, data.draftContribution);
+      mergeContributionIntoChapterState(chapterId, data.workflowContribution);
+      return data;
+    } catch (error) {
+      console.error('Erreur validation finale chapitre:', error);
+      throw error;
+    }
+  };
+
   const handleDeleteChapter = async (chapterId) => {
     try {
       const { error } = await supabase
@@ -379,42 +553,36 @@ const BookPageLuxe = () => {
         .eq('id', chapterId);
 
       if (error) throw error;
-      setChapters(prev => prev.filter(ch => ch.id !== chapterId));
+
+      const remainingChapters = chapters.filter((chapter) => chapter.id !== chapterId);
+      const reorderUpdates = remainingChapters
+        .map((chapter, index) => ({
+          id: chapter.id,
+          updates: {
+            order_index: index,
+            ...(index === 0 ? { title: 'Introduction' } : {})
+          },
+          shouldUpdate:
+            chapter.order_index !== index ||
+            (index === 0 && chapter.title !== 'Introduction')
+        }))
+        .filter((chapter) => chapter.shouldUpdate);
+
+      if (reorderUpdates.length > 0) {
+        await Promise.all(
+          reorderUpdates.map(({ id, updates }) =>
+            supabase
+              .from('chapters')
+              .update(updates)
+              .eq('id', id)
+          )
+        );
+      }
+
+      setChapters(normalizeChaptersForState(remainingChapters));
     } catch (error) {
       console.error('❌ Erreur suppression:', error);
       alert('Erreur lors de la suppression');
-    }
-  };
-
-  const handleAddChapter = async () => {
-    try {
-      const newChapter = {
-        book_id: bookId,
-        title: `Nouveau chapitre ${chapters.length + 1}`,
-        description: '',
-        order_index: chapters.length,
-        questions_ia: [
-          "Quel est votre souvenir préféré ?",
-          "Que retenez-vous de ce moment ?",
-          "Quelle émotion cela évoque-t-il ?",
-          "Un détail qui vous a marqué ?"
-        ]
-      };
-
-      const { data, error } = await supabase
-        .from('chapters')
-        .insert([newChapter])
-        .select()
-        .single();
-
-      if (error) throw error;
-      const createdChapter = decorateChapter(data);
-      setChapters((prev) => [...prev, createdChapter]);
-      return createdChapter;
-    } catch (error) {
-      console.error('❌ Erreur ajout:', error);
-      alert('Erreur lors de l\'ajout du chapitre');
-      return null;
     }
   };
 
@@ -434,6 +602,10 @@ const BookPageLuxe = () => {
 
   const handleGenerateDraft = async () => {
     try {
+      if (!chapters.length || chapters.some((chapter) => chapter?.chapterDraft?.status !== 'validated')) {
+        throw new Error('Generez et validez tous les chapitres avant l apercu global');
+      }
+
       setGeneratingDraft(true);
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -443,8 +615,7 @@ const BookPageLuxe = () => {
         throw new Error('Session introuvable');
       }
 
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-      const response = await fetch(`${apiUrl}/books/${bookId}/generate-draft`, {
+      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/generate-draft`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -455,13 +626,13 @@ const BookPageLuxe = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de la generation du brouillon');
+        throw new Error(data.error || 'Erreur lors de l apercu du livre');
       }
 
       setDraftPreview(data);
     } catch (error) {
-      console.error('Erreur generation brouillon:', error);
-      alert(error.message || 'Erreur lors de la generation du brouillon');
+      console.error('Erreur apercu livre:', error);
+      alert(error.message || 'Erreur lors de l apercu du livre');
     } finally {
       setGeneratingDraft(false);
     }
@@ -469,8 +640,14 @@ const BookPageLuxe = () => {
 
   const handleUpdateChaptersFromPages = async (newPages) => {
     try {
-      const newChaptersCount = Math.floor(newPages / 8);
+      const maxPages = MAX_CHAPTERS * 8;
+      const pagesToPersist = Math.min(newPages, maxPages);
+      const newChaptersCount = Math.min(MAX_CHAPTERS, Math.floor(pagesToPersist / 8));
       const currentChaptersCount = chapters.length;
+
+      if (newPages > maxPages) {
+        alert(`Le livre est limite a ${MAX_CHAPTERS} chapitres maximum.`);
+      }
 
       if (newChaptersCount > currentChaptersCount) {
         const chaptersToAdd = newChaptersCount - currentChaptersCount;
@@ -478,7 +655,7 @@ const BookPageLuxe = () => {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/ai/generate-chapters`, {
+        const response = await fetch(`${getApiBaseUrl()}/ai/generate-chapters`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -491,7 +668,8 @@ const BookPageLuxe = () => {
             bookTitle: book.title,
             recipientName: book.recipient_name,
             recipientAge: book.recipient_age,
-            recipientGender: book.recipient_gender
+            recipientGender: book.recipient_gender,
+            projectBrief: book?.cover_config?.aiProjectBrief || ''
           })
         });
 
@@ -500,7 +678,7 @@ const BookPageLuxe = () => {
         if (response.ok) {
           const newChapters = data.chapters.map((ch, index) => ({
             book_id: bookId,
-            title: ch.title,
+            title: currentChaptersCount === 0 && index === 0 ? 'Introduction' : ch.title,
             description: ch.description || `Chapitre ${currentChaptersCount + index + 1}`,
             order_index: currentChaptersCount + index,
             questions_ia: [
@@ -530,7 +708,7 @@ const BookPageLuxe = () => {
       }
       
       await loadBookAndChapters();
-      await handleUpdateBook({ pages: newPages });
+      await handleUpdateBook({ pages: pagesToPersist });
       
     } catch (error) {
       console.error('❌ Erreur mise à jour chapitres:', error);
@@ -540,6 +718,14 @@ const BookPageLuxe = () => {
 
   if (loading) return <Loading message="Chargement du livre..." />;
   if (!book) return <div>Livre non trouvé</div>;
+
+  const isSoloMode = getSoloMode(book);
+  const allChaptersDraftValidated = chapters.length > 0 && chapters.every(
+    (chapter) => chapter?.chapterDraft?.status === 'validated'
+  );
+  const visibleGuideSteps = isSoloMode
+    ? WRITING_GUIDE_STEPS.filter((step) => step.title !== 'Invitations')
+    : WRITING_GUIDE_STEPS;
 
   return (
     <div className="book-container">
@@ -558,9 +744,12 @@ const BookPageLuxe = () => {
             type="button"
             className="btn btn-outline book-generate-btn"
             onClick={handleGenerateDraft}
-            disabled={generatingDraft}
+            disabled={generatingDraft || !allChaptersDraftValidated}
+            title={allChaptersDraftValidated
+              ? 'Afficher l apercu assemble du livre'
+              : 'Generez et validez chaque chapitre avant l apercu global'}
           >
-            {generatingDraft ? 'Generation...' : 'Generer mon livre brouillon'}
+            {generatingDraft ? 'Generation...' : 'Apercu du livre'}
           </button>
           <Link to="/dashboard" className="dashboard-link">
             <span>📊</span>
@@ -621,7 +810,7 @@ const BookPageLuxe = () => {
                 </div>
 
                 <div className="writing-guide-list">
-                  {WRITING_GUIDE_STEPS.map((step) => (
+                  {visibleGuideSteps.map((step) => (
                     <div key={step.title} className="writing-guide-item">
                       <span className="writing-guide-label">{step.title}</span>
                       <span className="writing-guide-text">{step.text}</span>
@@ -643,14 +832,20 @@ const BookPageLuxe = () => {
             onUpdateChapter={handleUpdateChapter}
             onSaveContribution={handleSaveContribution}
             onFinalizeContribution={handleFinalizeContribution}
+            onGenerateChapterDraft={handleGenerateChapterDraft}
+            onSaveChapterDraft={handleSaveChapterDraft}
+            onFinalizeChapterDraft={handleFinalizeChapterDraft}
             onDeleteChapter={handleDeleteChapter}
-            onAddChapter={handleAddChapter}
             onUpdateBook={handleUpdateBook}
           />
         )}
         
         {activeTab === 'contributeurs' && (
-          <ContributorsTabLuxe bookId={bookId} />
+          <ContributorsTabLuxe
+            bookId={bookId}
+            book={book}
+            onUpdateBook={handleUpdateBook}
+          />
         )}
         
         {activeTab === 'config' && (
@@ -669,7 +864,7 @@ const BookPageLuxe = () => {
             <div className="book-draft-modal-header">
               <div>
                 <div className="label-gold">Apercu HTML grand format</div>
-                <h3 className="book-draft-modal-title">Brouillon du livre</h3>
+                <h3 className="book-draft-modal-title">Apercu du livre</h3>
                 {draftPreview.generatedAt && (
                   <div className="book-draft-modal-meta">
                     Genere le {new Date(draftPreview.generatedAt).toLocaleString('fr-FR')}
@@ -692,7 +887,7 @@ const BookPageLuxe = () => {
                 onClick={handleGenerateDraft}
                 disabled={generatingDraft}
               >
-                {generatingDraft ? 'Generation...' : 'Regenerer'}
+                {generatingDraft ? 'Generation...' : 'Actualiser l apercu'}
               </button>
               <button
                 type="button"

@@ -5,6 +5,8 @@ const aiService = require('../services/aiService');
 const authenticate = require('../middleware/auth');
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
+const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
+const MAX_CHAPTER_AI_GENERATIONS = 3;
 
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -103,75 +105,729 @@ router.delete('/:id', authenticate, async (req, res) => {
   }
 });
 
-router.post('/:id/generate-draft', authenticate, async (req, res) => {
+router.post('/:id/chapters/:chapterId/generate-draft', authenticate, async (req, res) => {
   try {
-    const bookId = req.params.id;
-    const { data: book, error: bookError } = await supabase
-      .from('books')
-      .select('*')
-      .eq('id', bookId)
-      .eq('owner_id', req.user.id)
-      .single();
+    const { book, chapters, currentChapter, contributors } = await loadOwnedBookChapterContext({
+      bookId: req.params.id,
+      chapterId: req.params.chapterId,
+      ownerId: req.user.id
+    });
+    const existingDraftState = extractChapterDraftState(currentChapter);
+    const generationCount = Number(existingDraftState?.generationCount || 0);
 
-    if (bookError || !book) {
-      return res.status(404).json({ error: 'Livre introuvable' });
+    if (existingDraftState?.status === 'validated') {
+      return res.status(400).json({ error: 'Ce chapitre est deja valide definitivement' });
     }
 
-    const [{ data: chapters, error: chaptersError }, { data: contributors, error: contributorsError }] = await Promise.all([
-      supabase
-        .from('chapters')
-        .select(`
-          *,
-          contributions:contributions(*),
-          chapter_invites:chapter_invites(*)
-        `)
-        .eq('book_id', bookId)
-        .order('order_index', { ascending: true }),
-      supabase
-        .from('book_contributors')
-        .select('id, name, email')
-        .eq('book_id', bookId)
-    ]);
-
-    if (chaptersError) {
-      throw chaptersError;
-    }
-    if (contributorsError) {
-      throw contributorsError;
+    if (generationCount >= MAX_CHAPTER_AI_GENERATIONS) {
+      return res.status(400).json({ error: 'La limite de 3 generations IA a ete atteinte pour ce chapitre' });
     }
 
-    const contributorNamesByEmail = (contributors || []).reduce((acc, contributor) => {
-      if (contributor.email) {
-        acc[contributor.email.trim().toLowerCase()] = contributor.name || null;
-      }
-      return acc;
-    }, {});
-
-    const sourcePayload = buildBookDraftSourcePayload({
+    const contributorNamesByEmail = buildContributorNamesByEmail(contributors);
+    const sourcePayload = buildChapterDraftSourcePayload({
       book,
-      chapters: chapters || [],
+      chapters,
+      currentChapter,
       organizerEmail: req.user.email || '',
       contributorNamesByEmail
     });
-
-    const draft = await generateBookDraftFromAI(sourcePayload);
-    const html = renderBookDraftHtml({
+    const generatedDraft = await generateChapterDraftFromAI(sourcePayload);
+    const html = renderChapterDraftPreviewHtml({
       book,
-      draft,
+      chapter: currentChapter,
+      draft: generatedDraft,
       sourcePayload
+    });
+    const nextState = {
+      version: 1,
+      status: 'draft',
+      generationCount: generationCount + 1,
+      maxGenerations: MAX_CHAPTER_AI_GENERATIONS,
+      title: cleanText(generatedDraft.title, 180) || cleanText(currentChapter.title, 180) || 'Chapitre',
+      summary: cleanText(generatedDraft.summary, 600) || summarizeHtmlForChapter(html),
+      html,
+      lastGeneratedAt: new Date().toISOString(),
+      lastEditedAt: existingDraftState?.lastEditedAt || null,
+      finalizedAt: null
+    };
+    const draftContribution = await upsertSystemContributionRecord({
+      chapterId: currentChapter.id,
+      existingRow: findSystemContribution(currentChapter, CHAPTER_DRAFT_EMAIL),
+      email: CHAPTER_DRAFT_EMAIL,
+      name: '__chapter_draft__',
+      message: JSON.stringify(nextState)
+    });
+
+    res.json({
+      generatedAt: nextState.lastGeneratedAt,
+      draft: nextState,
+      draftContribution
+    });
+  } catch (error) {
+    console.error('Erreur generation brouillon chapitre:', error);
+    res.status(error.status || 500).json({
+      error: error.message || 'Erreur lors de la generation du chapitre'
+    });
+  }
+});
+
+router.post('/:id/chapters/:chapterId/save-draft', authenticate, async (req, res) => {
+  try {
+    const { currentChapter } = await loadOwnedBookChapterContext({
+      bookId: req.params.id,
+      chapterId: req.params.chapterId,
+      ownerId: req.user.id
+    });
+    const existingDraftState = extractChapterDraftState(currentChapter);
+
+    if (existingDraftState?.status === 'validated') {
+      return res.status(400).json({ error: 'La version finale de ce chapitre est deja validee' });
+    }
+
+    const nextHtml = normalizeDraftHtml(
+      typeof req.body?.html === 'string' ? req.body.html : existingDraftState?.html
+    );
+
+    if (!nextHtml) {
+      return res.status(400).json({ error: 'Aucun contenu HTML a enregistrer' });
+    }
+
+    const nextState = {
+      version: 1,
+      status: 'draft',
+      generationCount: Number(existingDraftState?.generationCount || 0),
+      maxGenerations: MAX_CHAPTER_AI_GENERATIONS,
+      title: cleanText(existingDraftState?.title, 180) || cleanText(currentChapter.title, 180) || 'Chapitre',
+      summary: summarizeHtmlForChapter(nextHtml),
+      html: nextHtml,
+      lastGeneratedAt: existingDraftState?.lastGeneratedAt || null,
+      lastEditedAt: new Date().toISOString(),
+      finalizedAt: null
+    };
+    const draftContribution = await upsertSystemContributionRecord({
+      chapterId: currentChapter.id,
+      existingRow: findSystemContribution(currentChapter, CHAPTER_DRAFT_EMAIL),
+      email: CHAPTER_DRAFT_EMAIL,
+      name: '__chapter_draft__',
+      message: JSON.stringify(nextState)
+    });
+
+    res.json({
+      savedAt: nextState.lastEditedAt,
+      draft: nextState,
+      draftContribution
+    });
+  } catch (error) {
+    console.error('Erreur sauvegarde revision chapitre:', error);
+    res.status(error.status || 500).json({
+      error: error.message || 'Erreur lors de la sauvegarde du chapitre'
+    });
+  }
+});
+
+router.post('/:id/chapters/:chapterId/finalize-draft', authenticate, async (req, res) => {
+  try {
+    const { currentChapter } = await loadOwnedBookChapterContext({
+      bookId: req.params.id,
+      chapterId: req.params.chapterId,
+      ownerId: req.user.id
+    });
+    const existingDraftState = extractChapterDraftState(currentChapter);
+
+    if (existingDraftState?.status === 'validated') {
+      return res.status(400).json({ error: 'Ce chapitre est deja valide definitivement' });
+    }
+
+    const nextHtml = normalizeDraftHtml(
+      typeof req.body?.html === 'string' ? req.body.html : existingDraftState?.html
+    );
+
+    if (!nextHtml) {
+      return res.status(400).json({ error: 'Generez ou enregistrez un brouillon avant la validation finale' });
+    }
+
+    const finalizedAt = new Date().toISOString();
+    const nextState = {
+      version: 1,
+      status: 'validated',
+      generationCount: Number(existingDraftState?.generationCount || 0),
+      maxGenerations: MAX_CHAPTER_AI_GENERATIONS,
+      title: cleanText(existingDraftState?.title, 180) || cleanText(currentChapter.title, 180) || 'Chapitre',
+      summary: summarizeHtmlForChapter(nextHtml),
+      html: nextHtml,
+      lastGeneratedAt: existingDraftState?.lastGeneratedAt || null,
+      lastEditedAt: existingDraftState?.lastEditedAt || finalizedAt,
+      finalizedAt
+    };
+    const draftContribution = await upsertSystemContributionRecord({
+      chapterId: currentChapter.id,
+      existingRow: findSystemContribution(currentChapter, CHAPTER_DRAFT_EMAIL),
+      email: CHAPTER_DRAFT_EMAIL,
+      name: '__chapter_draft__',
+      message: JSON.stringify(nextState)
+    });
+    const workflowContribution = await upsertSystemContributionRecord({
+      chapterId: currentChapter.id,
+      existingRow: findSystemContribution(currentChapter, CHAPTER_STATE_EMAIL),
+      email: CHAPTER_STATE_EMAIL,
+      name: '__chapter_state__',
+      message: 'closed'
+    });
+
+    res.json({
+      finalizedAt,
+      draft: nextState,
+      draftContribution,
+      workflowContribution
+    });
+  } catch (error) {
+    console.error('Erreur validation finale chapitre:', error);
+    res.status(error.status || 500).json({
+      error: error.message || 'Erreur lors de la validation finale'
+    });
+  }
+});
+
+router.post('/:id/generate-draft', authenticate, async (req, res) => {
+  try {
+    const bookId = req.params.id;
+    const { book, chapters } = await loadOwnedBookChapterContext({
+      bookId,
+      ownerId: req.user.id
+    });
+    const chaptersWithDrafts = (chapters || []).map((chapter) => ({
+      chapter,
+      draft: extractChapterDraftState(chapter)
+    }));
+    const incompleteCount = chaptersWithDrafts.filter(
+      ({ draft }) => draft?.status !== 'validated'
+    ).length;
+
+    if (incompleteCount > 0) {
+      return res.status(400).json({
+        error: `Tous les chapitres doivent etre generes et valides avant l'aperçu du livre (${incompleteCount} restant(s))`
+      });
+    }
+
+    const html = renderValidatedBookPreviewHtml({
+      book,
+      chaptersWithDrafts
     });
 
     res.json({
       generatedAt: new Date().toISOString(),
-      source: sourcePayload,
-      draft,
       html
     });
   } catch (error) {
-    console.error('Erreur generation brouillon livre:', error);
-    res.status(500).json({ error: error.message || 'Erreur lors de la generation du brouillon' });
+    console.error('Erreur apercu livre:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Erreur lors de la generation du brouillon' });
   }
 });
+
+async function loadOwnedBookChapterContext({ bookId, chapterId = null, ownerId }) {
+  const { data: book, error: bookError } = await supabase
+    .from('books')
+    .select('*')
+    .eq('id', bookId)
+    .eq('owner_id', ownerId)
+    .single();
+
+  if (bookError || !book) {
+    const error = new Error('Livre introuvable');
+    error.status = 404;
+    throw error;
+  }
+
+  const [{ data: chapters, error: chaptersError }, { data: contributors, error: contributorsError }] = await Promise.all([
+    supabase
+      .from('chapters')
+      .select(`
+        *,
+        contributions:contributions(*),
+        chapter_invites:chapter_invites(*)
+      `)
+      .eq('book_id', bookId)
+      .order('order_index', { ascending: true }),
+    supabase
+      .from('book_contributors')
+      .select('id, name, email')
+      .eq('book_id', bookId)
+  ]);
+
+  if (chaptersError) {
+    throw chaptersError;
+  }
+
+  if (contributorsError) {
+    throw contributorsError;
+  }
+
+  const orderedChapters = Array.isArray(chapters) ? chapters : [];
+  const currentChapter = chapterId
+    ? orderedChapters.find((chapter) => chapter.id === chapterId) || null
+    : null;
+
+  if (chapterId && !currentChapter) {
+    const error = new Error('Chapitre introuvable');
+    error.status = 404;
+    throw error;
+  }
+
+  return {
+    book,
+    chapters: orderedChapters,
+    contributors: contributors || [],
+    currentChapter
+  };
+}
+
+function buildContributorNamesByEmail(contributors) {
+  return (contributors || []).reduce((acc, contributor) => {
+    const normalizedEmail = normalizeEmail(contributor?.email);
+    if (normalizedEmail) {
+      acc[normalizedEmail] = cleanText(contributor.name, 180) || null;
+    }
+    return acc;
+  }, {});
+}
+
+function findSystemContribution(chapter, systemEmail) {
+  const contributions = Array.isArray(chapter?.contributions) ? chapter.contributions : [];
+  return contributions
+    .filter((contribution) => normalizeEmail(contribution?.contributor_email) === systemEmail)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
+}
+
+function extractChapterDraftState(chapter) {
+  const draftContribution = findSystemContribution(chapter, CHAPTER_DRAFT_EMAIL);
+
+  if (!draftContribution?.message) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(draftContribution.message);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    return {
+      version: parsed.version || 1,
+      status: parsed.status || 'draft',
+      generationCount: Number(parsed.generationCount || 0),
+      maxGenerations: Number(parsed.maxGenerations || MAX_CHAPTER_AI_GENERATIONS),
+      title: cleanText(parsed.title, 180),
+      summary: cleanText(parsed.summary, 600),
+      html: normalizeDraftHtml(parsed.html),
+      lastGeneratedAt: parsed.lastGeneratedAt || null,
+      lastEditedAt: parsed.lastEditedAt || null,
+      finalizedAt: parsed.finalizedAt || null
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function upsertSystemContributionRecord({
+  chapterId,
+  existingRow,
+  email,
+  name,
+  message
+}) {
+  const payload = {
+    contributor_name: name,
+    contributor_email: email,
+    message,
+    photo_urls: [],
+    approved: true,
+    is_finalized: true,
+    needs_revision: false,
+    moderation_feedback: null
+  };
+
+  if (existingRow?.id) {
+    const { data, error } = await supabase
+      .from('contributions')
+      .update(payload)
+      .eq('id', existingRow.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('contributions')
+    .insert([{
+      chapter_id: chapterId,
+      ...payload
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+function buildChapterDraftSourcePayload({
+  book,
+  chapters,
+  currentChapter,
+  organizerEmail,
+  contributorNamesByEmail
+}) {
+  const organizerEmailKey = normalizeEmail(organizerEmail);
+  const chapterContributions = Array.isArray(currentChapter?.contributions) ? currentChapter.contributions : [];
+  const chapterInvites = Array.isArray(currentChapter?.chapter_invites) ? currentChapter.chapter_invites : [];
+  const organizerContribution = chapterContributions
+    .filter((contribution) => (
+      normalizeEmail(contribution?.contributor_email) === organizerEmailKey &&
+      contribution.is_finalized !== false
+    ))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
+  const guestContributions = chapterContributions
+    .filter((contribution) => {
+      const normalizedEmail = normalizeEmail(contribution?.contributor_email);
+      return (
+        normalizedEmail &&
+        normalizedEmail !== organizerEmailKey &&
+        normalizedEmail !== CHAPTER_STATE_EMAIL &&
+        normalizedEmail !== CHAPTER_DRAFT_EMAIL &&
+        contribution.approved === true &&
+        contribution.is_finalized !== false &&
+        !contribution.needs_revision
+      );
+    })
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    .map((contribution) => {
+      const normalizedEmail = normalizeEmail(contribution?.contributor_email);
+      return {
+        contributorName:
+          cleanText(contribution.contributor_name, 180) ||
+          contributorNamesByEmail[normalizedEmail] ||
+          cleanText(normalizedEmail.split('@')[0], 180) ||
+          'Contributeur',
+        message: cleanText(contribution.message, 2400),
+        photoUrls: normalizePhotoUrls(contribution.photo_urls)
+      };
+    });
+
+  return {
+    book: {
+      id: book.id,
+      title: cleanText(book.title, 180) || 'Livre souvenir',
+      recipientName: cleanText(book.recipient_name, 180) || 'la personne celebree',
+      eventType: cleanText(book.event_type, 120) || 'evenement',
+      styleNarratif: cleanText(book.style_narratif, 120) || 'intime',
+      aiProjectBrief: cleanText(book?.cover_config?.aiProjectBrief, 900),
+      minPagesPerChapter: 4
+    },
+    chapter: {
+      id: currentChapter.id,
+      orderIndex: Number(currentChapter.order_index || 0),
+      title: cleanText(currentChapter.title, 180) || 'Chapitre',
+      description: cleanText(currentChapter.description, 700),
+      questions: Array.isArray(currentChapter.questions_ia)
+        ? currentChapter.questions_ia.map((question) => cleanText(question, 260)).filter(Boolean)
+        : [],
+      organizerContribution: organizerContribution
+        ? {
+            message: cleanText(organizerContribution.message, 3200),
+            photoUrls: normalizePhotoUrls(organizerContribution.photo_urls)
+          }
+        : null,
+      guestContributions,
+      photoUrls: collectChapterPhotos({
+        organizerContribution: organizerContribution
+          ? { photoUrls: normalizePhotoUrls(organizerContribution.photo_urls) }
+          : null,
+        guestContributions
+      }),
+      stats: {
+        invitedCount: chapterInvites.length,
+        respondedCount: chapterInvites.filter((invite) => invite.accepted || invite.contributed).length
+      }
+    },
+    previousChapterSummaries: (chapters || [])
+      .filter((chapter) => Number(chapter?.order_index || 0) < Number(currentChapter?.order_index || 0))
+      .map((chapter) => {
+        const draftState = extractChapterDraftState(chapter);
+        if (draftState?.status !== 'validated' || !draftState.summary) {
+          return null;
+        }
+
+        return {
+          title: cleanText(chapter.title, 180) || 'Chapitre',
+          summary: cleanText(draftState.summary, 500)
+        };
+      })
+      .filter(Boolean)
+  };
+}
+
+async function generateChapterDraftFromAI(sourcePayload) {
+  const fallbackDraft = buildFallbackChapterDraft(sourcePayload);
+
+  if (!aiService?.mistral) {
+    return fallbackDraft;
+  }
+
+  const prompt = [
+    'Tu rediges le brouillon d un seul chapitre d un livre souvenir.',
+    'Tu dois produire exactement 4 pages de contenu coherentes entre elles.',
+    'Le ton doit respecter le style narratif demande et rester fluide en francais.',
+    'Prends en compte les resumes des chapitres precedents pour garder une vraie continuite narrative.',
+    'Si un brief libre est fourni, utilise-le comme intention editoriale prioritaire.',
+    'Ignore totalement les contributions non validees : seules les donnees fournies ci-dessous sont utilisables.',
+    'Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :',
+    '{',
+    '  "title": "string",',
+    '  "pages": [',
+    '    { "title": "string", "body": "string" },',
+    '    { "title": "string", "body": "string" },',
+    '    { "title": "string", "body": "string" },',
+    '    { "title": "string", "body": "string" }',
+    '  ],',
+    '  "summary": "string"',
+    '}',
+    'Ne mets aucun markdown, aucun commentaire, aucun texte hors du JSON.',
+    '',
+    'DONNEES SOURCE :',
+    JSON.stringify({
+      book: sourcePayload.book,
+      chapter: {
+        ...sourcePayload.chapter,
+        organizerContribution: sourcePayload.chapter.organizerContribution
+          ? {
+              message: sourcePayload.chapter.organizerContribution.message,
+              photoCount: sourcePayload.chapter.organizerContribution.photoUrls.length
+            }
+          : null,
+        guestContributions: sourcePayload.chapter.guestContributions.map((contribution) => ({
+          contributorName: contribution.contributorName,
+          message: contribution.message,
+          photoCount: Array.isArray(contribution.photoUrls) ? contribution.photoUrls.length : 0
+        })),
+        photoUrls: undefined
+      },
+      previousChapterSummaries: sourcePayload.previousChapterSummaries
+    })
+  ].join('\n');
+
+  try {
+    const response = await aiService.mistral.chat.complete({
+      model: 'mistral-small-latest',
+      messages: [
+        {
+          role: 'system',
+          content: 'Tu es un redacteur editorial de livres souvenirs. Tu produis uniquement du JSON valide.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.55,
+      maxTokens: 2200
+    });
+
+    const content = response?.choices?.[0]?.message?.content || '';
+    const parsed = parseDraftJson(content);
+
+    if (!parsed || !Array.isArray(parsed.pages)) {
+      return fallbackDraft;
+    }
+
+    return {
+      title: cleanText(parsed.title, 180) || fallbackDraft.title,
+      pages: ensureFourDraftPages(parsed.pages, fallbackDraft.pages),
+      summary: cleanText(parsed.summary, 600) || fallbackDraft.summary
+    };
+  } catch (error) {
+    console.error('Erreur IA brouillon chapitre:', error);
+    return fallbackDraft;
+  }
+}
+
+function buildFallbackChapterDraft(sourcePayload) {
+  const chapter = sourcePayload.chapter || {};
+  const recipientName = sourcePayload.book?.recipientName || 'la personne celebree';
+  const questions = Array.isArray(chapter.questions) ? chapter.questions : [];
+  const guestContributions = Array.isArray(chapter.guestContributions) ? chapter.guestContributions : [];
+  const organizerText = chapter.organizerContribution?.message || '';
+  const previousBridge = sourcePayload.previousChapterSummaries.length > 0
+    ? `Ce chapitre prolonge ${sourcePayload.previousChapterSummaries.slice(-1)[0].summary}`
+    : `Ce chapitre ouvre une nouvelle sequence du livre dedie a ${recipientName}.`;
+  const projectIntent = sourcePayload.book?.aiProjectBrief
+    ? `Intention editoriale : ${sourcePayload.book.aiProjectBrief}`
+    : '';
+
+  return {
+    title: chapter.title || 'Chapitre',
+    pages: [
+      {
+        title: chapter.title || 'Ouverture',
+        body: [
+          chapter.description || `${chapter.title || 'Ce chapitre'} pose le decor du souvenir a transmettre.`,
+          previousBridge,
+          projectIntent,
+          questions.length > 0 ? `Pistes editoriales : ${questions.slice(0, 4).join(' ')}` : ''
+        ].filter(Boolean).join('\n\n')
+      },
+      {
+        title: 'Recit principal',
+        body: organizerText || `L organisateur peut encore enrichir ce chapitre pour raconter avec plus de nuances ce moment cle autour de ${recipientName}.`
+      },
+      {
+        title: 'Voix des proches',
+        body: guestContributions.length > 0
+          ? guestContributions
+              .slice(0, 4)
+              .map((contribution) => `${contribution.contributorName} partage : ${contribution.message}`)
+              .join('\n\n')
+          : 'Aucune contribution validee supplementaire n est encore integree a ce chapitre.'
+      },
+      {
+        title: 'Clore la sequence',
+        body: [
+          `Ce chapitre se referme sur une tonalite ${sourcePayload.book?.styleNarratif || 'sensible'} et prepare la transition vers la suite du livre.`,
+          chapter.stats?.respondedCount
+            ? `${chapter.stats.respondedCount} contribution(s) validee(s) ont nourri ce brouillon.`
+            : 'Le chapitre peut encore etre enrichi avant la validation finale.'
+        ].filter(Boolean).join('\n\n')
+      }
+    ],
+    summary: summarizePlainText([
+      chapter.description,
+      organizerText,
+      guestContributions[0]?.message
+    ].filter(Boolean).join(' '), 420) || `Resume du chapitre ${chapter.title || 'en cours'}.`
+  };
+}
+
+function ensureFourDraftPages(pages, fallbackPages) {
+  const safePages = Array.isArray(pages) ? pages : [];
+  const fallback = Array.isArray(fallbackPages) ? fallbackPages : [];
+  const normalizedPages = [];
+
+  for (let index = 0; index < 4; index += 1) {
+    const currentPage = safePages[index] || fallback[index] || {};
+    normalizedPages.push({
+      title: cleanText(currentPage.title, 180) || `Page ${index + 1}`,
+      body: cleanText(currentPage.body, 3200) || cleanText(fallback[index]?.body, 3200) || 'Contenu a enrichir.'
+    });
+  }
+
+  return normalizedPages;
+}
+
+function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) {
+  const chapterNumber = Number(chapter?.order_index || 0) + 1;
+  const visiblePhotos = Array.isArray(sourcePayload?.chapter?.photoUrls)
+    ? sourcePayload.chapter.photoUrls.slice(0, 6)
+    : [];
+  const remainingPhotoCount = Math.max(
+    0,
+    (Array.isArray(sourcePayload?.chapter?.photoUrls) ? sourcePayload.chapter.photoUrls.length : 0) - visiblePhotos.length
+  );
+  const guestHighlights = Array.isArray(sourcePayload?.chapter?.guestContributions)
+    ? sourcePayload.chapter.guestContributions.slice(0, 3)
+    : [];
+
+  return `
+    <section class="draft-book-chapter">
+      <div class="draft-book-chapter-shell">
+        ${draft.pages.map((page, index) => `
+          <section class="draft-book-page${index === 0 ? ' draft-book-page-opening' : ''}${index === 3 ? ' draft-book-page-gallery' : ''}">
+            <div class="draft-book-page-label">Page ${index + 1}</div>
+            ${index === 0 ? `<div class="draft-book-chapter-index">Chapitre ${chapterNumber}</div>` : ''}
+            <h3>${escapeHtml(page.title || draft.title || chapter?.title || `Chapitre ${chapterNumber}`)}</h3>
+            ${index === 0 && sourcePayload?.chapter?.description
+              ? `<p class="draft-book-intro">${escapeHtml(sourcePayload.chapter.description)}</p>`
+              : ''}
+            <div class="draft-book-body">
+              ${formatParagraphs(page.body || '')}
+            </div>
+            ${index === 0 ? renderQuestionList(sourcePayload?.chapter?.questions) : ''}
+            ${index === 2 ? renderContributionSpotlight(sourcePayload?.chapter?.organizerContribution, guestHighlights) : ''}
+            ${index === 3 ? renderPhotoGallery(visiblePhotos, remainingPhotoCount) : ''}
+          </section>
+        `).join('')}
+      </div>
+      <div class="draft-book-section" style="margin-top:16px;">
+        <div class="draft-book-mini-title">Resume de chapitre</div>
+        ${formatParagraphs(draft.summary || summarizeHtmlForChapter(draft.html || ''))}
+      </div>
+    </section>
+  `;
+}
+
+function renderValidatedBookPreviewHtml({ book, chaptersWithDrafts }) {
+  const chapterBlocks = chaptersWithDrafts
+    .map(({ draft }) => draft?.html || '')
+    .filter(Boolean)
+    .join('');
+
+  return `
+    <article class="draft-book">
+      <header class="draft-book-header">
+        <div class="draft-book-eyebrow">Apercu assemble</div>
+        <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
+        <div class="draft-book-meta">
+          ${escapeHtml([
+            book.recipient_name ? `Destinataire : ${book.recipient_name}` : '',
+            book.style_narratif ? `Style : ${book.style_narratif}` : '',
+            book.event_type ? `Evenement : ${book.event_type}` : ''
+          ].filter(Boolean).join(' | '))}
+        </div>
+      </header>
+      ${chapterBlocks || '<p class="draft-book-empty">Aucun chapitre valide.</p>'}
+    </article>
+  `;
+}
+
+function summarizeHtmlForChapter(html) {
+  return summarizePlainText(
+    String(html || '').replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' '),
+    420
+  );
+}
+
+function summarizePlainText(value, maxLength = 420) {
+  const normalized = cleanText(value, maxLength * 2);
+  if (!normalized) {
+    return '';
+  }
+
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength).trim()}...`
+    : normalized;
+}
+
+function normalizeDraftHtml(value, maxLength = 40000) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const withoutScripts = value.replace(/<script[\s\S]*?<\/script>/gi, '');
+  const trimmed = withoutScripts.trim();
+
+  return trimmed.length > maxLength
+    ? trimmed.slice(0, maxLength).trim()
+    : trimmed;
+}
+
+function normalizeEmail(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
 
 function buildBookDraftSourcePayload({ book, chapters, organizerEmail, contributorNamesByEmail }) {
   const organizerEmailKey = organizerEmail ? organizerEmail.trim().toLowerCase() : '';
@@ -187,6 +843,7 @@ function buildBookDraftSourcePayload({ book, chapters, organizerEmail, contribut
       finition: cleanText(book.finition) || '',
       papier: cleanText(book.papier) || '',
       styleNarratif: cleanText(book.style_narratif) || 'intime',
+      aiProjectBrief: cleanText(book?.cover_config?.aiProjectBrief, 900),
       pages: book.pages || null,
       minPagesPerChapter: 4
     },

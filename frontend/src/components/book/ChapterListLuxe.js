@@ -1,4 +1,3 @@
-// C:\Users\USER\bookfete\frontend\src\components\book\ChapterListLuxe.js
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import Tooltip from '../ui/Tooltip';
@@ -6,10 +5,8 @@ import ChapterDetailsLuxe from './chapters/ChapterDetailsLuxe';
 import ContributionsModerationLuxe from './chapters/ContributionsModerationLuxe';
 import ChapterEditorLuxe from './chapters/ChapterEditorLuxe';
 import QuestionsEditorLuxe from './chapters/QuestionsEditorLuxe';
-import InviteSelectorLuxe from './contributors/InviteSelectorLuxe';
 import { useChapterActions } from './hooks/useChapterActions';
 import { useContributions } from './hooks/useContributions';
-import { useInvitations } from './hooks/useInvitations';
 import { useQuestions } from './hooks/useQuestions';
 import './BookLuxe.css';
 
@@ -18,12 +15,13 @@ const ChapterListLuxe = ({
   onUpdateChapter,
   onSaveContribution,
   onFinalizeContribution,
+  onGenerateChapterDraft,
+  onSaveChapterDraft,
+  onFinalizeChapterDraft,
   onDeleteChapter,
-  onAddChapter,
   bookId,
   book
 }) => {
-  // ==================== HOOKS ====================
   const [user, setUser] = useState(null);
 
   const {
@@ -61,15 +59,6 @@ const ChapterListLuxe = ({
   } = useContributions();
 
   const {
-    showInviteSelector,
-    selectedChapterForInvite,
-    inviteSuccess,
-    handleOpenInviteSelector,
-    handleInvitesSent,
-    closeInviteSelector
-  } = useInvitations();
-
-  const {
     editingQuestions,
     setEditingQuestions,
     newQuestion,
@@ -82,10 +71,9 @@ const ChapterListLuxe = ({
     generateAIQuestions
   } = useQuestions(onUpdateChapter);
 
-  // Récupérer l'utilisateur connecté
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
+      setUser(authUser);
     });
   }, []);
 
@@ -102,73 +90,53 @@ const ChapterListLuxe = ({
 
   const getStatusColor = (contributions) => {
     const count = Array.isArray(contributions) ? contributions.length : 0;
-    if (count === 0) return 'var(--gold)';
-    if (count < 3) return 'var(--ink)';
-    return 'var(--gold)';
+    if (count === 0) return '#b9c4cf';
+    if (count < 3) return '#7f95a5';
+    return '#2f6e78';
   };
 
   const getChapterState = (chapter) => {
     if (chapter?.isChapterClosed) {
       return {
-        label: 'Cloture',
-        color: '#1f7a3d',
-        background: '#e9f7ef'
+        label: 'Clotur\u00e9',
+        color: '#2f6e78',
+        background: '#edf7f8'
       };
     }
 
     if (chapter?.contributionsClosed) {
       return {
         label: 'Contributions closes',
-        color: '#8a6d00',
-        background: '#fff8e1'
+        color: '#5d7183',
+        background: '#f1f5f8'
       };
     }
 
     return {
       label: 'En cours',
-      color: '#8b6f47',
-      background: '#f7f1e7'
+      color: '#5f6770',
+      background: '#f4f6f8'
     };
   };
 
-  // ==================== RENDU ====================
   return (
     <div className="chapters-container">
-      {/* Sidebar gauche */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <h3>📖 Structure du livre</h3>
-          <Tooltip text="Ajouter un chapitre">
-            <button
-              type="button"
-              className="sidebar-add-btn"
-              onClick={async () => {
-                if (typeof onAddChapter !== 'function') {
-                  return;
-                }
-
-                const createdChapter = await onAddChapter();
-
-                if (createdChapter?.id) {
-                  handleSelectChapter(createdChapter.id);
-                  setShowContributions(false);
-                }
-              }}
-            >
-              +
-            </button>
-          </Tooltip>
+          <h3>Structure du livre</h3>
         </div>
+
         <div className="sidebar-content">
           {chapters.map((chapter, index) => {
             const chapterState = getChapterState(chapter);
+            const displayTitle = index === 0 ? 'Introduction' : chapter.title;
 
             return (
               <div
                 key={chapter.id}
                 onClick={() => {
                   handleSelectChapter(chapter.id);
-                  setShowContributions(false); // ← ICI on utilise la fonction du hook
+                  setShowContributions(false);
                 }}
                 className={`chapter-item ${selectedChapterId === chapter.id ? 'selected' : ''}`}
                 style={{
@@ -177,7 +145,33 @@ const ChapterListLuxe = ({
               >
                 <div className="chapter-title-row">
                   <div className="chapter-title">
-                    {index + 1}. {chapter.title}
+                    {index + 1}. {displayTitle}
+                  </div>
+
+                  <div className="chapter-actions">
+                    <Tooltip text="Modifier le chapitre">
+                      <button
+                        className="chapter-action-btn"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleEdit({
+                            ...chapter,
+                            title: displayTitle
+                          });
+                        }}
+                      >
+                        ✎
+                      </button>
+                    </Tooltip>
+
+                    <Tooltip text="Supprimer">
+                      <button
+                        className="chapter-action-btn"
+                        onClick={(event) => handleDeleteClick(chapter, event)}
+                      >
+                        🗑
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
 
@@ -192,57 +186,6 @@ const ChapterListLuxe = ({
                     >
                       {chapterState.label}
                     </div>
-
-                    <div className="chapter-stats">
-                      <span>💬 {chapter.contributionsCount || 0}</span>
-                    </div>
-                  </div>
-
-                  <div className="chapter-actions">
-                    <Tooltip text="Modifier le titre">
-                      <button 
-                        className="chapter-action-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(chapter);
-                        }}
-                      >
-                        ✎
-                      </button>
-                    </Tooltip>
-                    
-                    <Tooltip text="Modifier les questions">
-                      <button 
-                        className="chapter-action-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditQuestions(chapter);
-                        }}
-                      >
-                        ?
-                      </button>
-                    </Tooltip>
-                    
-                    <Tooltip text="Inviter des contributeurs">
-                      <button 
-                        className="chapter-action-btn"
-                        onClick={(e) => handleOpenInviteSelector(chapter, e)}
-                        style={{
-                          color: inviteSuccess === chapter.id ? 'var(--gold)' : 'var(--text-light)'
-                        }}
-                      >
-                        👥
-                      </button>
-                    </Tooltip>
-                    
-                    <Tooltip text="Supprimer">
-                      <button 
-                        className="chapter-action-btn"
-                        onClick={(e) => handleDeleteClick(chapter, e)}
-                      >
-                        🗑
-                      </button>
-                    </Tooltip>
                   </div>
                 </div>
 
@@ -250,9 +193,9 @@ const ChapterListLuxe = ({
                   className="chapter-status"
                   style={{
                     background: chapter?.isChapterClosed
-                      ? '#1f7a3d'
+                      ? '#2f6e78'
                       : chapter?.contributionsClosed
-                        ? '#b88a1f'
+                        ? '#7b8e9c'
                         : getStatusColor(chapter.contributions)
                   }}
                 />
@@ -262,18 +205,16 @@ const ChapterListLuxe = ({
         </div>
       </div>
 
-      {/* Colonne droite */}
       <div className="right-panel">
-        {/* Modal de confirmation de suppression */}
         {deleteConfirm && (
           <div className="delete-confirm" onClick={cancelDelete}>
-            <div className="delete-confirm-card" onClick={(e) => e.stopPropagation()}>
-              <div className="delete-confirm-icon">⚠️</div>
+            <div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}>
+              <div className="delete-confirm-icon">⚠</div>
               <h3 className="delete-confirm-title">Supprimer le chapitre ?</h3>
               <p className="delete-confirm-text">
-                Êtes-vous sûr de vouloir supprimer le chapitre <strong>"{deleteConfirm.title}"</strong> ?
+                Etes-vous sur de vouloir supprimer le chapitre <strong>"{deleteConfirm.title}"</strong> ?
                 <br />
-                Cette action est irréversible. Toutes les contributions associées seront également supprimées.
+                Cette action est irreversible. Toutes les contributions associees seront egalement supprimees.
               </p>
               <div className="delete-confirm-actions">
                 <button
@@ -286,7 +227,7 @@ const ChapterListLuxe = ({
                   onClick={confirmDelete}
                   className="modal-btn modal-btn-danger"
                 >
-                  Supprimer définitivement
+                  Supprimer definitivement
                 </button>
               </div>
             </div>
@@ -295,7 +236,6 @@ const ChapterListLuxe = ({
 
         {selectedChapter ? (
           editingChapter ? (
-            // Mode édition du titre
             <ChapterEditorLuxe
               editingChapter={editingChapter}
               setEditingChapter={setEditingChapter}
@@ -303,7 +243,6 @@ const ChapterListLuxe = ({
               onCancel={() => setEditingChapter(null)}
             />
           ) : editingQuestions ? (
-            // Mode édition des questions
             <QuestionsEditorLuxe
               editingQuestions={editingQuestions}
               setEditingQuestions={setEditingQuestions}
@@ -315,9 +254,8 @@ const ChapterListLuxe = ({
               onCancel={() => setEditingQuestions(null)}
             />
           ) : showContributions ? (
-            // Mode modération
             <ContributionsModerationLuxe
-              chapterTitle={selectedChapter.title}
+              chapterTitle={selectedChapter.order_index === 0 ? 'Introduction' : selectedChapter.title}
               contributions={chapterContributions}
               loading={loadingContributions}
               onApprove={approveContribution}
@@ -326,14 +264,16 @@ const ChapterListLuxe = ({
               userEmail={user?.email}
             />
           ) : (
-            // Mode détails du chapitre
             <ChapterDetailsLuxe
               chapter={selectedChapter}
               chaptersCount={chapters.length}
               onUpdateChapter={onUpdateChapter}
               onSaveContribution={onSaveContribution}
               onFinalizeContribution={onFinalizeContribution}
-              onGenerateQuestions={(chapter) => generateAIQuestions(chapter, bookId, selectedChapter)}
+              onGenerateChapterDraft={onGenerateChapterDraft}
+              onSaveChapterDraft={onSaveChapterDraft}
+              onFinalizeChapterDraft={onFinalizeChapterDraft}
+              onGenerateQuestions={(chapterItem) => generateAIQuestions(chapterItem, bookId, selectedChapter)}
               generatingQuestions={generatingQuestions}
               contributionText={contributionText}
               setContributionText={setContributionText}
@@ -341,7 +281,11 @@ const ChapterListLuxe = ({
               photoPreviews={photoPreviews}
               onPhotoChange={handlePhotoChange}
               onRemovePhoto={removePhoto}
-              onSubmitContribution={() => submitContribution(selectedChapter.id, user?.email, user?.user_metadata?.full_name || user?.email)}
+              onSubmitContribution={() => submitContribution(
+                selectedChapter.id,
+                user?.email,
+                user?.user_metadata?.full_name || user?.email
+              )}
               submitting={submitting}
               onLoadContributions={loadContributions}
               userEmail={user?.email}
@@ -359,21 +303,11 @@ const ChapterListLuxe = ({
         ) : (
           <div className="empty-state">
             <div className="empty-state-icon">📖</div>
-            <h3>Sélectionnez un chapitre</h3>
+            <h3>Selectionnez un chapitre</h3>
             <p>Cliquez sur un chapitre pour voir son contenu</p>
           </div>
         )}
       </div>
-
-      {/* Modal d'invitation */}
-      {showInviteSelector && selectedChapterForInvite && (
-        <InviteSelectorLuxe
-          chapterId={selectedChapterForInvite.id}
-          bookId={bookId}
-          onClose={closeInviteSelector}
-          onInvitesSent={() => handleInvitesSent(selectedChapterForInvite.id)}
-        />
-      )}
     </div>
   );
 };

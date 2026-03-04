@@ -3,6 +3,8 @@ import React from 'react';
 import '../BookLuxe.css';
 
 const ChapterEditorLuxe = ({ editingChapter, setEditingChapter, onSave, onCancel }) => {
+  const isIntroductionChapter = editingChapter?.title === 'Introduction';
+
   return (
     <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
       <h3 style={{ margin: '0 0 var(--space-lg)', fontSize: '18px', fontWeight: '600' }}>
@@ -17,7 +19,13 @@ const ChapterEditorLuxe = ({ editingChapter, setEditingChapter, onSave, onCancel
           onChange={(e) => setEditingChapter({ ...editingChapter, title: e.target.value })}
           className="input-luxe"
           placeholder="Titre du chapitre"
+          disabled={isIntroductionChapter}
         />
+        {isIntroductionChapter && (
+          <p className="chapter-subtitle" style={{ margin: '8px 0 0' }}>
+            Le premier chapitre reste une introduction.
+          </p>
+        )}
       </div>
       
       <div style={{ marginBottom: 'var(--space-lg)' }}>

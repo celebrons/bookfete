@@ -55,6 +55,7 @@ const CreateBookWizardLuxe = () => {
     papier: 'mat',
     style_narratif: 'factuel',
     pages: 64,
+    ai_project_brief: '',
   });
 
   // ============================================
@@ -118,6 +119,7 @@ Contexte détaillé :
 - Âge : ${bookData.recipient_age || 'non spécifié'} ans
 - Sexe : ${bookData.recipient_gender || 'non spécifié'}
 - Style narratif : ${bookData.style_narratif || 'intime'}
+- Contexte libre : ${bookData.ai_project_brief || 'non renseigne'}
 
 IMPORTANT : Les titres doivent être adaptés à :
 - L'âge de ${bookData.recipient_name || 'la personne'} (${bookData.recipient_age || '?'} ans)
@@ -135,6 +137,7 @@ Les titres doivent être :
 - Rédigés en français
 - Longueur : entre 3 et 8 mots maximum
 - Évocateurs et donnant envie d'écrire
+- Tiens compte du contexte libre s il est renseigne pour mieux cerner l intention du livre
 
 Réponds UNIQUEMENT avec un tableau JSON de ${chaptersCount} chaînes de caractères.
 Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
@@ -154,6 +157,7 @@ Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
           recipientName: bookData.recipient_name,
           recipientAge: bookData.recipient_age,
           recipientGender: bookData.recipient_gender,
+          projectBrief: bookData.ai_project_brief,
           prompt: prompt
         })
       });
@@ -367,7 +371,8 @@ Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
             title: bookData.title,
             template: 'classic',
             color: '#8B4513',
-            font: 'Playfair Display'
+            font: 'Playfair Display',
+            aiProjectBrief: bookData.ai_project_brief || ''
           },
           back_cover_config: {
             template: 'classic',

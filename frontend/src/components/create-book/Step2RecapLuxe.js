@@ -74,6 +74,18 @@ const Step2RecapLuxe = ({ bookData, price, loading, onCreate, onPrevious, chapte
       </div>
 
       {/* Aperçu des chapitres */}
+      {bookData.ai_project_brief && (
+        <div className="recap-card" style={{ marginTop: 'var(--space-md)' }}>
+          <div className="recap-item-label">Aidez-nous a vous aider</div>
+          <div
+            className="recap-item-sub"
+            style={{ marginTop: '8px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}
+          >
+            {bookData.ai_project_brief}
+          </div>
+        </div>
+      )}
+
       <div className="chapters-preview">
         <div className="chapters-header">
           <h3>📖 Aperçu des chapitres</h3>

@@ -118,6 +118,13 @@
   transition: var(--transition-fast);
 }
 
+.create-book-textarea {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+  line-height: 1.7;
+}
+
 .form-group input:focus {
   outline: none;
   border-color: var(--gold);

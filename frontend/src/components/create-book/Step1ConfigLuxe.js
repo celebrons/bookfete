@@ -63,6 +63,20 @@ const Step1ConfigLuxe = ({ bookData, setBookData, onNext, loading }) => {
         />
       </div>
 
+      <div className="config-section">
+        <span className="config-label">Aidez-nous a vous aider</span>
+        <textarea
+          value={bookData.ai_project_brief || ''}
+          onChange={(e) => setBookData({ ...bookData, ai_project_brief: e.target.value })}
+          placeholder="Dites-nous ce que vous voulez transmettre : ton souhaite, anecdotes importantes, sensibilite du destinataire, intentions, souvenirs a faire ressortir..."
+          className="input-luxe create-book-textarea"
+          rows={4}
+        />
+        <small style={{ display: 'block', marginTop: '8px', color: 'var(--text-light)', lineHeight: 1.6 }}>
+          Ce texte libre aide l IA a mieux comprendre l esprit du projet et a proposer des chapitres plus justes.
+        </small>
+      </div>
+
       {/* Finition */}
       <div className="config-section">
         <span className="config-label">Finition</span>
