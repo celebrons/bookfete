@@ -1,5 +1,5 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\BookPageLuxe.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import ChapterListLuxe from './ChapterListLuxe';
@@ -71,6 +71,8 @@ const BookPageLuxe = () => {
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [draftPreview, setDraftPreview] = useState(null);
   const [user, setUser] = useState(null);
+  const [pageNotice, setPageNotice] = useState(null);
+  const chapterIdsRef = useRef(new Set());
 
   useEffect(() => {
     getUser();
@@ -83,22 +85,53 @@ const BookPageLuxe = () => {
   }, [bookId, user]);
 
   useEffect(() => {
+    chapterIdsRef.current = new Set(
+      chapters
+        .map((chapter) => chapter?.id)
+        .filter(Boolean)
+    );
+  }, [chapters]);
+
+  useEffect(() => {
     if (!bookId || !user) {
       return undefined;
     }
+
+    const shouldRefreshForChapter = (payload) => {
+      const changedChapterId = payload?.new?.chapter_id || payload?.old?.chapter_id;
+      return Boolean(changedChapterId && chapterIdsRef.current.has(changedChapterId));
+    };
 
     const channel = supabase
       .channel(`book-page-${bookId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'contributions' },
+        (payload) => {
+          if (shouldRefreshForChapter(payload)) {
+            loadBookAndChapters({ silent: true });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chapter_invites' },
+        (payload) => {
+          if (shouldRefreshForChapter(payload)) {
+            loadBookAndChapters({ silent: true });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chapters', filter: `book_id=eq.${bookId}` },
         () => {
           loadBookAndChapters({ silent: true });
         }
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chapter_invites' },
+        { event: 'UPDATE', schema: 'public', table: 'books', filter: `id=eq.${bookId}` },
         () => {
           loadBookAndChapters({ silent: true });
         }
@@ -116,6 +149,12 @@ const BookPageLuxe = () => {
   };
 
   const getApiBaseUrl = () => process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  const showPageNotice = (message, type = 'info') => {
+    setPageNotice({ message, type });
+  };
+  const dismissPageNotice = () => {
+    setPageNotice(null);
+  };
 
   const decorateChapter = (chapter) => {
     const contributions = Array.isArray(chapter?.contributions) ? chapter.contributions : [];
@@ -349,7 +388,7 @@ const BookPageLuxe = () => {
       return data;
     } catch (error) {
       console.error('❌ Erreur mise à jour:', error);
-      alert('Erreur lors de la mise à jour');
+      showPageNotice('Erreur lors de la mise à jour du chapitre.', 'error');
       throw error;
     }
   };
@@ -580,9 +619,10 @@ const BookPageLuxe = () => {
       }
 
       setChapters(normalizeChaptersForState(remainingChapters));
+      showPageNotice('Chapitre supprimé.', 'success');
     } catch (error) {
       console.error('❌ Erreur suppression:', error);
-      alert('Erreur lors de la suppression');
+      showPageNotice('Erreur lors de la suppression du chapitre.', 'error');
     }
   };
 
@@ -630,9 +670,10 @@ const BookPageLuxe = () => {
       }
 
       setDraftPreview(data);
+      dismissPageNotice();
     } catch (error) {
       console.error('Erreur apercu livre:', error);
-      alert(error.message || 'Erreur lors de l apercu du livre');
+      showPageNotice(error.message || 'Erreur lors de l apercu du livre', 'error');
     } finally {
       setGeneratingDraft(false);
     }
@@ -646,7 +687,7 @@ const BookPageLuxe = () => {
       const currentChaptersCount = chapters.length;
 
       if (newPages > maxPages) {
-        alert(`Le livre est limite a ${MAX_CHAPTERS} chapitres maximum.`);
+        showPageNotice(`Le livre est limité à ${MAX_CHAPTERS} chapitres maximum.`, 'info');
       }
 
       if (newChaptersCount > currentChaptersCount) {
@@ -712,7 +753,7 @@ const BookPageLuxe = () => {
       
     } catch (error) {
       console.error('❌ Erreur mise à jour chapitres:', error);
-      alert('Erreur lors de la mise à jour des chapitres');
+      showPageNotice('Erreur lors de la mise à jour des chapitres.', 'error');
     }
   };
 
@@ -824,6 +865,20 @@ const BookPageLuxe = () => {
       </div>
 
       <div className="book-main-content">
+        {pageNotice?.message && (
+          <div className={`luxe-feedback-banner is-${pageNotice.type || 'info'}`}>
+            <span>{pageNotice.message}</span>
+            <button
+              type="button"
+              className="luxe-feedback-close"
+              onClick={dismissPageNotice}
+              aria-label="Fermer le message"
+            >
+              x
+            </button>
+          </div>
+        )}
+
         {activeTab === 'chapitres' && (
           <ChapterListLuxe
             chapters={chapters}

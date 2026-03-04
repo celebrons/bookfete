@@ -238,6 +238,117 @@
   min-height: 600px;
 }
 
+.luxe-feedback-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  padding: 12px 14px;
+  border: 1px solid rgba(219, 227, 233, 0.95);
+  border-radius: var(--radius);
+  background: #f7fafb;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.luxe-feedback-banner.is-success {
+  background: #eef8f1;
+  border-color: #d7eadc;
+  color: #1f7a3d;
+}
+
+.luxe-feedback-banner.is-error {
+  background: #fff4f4;
+  border-color: #efc8cb;
+  color: #b42318;
+}
+
+.luxe-feedback-banner.is-info {
+  background: #eef7f8;
+  border-color: #d5e6e8;
+  color: #2f6e78;
+}
+
+.luxe-feedback-close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(24, 20, 14, 0.22);
+}
+
+.modal-content {
+  width: min(640px, calc(100vw - 24px));
+  max-width: min(640px, calc(100vw - 24px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: var(--white);
+  border: var(--border-fine);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-luxe);
+  padding: var(--space-xl);
+}
+
+.modal-content-compact {
+  width: min(520px, calc(100vw - 24px));
+  max-width: min(520px, calc(100vw - 24px));
+}
+
+.modal-title {
+  margin: 0 0 var(--space-sm);
+  font-size: 24px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.modal-text {
+  margin: 0;
+  color: var(--text-light);
+  line-height: 1.7;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-light);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.modal-close:hover {
+  background: rgba(184, 138, 31, 0.12);
+  color: var(--gold);
+}
+
 .modal-content.book-draft-modal {
   width: min(1480px, 97vw);
   max-width: min(1480px, 97vw);
@@ -595,6 +706,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
+}
+
+.sidebar-content {
+  flex: 1;
+  margin-top: var(--space-md);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .chapter-item {
@@ -1017,7 +1135,7 @@
 }
 
 .workflow-step.completed::before {
-  background: linear-gradient(180deg, #89b8c0 0%, #2f6e78 100%);
+  background: linear-gradient(180deg, rgba(31, 122, 61, 0.2) 0%, rgba(31, 122, 61, 0.45) 100%);
 }
 
 .workflow-step.locked {
@@ -1062,8 +1180,12 @@
 }
 
 .workflow-step.completed .workflow-step-number {
-  background: linear-gradient(180deg, #8cc0c7 0%, #2f6e78 100%);
-  border-color: rgba(255, 255, 255, 0.52);
+  background: rgba(31, 122, 61, 0.12);
+  color: #1f7a3d;
+  border-color: rgba(31, 122, 61, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 10px 18px -14px rgba(31, 122, 61, 0.28);
 }
 
 .workflow-step.locked .workflow-step-number {
@@ -1093,9 +1215,9 @@
 }
 
 .workflow-step-status.is-complete {
-  background: #eef7f8;
-  border-color: #d5e6e8;
-  color: #2f6e78;
+  background: rgba(31, 122, 61, 0.08);
+  border-color: rgba(31, 122, 61, 0.16);
+  color: #1f7a3d;
 }
 
 .workflow-step-status.is-draft {
@@ -1769,6 +1891,41 @@
   color: var(--text-light);
   font-size: 12px;
   margin: 4px 0 var(--space-lg);
+}
+
+@media (max-width: 1024px) {
+  .book-container {
+    padding: var(--space-md);
+  }
+
+  .tabs-container {
+    padding: 0;
+  }
+
+  .book-main-content {
+    padding: 0 0 var(--space-lg);
+  }
+
+  .chapters-container {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sidebar,
+  .right-panel {
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+  }
+
+  .sidebar {
+    flex: 1 1 auto;
+  }
+
+  .sidebar-content,
+  .right-panel {
+    overflow: visible;
+  }
 }
 
 @media (max-width: 1100px) {

@@ -14,14 +14,19 @@ const Step2Contribution = ({
   const [photoPreviews, setPhotoPreviews] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const existingContribution = chapter?.currentUserContribution || null;
   const hasContributed = chapter?.hasContributed || false;
   const isFinalized = chapter?.isFinalized || false;
 
   useEffect(() => {
+    setError('');
+    setNotice('');
+
     if (!chapter?.id) {
       setContributionText('');
       setPhotos([]);
@@ -79,11 +84,12 @@ const Step2Contribution = ({
     const files = Array.from(event.target.files || []);
 
     if (photos.length + files.length > 2) {
-      alert('Maximum 2 photos');
+      setError('Maximum 2 photos.');
       return;
     }
 
     setUploading(true);
+    setError('');
 
     for (const file of files) {
       const url = await uploadPhoto(file);
@@ -110,12 +116,13 @@ const Step2Contribution = ({
 
   const handleSave = async () => {
     if (!contributionText.trim()) {
-      alert('Veuillez ecrire un message');
+      setError('Veuillez ecrire un message.');
       return;
     }
 
     setSaving(true);
     setError('');
+    setNotice('');
 
     try {
       const photoUrls = photos.map((photo) => photo.url).filter(Boolean);
@@ -130,6 +137,7 @@ const Step2Contribution = ({
       });
 
       setIsEditing(false);
+      setNotice('Brouillon enregistre.');
     } catch (saveError) {
       console.error('Erreur sauvegarde:', saveError);
       setError(saveError.message);
@@ -144,11 +152,16 @@ const Step2Contribution = ({
     }
 
     try {
+      setFinalizing(true);
       setError('');
+      setNotice('');
       await onFinalizeContribution(chapter.id);
+      setNotice('Contribution validee.');
     } catch (finalizeError) {
       console.error('Erreur finalisation:', finalizeError);
       setError(finalizeError.message);
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -188,8 +201,11 @@ const Step2Contribution = ({
     return (
       <div className="workflow-content">
         <div className="contribution-section finalized">
+          {notice && (
+            <div className="luxe-feedback-banner is-success">{notice}</div>
+          )}
           {error && (
-            <div style={{ color: '#dc3545', marginBottom: '15px' }}>{error}</div>
+            <div className="luxe-feedback-banner is-error">{error}</div>
           )}
           {renderContentCard()}
         </div>
@@ -201,6 +217,9 @@ const Step2Contribution = ({
     return (
       <div className="workflow-content">
         <div className="contribution-section">
+          {notice && (
+            <div className="luxe-feedback-banner is-success">{notice}</div>
+          )}
           <div className="questions-header">
             <h3>Brouillon sauvegarde</h3>
             <Tooltip text="Vous pourrez modifier ce message jusqu'a la validation finale">
@@ -209,17 +228,27 @@ const Step2Contribution = ({
           </div>
 
           {error && (
-            <div style={{ color: '#dc3545', marginBottom: '15px' }}>{error}</div>
+            <div className="luxe-feedback-banner is-error">{error}</div>
           )}
 
           {renderContentCard()}
 
           <div className="questions-actions">
-            <button onClick={() => setIsEditing(true)} className="btn btn-outline" style={{ flex: 1 }}>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="btn btn-outline"
+              style={{ flex: 1 }}
+              disabled={finalizing}
+            >
               Modifier
             </button>
-            <button onClick={handleFinalize} className="btn btn-primary" style={{ flex: 1 }}>
-              Valider
+            <button
+              onClick={handleFinalize}
+              className="btn btn-primary"
+              style={{ flex: 1 }}
+              disabled={finalizing}
+            >
+              {finalizing ? 'Validation...' : 'Valider'}
             </button>
           </div>
         </div>
@@ -230,8 +259,11 @@ const Step2Contribution = ({
   return (
     <div className="workflow-content">
       <div className="contribution-section">
+        {notice && (
+          <div className="luxe-feedback-banner is-success">{notice}</div>
+        )}
         {error && (
-          <div style={{ color: '#dc3545', marginBottom: '15px' }}>{error}</div>
+          <div className="luxe-feedback-banner is-error">{error}</div>
         )}
 
         <textarea
@@ -310,7 +342,7 @@ const Step2Contribution = ({
 
         <button
           onClick={handleSave}
-          disabled={saving || !contributionText.trim()}
+          disabled={saving || uploading || finalizing || !contributionText.trim()}
           className="btn btn-primary"
           style={{ width: '100%' }}
         >

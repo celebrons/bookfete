@@ -168,7 +168,7 @@ const ChapterWorkflowLuxe = (props) => {
           style={{ cursor: questionsValidated ? 'pointer' : 'default' }}
         >
           <span className="workflow-step-number">
-            {isFinalized ? completedMarker : (hasContributed ? 'B' : '2')}
+            {isFinalized ? completedMarker : '2'}
           </span>
           <span className="workflow-step-title">Votre contribution</span>
           <span
@@ -230,7 +230,7 @@ const ChapterWorkflowLuxe = (props) => {
           onClick={() => toggleSection('step4')}
         >
           <span className="workflow-step-number">
-            {isClosed ? completedMarker : (chapterDraftStatus === 'draft' ? 'B' : '4')}
+            {isClosed ? completedMarker : '4'}
           </span>
           <span className="workflow-step-title">Clore le chapitre</span>
           <span

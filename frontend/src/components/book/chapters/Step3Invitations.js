@@ -21,13 +21,24 @@ const Step3Invitations = ({
   const [showInviteSelector, setShowInviteSelector] = useState(false);
   const [inviteRefreshToken, setInviteRefreshToken] = useState(0);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const isOrganizer = user && book && user.id === book.owner_id;
   const contributionsClosed = chapter?.contributionsClosed || false;
 
   useEffect(() => {
-    loadInvitations();
-  }, [chapter.id]);
+    setError('');
+    setNotice('');
+
+    if (!chapter?.id) {
+      setInvitations([]);
+      setLoading(false);
+      return;
+    }
+
+    setInvitations(Array.isArray(chapter?.chapter_invites) ? chapter.chapter_invites : []);
+    setLoading(false);
+  }, [chapter?.id, chapter?.chapter_invites]);
 
   const loadInvitations = async () => {
     try {
@@ -37,6 +48,7 @@ const Step3Invitations = ({
         .select('*')
         .eq('chapter_id', chapter.id);
       setInvitations(data || []);
+      setError('');
     } catch (loadError) {
       console.error('Error loading invitations:', loadError);
       setError(loadError.message);
@@ -81,11 +93,12 @@ const Step3Invitations = ({
 
     setClosing(true);
     setError('');
+    setNotice('');
 
     try {
       await onUpdateChapter(chapter.id, { status: 'contributions_closed' });
       setShowCloseModal(false);
-      alert('Contributions cloturees');
+      setNotice('Contributions cloturees pour ce chapitre.');
     } catch (loadError) {
       console.error('Error closing contributions:', loadError);
       setError(loadError.message);
@@ -117,14 +130,18 @@ const Step3Invitations = ({
 
   if (error) {
     return (
-      <div className="workflow-content" style={{ color: '#dc3545' }}>
-        {error}
+      <div className="workflow-content">
+        <div className="luxe-feedback-banner is-error">{error}</div>
       </div>
     );
   }
 
   return (
     <div className="workflow-content">
+      {notice && (
+        <div className="luxe-feedback-banner is-success">{notice}</div>
+      )}
+
       {isOrganizer && (
         <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: '15px', flexWrap: 'wrap' }}>
           <button

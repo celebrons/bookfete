@@ -23,6 +23,7 @@ const Step4Cloture = ({
   const [editorHtml, setEditorHtml] = useState(chapter?.chapterDraft?.html || '');
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
 
   const isOrganizer = user && book && user.id === book.owner_id;
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
@@ -117,6 +118,7 @@ const Step4Cloture = ({
     setNotice('');
     setShowPreviewModal(false);
     setShowEditorModal(false);
+    setShowFinalizeConfirm(false);
   }, [chapter?.id, chapter?.chapterDraft?.html, chapter?.chapterDraft?.status]);
 
   useEffect(() => {
@@ -224,7 +226,7 @@ const Step4Cloture = ({
     }
   };
 
-  const handleFinalize = async () => {
+  const requestFinalize = () => {
     if (!generationUnlocked) {
       setError('Fermez d abord les contributions avant la validation finale.');
       return;
@@ -240,10 +242,12 @@ const Step4Cloture = ({
       return;
     }
 
-    if (!window.confirm('Valider definitivement ce chapitre ? Cette action est irreversible.')) {
-      return;
-    }
+    setError('');
+    setNotice('');
+    setShowFinalizeConfirm(true);
+  };
 
+  const handleFinalize = async () => {
     setBusyAction('finalize');
     setError('');
     setNotice('');
@@ -258,6 +262,7 @@ const Step4Cloture = ({
       setError(finalizeError.message || 'Erreur lors de la validation finale.');
     } finally {
       setBusyAction('');
+      setShowFinalizeConfirm(false);
     }
   };
 
@@ -283,11 +288,11 @@ const Step4Cloture = ({
   return (
     <div className="workflow-content">
       {error && (
-        <div style={{ color: '#dc3545', marginBottom: '15px' }}>{error}</div>
+        <div className="luxe-feedback-banner is-error">{error}</div>
       )}
 
       {notice && (
-        <div style={{ color: '#1f7a3d', marginBottom: '15px' }}>{notice}</div>
+        <div className="luxe-feedback-banner is-success">{notice}</div>
       )}
 
       <div
@@ -361,7 +366,7 @@ const Step4Cloture = ({
           <button
             type="button"
             className="btn btn-primary"
-            onClick={handleFinalize}
+            onClick={requestFinalize}
             disabled={!canFinalize || busyAction !== ''}
           >
             {busyAction === 'finalize' ? 'Validation...' : 'Validation finale'}
@@ -440,6 +445,45 @@ const Step4Cloture = ({
               ) : (
                 <p className="draft-book-empty">Aucun brouillon n a encore ete genere pour ce chapitre.</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFinalizeConfirm && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            if (busyAction !== 'finalize') {
+              setShowFinalizeConfirm(false);
+            }
+          }}
+        >
+          <div
+            className="modal-content modal-content-compact"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="modal-title">Validation finale</h3>
+            <p className="modal-text">
+              Cette action verrouille definitivement le chapitre et ferme son edition.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-btn modal-btn-secondary"
+                onClick={() => setShowFinalizeConfirm(false)}
+                disabled={busyAction === 'finalize'}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="modal-btn modal-btn-primary"
+                onClick={handleFinalize}
+                disabled={busyAction === 'finalize'}
+              >
+                {busyAction === 'finalize' ? 'Validation...' : 'Confirmer'}
+              </button>
             </div>
           </div>
         </div>

@@ -15,6 +15,9 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
     approved: 0
   });
   const [reminding, setReminding] = useState(null);
+  const [feedback, setFeedback] = useState(null);
+  const [confirmReminderId, setConfirmReminderId] = useState(null);
+  const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
   useEffect(() => {
     if (chapterId) {
@@ -139,40 +142,67 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
 
   const getInviteLink = (token) => `${window.location.origin}/invite/${token}`;
 
-  const copyInviteLink = (token) => {
+  const handleCopyInviteLink = async (token) => {
     const link = getInviteLink(token);
-    navigator.clipboard.writeText(link);
-    alert('✅ Lien copié dans le presse-papier');
+
+    try {
+      await navigator.clipboard.writeText(link);
+      setFeedback({
+        type: 'success',
+        message: 'Lien d invitation copie.'
+      });
+    } catch (copyError) {
+      console.error('Erreur copie lien:', copyError);
+      setFeedback({
+        type: 'error',
+        message: 'Impossible de copier le lien.'
+      });
+    }
   };
 
-  const sendReminder = async (inviteId) => {
-    if (!window.confirm('Envoyer un rappel à cette personne ?')) return;
+  const handleOpenReminder = (inviteId) => {
+    setConfirmReminderId(inviteId);
+  };
 
-    setReminding(inviteId);
+  const confirmReminder = async () => {
+    if (!confirmReminderId) {
+      return;
+    }
+
+    setReminding(confirmReminderId);
+    setFeedback(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/invites/resend/${inviteId}`, {
+      const response = await fetch(`${apiBaseUrl}/invites/resend/${confirmReminderId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      if (!response.ok) throw new Error('Erreur lors de l\'envoi du rappel');
+      if (!response.ok) throw new Error('Erreur lors de l envoi du rappel');
 
-      alert('✅ Rappel envoyé avec succès');
+      setFeedback({
+        type: 'success',
+        message: 'Rappel envoye.'
+      });
       await loadInvitations();
-      
     } catch (error) {
-      console.error('❌ Erreur:', error);
-      alert('Erreur lors de l\'envoi du rappel');
+      console.error('Erreur envoi rappel:', error);
+      setFeedback({
+        type: 'error',
+        message: 'Erreur lors de l envoi du rappel.'
+      });
     } finally {
       setReminding(null);
+      setConfirmReminderId(null);
     }
   };
+
+  const reminderTarget = invitations.find((invite) => invite.id === confirmReminderId) || null;
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Date inconnue';
@@ -235,6 +265,20 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
 
   return (
     <div>
+      {feedback?.message && (
+        <div className={`luxe-feedback-banner is-${feedback.type || 'info'}`}>
+          <span>{feedback.message}</span>
+          <button
+            type="button"
+            className="luxe-feedback-close"
+            onClick={() => setFeedback(null)}
+            aria-label="Fermer le message"
+          >
+            x
+          </button>
+        </div>
+      )}
+
       <div className="invitations-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--ink)' }}>
@@ -304,14 +348,14 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
                   {!invite.hasSubmittedContribution && !isClosed && (
                     <>
                       <button
-                        onClick={() => copyInviteLink(invite.token)}
+                        onClick={() => handleCopyInviteLink(invite.token)}
                         className="btn-outline"
                         style={{ padding: '4px 8px', fontSize: '11px' }}
                       >
                         Copier
                       </button>
                       <button
-                        onClick={() => sendReminder(invite.id)}
+                        onClick={() => handleOpenReminder(invite.id)}
                         disabled={reminding === invite.id}
                         className="btn-outline"
                         style={{
@@ -346,6 +390,45 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
           );
         })}
       </div>
+
+      {confirmReminderId && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            if (reminding !== confirmReminderId) {
+              setConfirmReminderId(null);
+            }
+          }}
+        >
+          <div
+            className="modal-content modal-content-compact"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="modal-title">Envoyer un rappel</h3>
+            <p className="modal-text">
+              {`Relancer ${reminderTarget?.contributor?.name || reminderTarget?.email || 'cette personne'} maintenant ?`}
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-btn modal-btn-secondary"
+                onClick={() => setConfirmReminderId(null)}
+                disabled={reminding === confirmReminderId}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="modal-btn modal-btn-primary"
+                onClick={confirmReminder}
+                disabled={reminding === confirmReminderId}
+              >
+                {reminding === confirmReminderId ? 'Envoi...' : 'Confirmer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
