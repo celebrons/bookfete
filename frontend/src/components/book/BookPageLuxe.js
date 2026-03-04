@@ -767,14 +767,28 @@ const BookPageLuxe = () => {
   const visibleGuideSteps = isSoloMode
     ? WRITING_GUIDE_STEPS.filter((step) => step.title !== 'Invitations')
     : WRITING_GUIDE_STEPS;
+  const bookMetaItems = [
+    { label: 'Finition', value: book.finition || 'Classique' },
+    { label: 'Papier', value: book.papier || 'Mat' },
+    { label: 'Voix', value: book.style_narratif || 'Factuel' }
+  ];
 
   return (
     <div className="book-container">
       <div className="book-header">
         <div className="book-header-content">
           <div className="book-title">
+            <div className="book-eyebrow">Edition en cours</div>
             <h1>{book.title}</h1>
             <div className="book-meta">
+              <div className="book-meta-grid">
+                {bookMetaItems.map((item) => (
+                  <div key={item.label} className="book-meta-pill">
+                    <span className="book-meta-label">{item.label}</span>
+                    <span className="book-meta-value">{item.value}</span>
+                  </div>
+                ))}
+              </div>
               <span>📖 {book.finition || 'Classique'}</span>
               <span>📄 {book.papier || 'Mat'}</span>
               <span>✍️ {book.style_narratif || 'Factuel'}</span>
@@ -783,18 +797,22 @@ const BookPageLuxe = () => {
           <div className="book-header-actions">
           <button
             type="button"
-            className="btn btn-outline book-generate-btn"
+            className="book-header-btn book-header-btn-primary book-generate-btn"
             onClick={handleGenerateDraft}
             disabled={generatingDraft || !allChaptersDraftValidated}
             title={allChaptersDraftValidated
               ? 'Afficher l apercu assemble du livre'
               : 'Generez et validez chaque chapitre avant l apercu global'}
           >
-            {generatingDraft ? 'Generation...' : 'Apercu du livre'}
+            <span className="book-action-label">
+              {generatingDraft ? 'Generation...' : 'Apercu du livre'}
+            </span>
+            <span className="book-action-note">Apercu assemble du livre</span>
           </button>
-          <Link to="/dashboard" className="dashboard-link">
+          <Link to="/dashboard" className="dashboard-link book-header-btn book-header-link">
             <span>📊</span>
-            Tableau de bord
+            <span className="book-action-label">Tableau de bord</span>
+            <span className="book-action-note">Retour au pilotage</span>
           </Link>
           </div>
         </div>
