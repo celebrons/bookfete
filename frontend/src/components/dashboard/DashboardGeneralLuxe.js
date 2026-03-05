@@ -444,6 +444,10 @@ const DashboardGeneralLuxe = () => {
             Nouveau livre
           </Link>
 
+          <Link to="/admin/prompts" className="btn-admin">
+            Prompts IA
+          </Link>
+
           {stats.archives.count > 0 && (
             <button
               onClick={() => setShowArchived(!showArchived)}

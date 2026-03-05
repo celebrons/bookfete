@@ -17,6 +17,7 @@ import RegisterLuxe from './components/auth/RegisterLuxe';
 import CreateBookWizardLuxe from './components/create-book/CreateBookWizardLuxe';
 import DashboardGeneralLuxe from './components/dashboard/DashboardGeneralLuxe';
 import BookPageLuxe  from './components/book/BookPageLuxe';
+import PromptAdminLuxe from './components/admin/PromptAdminLuxe';
 import InvitationPageLuxe from './components/contributeur/InvitationPageLuxe';
 import TokenContributePageLuxe from './components/contributeur/TokenContributePageLuxe';
 
@@ -99,6 +100,12 @@ function App() {
           <Route path="/book/:bookId" element={
             <ProtectedRoute>
               <BookPageLuxe  />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/admin/prompts" element={
+            <ProtectedRoute>
+              <PromptAdminLuxe />
             </ProtectedRoute>
           } />
 

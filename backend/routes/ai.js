@@ -2,7 +2,164 @@
 const express = require('express');
 const router = express.Router();
 const aiService = require('../services/aiService');
+const promptTemplateService = require('../services/promptTemplateService');
 const authenticate = require('../middleware/auth');
+
+function ensurePromptAdmin(req, res, next) {
+  const allowListRaw = process.env.AI_PROMPT_ADMIN_EMAILS || '';
+  const allowList = allowListRaw
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowList.length === 0) {
+    return next();
+  }
+
+  const userEmail = (req.user?.email || '').trim().toLowerCase();
+  if (!userEmail || !allowList.includes(userEmail)) {
+    return res.status(403).json({
+      error: 'Accès refusé. Utilisateur non autorisé à gérer les prompts.'
+    });
+  }
+
+  return next();
+}
+
+function normalizeTitle(value) {
+  if (value === null || value === undefined) return '';
+  const normalized = String(value).replace(/\s+/g, ' ').trim();
+  return normalized;
+}
+
+function normalizeTitles(raw) {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (typeof item === 'string') return normalizeTitle(item);
+        if (item && typeof item === 'object') {
+          return normalizeTitle(item.title || item.name || item.chapterTitle || item.label);
+        }
+        return '';
+      })
+      .filter(Boolean);
+  }
+
+  if (raw && typeof raw === 'object') {
+    const arrayCandidates = [
+      raw.chapters,
+      raw.chapterTitles,
+      raw.titles,
+      raw.sommaire,
+      raw['Sommaire des souvenirs'],
+      raw.Sommaire
+    ];
+
+    for (const candidate of arrayCandidates) {
+      const normalized = normalizeTitles(candidate);
+      if (normalized.length > 0) {
+        return normalized;
+      }
+    }
+  }
+
+  return [];
+}
+
+function parseChapterTitles(content) {
+  if (!content) return [];
+
+  const cleanContent = String(content).replace(/```json|```/g, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleanContent);
+    const normalized = normalizeTitles(parsed);
+    if (normalized.length > 0) {
+      return normalized;
+    }
+  } catch (error) {
+    // no-op
+  }
+
+  const arrayMatch = cleanContent.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try {
+      const parsedArray = JSON.parse(arrayMatch[0]);
+      const normalized = normalizeTitles(parsedArray);
+      if (normalized.length > 0) {
+        return normalized;
+      }
+    } catch (error) {
+      // no-op
+    }
+  }
+
+  const lineMatches = [];
+  const chapterRegex = /(?:^|\n)\s*(?:[-*•○]?\s*)?chapitre\s*\d+\s*[:\-]\s*(.+)/gi;
+  let match = chapterRegex.exec(cleanContent);
+  while (match) {
+    const title = normalizeTitle(match[1]);
+    if (title) {
+      lineMatches.push(title);
+    }
+    match = chapterRegex.exec(cleanContent);
+  }
+
+  return lineMatches;
+}
+
+function shapeChaptersFromTitles(titles, count) {
+  const safeTitles = Array.isArray(titles) ? [...titles] : [];
+
+  while (safeTitles.length < count) {
+    safeTitles.push(`Chapitre ${safeTitles.length + 1}`);
+  }
+
+  return safeTitles.slice(0, count).map((title, index) => ({
+    title,
+    description: `Chapitre ${index + 1} - Partagez vos souvenirs`,
+    order_index: index
+  }));
+}
+
+function buildDefaultPromptTestVariables({
+  promptKey,
+  eventType = 'generique'
+}) {
+  const base = {
+    count: 8,
+    eventType: eventType || 'generique',
+    style: 'intime',
+    bookTitle: 'Livre souvenir',
+    chapterTitle: 'Nos plus beaux moments',
+    recipientName: 'Julie',
+    recipientAge: '40',
+    recipientGender: 'femme',
+    projectBrief: 'Surnom: Ju. Anecdote: son rire communicatif.',
+    pronoun: 'cette femme',
+    subjectPronoun: 'elle',
+    possessive: 'sa',
+    ageContext: '(cette femme est une adulte de 40 ans)',
+    styleInstruction: 'Adopte un ton chaleureux, personnel et confidentiel.'
+  };
+
+  if (promptKey === promptTemplateService.PROMPT_KEYS.CHAPTER_GENERATION) {
+    return {
+      ...base,
+      count: 8,
+      chapterTitle: undefined
+    };
+  }
+
+  if (promptKey === promptTemplateService.PROMPT_KEYS.QUESTION_GENERATION) {
+    return {
+      ...base,
+      count: undefined
+    };
+  }
+
+  return base;
+}
 
 // ============================================
 // ROUTES PUBLIQUES (SANS AUTHENTIFICATION)
@@ -20,7 +177,8 @@ router.post('/generate-chapters-public', async (req, res) => {
       recipientAge, 
       recipientGender,
       projectBrief,
-      prompt 
+      prompt,
+      usePromptOverride
     } = req.body;
     
     console.log('='.repeat(60));
@@ -41,31 +199,22 @@ router.post('/generate-chapters-public', async (req, res) => {
       return res.status(400).json({ error: 'Le nombre de chapitres doit être supérieur à 0' });
     }
 
-    // Utiliser le prompt fourni ou en construire un
-    const finalPrompt = prompt || `Génère ${count} titres de chapitres pour un livre souvenir personnalisé.
+    const promptConfig = await promptTemplateService.buildPrompt({
+      promptKey: promptTemplateService.PROMPT_KEYS.CHAPTER_GENERATION,
+      eventType: eventType || 'generique',
+      variables: {
+        count,
+        eventType: eventType || 'générique',
+        style: style || 'intime',
+        bookTitle: bookTitle || 'Livre souvenir',
+        recipientName: recipientName || 'la personne',
+        recipientAge: recipientAge || 'non spécifié',
+        recipientGender: recipientGender || 'non spécifié',
+        projectBrief: projectBrief || 'non renseignée'
+      }
+    });
 
-Contexte :
-- Type d'événement : ${eventType || 'générique'}
-- Style narratif : ${style || 'intime'}
-- Titre du livre : ${bookTitle || 'Livre souvenir'}
-- Personne célébrée : ${recipientName || 'la personne'}
-- Âge : ${recipientAge || 'non spécifié'} ans
-- Sexe : ${recipientGender || 'non spécifié'}
-- Intention éditoriale : ${projectBrief || 'non renseignée'}
-
-Les titres doivent être :
-- Créatifs et originaux, adaptés à l'événement et à la personne
-- Variés (souvenirs, anecdotes, messages, photos, émotions)
-- Rédigés en français
-- Longueur : entre 3 et 8 mots maximum
-- Évocateurs et donnant envie d'écrire
-
-Exemples adaptés :
-- Pour une femme : "Souvenirs avec [Prénom]", "Ce que j'admire chez elle"
-- Pour un homme : "Ce qu'il nous a appris", "Nos moments avec lui"
-
-Réponds UNIQUEMENT avec un tableau JSON de ${count} chaînes de caractères.
-Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
+    const finalPrompt = usePromptOverride && prompt ? prompt : promptConfig.userPrompt;
 
     console.log('📤 Appel à Mistral...');
 
@@ -74,63 +223,34 @@ Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
       messages: [
         { 
           role: 'system', 
-          content: 'Tu es un expert en création de livres souvenirs. Tu génères des titres de chapitres poétiques et originaux, parfaitement adaptés au contexte de la personne et de l\'événement.' 
+          content: promptConfig.systemPrompt
         },
         { 
           role: 'user', 
           content: finalPrompt 
         }
       ],
-      temperature: 0.8,
-      maxTokens: 800
+      temperature: promptConfig.temperature,
+      maxTokens: promptConfig.maxTokens
     });
 
     const content = response.choices[0].message.content;
     console.log('📦 Réponse Mistral reçue');
     
-    let titles = [];
-    
-    // Essayer de parser la réponse
-    try {
-      // Nettoyer la réponse (enlever les markdown éventuels)
-      const cleanContent = content.replace(/```json|```/g, '').trim();
-      titles = JSON.parse(cleanContent);
-    } catch (e) {
-      console.log('⚠️ Premier parsing échoué, tentative avec regex...');
-      // Si le parsing échoue, on essaie d'extraire un tableau avec regex
-      const match = content.match(/\[[\s\S]*\]/);
-      if (match) {
-        try {
-          titles = JSON.parse(match[0]);
-        } catch (e2) {
-          console.error('❌ Parsing regex échoué');
-        }
-      }
-    }
-
-    // Vérifier que titles est bien un tableau
+    let titles = parseChapterTitles(content);
     if (!Array.isArray(titles) || titles.length === 0) {
       console.log('⚠️ Pas de titres valides, utilisation du fallback');
       titles = generateFallbackTitles(eventType, count, recipientName, recipientAge, recipientGender);
     }
 
-    // S'assurer qu'on a le bon nombre de titres
-    while (titles.length < count) {
-      titles.push(`Chapitre ${titles.length + 1}`);
-    }
-    
-    // Limiter au nombre demandé
-    titles = titles.slice(0, count);
-
-    // Transformer en objets chapitres
-    const chapters = titles.map((title, index) => ({
-      title: title,
-      description: `Chapitre ${index + 1} - Partagez vos souvenirs`,
-      order_index: index
-    }));
+    const chapters = shapeChaptersFromTitles(titles, count);
 
     console.log(`✅ ${chapters.length} chapitres générés avec succès (public)`);
-    res.json({ chapters });
+    res.json({
+      chapters,
+      promptSource: promptConfig.source,
+      promptVersion: promptConfig.version
+    });
     
   } catch (error) {
     console.error('❌ Erreur génération chapitres (public):', error);
@@ -159,6 +279,147 @@ Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
 // ============================================
 // ROUTES PROTÉGÉES (AVEC AUTHENTIFICATION)
 // ============================================
+
+router.get('/prompt-templates/:promptKey', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const { promptKey } = req.params;
+    const eventType = (req.query.eventType || '*').toString();
+    const locale = (req.query.locale || 'fr').toString();
+
+    const activePrompt = await promptTemplateService.getActivePromptConfig({
+      promptKey,
+      eventType: eventType === '*' ? 'generique' : eventType,
+      locale
+    });
+
+    const templateVersions = await promptTemplateService.listPromptVersions({
+      promptKey,
+      eventType,
+      locale
+    });
+
+    res.json({
+      promptKey,
+      eventType,
+      locale,
+      activePrompt,
+      templateVersions
+    });
+  } catch (error) {
+    console.error('❌ Erreur lecture prompt templates:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const { promptKey } = req.params;
+    const {
+      eventType = '*',
+      locale = 'fr',
+      variables = {},
+      runModel = false,
+      model = 'mistral-small-latest',
+      temperature,
+      maxTokens
+    } = req.body || {};
+
+    const normalizedEventType = eventType === '*' ? 'generique' : eventType;
+    const defaultVariables = buildDefaultPromptTestVariables({
+      promptKey,
+      eventType: normalizedEventType
+    });
+
+    const promptConfig = await promptTemplateService.buildPrompt({
+      promptKey,
+      eventType: normalizedEventType,
+      locale,
+      variables: {
+        ...defaultVariables,
+        ...(variables || {})
+      }
+    });
+
+    const payload = {
+      promptKey,
+      eventType: normalizedEventType,
+      locale,
+      source: promptConfig.source,
+      version: promptConfig.version,
+      systemPrompt: promptConfig.systemPrompt,
+      userPrompt: promptConfig.userPrompt,
+      modelCall: null
+    };
+
+    if (runModel) {
+      const response = await aiService.mistral.chat.complete({
+        model,
+        messages: [
+          { role: 'system', content: promptConfig.systemPrompt },
+          { role: 'user', content: promptConfig.userPrompt }
+        ],
+        temperature: Number.isFinite(Number(temperature))
+          ? Number(temperature)
+          : promptConfig.temperature,
+        maxTokens: Number.isFinite(Number(maxTokens))
+          ? Number(maxTokens)
+          : promptConfig.maxTokens
+      });
+
+      payload.modelCall = {
+        model,
+        output: response?.choices?.[0]?.message?.content || ''
+      };
+    }
+
+    res.json(payload);
+  } catch (error) {
+    console.error('❌ Erreur test prompt template:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/prompt-templates/:promptKey/versions', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const { promptKey } = req.params;
+    const {
+      eventType = '*',
+      locale = 'fr',
+      systemPrompt,
+      userPromptTemplate,
+      temperature,
+      maxTokens,
+      status = 'published',
+      publish = true
+    } = req.body || {};
+
+    const result = await promptTemplateService.upsertPromptVersion({
+      promptKey,
+      eventType,
+      locale,
+      systemPrompt,
+      userPromptTemplate,
+      temperature,
+      maxTokens,
+      status,
+      publish: publish !== false,
+      createdBy: req.user?.email || ''
+    });
+
+    res.json({
+      ok: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('❌ Erreur publication prompt:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/prompt-templates/cache/clear', authenticate, ensurePromptAdmin, async (req, res) => {
+  promptTemplateService.clearPromptCache();
+  res.json({ ok: true });
+});
 
 // Route pour générer des questions
 // backend/routes/ai.js - Route /generate-questions
@@ -234,7 +495,8 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
       recipientAge, 
       recipientGender,
       projectBrief,
-      prompt 
+      prompt,
+      usePromptOverride
     } = req.body;
     
     console.log('📝 [PROTÉGÉ] Génération de chapitres avec contexte:', {
@@ -252,82 +514,55 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Le nombre de chapitres doit être supérieur à 0' });
     }
 
-    // Utiliser le prompt fourni ou en construire un
-    const finalPrompt = prompt || `Génère ${count} titres de chapitres pour un livre souvenir personnalisé.
+    const promptConfig = await promptTemplateService.buildPrompt({
+      promptKey: promptTemplateService.PROMPT_KEYS.CHAPTER_GENERATION,
+      eventType: eventType || 'generique',
+      variables: {
+        count,
+        eventType: eventType || 'générique',
+        style: style || 'intime',
+        bookTitle: bookTitle || 'Livre souvenir',
+        recipientName: recipientName || 'la personne',
+        recipientAge: recipientAge || 'non spécifié',
+        recipientGender: recipientGender || 'non spécifié',
+        projectBrief: projectBrief || 'non renseignée'
+      }
+    });
 
-Contexte :
-- Type d'événement : ${eventType || 'générique'}
-- Style narratif : ${style || 'intime'}
-- Titre du livre : ${bookTitle || 'Livre souvenir'}
-- Personne célébrée : ${recipientName || 'la personne'}
-- Âge : ${recipientAge || 'non spécifié'} ans
-- Sexe : ${recipientGender || 'non spécifié'}
-- Intention éditoriale : ${projectBrief || 'non renseignée'}
-
-Les titres doivent être :
-- Créatifs et originaux, adaptés à l'événement et à la personne
-- Variés (souvenirs, anecdotes, messages, photos, émotions)
-- Rédigés en français
-- Longueur : entre 3 et 8 mots maximum
-- Évocateurs et donnant envie d'écrire
-
-Réponds UNIQUEMENT avec un tableau JSON de ${count} chaînes de caractères.
-Format exact : ["Titre 1", "Titre 2", "Titre 3", ...]`;
+    const finalPrompt = usePromptOverride && prompt ? prompt : promptConfig.userPrompt;
 
     const response = await aiService.mistral.chat.complete({
       model: 'mistral-small-latest',
       messages: [
         { 
           role: 'system', 
-          content: 'Tu es un expert en création de livres souvenirs. Tu génères des titres de chapitres poétiques et originaux.' 
+          content: promptConfig.systemPrompt
         },
         { 
           role: 'user', 
           content: finalPrompt 
         }
       ],
-      temperature: 0.8,
-      maxTokens: 800
+      temperature: promptConfig.temperature,
+      maxTokens: promptConfig.maxTokens
     });
 
     const content = response.choices[0].message.content;
     
-    let titles = [];
-    
-    try {
-      const cleanContent = content.replace(/```json|```/g, '').trim();
-      titles = JSON.parse(cleanContent);
-    } catch (e) {
-      console.log('⚠️ Parsing échoué, tentative avec regex...');
-      const match = content.match(/\[[\s\S]*\]/);
-      if (match) {
-        try {
-          titles = JSON.parse(match[0]);
-        } catch (e2) {
-          console.error('❌ Parsing regex échoué');
-        }
-      }
-    }
-
+    let titles = parseChapterTitles(content);
     if (!Array.isArray(titles) || titles.length === 0) {
       console.log('⚠️ Pas de titres valides, utilisation du fallback');
       titles = generateFallbackTitles(eventType, count, recipientName, recipientAge, recipientGender);
     }
 
-    while (titles.length < count) {
-      titles.push(`Chapitre ${titles.length + 1}`);
-    }
-    
-    titles = titles.slice(0, count);
-
-    const chapters = titles.map((title, index) => ({
-      title: title,
-      description: `Chapitre ${index + 1} - Partagez vos souvenirs`,
-      order_index: index
-    }));
+    const chapters = shapeChaptersFromTitles(titles, count);
 
     console.log(`✅ ${chapters.length} chapitres générés avec succès (protégé)`);
-    res.json({ chapters });
+    res.json({
+      chapters,
+      promptSource: promptConfig.source,
+      promptVersion: promptConfig.version
+    });
     
   } catch (error) {
     console.error('❌ Erreur génération chapitres:', error);

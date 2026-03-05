@@ -9,7 +9,10 @@ const Step2RecapLuxe = ({ bookData, price, loading, onCreate, onPrevious, chapte
     anniversaire: 'Anniversaire',
     mariage: 'Mariage',
     naissance: 'Naissance',
-    depart: 'Départ'
+    depart: 'Départ',
+    projet: 'Fin de projet',
+    retraite: 'Retraite',
+    vacances: 'Vacances'
   };
 
   const finitionLabels = {
@@ -29,6 +32,12 @@ const Step2RecapLuxe = ({ bookData, price, loading, onCreate, onPrevious, chapte
     factuel: 'Factuel',
     intime: 'Intime'
   };
+  const hasNarrativeContext = Boolean(
+    bookData.recipient_nickname ||
+    bookData.recipient_trait ||
+    bookData.recipient_anecdote ||
+    bookData.ai_project_brief
+  );
 
   return (
     <div className="step-container">
@@ -74,15 +83,29 @@ const Step2RecapLuxe = ({ bookData, price, loading, onCreate, onPrevious, chapte
       </div>
 
       {/* Aperçu des chapitres */}
-      {bookData.ai_project_brief && (
+      {hasNarrativeContext && (
         <div className="recap-card" style={{ marginTop: 'var(--space-md)' }}>
-          <div className="recap-item-label">Aidez-nous a vous aider</div>
-          <div
-            className="recap-item-sub"
-            style={{ marginTop: '8px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}
-          >
-            {bookData.ai_project_brief}
-          </div>
+          <div className="recap-item-label">Donnees narratives</div>
+          {bookData.recipient_nickname && (
+            <div className="recap-item-sub" style={{ marginTop: '8px', lineHeight: 1.7 }}>
+              <strong>Surnom :</strong> {bookData.recipient_nickname}
+            </div>
+          )}
+          {bookData.recipient_trait && (
+            <div className="recap-item-sub" style={{ marginTop: '8px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+              <strong>Trait marquant :</strong> {bookData.recipient_trait}
+            </div>
+          )}
+          {bookData.recipient_anecdote && (
+            <div className="recap-item-sub" style={{ marginTop: '8px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+              <strong>Anecdote phare :</strong> {bookData.recipient_anecdote}
+            </div>
+          )}
+          {bookData.ai_project_brief && (
+            <div className="recap-item-sub" style={{ marginTop: '8px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+              <strong>Notes complementaires :</strong> {bookData.ai_project_brief}
+            </div>
+          )}
         </div>
       )}
 

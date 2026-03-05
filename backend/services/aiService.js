@@ -1,5 +1,6 @@
 // C:\Users\USER\bookfete\backend\services\aiService.js
 const { Mistral } = require('@mistralai/mistralai');
+const promptTemplateService = require('./promptTemplateService');
 
 const apiKey = process.env.MISTRAL_API_KEY;
 
@@ -9,23 +10,130 @@ if (!apiKey) {
 
 const mistral = new Mistral({ apiKey: apiKey });
 
+function normalizeQuestionText(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\s+/g, ' ').trim();
+}
+
+function normalizeQuestionList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') return normalizeQuestionText(item);
+      if (item && typeof item === 'object') {
+        return normalizeQuestionText(item.question || item.title || item.label);
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function parseQuestions(content) {
+  if (!content) return [];
+
+  const cleanContent = String(content).replace(/```json|```/g, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleanContent);
+    if (Array.isArray(parsed)) {
+      return normalizeQuestionList(parsed);
+    }
+    if (parsed && typeof parsed === 'object') {
+      if (Array.isArray(parsed.questions)) {
+        return normalizeQuestionList(parsed.questions);
+      }
+      if (Array.isArray(parsed.items)) {
+        return normalizeQuestionList(parsed.items);
+      }
+    }
+  } catch (error) {
+    // no-op
+  }
+
+  const jsonMatch = cleanContent.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    try {
+      const parsedArray = JSON.parse(jsonMatch[0]);
+      return normalizeQuestionList(parsedArray);
+    } catch (error) {
+      // no-op
+    }
+  }
+
+  const fromLines = [];
+  const numberedLineRegex = /(?:^|\n)\s*(?:[-*•]?\s*)?(?:\d+[\)\.\-]|Question\s*\d+\s*[:\-])\s*(.+)/gi;
+  let match = numberedLineRegex.exec(cleanContent);
+  while (match) {
+    const text = normalizeQuestionText(match[1]);
+    if (text) {
+      fromLines.push(text);
+    }
+    match = numberedLineRegex.exec(cleanContent);
+  }
+
+  return fromLines;
+}
+
 /**
  * Génère des questions pour un chapitre
  * @param {Object} params - TOUS les paramètres dans un objet
  */
 async function generateQuestions(params) {
-  try {
-    // Extraire toutes les données de l'objet params
-    const { 
-      chapterTitle, 
-      eventType, 
-      style, 
-      bookTitle,
-      recipientName,
-      recipientAge,
-      recipientGender 
-    } = params;
+  // Extraire toutes les données de l'objet params
+  const { 
+    chapterTitle, 
+    eventType, 
+    style, 
+    bookTitle,
+    recipientName,
+    recipientAge,
+    recipientGender 
+  } = params || {};
 
+  // UTILISATION DES VRAIES VALEURS DE LA BASE
+  // Si les valeurs sont undefined, on utilise le titre comme fallback
+  const name = recipientName || 
+              (bookTitle ? bookTitle.split(' ').pop() : 'la personne');
+  const age = recipientAge || 'non spécifié';
+  const gender = recipientGender || 'non spécifié';
+
+  // Déterminer les pronoms selon le genre (basé sur les vraies données)
+  let pronoun = 'la personne';
+  let possessive = 'sa';
+  let subjectPronoun = 'elle';
+  
+  if (gender === 'homme') {
+    pronoun = 'cet homme';
+    possessive = 'son';
+    subjectPronoun = 'il';
+  } else if (gender === 'femme') {
+    pronoun = 'cette femme';
+    possessive = 'sa';
+    subjectPronoun = 'elle';
+  }
+
+  // Adapter selon l'âge (basé sur les vraies données)
+  let ageContext = '';
+  if (age !== 'non spécifié') {
+    const ageNum = parseInt(age, 10);
+    if (!Number.isNaN(ageNum)) {
+      if (ageNum < 18) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un jeune garçon' : 'une jeune fille'} de ${ageNum} ans)`;
+      else if (ageNum < 30) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un jeune homme' : 'une jeune femme'} de ${ageNum} ans)`;
+      else if (ageNum < 50) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un adulte' : 'une adulte'} de ${ageNum} ans)`;
+      else if (ageNum < 70) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un senior' : 'une senior'} de ${ageNum} ans)`;
+      else ageContext = `(${pronoun} est ${gender === 'homme' ? 'un vétéran' : 'une vétérane'} de ${ageNum} ans)`;
+    }
+  }
+
+  const styleInstructions = {
+    poetique: "Utilise un langage imagé, émouvant et lyrique.",
+    factuel: "Sois direct, concret et pratique.",
+    intime: "Adopte un ton chaleureux, personnel et confidentiel."
+  };
+
+  const styleInstruction = styleInstructions[style] || styleInstructions.factuel;
+
+  try {
     console.log('='.repeat(60));
     console.log('🎯 AI SERVICE - GÉNÉRATION DE QUESTIONS');
     console.log('='.repeat(60));
@@ -37,114 +145,53 @@ async function generateQuestions(params) {
     console.log('📅 recipientAge reçu:', recipientAge);
     console.log('⚥ recipientGender reçu:', recipientGender);
 
-    // UTILISATION DES VRAIES VALEURS DE LA BASE
-    // Si les valeurs sont undefined, on utilise le titre comme fallback
-    const name = recipientName || 
-                (bookTitle ? bookTitle.split(' ').pop() : 'la personne');
-    const age = recipientAge || 'non spécifié';
-    const gender = recipientGender || 'non spécifié';
+    const promptConfig = await promptTemplateService.buildPrompt({
+      promptKey: promptTemplateService.PROMPT_KEYS.QUESTION_GENERATION,
+      eventType: eventType || 'generique',
+      variables: {
+        chapterTitle: chapterTitle || 'Chapitre',
+        eventType: eventType || 'evenement',
+        style: style || 'factuel',
+        bookTitle: bookTitle || 'Notre livre de souvenirs',
+        recipientName: name,
+        recipientAge: age,
+        recipientGender: gender,
+        pronoun,
+        possessive,
+        subjectPronoun,
+        ageContext,
+        styleInstruction
+      }
+    });
 
-    // Déterminer les pronoms selon le genre (basé sur les vraies données)
-    let pronoun = 'la personne';
-    let possessive = 'sa';
-    let subjectPronoun = 'elle';
-    
-    if (gender === 'homme') {
-      pronoun = 'cet homme';
-      possessive = 'son';
-      subjectPronoun = 'il';
-    } else if (gender === 'femme') {
-      pronoun = 'cette femme';
-      possessive = 'sa';
-      subjectPronoun = 'elle';
-    }
-
-    // Adapter selon l'âge (basé sur les vraies données)
-    let ageContext = '';
-    if (age !== 'non spécifié') {
-      const ageNum = parseInt(age);
-      if (ageNum < 18) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un jeune garçon' : 'une jeune fille'} de ${ageNum} ans)`;
-      else if (ageNum < 30) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un jeune homme' : 'une jeune femme'} de ${ageNum} ans)`;
-      else if (ageNum < 50) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un adulte' : 'une adulte'} de ${ageNum} ans)`;
-      else if (ageNum < 70) ageContext = `(${pronoun} est ${gender === 'homme' ? 'un senior' : 'une senior'} de ${ageNum} ans)`;
-      else ageContext = `(${pronoun} est ${gender === 'homme' ? 'un vétéran' : 'une vétérane'} de ${ageNum} ans)`;
-    }
-
-    const styleInstructions = {
-      poetique: "Utilise un langage imagé, émouvant et lyrique.",
-      factuel: "Sois direct, concret et pratique.",
-      intime: "Adopte un ton chaleureux, personnel et confidentiel."
-    };
-
-    const styleInstruction = styleInstructions[style] || styleInstructions.factuel;
-
-    const prompt = `Tu es un assistant qui aide à créer des questions pour un livre souvenir collaboratif.
-    
-Contexte DÉTAILLÉ du livre :
-- Titre du livre : "${bookTitle || 'Notre livre de souvenirs'}"
-- Type d'événement : ${eventType}
-- Titre du chapitre : "${chapterTitle}"
-- Style narratif : ${style}
-- Personne célébrée : ${name}
-- Âge : ${age} ans ${ageContext}
-- Sexe : ${gender}
-
-${styleInstruction}
-
-RÈGLES IMPÉRATIVES :
-1. Chaque question doit mentionner le prénom "${name}" ou un pronom adapté (${pronoun})
-2. Les questions doivent être en lien avec le titre du chapitre "${chapterTitle}"
-3. Adapte le ton à l'âge (${age} ans) et au sexe (${gender})
-4. Utilise le style ${style}
-
-Exemples adaptés au contexte :
-- Pour un homme de 67 ans : "Quel souvenir précieux avec papa vous a le plus marqué ?"
-- Pour une femme de 30 ans : "Comment maman a-t-elle changé votre vie ?"
-- Pour un enfant de 10 ans : "Quel est ton meilleur souvenir avec [prénom] ?"
-
-Génère 4 questions ouvertes et inspirantes pour ce chapitre.
-
-Réponds UNIQUEMENT avec un tableau JSON de 4 chaînes de caractères.
-Exemple de format : ["Question 1", "Question 2", "Question 3", "Question 4"]
-
-Ne mets rien d'autre que le tableau JSON dans ta réponse.`;
+    const prompt = promptConfig.userPrompt;
 
     console.log('📝 Prompt envoyé à Mistral (extrait):', prompt.substring(0, 300) + '...');
-	
-	console.log('='.repeat(80));
-console.log('📝 PROMPT COMPLET ENVOYÉ À L\'IA');
-console.log('='.repeat(80));
-console.log(prompt);
-console.log('='.repeat(80));
+    console.log('🧩 Source prompt questions:', promptConfig.source, 'version:', promptConfig.version);
 
     const response = await mistral.chat.complete({
       model: 'mistral-small-latest',
       messages: [
         { 
           role: 'system', 
-          content: 'Tu es un assistant spécialisé dans la création de livres souvenirs et de témoignages.' 
+          content: promptConfig.systemPrompt
         },
         { 
           role: 'user', 
           content: prompt 
         }
       ],
-      temperature: 0.7,
-      maxTokens: 500
+      temperature: promptConfig.temperature,
+      maxTokens: promptConfig.maxTokens
     });
 
     const content = response.choices[0].message.content;
     console.log('📝 Réponse Mistral reçue');
-    
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      try {
-        const questions = JSON.parse(jsonMatch[0]);
-        console.log('✅ Questions générées:', questions);
-        return questions.slice(0, 4);
-      } catch (parseError) {
-        console.error('❌ Erreur parsing JSON:', parseError);
-      }
+
+    const questions = parseQuestions(content);
+    if (questions.length > 0) {
+      console.log('✅ Questions générées:', questions);
+      return questions.slice(0, 4);
     }
     
     console.log('⚠️ Utilisation des questions par défaut');

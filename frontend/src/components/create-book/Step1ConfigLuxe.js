@@ -9,7 +9,10 @@ const Step1ConfigLuxe = ({ bookData, setBookData, onNext, loading }) => {
     { id: 'anniversaire', label: 'Anniversaire', icon: '🎂' },
     { id: 'mariage', label: 'Mariage', icon: '💍' },
     { id: 'naissance', label: 'Naissance', icon: '👶' },
-    { id: 'depart', label: 'Départ', icon: '✈️' }
+    { id: 'depart', label: 'Départ', icon: '✈️' },
+    { id: 'projet', label: 'Fin de projet', icon: '🏁' },
+    { id: 'retraite', label: 'Retraite', icon: '🌅' },
+    { id: 'vacances', label: 'Vacances', icon: '🏖️' }
   ];
 
   const finitions = [
@@ -61,20 +64,6 @@ const Step1ConfigLuxe = ({ bookData, setBookData, onNext, loading }) => {
           placeholder="Ex: Les 60 ans de Maman, Notre Mariage..."
           className="input-luxe"
         />
-      </div>
-
-      <div className="config-section">
-        <span className="config-label">Aidez-nous a vous aider</span>
-        <textarea
-          value={bookData.ai_project_brief || ''}
-          onChange={(e) => setBookData({ ...bookData, ai_project_brief: e.target.value })}
-          placeholder="Dites-nous ce que vous voulez transmettre : ton souhaite, anecdotes importantes, sensibilite du destinataire, intentions, souvenirs a faire ressortir..."
-          className="input-luxe create-book-textarea"
-          rows={4}
-        />
-        <small style={{ display: 'block', marginTop: '8px', color: 'var(--text-light)', lineHeight: 1.6 }}>
-          Ce texte libre aide l IA a mieux comprendre l esprit du projet et a proposer des chapitres plus justes.
-        </small>
       </div>
 
       {/* Finition */}

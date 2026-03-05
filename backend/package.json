@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "prompts:seed": "node scripts/seedPromptTemplates.js",
+    "prompts:seed:question-variants": "node scripts/seedQuestionPromptVariants.js"
   },
   "dependencies": {
     "@mistralai/mistralai": "^1.14.0",
