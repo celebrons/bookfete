@@ -67,6 +67,7 @@ const buildDefaultVariables = (promptKey, rawEventType) => {
 };
 
 const PromptAdminLuxe = () => {
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [promptKey, setPromptKey] = useState('chapter_generation');
   const [eventType, setEventType] = useState('*');
   const [locale, setLocale] = useState('fr');
@@ -299,6 +300,57 @@ const PromptAdminLuxe = () => {
             Retour dashboard
           </Link>
         </div>
+
+        <section className={`prompt-admin-guide ${isGuideOpen ? 'is-open' : ''}`}>
+          <button
+            type="button"
+            className="prompt-admin-guide-toggle"
+            onClick={() => setIsGuideOpen((previous) => !previous)}
+            aria-expanded={isGuideOpen}
+            aria-controls="prompt-admin-guide-content"
+          >
+            <span>Mini guide des variables</span>
+            <span className="prompt-admin-guide-toggle-icon">{isGuideOpen ? '−' : '+'}</span>
+          </button>
+
+          {isGuideOpen ? (
+            <div id="prompt-admin-guide-content" className="prompt-admin-guide-content">
+              <p>
+                <strong>promptKey</strong>: type de prompt gere (<code>chapter_generation</code> ou
+                <code>question_generation</code>). <strong>eventType</strong>: contexte metier du prompt
+                (<code>anniversaire</code>, <code>projet</code>, etc.). <strong>locale</strong>: langue cible
+                (<code>fr</code>, <code>en</code>...).
+              </p>
+              <p>
+                <strong>temperature</strong>: creativite de sortie. <strong>maxTokens</strong>: longueur maximale
+                de sortie. <strong>Variables (JSON)</strong>: donnees injectees dans les placeholders
+                <code>{'{{...}}'}</code>.
+              </p>
+              <div className="prompt-admin-guide-grid">
+                <div className="prompt-admin-guide-card">
+                  <h3>Variables chapter_generation</h3>
+                  <p>
+                    <code>{'{{count}}'}</code>, <code>{'{{eventType}}'}</code>, <code>{'{{style}}'}</code>,
+                    <code>{'{{bookTitle}}'}</code>, <code>{'{{recipientName}}'}</code>,
+                    <code>{'{{recipientAge}}'}</code>, <code>{'{{recipientGender}}'}</code>,
+                    <code>{'{{projectBrief}}'}</code>.
+                  </p>
+                </div>
+                <div className="prompt-admin-guide-card">
+                  <h3>Variables question_generation</h3>
+                  <p>
+                    <code>{'{{chapterTitle}}'}</code>, <code>{'{{eventType}}'}</code>, <code>{'{{style}}'}</code>,
+                    <code>{'{{bookTitle}}'}</code>, <code>{'{{recipientName}}'}</code>,
+                    <code>{'{{recipientAge}}'}</code>, <code>{'{{recipientGender}}'}</code>,
+                    <code>{'{{pronoun}}'}</code>, <code>{'{{possessive}}'}</code>,
+                    <code>{'{{subjectPronoun}}'}</code>, <code>{'{{ageContext}}'}</code>,
+                    <code>{'{{styleInstruction}}'}</code>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </section>
 
         {errorMessage ? (
           <div className="prompt-admin-feedback is-error">
