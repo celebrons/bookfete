@@ -135,7 +135,10 @@ function buildDefaultPromptTestVariables({
     recipientName: 'Julie',
     recipientAge: '40',
     recipientGender: 'femme',
-    projectBrief: 'Surnom: Ju. Anecdote: son rire communicatif.',
+    recipientNickname: 'Ju',
+    recipientTrait: 'Genereuse et pleine d energie',
+    recipientAnecdote: 'Son rire communicatif dans toutes les fetes',
+    additionalContext: 'Ton elegant, chaleureux et complice',
     pronoun: 'cette femme',
     subjectPronoun: 'elle',
     possessive: 'sa',
@@ -176,10 +179,16 @@ router.post('/generate-chapters-public', async (req, res) => {
       recipientName, 
       recipientAge, 
       recipientGender,
+      recipientNickname,
+      recipientTrait,
+      recipientAnecdote,
+      additionalContext,
       projectBrief,
       prompt,
       usePromptOverride
     } = req.body;
+
+    const resolvedAdditionalContext = additionalContext || projectBrief || '';
     
     console.log('='.repeat(60));
     console.log('📝 [PUBLIC] GÉNÉRATION DE CHAPITRES');
@@ -192,7 +201,10 @@ router.post('/generate-chapters-public', async (req, res) => {
       recipientName, 
       recipientAge, 
       recipientGender,
-      projectBrief
+      recipientNickname,
+      recipientTrait,
+      recipientAnecdote,
+      additionalContext: resolvedAdditionalContext
     });
 
     if (!count || count < 1) {
@@ -210,7 +222,10 @@ router.post('/generate-chapters-public', async (req, res) => {
         recipientName: recipientName || 'la personne',
         recipientAge: recipientAge || 'non spécifié',
         recipientGender: recipientGender || 'non spécifié',
-        projectBrief: projectBrief || 'non renseignée'
+        recipientNickname: recipientNickname || '',
+        recipientTrait: recipientTrait || '',
+        recipientAnecdote: recipientAnecdote || '',
+        additionalContext: resolvedAdditionalContext || ''
       }
     });
 
@@ -494,10 +509,16 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
       recipientName, 
       recipientAge, 
       recipientGender,
+      recipientNickname,
+      recipientTrait,
+      recipientAnecdote,
+      additionalContext,
       projectBrief,
       prompt,
       usePromptOverride
     } = req.body;
+
+    const resolvedAdditionalContext = additionalContext || projectBrief || '';
     
     console.log('📝 [PROTÉGÉ] Génération de chapitres avec contexte:', {
       eventType, 
@@ -507,7 +528,10 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
       recipientName, 
       recipientAge, 
       recipientGender,
-      projectBrief
+      recipientNickname,
+      recipientTrait,
+      recipientAnecdote,
+      additionalContext: resolvedAdditionalContext
     });
 
     if (!count || count < 1) {
@@ -525,7 +549,10 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
         recipientName: recipientName || 'la personne',
         recipientAge: recipientAge || 'non spécifié',
         recipientGender: recipientGender || 'non spécifié',
-        projectBrief: projectBrief || 'non renseignée'
+        recipientNickname: recipientNickname || '',
+        recipientTrait: recipientTrait || '',
+        recipientAnecdote: recipientAnecdote || '',
+        additionalContext: resolvedAdditionalContext || ''
       }
     });
 

@@ -61,7 +61,10 @@ const buildDefaultVariables = (promptKey, rawEventType) => {
     recipientName: 'Juliette',
     recipientAge: 40,
     recipientGender: 'femme',
-    projectBrief: 'Souvenirs drles et touchants partags en famille',
+    recipientNickname: 'Ju',
+    recipientTrait: 'Genereuse et toujours pleine d energie',
+    recipientAnecdote: "Elle a confondu le sel et le sucre dans son gateau d anniversaire",
+    additionalContext: 'Ton chaleureux, complice, avec elegance',
     count: 8
   };
 };
@@ -333,7 +336,8 @@ const PromptAdminLuxe = () => {
                     <code>{'{{count}}'}</code>, <code>{'{{eventType}}'}</code>, <code>{'{{style}}'}</code>,
                     <code>{'{{bookTitle}}'}</code>, <code>{'{{recipientName}}'}</code>,
                     <code>{'{{recipientAge}}'}</code>, <code>{'{{recipientGender}}'}</code>,
-                    <code>{'{{projectBrief}}'}</code>.
+                    <code>{'{{recipientNickname}}'}</code>, <code>{'{{recipientTrait}}'}</code>,
+                    <code>{'{{recipientAnecdote}}'}</code>, <code>{'{{additionalContext}}'}</code>.
                   </p>
                 </div>
                 <div className="prompt-admin-guide-card">

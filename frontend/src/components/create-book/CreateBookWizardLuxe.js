@@ -344,7 +344,6 @@ const CreateBookWizardLuxe = () => {
   const generateChaptersWithIA = async () => {
     try {
       const chaptersCount = Math.floor(bookData.pages / 8);
-      const projectBrief = buildProjectBrief(bookData);
 
       console.log('📤 Envoi à l\'IA sans authentification');
 
@@ -361,7 +360,10 @@ const CreateBookWizardLuxe = () => {
           recipientName: bookData.recipient_name,
           recipientAge: bookData.recipient_age,
           recipientGender: bookData.recipient_gender,
-          projectBrief: projectBrief
+          recipientNickname: bookData.recipient_nickname || '',
+          recipientTrait: bookData.recipient_trait || '',
+          recipientAnecdote: bookData.recipient_anecdote || '',
+          additionalContext: bookData.ai_project_brief || ''
         })
       });
 

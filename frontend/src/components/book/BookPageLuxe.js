@@ -723,7 +723,10 @@ const BookPageLuxe = () => {
             recipientName: book.recipient_name,
             recipientAge: book.recipient_age,
             recipientGender: book.recipient_gender,
-            projectBrief: book?.cover_config?.aiProjectBrief || ''
+            recipientNickname: '',
+            recipientTrait: '',
+            recipientAnecdote: '',
+            additionalContext: book?.cover_config?.aiProjectBrief || ''
           })
         });
 
