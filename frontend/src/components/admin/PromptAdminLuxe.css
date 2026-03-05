@@ -178,7 +178,11 @@
 .prompt-admin-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  grid-template-areas:
+    "editor test"
+    "versions versions";
   gap: var(--space-md);
+  align-items: start;
 }
 
 .prompt-admin-editor,
@@ -191,19 +195,21 @@
 }
 
 .prompt-admin-editor {
+  grid-area: editor;
   padding: var(--space-lg);
-}
-
-.prompt-admin-side {
-  display: grid;
-  grid-template-rows: auto auto;
-  gap: var(--space-md);
-  align-content: start;
 }
 
 .prompt-admin-versions,
 .prompt-admin-test {
   padding: var(--space-md);
+}
+
+.prompt-admin-test {
+  grid-area: test;
+}
+
+.prompt-admin-versions {
+  grid-area: versions;
 }
 
 .prompt-admin-panel-head {
@@ -390,6 +396,10 @@
 
   .prompt-admin-grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "editor"
+      "test"
+      "versions";
   }
 }
 

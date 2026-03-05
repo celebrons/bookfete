@@ -287,6 +287,18 @@ const PromptAdminLuxe = () => {
   };
 
   const activeVersion = templateVersions?.active_version || activePrompt?.version || null;
+  const compiledPromptPreview = testResult
+    ? (
+        testResult.compiledPrompt
+        || [
+          '[SYSTEM PROMPT]',
+          testResult.systemPrompt || '',
+          '',
+          '[USER TEMPLATE COMPILE]',
+          testResult.userPrompt || ''
+        ].join('\n')
+      )
+    : '';
 
   return (
     <div className="prompt-admin-page">
@@ -500,139 +512,137 @@ const PromptAdminLuxe = () => {
             </div>
           </article>
 
-          <aside className="prompt-admin-side">
-            <article className="prompt-admin-versions">
-              <div className="prompt-admin-panel-head">
-                <h2>Versions</h2>
-                <span>{templateVersions?.versions?.length || 0} version(s)</span>
-              </div>
+          <article className="prompt-admin-test">
+            <div className="prompt-admin-panel-head">
+              <h2>Test</h2>
+            </div>
 
-              <div className="prompt-admin-version-list">
-                {(templateVersions?.versions || []).length === 0 ? (
-                  <p className="prompt-admin-empty">Aucune version stockee.</p>
-                ) : (
-                  (templateVersions?.versions || []).map((versionRow) => (
-                    <div
-                      key={versionRow.id || versionRow.version}
-                      className={`prompt-admin-version-row ${
-                        Number(versionRow.version) === Number(activeVersion) ? 'is-active' : ''
-                      }`}
-                    >
-                      <div>
-                        <strong>v{versionRow.version}</strong>
-                        <span>{versionRow.status || '-'}</span>
-                      </div>
-                      <div>
-                        <span>{formatDateTime(versionRow.created_at)}</span>
-                        <span>{versionRow.created_by || '-'}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </article>
+            <div className="prompt-admin-field">
+              <label htmlFor="test-vars">Variables (JSON)</label>
+              <textarea
+                id="test-vars"
+                className="input-luxe prompt-admin-textarea prompt-admin-textarea-test-vars"
+                value={testVariablesText}
+                onChange={(event) => setTestVariablesText(event.target.value)}
+              />
+            </div>
 
-            <article className="prompt-admin-test">
-              <div className="prompt-admin-panel-head">
-                <h2>Test</h2>
+            <div className="prompt-admin-check-row">
+              <input
+                id="test-run-model"
+                type="checkbox"
+                checked={runModel}
+                onChange={(event) => setRunModel(event.target.checked)}
+              />
+              <label htmlFor="test-run-model">Executer aussi le modele</label>
+            </div>
+
+            <div className="prompt-admin-inline-fields">
+              <div className="prompt-admin-field">
+                <label htmlFor="test-model">Modele</label>
+                <input
+                  id="test-model"
+                  className="input-luxe"
+                  value={modelName}
+                  onChange={(event) => setModelName(event.target.value)}
+                  placeholder={DEFAULT_MODEL}
+                />
               </div>
 
               <div className="prompt-admin-field">
-                <label htmlFor="test-vars">Variables (JSON)</label>
-                <textarea
-                  id="test-vars"
-                  className="input-luxe prompt-admin-textarea prompt-admin-textarea-test-vars"
-                  value={testVariablesText}
-                  onChange={(event) => setTestVariablesText(event.target.value)}
-                />
-              </div>
-
-              <div className="prompt-admin-check-row">
+                <label htmlFor="test-temperature">Temp test</label>
                 <input
-                  id="test-run-model"
-                  type="checkbox"
-                  checked={runModel}
-                  onChange={(event) => setRunModel(event.target.checked)}
+                  id="test-temperature"
+                  className="input-luxe"
+                  value={testTemperature}
+                  onChange={(event) => setTestTemperature(event.target.value)}
+                  placeholder="0.7"
                 />
-                <label htmlFor="test-run-model">Executer aussi le modele</label>
               </div>
 
-              <div className="prompt-admin-inline-fields">
-                <div className="prompt-admin-field">
-                  <label htmlFor="test-model">Modele</label>
-                  <input
-                    id="test-model"
-                    className="input-luxe"
-                    value={modelName}
-                    onChange={(event) => setModelName(event.target.value)}
-                    placeholder={DEFAULT_MODEL}
-                  />
+              <div className="prompt-admin-field">
+                <label htmlFor="test-max-tokens">Max tokens test</label>
+                <input
+                  id="test-max-tokens"
+                  className="input-luxe"
+                  value={testMaxTokens}
+                  onChange={(event) => setTestMaxTokens(event.target.value)}
+                  placeholder="900"
+                />
+              </div>
+            </div>
+
+            <div className="prompt-admin-editor-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleTest}
+                disabled={testing}
+              >
+                {testing ? 'Test...' : 'Tester le prompt'}
+              </button>
+            </div>
+
+            {testResult ? (
+              <div className="prompt-admin-test-result">
+                <div className="prompt-admin-result-meta">
+                  <span>Source: {testResult.source || '-'}</span>
+                  <span>Version: {testResult.version || '-'}</span>
                 </div>
 
                 <div className="prompt-admin-field">
-                  <label htmlFor="test-temperature">Temp test</label>
-                  <input
-                    id="test-temperature"
-                    className="input-luxe"
-                    value={testTemperature}
-                    onChange={(event) => setTestTemperature(event.target.value)}
-                    placeholder="0.7"
+                  <label>Prompt compile (system + user)</label>
+                  <textarea
+                    className="input-luxe prompt-admin-textarea prompt-admin-textarea-result"
+                    value={compiledPromptPreview}
+                    readOnly
                   />
                 </div>
 
-                <div className="prompt-admin-field">
-                  <label htmlFor="test-max-tokens">Max tokens test</label>
-                  <input
-                    id="test-max-tokens"
-                    className="input-luxe"
-                    value={testMaxTokens}
-                    onChange={(event) => setTestMaxTokens(event.target.value)}
-                    placeholder="900"
-                  />
-                </div>
-              </div>
-
-              <div className="prompt-admin-editor-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleTest}
-                  disabled={testing}
-                >
-                  {testing ? 'Test...' : 'Tester le prompt'}
-                </button>
-              </div>
-
-              {testResult ? (
-                <div className="prompt-admin-test-result">
-                  <div className="prompt-admin-result-meta">
-                    <span>Source: {testResult.source || '-'}</span>
-                    <span>Version: {testResult.version || '-'}</span>
-                  </div>
-
+                {testResult?.modelCall?.output ? (
                   <div className="prompt-admin-field">
-                    <label>Prompt compile</label>
+                    <label>Sortie modele</label>
                     <textarea
                       className="input-luxe prompt-admin-textarea prompt-admin-textarea-result"
-                      value={testResult.userPrompt || ''}
+                      value={testResult.modelCall.output}
                       readOnly
                     />
                   </div>
+                ) : null}
+              </div>
+            ) : null}
+          </article>
 
-                  {testResult?.modelCall?.output ? (
-                    <div className="prompt-admin-field">
-                      <label>Sortie modele</label>
-                      <textarea
-                        className="input-luxe prompt-admin-textarea prompt-admin-textarea-result"
-                        value={testResult.modelCall.output}
-                        readOnly
-                      />
+          <article className="prompt-admin-versions">
+            <div className="prompt-admin-panel-head">
+              <h2>Versions</h2>
+              <span>{templateVersions?.versions?.length || 0} version(s)</span>
+            </div>
+
+            <div className="prompt-admin-version-list">
+              {(templateVersions?.versions || []).length === 0 ? (
+                <p className="prompt-admin-empty">Aucune version stockee.</p>
+              ) : (
+                (templateVersions?.versions || []).map((versionRow) => (
+                  <div
+                    key={versionRow.id || versionRow.version}
+                    className={`prompt-admin-version-row ${
+                      Number(versionRow.version) === Number(activeVersion) ? 'is-active' : ''
+                    }`}
+                  >
+                    <div>
+                      <strong>v{versionRow.version}</strong>
+                      <span>{versionRow.status || '-'}</span>
                     </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </article>
-          </aside>
+                    <div>
+                      <span>{formatDateTime(versionRow.created_at)}</span>
+                      <span>{versionRow.created_by || '-'}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </article>
         </section>
       </div>
     </div>

@@ -363,6 +363,13 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
       version: promptConfig.version,
       systemPrompt: promptConfig.systemPrompt,
       userPrompt: promptConfig.userPrompt,
+      compiledPrompt: [
+        '[SYSTEM PROMPT]',
+        promptConfig.systemPrompt || '',
+        '',
+        '[USER TEMPLATE COMPILE]',
+        promptConfig.userPrompt || ''
+      ].join('\n'),
       modelCall: null
     };
 

@@ -224,6 +224,7 @@ const CreateBookWizardLuxe = () => {
     'mariage': 'mariage',
     'vacances': 'vacances',
     'anniversaire': 'anniversaire',
+    'anniverssaire': 'anniversaire',
     'retraite': 'retraite'
   };
 
@@ -234,6 +235,7 @@ const CreateBookWizardLuxe = () => {
     'mariage': 'Mariage',
     'vacances': 'Vacances',
     'anniversaire': 'Anniversaire',
+    'anniverssaire': 'Anniversaire',
     'retraite': 'Départ en retraite',
     'generique': 'Événement',
     'depart': 'Départ',
@@ -272,6 +274,7 @@ const CreateBookWizardLuxe = () => {
     ai_project_brief: ''
   }));
   const soulFormCopy = getSoulFormCopy(bookData.event_type);
+  const isBirthdayEvent = bookData.event_type === 'anniversaire';
 
   // ============================================
   // GESTION DE LA REPRISE APRÈS CONNEXION
@@ -655,17 +658,20 @@ const CreateBookWizardLuxe = () => {
                 />
               </div>
 
-              <div className="form-group">
-                <label>{soulFormCopy.ageLabel}</label>
-                <input
-                  type="number"
-                  value={bookData.recipient_age}
-                  onChange={(e) => setBookData({ ...bookData, recipient_age: e.target.value })}
-                  placeholder={soulFormCopy.agePlaceholder}
-                  min="0"
-                  max="120"
-                />
-              </div>
+              {isBirthdayEvent ? (
+                <div className="form-group">
+                  <label>{soulFormCopy.ageLabel} <span style={{ color: 'var(--gold)' }}>*</span></label>
+                  <input
+                    type="number"
+                    value={bookData.recipient_age}
+                    onChange={(e) => setBookData({ ...bookData, recipient_age: e.target.value })}
+                    placeholder={soulFormCopy.agePlaceholder}
+                    min="1"
+                    max="120"
+                    required
+                  />
+                </div>
+              ) : null}
 
               <div className="form-group">
                 <label>{soulFormCopy.nicknameLabel}</label>
@@ -713,7 +719,10 @@ const CreateBookWizardLuxe = () => {
               <button
                 type="submit"
                 className="btn btn-primary button-primary"
-                disabled={!bookData.recipient_name}
+                disabled={
+                  !bookData.recipient_name
+                  || (isBirthdayEvent && !String(bookData.recipient_age || '').trim())
+                }
               >
                 Continuer la configuration →
               </button>

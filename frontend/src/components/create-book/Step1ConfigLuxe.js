@@ -34,6 +34,10 @@ const Step1ConfigLuxe = ({ bookData, setBookData, onNext, loading }) => {
   ];
 
   const chaptersCount = Math.floor(bookData.pages / 8);
+  const isBirthdayEvent = bookData.event_type === 'anniversaire';
+  const canContinue = Boolean(
+    bookData.title && (!isBirthdayEvent || String(bookData.recipient_age || '').trim())
+  );
 
   return (
     <div className="step-container">
@@ -53,6 +57,21 @@ const Step1ConfigLuxe = ({ bookData, setBookData, onNext, loading }) => {
           ))}
         </select>
       </div>
+
+      {isBirthdayEvent && (
+        <div className="config-section">
+          <span className="config-label">Age de la personne fetee *</span>
+          <input
+            type="number"
+            value={bookData.recipient_age || ''}
+            onChange={(e) => setBookData({ ...bookData, recipient_age: e.target.value })}
+            placeholder="Ex: 40"
+            min="1"
+            max="120"
+            className="input-luxe"
+          />
+        </div>
+      )}
 
       {/* Titre */}
       <div className="config-section">
@@ -153,7 +172,7 @@ const Step1ConfigLuxe = ({ bookData, setBookData, onNext, loading }) => {
         <div></div> {/* Spacer */}
         <button
           onClick={onNext}
-          disabled={loading || !bookData.title}
+          disabled={loading || !canContinue}
           className="btn btn-primary btn-next"
         >
           {loading ? 'Génération...' : 'Continuer →'}
