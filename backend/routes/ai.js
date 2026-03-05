@@ -411,6 +411,7 @@ router.post('/prompt-templates/:promptKey/versions', authenticate, ensurePromptA
       userPromptTemplate,
       temperature,
       maxTokens,
+      note = '',
       status = 'published',
       publish = true
     } = req.body || {};
@@ -423,6 +424,7 @@ router.post('/prompt-templates/:promptKey/versions', authenticate, ensurePromptA
       userPromptTemplate,
       temperature,
       maxTokens,
+      note,
       status,
       publish: publish !== false,
       createdBy: req.user?.email || ''
@@ -434,6 +436,56 @@ router.post('/prompt-templates/:promptKey/versions', authenticate, ensurePromptA
     });
   } catch (error) {
     console.error('❌ Erreur publication prompt:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.patch('/prompt-templates/:promptKey/versions/:version', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const { promptKey, version } = req.params;
+    const {
+      eventType = '*',
+      locale = 'fr',
+      note = ''
+    } = req.body || {};
+
+    const result = await promptTemplateService.updatePromptVersionNote({
+      promptKey,
+      eventType,
+      locale,
+      version,
+      note
+    });
+
+    res.json({
+      ok: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('❌ Erreur mise à jour note version prompt:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.delete('/prompt-templates/:promptKey/versions/:version', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const { promptKey, version } = req.params;
+    const eventType = (req.query.eventType || req.body?.eventType || '*').toString();
+    const locale = (req.query.locale || req.body?.locale || 'fr').toString();
+
+    const result = await promptTemplateService.deletePromptVersion({
+      promptKey,
+      eventType,
+      locale,
+      version
+    });
+
+    res.json({
+      ok: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('❌ Erreur suppression version prompt:', error);
     res.status(400).json({ error: error.message });
   }
 });

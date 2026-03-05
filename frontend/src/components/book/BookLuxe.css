@@ -1,17 +1,19 @@
 /* C:\Users\USER\bookfete\frontend\src\components\book\BookLuxe.css */
 
 .book-container {
-  --book-soft-surface: #e1e7ec;
-  --book-soft-panel: #edf2f6;
+  --book-soft-surface: #ecebe7;
+  --book-soft-panel: #f7f6f3;
   min-height: calc(100vh - 200px);
-  background-color: var(--book-soft-surface);
+  background:
+    radial-gradient(circle at top left, rgba(31, 122, 61, 0.08), transparent 38%),
+    linear-gradient(180deg, #f7f6f3 0%, var(--book-soft-surface) 100%);
   padding: var(--space-xl);
 }
 
 .book-header {
   background:
-    radial-gradient(circle at top right, rgba(184, 146, 74, 0.14), transparent 26%),
-    linear-gradient(135deg, #f7fbff 0%, #e1e7ec 100%);
+    radial-gradient(circle at top right, rgba(184, 146, 74, 0.12), transparent 26%),
+    linear-gradient(135deg, #fbfaf7 0%, #ecebe7 100%);
   border: 1px solid rgba(218, 207, 186, 0.7);
   border-radius: 18px;
   padding: var(--space-xl);
@@ -807,7 +809,7 @@
 .sidebar {
   background:
     radial-gradient(circle at top right, rgba(184, 146, 74, 0.12), transparent 30%),
-    linear-gradient(135deg, #f7fbff 0%, #e1e7ec 100%) !important;
+    linear-gradient(135deg, #f7f6f3 0%, #ecebe7 100%) !important;
   border: 1px solid rgba(218, 207, 186, 0.72) !important;
   padding: var(--space-xl) !important;
 }
@@ -899,7 +901,7 @@
 .right-panel {
   background:
     radial-gradient(circle at top right, rgba(184, 146, 74, 0.12), transparent 28%),
-    linear-gradient(135deg, #f7fbff 0%, #e1e7ec 100%) !important;
+    linear-gradient(135deg, #f7f6f3 0%, #ecebe7 100%) !important;
   border: 1px solid rgba(218, 207, 186, 0.72) !important;
   border-radius: 18px !important;
   padding: var(--space-xl) !important;
@@ -1030,7 +1032,7 @@
   height: 26px;
   padding: 0;
   background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   border-radius: 8px;
   color: #6b7c89;
   font-size: 13px;
@@ -1588,7 +1590,7 @@
 
 .workflow-step-chip {
   width: 100%;
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.9);
   padding: 8px 10px;
@@ -2613,7 +2615,7 @@
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid rgba(223, 216, 201, 0.88);
-  background: linear-gradient(180deg, #f7fbff 0%, #e1e7ec 100%);
+  background: linear-gradient(180deg, #f7f6f3 0%, #ecebe7 100%);
   color: var(--text-light);
   font-size: 12px;
   line-height: 1.5;
@@ -2629,7 +2631,7 @@
 .contributors-stat-pill {
   min-width: 96px;
   border-radius: 12px;
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   background: rgba(255, 255, 255, 0.85);
   padding: 8px 10px;
   display: flex;
@@ -2673,7 +2675,7 @@
   margin-bottom: var(--space-lg);
   border: 1px solid rgba(223, 216, 201, 0.88);
   border-radius: 14px;
-  background: linear-gradient(180deg, #f7fbff 0%, #e1e7ec 100%);
+  background: linear-gradient(180deg, #f7f6f3 0%, #ecebe7 100%);
   padding: var(--space-md) var(--space-lg);
 }
 
@@ -2704,7 +2706,7 @@
   margin-bottom: var(--space-lg);
   border: 1px solid rgba(223, 216, 201, 0.88);
   border-radius: 14px;
-  background: linear-gradient(180deg, #f7fbff 0%, #e1e7ec 100%);
+  background: linear-gradient(180deg, #f7f6f3 0%, #ecebe7 100%);
   padding: var(--space-md) var(--space-lg);
 }
 
@@ -2748,7 +2750,7 @@
 .contributors-loading {
   text-align: center;
   border-color: rgba(223, 216, 201, 0.88);
-  background: #edf2f6;
+  background: #f7f6f3;
 }
 
 .contributors-spinner {
@@ -2763,7 +2765,7 @@
 
 .contributors-solo-empty {
   text-align: center;
-  background: #edf2f6;
+  background: #f7f6f3;
   border-color: rgba(223, 216, 201, 0.88);
 }
 
@@ -2778,7 +2780,7 @@
 
 .contributors-empty {
   text-align: center;
-  background: #edf2f6;
+  background: #f7f6f3;
   border-color: rgba(223, 216, 201, 0.88);
 }
 
@@ -2794,7 +2796,7 @@
 .contributors-list-wrap {
   border: 1px solid rgba(223, 216, 201, 0.88);
   border-radius: 14px;
-  background: linear-gradient(180deg, #f7fbff 0%, #e1e7ec 100%);
+  background: linear-gradient(180deg, #f7f6f3 0%, #ecebe7 100%);
   padding: var(--space-md) var(--space-lg);
 }
 
@@ -2823,7 +2825,7 @@
 }
 
 .contributors-item-card {
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.86);
   padding: 12px;
@@ -2932,7 +2934,7 @@
   padding: 14px 16px;
   border-radius: 14px;
   border: 1px solid rgba(223, 216, 201, 0.88);
-  background: linear-gradient(160deg, #f7fbff 0%, #e1e7ec 100%);
+  background: linear-gradient(160deg, #f7f6f3 0%, #ecebe7 100%);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -2969,7 +2971,7 @@
   border: 1px solid rgba(223, 216, 201, 0.88);
   border-radius: 14px;
   padding: var(--space-lg);
-  background: linear-gradient(180deg, #f7fbff 0%, #e1e7ec 100%);
+  background: linear-gradient(180deg, #f7f6f3 0%, #ecebe7 100%);
 }
 
 .book-config-group + .book-config-group {
@@ -2996,7 +2998,7 @@
   text-align: left;
   min-height: 86px;
   padding: 12px;
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.85);
   cursor: pointer;
@@ -3211,7 +3213,7 @@
 }
 
 .book-config-preview-item {
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.75);
   padding: 10px;

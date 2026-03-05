@@ -1,6 +1,6 @@
 .prompt-admin-page {
   min-height: calc(100vh - 200px);
-  background-color: #e1e7ec;
+  background-color: #ecebe7;
   padding: var(--space-xl);
 }
 
@@ -41,7 +41,7 @@
   align-items: center;
   gap: 8px;
   border-radius: 12px;
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   padding: 10px 12px;
   background: #f7fafb;
   color: var(--ink);
@@ -66,7 +66,7 @@
   border-radius: 16px;
   background:
     radial-gradient(circle at top right, rgba(184, 146, 74, 0.12), transparent 32%),
-    linear-gradient(135deg, #f7fbff 0%, #e1e7ec 100%);
+    linear-gradient(135deg, #f7f6f3 0%, #ecebe7 100%);
 }
 
 .prompt-admin-guide-toggle {
@@ -89,7 +89,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   background: rgba(255, 255, 255, 0.84);
   color: #4f6171;
   display: inline-flex;
@@ -100,7 +100,7 @@
 }
 
 .prompt-admin-guide-content {
-  border-top: 1px solid rgba(211, 221, 228, 0.92);
+  border-top: 1px solid rgba(220, 215, 204, 0.92);
   padding: 12px 16px 16px;
   display: flex;
   flex-direction: column;
@@ -124,7 +124,7 @@
   min-height: 22px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   background: rgba(255, 255, 255, 0.84);
   color: #3b4f62;
   font-size: 11px;
@@ -139,7 +139,7 @@
 }
 
 .prompt-admin-guide-card {
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.8);
   padding: 10px 12px;
@@ -155,13 +155,53 @@
   margin: 0;
 }
 
+.prompt-admin-guide-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prompt-admin-guide-list-item {
+  border: 1px solid rgba(220, 215, 204, 0.72);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-light);
+}
+
+.prompt-admin-guide-list-item strong {
+  color: var(--ink);
+}
+
+.prompt-admin-guide-steps {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prompt-admin-guide-steps li {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-light);
+}
+
 .prompt-admin-filters {
   border: 1px solid rgba(218, 207, 186, 0.72);
   border-radius: 18px;
   padding: var(--space-md);
   background:
     radial-gradient(circle at top right, rgba(184, 146, 74, 0.14), transparent 30%),
-    linear-gradient(135deg, #f7fbff 0%, #e1e7ec 100%);
+    linear-gradient(135deg, #f7f6f3 0%, #ecebe7 100%);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   gap: 12px;
@@ -231,7 +271,7 @@
   min-height: 28px;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   background: rgba(255, 255, 255, 0.84);
   color: #4f6171;
   font-size: 11px;
@@ -290,21 +330,87 @@
 }
 
 .prompt-admin-version-row {
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.86);
   padding: 10px 12px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
 }
 
-.prompt-admin-version-row > div {
+.prompt-admin-version-main {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.prompt-admin-version-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.prompt-admin-version-note-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(184, 146, 74, 0.32);
+  background: rgba(184, 146, 74, 0.12);
+  color: #7a5b27;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.prompt-admin-version-active-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 122, 61, 0.32);
+  background: rgba(31, 122, 61, 0.12);
+  color: #1f7a3d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.prompt-admin-version-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prompt-admin-version-actions {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.prompt-admin-version-note-input {
+  min-width: 0;
+}
+
+.prompt-admin-version-delete-btn {
+  border-color: #efc8cb;
+  color: #b42318;
+}
+
+.prompt-admin-version-delete-btn:hover {
+  border-color: #efc8cb;
+  background: #fff4f4;
+  color: #b42318;
 }
 
 .prompt-admin-version-row strong {
@@ -346,10 +452,10 @@
 
 .prompt-admin-test-result {
   margin-top: var(--space-md);
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   border-radius: 12px;
   padding: 12px;
-  background: linear-gradient(180deg, #f7fbff 0%, #e1e7ec 100%);
+  background: linear-gradient(180deg, #f7f6f3 0%, #ecebe7 100%);
 }
 
 .prompt-admin-result-meta {
@@ -365,7 +471,7 @@
   align-items: center;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(211, 221, 228, 0.92);
+  border: 1px solid rgba(220, 215, 204, 0.92);
   background: rgba(255, 255, 255, 0.85);
   font-size: 11px;
   font-weight: 700;
@@ -431,6 +537,10 @@
   }
 
   .prompt-admin-inline-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .prompt-admin-version-actions {
     grid-template-columns: 1fr;
   }
 

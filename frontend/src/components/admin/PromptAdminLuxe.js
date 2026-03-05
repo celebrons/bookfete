@@ -22,6 +22,161 @@ const EVENT_PRESETS = [
 
 const DEFAULT_MODEL = 'mistral-small-latest';
 
+const CHAPTER_PROMPT_VARIABLES = [
+  {
+    placeholder: '{{count}}',
+    frontKey: 'chaptersCount / chaptersToAdd',
+    source: 'create-book: pages/8, book page: delta de chapitres',
+    description: 'Nombre de chapitres a generer.'
+  },
+  {
+    placeholder: '{{eventType}}',
+    frontKey: 'bookData.event_type / book.event_type',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Type d evenement (anniversaire, projet, etc.).'
+  },
+  {
+    placeholder: '{{style}}',
+    frontKey: 'bookData.style_narratif / book.style_narratif',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Ton narratif cible.'
+  },
+  {
+    placeholder: '{{bookTitle}}',
+    frontKey: 'bookData.title / book.title',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Titre du livre.'
+  },
+  {
+    placeholder: '{{recipientName}}',
+    frontKey: 'bookData.recipient_name / book.recipient_name',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Nom de la personne ou equipe cible.'
+  },
+  {
+    placeholder: '{{recipientAge}}',
+    frontKey: 'bookData.recipient_age / book.recipient_age',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Age/anciennete utile pour adapter le vocabulaire.'
+  },
+  {
+    placeholder: '{{recipientGender}}',
+    frontKey: 'bookData.recipient_gender / book.recipient_gender',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Genre de reference.'
+  },
+  {
+    placeholder: '{{recipientNickname}}',
+    frontKey: 'bookData.recipient_nickname',
+    source: 'CreateBookWizardLuxe',
+    description: 'Surnom pour personnalisation emotionnelle.'
+  },
+  {
+    placeholder: '{{recipientTrait}}',
+    frontKey: 'bookData.recipient_trait',
+    source: 'CreateBookWizardLuxe',
+    description: 'Trait marquant.'
+  },
+  {
+    placeholder: '{{recipientAnecdote}}',
+    frontKey: 'bookData.recipient_anecdote',
+    source: 'CreateBookWizardLuxe',
+    description: 'Anecdote centrale.'
+  },
+  {
+    placeholder: '{{additionalContext}}',
+    frontKey: 'bookData.ai_project_brief / book.cover_config.aiProjectBrief',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Contexte additionnel libre.'
+  }
+];
+
+const QUESTION_PROMPT_VARIABLES = [
+  {
+    placeholder: '{{chapterTitle}}',
+    frontKey: 'chapter.title',
+    source: 'useQuestions / Step1Questions',
+    description: 'Titre du chapitre en cours.'
+  },
+  {
+    placeholder: '{{eventType}}',
+    frontKey: 'book.event_type',
+    source: 'useQuestions / Step1Questions',
+    description: 'Type d evenement.'
+  },
+  {
+    placeholder: '{{style}}',
+    frontKey: 'book.style_narratif',
+    source: 'useQuestions / Step1Questions',
+    description: 'Ton narratif choisi.'
+  },
+  {
+    placeholder: '{{bookTitle}}',
+    frontKey: 'book.title',
+    source: 'useQuestions / Step1Questions',
+    description: 'Titre du livre.'
+  },
+  {
+    placeholder: '{{recipientName}}',
+    frontKey: 'book.recipient_name',
+    source: 'useQuestions / Step1Questions',
+    description: 'Nom cible.'
+  },
+  {
+    placeholder: '{{recipientAge}}',
+    frontKey: 'book.recipient_age',
+    source: 'useQuestions / Step1Questions',
+    description: 'Age cible.'
+  },
+  {
+    placeholder: '{{recipientGender}}',
+    frontKey: 'book.recipient_gender',
+    source: 'useQuestions / Step1Questions',
+    description: 'Genre cible.'
+  },
+  {
+    placeholder: '{{pronoun}}',
+    frontKey: 'derive backend',
+    source: 'backend/services/aiService.generateQuestions',
+    description: 'Pronom objet derive depuis le genre.'
+  },
+  {
+    placeholder: '{{subjectPronoun}}',
+    frontKey: 'derive backend',
+    source: 'backend/services/aiService.generateQuestions',
+    description: 'Pronom sujet derive.'
+  },
+  {
+    placeholder: '{{possessive}}',
+    frontKey: 'derive backend',
+    source: 'backend/services/aiService.generateQuestions',
+    description: 'Possessif derive.'
+  },
+  {
+    placeholder: '{{ageContext}}',
+    frontKey: 'derive backend',
+    source: 'backend/services/aiService.generateQuestions',
+    description: 'Contexte age adapte automatiquement.'
+  },
+  {
+    placeholder: '{{styleInstruction}}',
+    frontKey: 'derive backend',
+    source: 'backend/services/aiService.generateQuestions',
+    description: 'Instruction de ton construite depuis style.'
+  }
+];
+
+const PROMPT_TEST_STEPS = [
+  'Choisir prompt key, event type, locale puis cliquer sur "Charger".',
+  'Verifier/editer System prompt et User prompt template.',
+  'Configurer Temperature et Max tokens pour la version a publier.',
+  'Renseigner les variables JSON dans "Test" (elles doivent matcher les {{placeholders}}).',
+  'Cliquer sur "Tester le prompt" pour verifier le compile (system + user).',
+  'Activer "Executer aussi le modele" seulement si tu veux un run IA reel.',
+  'Publier la version quand le rendu compile est valide.',
+  'Dans "Versions", ajouter une note (contexte, objectif) ou supprimer une version obsolete.'
+];
+
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const trimmed = configured.replace(/\/$/, '');
@@ -33,6 +188,19 @@ const formatDateTime = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('fr-FR');
+};
+
+const extractTemplateVariables = (templateText = '') => {
+  const variableNames = new Set();
+  const variablePattern = /{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}/g;
+  let match = variablePattern.exec(templateText);
+
+  while (match) {
+    variableNames.add(match[1]);
+    match = variablePattern.exec(templateText);
+  }
+
+  return [...variableNames];
 };
 
 const buildDefaultVariables = (promptKey, rawEventType) => {
@@ -90,6 +258,7 @@ const PromptAdminLuxe = () => {
   const [userPromptTemplate, setUserPromptTemplate] = useState('');
   const [temperature, setTemperature] = useState('');
   const [maxTokens, setMaxTokens] = useState('');
+  const [newVersionNote, setNewVersionNote] = useState('');
 
   const [runModel, setRunModel] = useState(false);
   const [modelName, setModelName] = useState(DEFAULT_MODEL);
@@ -99,6 +268,9 @@ const PromptAdminLuxe = () => {
     JSON.stringify(buildDefaultVariables('chapter_generation', '*'), null, 2)
   );
   const [testResult, setTestResult] = useState(null);
+  const [versionNotesById, setVersionNotesById] = useState({});
+  const [savingVersionNoteKey, setSavingVersionNoteKey] = useState('');
+  const [deletingVersionKey, setDeletingVersionKey] = useState('');
 
   const buildEndpoint = (path) => `${buildApiBaseUrl()}/ai${path}`;
 
@@ -144,6 +316,8 @@ const PromptAdminLuxe = () => {
     );
   };
 
+  const getVersionRowKey = (versionRow) => String(versionRow?.id || versionRow?.version || '');
+
   const loadTemplate = async () => {
     setLoading(true);
     setErrorMessage('');
@@ -172,6 +346,63 @@ const PromptAdminLuxe = () => {
       JSON.stringify(buildDefaultVariables(promptKey, eventType), null, 2)
     );
   }, [promptKey, eventType]);
+
+  useEffect(() => {
+    const rows = templateVersions?.versions || [];
+    const nextNotes = {};
+    rows.forEach((versionRow) => {
+      const rowKey = String(versionRow?.id || versionRow?.version || '');
+      nextNotes[rowKey] = versionRow?.note || '';
+    });
+    setVersionNotesById(nextNotes);
+  }, [templateVersions]);
+
+  useEffect(() => {
+    let parsedVariables = null;
+    try {
+      parsedVariables = JSON.parse(testVariablesText || '{}');
+    } catch (_error) {
+      return;
+    }
+
+    if (!parsedVariables || Array.isArray(parsedVariables) || typeof parsedVariables !== 'object') {
+      return;
+    }
+
+    const expectedKeys = Array.from(new Set([
+      ...extractTemplateVariables(systemPrompt),
+      ...extractTemplateVariables(userPromptTemplate)
+    ]));
+    const currentKeys = Object.keys(parsedVariables);
+    const hasStructureChanged = (
+      currentKeys.length !== expectedKeys.length
+      || currentKeys.some((key) => !expectedKeys.includes(key))
+      || expectedKeys.some((key) => !Object.prototype.hasOwnProperty.call(parsedVariables, key))
+    );
+
+    if (!hasStructureChanged) {
+      return;
+    }
+
+    const fallbackVariables = buildDefaultVariables(promptKey, eventType);
+    const nextVariables = {};
+    expectedKeys.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(parsedVariables, key)) {
+        nextVariables[key] = parsedVariables[key];
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(fallbackVariables, key)) {
+        nextVariables[key] = fallbackVariables[key];
+        return;
+      }
+      nextVariables[key] = '';
+    });
+
+    const nextVariablesText = JSON.stringify(nextVariables, null, 2);
+    if (nextVariablesText !== testVariablesText) {
+      setTestVariablesText(nextVariablesText);
+    }
+  }, [systemPrompt, userPromptTemplate, promptKey, eventType, testVariablesText]); // sync when prompt template changes
 
   useEffect(() => {
     loadTemplate();
@@ -207,6 +438,7 @@ const PromptAdminLuxe = () => {
         locale: (locale || 'fr').trim() || 'fr',
         systemPrompt: systemPrompt.trim(),
         userPromptTemplate: userPromptTemplate.trim(),
+        note: (newVersionNote || '').trim(),
         temperature: parseOptionalNumber(temperature, 'Temperature'),
         maxTokens: parseOptionalNumber(maxTokens, 'Max tokens'),
         status: 'published',
@@ -224,6 +456,7 @@ const PromptAdminLuxe = () => {
       setSuccessMessage(
         `Version ${response?.insertedVersion?.version || '?'} publiee avec succes.`
       );
+      setNewVersionNote('');
       await loadTemplate();
     } catch (error) {
       setErrorMessage(error.message || 'Publication impossible.');
@@ -286,6 +519,72 @@ const PromptAdminLuxe = () => {
     }
   };
 
+  const handleVersionNoteChange = (versionRow, value) => {
+    const rowKey = getVersionRowKey(versionRow);
+    setVersionNotesById((previous) => ({
+      ...previous,
+      [rowKey]: value
+    }));
+  };
+
+  const handleSaveVersionNote = async (versionRow) => {
+    const rowKey = getVersionRowKey(versionRow);
+    setErrorMessage('');
+    setSuccessMessage('');
+    setSavingVersionNoteKey(rowKey);
+
+    try {
+      await apiRequest(
+        `/prompt-templates/${encodeURIComponent(promptKey)}/versions/${encodeURIComponent(versionRow.version)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            eventType: (eventType || '*').trim() || '*',
+            locale: (locale || 'fr').trim() || 'fr',
+            note: (versionNotesById[rowKey] || '').trim()
+          })
+        }
+      );
+      setSuccessMessage(`Note enregistree pour la version ${versionRow.version}.`);
+      await loadTemplate();
+    } catch (error) {
+      setErrorMessage(error.message || 'Impossible de mettre a jour la note.');
+    } finally {
+      setSavingVersionNoteKey('');
+    }
+  };
+
+  const handleDeleteVersion = async (versionRow) => {
+    const rowKey = getVersionRowKey(versionRow);
+    const isActive = Number(versionRow.version) === Number(activeVersion);
+    const confirmMessage = isActive
+      ? `Supprimer la version active v${versionRow.version} ? La version active sera reajustee automatiquement.`
+      : `Supprimer la version v${versionRow.version} ?`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setErrorMessage('');
+    setSuccessMessage('');
+    setDeletingVersionKey(rowKey);
+
+    try {
+      const query = `eventType=${encodeURIComponent((eventType || '*').trim() || '*')}&locale=${encodeURIComponent((locale || 'fr').trim() || 'fr')}`;
+      await apiRequest(
+        `/prompt-templates/${encodeURIComponent(promptKey)}/versions/${encodeURIComponent(versionRow.version)}?${query}`,
+        {
+          method: 'DELETE'
+        }
+      );
+      setSuccessMessage(`Version ${versionRow.version} supprimee.`);
+      await loadTemplate();
+    } catch (error) {
+      setErrorMessage(error.message || 'Impossible de supprimer cette version.');
+    } finally {
+      setDeletingVersionKey('');
+    }
+  };
+
   const activeVersion = templateVersions?.active_version || activePrompt?.version || null;
   const compiledPromptPreview = testResult
     ? (
@@ -344,25 +643,39 @@ const PromptAdminLuxe = () => {
               <div className="prompt-admin-guide-grid">
                 <div className="prompt-admin-guide-card">
                   <h3>Variables chapter_generation</h3>
-                  <p>
-                    <code>{'{{count}}'}</code>, <code>{'{{eventType}}'}</code>, <code>{'{{style}}'}</code>,
-                    <code>{'{{bookTitle}}'}</code>, <code>{'{{recipientName}}'}</code>,
-                    <code>{'{{recipientAge}}'}</code>, <code>{'{{recipientGender}}'}</code>,
-                    <code>{'{{recipientNickname}}'}</code>, <code>{'{{recipientTrait}}'}</code>,
-                    <code>{'{{recipientAnecdote}}'}</code>, <code>{'{{additionalContext}}'}</code>.
-                  </p>
+                  <ul className="prompt-admin-guide-list">
+                    {CHAPTER_PROMPT_VARIABLES.map((item) => (
+                      <li key={item.placeholder} className="prompt-admin-guide-list-item">
+                        <code>{item.placeholder}</code>
+                        <span><strong>Front:</strong> {item.frontKey}</span>
+                        <span><strong>Source:</strong> {item.source}</span>
+                        <span>{item.description}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
                 <div className="prompt-admin-guide-card">
                   <h3>Variables question_generation</h3>
-                  <p>
-                    <code>{'{{chapterTitle}}'}</code>, <code>{'{{eventType}}'}</code>, <code>{'{{style}}'}</code>,
-                    <code>{'{{bookTitle}}'}</code>, <code>{'{{recipientName}}'}</code>,
-                    <code>{'{{recipientAge}}'}</code>, <code>{'{{recipientGender}}'}</code>,
-                    <code>{'{{pronoun}}'}</code>, <code>{'{{possessive}}'}</code>,
-                    <code>{'{{subjectPronoun}}'}</code>, <code>{'{{ageContext}}'}</code>,
-                    <code>{'{{styleInstruction}}'}</code>.
-                  </p>
+                  <ul className="prompt-admin-guide-list">
+                    {QUESTION_PROMPT_VARIABLES.map((item) => (
+                      <li key={item.placeholder} className="prompt-admin-guide-list-item">
+                        <code>{item.placeholder}</code>
+                        <span><strong>Front:</strong> {item.frontKey}</span>
+                        <span><strong>Source:</strong> {item.source}</span>
+                        <span>{item.description}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
+              </div>
+
+              <div className="prompt-admin-guide-card">
+                <h3>Guide rapide de test (pas a pas)</h3>
+                <ol className="prompt-admin-guide-steps">
+                  {PROMPT_TEST_STEPS.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
               </div>
             </div>
           ) : null}
@@ -500,6 +813,17 @@ const PromptAdminLuxe = () => {
               </div>
             </div>
 
+            <div className="prompt-admin-field">
+              <label htmlFor="version-note">Note de version (optionnel)</label>
+              <input
+                id="version-note"
+                className="input-luxe"
+                value={newVersionNote}
+                onChange={(event) => setNewVersionNote(event.target.value)}
+                placeholder="Ex: Variante anniversaire plus premium"
+              />
+            </div>
+
             <div className="prompt-admin-editor-actions">
               <button
                 type="button"
@@ -623,23 +947,63 @@ const PromptAdminLuxe = () => {
               {(templateVersions?.versions || []).length === 0 ? (
                 <p className="prompt-admin-empty">Aucune version stockee.</p>
               ) : (
-                (templateVersions?.versions || []).map((versionRow) => (
-                  <div
-                    key={versionRow.id || versionRow.version}
-                    className={`prompt-admin-version-row ${
-                      Number(versionRow.version) === Number(activeVersion) ? 'is-active' : ''
-                    }`}
-                  >
-                    <div>
-                      <strong>v{versionRow.version}</strong>
-                      <span>{versionRow.status || '-'}</span>
+                (templateVersions?.versions || []).map((versionRow) => {
+                  const rowKey = getVersionRowKey(versionRow);
+                  const rowNote = versionNotesById[rowKey] ?? versionRow?.note ?? '';
+                  const isRowActive = Number(versionRow.version) === Number(activeVersion);
+                  const isSavingNote = savingVersionNoteKey === rowKey;
+                  const isDeleting = deletingVersionKey === rowKey;
+
+                  return (
+                    <div
+                      key={rowKey}
+                      className={`prompt-admin-version-row ${isRowActive ? 'is-active' : ''}`}
+                    >
+                      <div className="prompt-admin-version-main">
+                        <div className="prompt-admin-version-title">
+                          {versionRow?.note ? (
+                            <span className="prompt-admin-version-note-pill">{versionRow.note}</span>
+                          ) : null}
+                          <strong>v{versionRow.version}</strong>
+                          {isRowActive ? (
+                            <span className="prompt-admin-version-active-badge">active</span>
+                          ) : null}
+                          <span>{versionRow.status || '-'}</span>
+                        </div>
+                        <div className="prompt-admin-version-meta">
+                          <span>{formatDateTime(versionRow.created_at)}</span>
+                          <span>{versionRow.created_by || '-'}</span>
+                        </div>
+                      </div>
+
+                      <div className="prompt-admin-version-actions">
+                        <input
+                          className="input-luxe prompt-admin-version-note-input"
+                          value={rowNote}
+                          onChange={(event) => handleVersionNoteChange(versionRow, event.target.value)}
+                          placeholder="Note courte pour cette version"
+                          disabled={isDeleting}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => handleSaveVersionNote(versionRow)}
+                          disabled={isSavingNote || isDeleting}
+                        >
+                          {isSavingNote ? 'Note...' : 'Enregistrer note'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline prompt-admin-version-delete-btn"
+                          onClick={() => handleDeleteVersion(versionRow)}
+                          disabled={isDeleting || isSavingNote}
+                        >
+                          {isDeleting ? 'Suppression...' : 'Supprimer'}
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <span>{formatDateTime(versionRow.created_at)}</span>
-                      <span>{versionRow.created_by || '-'}</span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </article>

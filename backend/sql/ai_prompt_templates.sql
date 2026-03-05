@@ -20,6 +20,7 @@ create table if not exists public.ai_prompt_versions (
   version integer not null,
   system_prompt text not null,
   user_prompt_template text not null,
+  note text,
   temperature numeric(4,2),
   max_tokens integer,
   status text not null default 'published',
@@ -27,6 +28,9 @@ create table if not exists public.ai_prompt_versions (
   created_at timestamptz not null default now(),
   constraint ai_prompt_versions_unique unique (template_id, version)
 );
+
+alter table if exists public.ai_prompt_versions
+  add column if not exists note text;
 
 create index if not exists ai_prompt_templates_lookup_idx
   on public.ai_prompt_templates(prompt_key, event_type, locale);

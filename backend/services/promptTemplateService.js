@@ -227,24 +227,43 @@ async function buildPrompt({ promptKey, eventType = 'generique', locale = 'fr', 
   };
 }
 
-async function listPromptVersions({ promptKey, eventType = '*', locale = 'fr' }) {
+async function getScopedTemplateRecord({
+  promptKey,
+  eventType = '*',
+  locale = 'fr'
+}) {
+  const normalizedPromptKey = normalizeText(promptKey);
   const normalizedEventType = normalizeText(eventType, '*').toLowerCase();
   const normalizedLocale = normalizeText(locale, 'fr');
 
   const { data: template, error: templateError } = await supabase
     .from('ai_prompt_templates')
     .select('id, prompt_key, event_type, locale, active_version')
-    .eq('prompt_key', promptKey)
+    .eq('prompt_key', normalizedPromptKey)
     .eq('event_type', normalizedEventType)
     .eq('locale', normalizedLocale)
     .maybeSingle();
 
   if (templateError) throw templateError;
+  return {
+    template,
+    normalizedPromptKey,
+    normalizedEventType,
+    normalizedLocale
+  };
+}
+
+async function listPromptVersions({ promptKey, eventType = '*', locale = 'fr' }) {
+  const { template } = await getScopedTemplateRecord({
+    promptKey,
+    eventType,
+    locale
+  });
   if (!template) return null;
 
   const { data: versions, error: versionsError } = await supabase
     .from('ai_prompt_versions')
-    .select('id, version, temperature, max_tokens, status, created_by, created_at')
+    .select('id, version, note, temperature, max_tokens, status, created_by, created_at')
     .eq('template_id', template.id)
     .order('version', { ascending: false });
 
@@ -264,6 +283,7 @@ async function upsertPromptVersion({
   userPromptTemplate,
   temperature,
   maxTokens,
+  note = '',
   status = 'published',
   publish = true,
   createdBy = ''
@@ -273,6 +293,7 @@ async function upsertPromptVersion({
   const normalizedLocale = normalizeText(locale, 'fr');
   const normalizedSystemPrompt = normalizeText(systemPrompt);
   const normalizedUserPromptTemplate = normalizeText(userPromptTemplate);
+  const normalizedNote = normalizeText(note);
   const normalizedStatus = normalizeText(status, 'published');
   const normalizedCreatedBy = normalizeText(createdBy);
 
@@ -334,11 +355,12 @@ async function upsertPromptVersion({
         user_prompt_template: normalizedUserPromptTemplate,
         temperature: Number.isFinite(Number(temperature)) ? Number(temperature) : null,
         max_tokens: Number.isFinite(Number(maxTokens)) ? Number(maxTokens) : null,
+        note: normalizedNote || null,
         status: normalizedStatus,
         created_by: normalizedCreatedBy || null
       }
     ])
-    .select('id, version, status, temperature, max_tokens, created_at')
+    .select('id, version, note, status, temperature, max_tokens, created_at')
     .single();
 
   if (insertVersionError) throw insertVersionError;
@@ -367,6 +389,124 @@ async function upsertPromptVersion({
   };
 }
 
+async function updatePromptVersionNote({
+  promptKey,
+  eventType = '*',
+  locale = 'fr',
+  version,
+  note = ''
+}) {
+  const normalizedVersion = Number(version);
+  if (!Number.isInteger(normalizedVersion) || normalizedVersion <= 0) {
+    throw new Error('Version invalide.');
+  }
+
+  const { template } = await getScopedTemplateRecord({
+    promptKey,
+    eventType,
+    locale
+  });
+
+  if (!template) {
+    throw new Error('Template introuvable pour ce scope.');
+  }
+
+  const normalizedNote = normalizeText(note);
+
+  const { data: updatedVersion, error: updateError } = await supabase
+    .from('ai_prompt_versions')
+    .update({
+      note: normalizedNote || null
+    })
+    .eq('template_id', template.id)
+    .eq('version', normalizedVersion)
+    .select('id, version, note, status, created_by, created_at')
+    .maybeSingle();
+
+  if (updateError) throw updateError;
+  if (!updatedVersion) {
+    throw new Error(`Version ${normalizedVersion} introuvable.`);
+  }
+
+  return {
+    templateId: template.id,
+    activeVersion: template.active_version,
+    updatedVersion
+  };
+}
+
+async function deletePromptVersion({
+  promptKey,
+  eventType = '*',
+  locale = 'fr',
+  version
+}) {
+  const normalizedVersion = Number(version);
+  if (!Number.isInteger(normalizedVersion) || normalizedVersion <= 0) {
+    throw new Error('Version invalide.');
+  }
+
+  const { template } = await getScopedTemplateRecord({
+    promptKey,
+    eventType,
+    locale
+  });
+
+  if (!template) {
+    throw new Error('Template introuvable pour ce scope.');
+  }
+
+  const { data: existingVersions, error: listError } = await supabase
+    .from('ai_prompt_versions')
+    .select('id, version')
+    .eq('template_id', template.id)
+    .order('version', { ascending: false });
+
+  if (listError) throw listError;
+
+  const versionExists = (existingVersions || []).some(
+    (versionRow) => Number(versionRow.version) === normalizedVersion
+  );
+  if (!versionExists) {
+    throw new Error(`Version ${normalizedVersion} introuvable.`);
+  }
+
+  const { error: deleteError } = await supabase
+    .from('ai_prompt_versions')
+    .delete()
+    .eq('template_id', template.id)
+    .eq('version', normalizedVersion);
+
+  if (deleteError) throw deleteError;
+
+  let nextActiveVersion = template.active_version;
+  if (Number(template.active_version) === normalizedVersion) {
+    const remainingVersions = (existingVersions || [])
+      .map((versionRow) => Number(versionRow.version))
+      .filter((versionNumber) => versionNumber !== normalizedVersion)
+      .sort((left, right) => right - left);
+    nextActiveVersion = remainingVersions[0] || 0;
+
+    const { error: updateTemplateError } = await supabase
+      .from('ai_prompt_templates')
+      .update({
+        active_version: nextActiveVersion,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', template.id);
+
+    if (updateTemplateError) throw updateTemplateError;
+  }
+
+  clearPromptCache();
+
+  return {
+    templateId: template.id,
+    deletedVersion: normalizedVersion,
+    activeVersion: nextActiveVersion
+  };
+}
+
 module.exports = {
   PROMPT_KEYS,
   DEFAULT_PROMPTS,
@@ -375,5 +515,7 @@ module.exports = {
   getActivePromptConfig,
   listPromptVersions,
   upsertPromptVersion,
+  updatePromptVersionNote,
+  deletePromptVersion,
   clearPromptCache
 };
