@@ -20,12 +20,28 @@ const Step1Questions = ({
   const isValidated = chapter?.questions_validated || false;
   const isOrganizer = Boolean(user && book && user.id === book.owner_id);
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
+  const chapterLocked = chapter?.isChapterClosed || false;
 
   useEffect(() => {
     setLocalQuestions(chapter?.questions_ia || []);
   }, [chapter?.questions_ia]);
 
+  useEffect(() => {
+    if (!chapterLocked) {
+      return;
+    }
+
+    setIsEditing(false);
+    setEditingQuestions(null);
+    setNewQuestion('');
+  }, [chapterLocked]);
+
   const generateAIQuestions = async () => {
+    if (chapterLocked) {
+      setError('Ce chapitre est verrouille apres validation finale.');
+      return;
+    }
+
     try {
       setGenerating(true);
       setError('');
@@ -80,6 +96,11 @@ const Step1Questions = ({
   };
 
   const handleEdit = () => {
+    if (chapterLocked) {
+      setError('Ce chapitre est verrouille apres validation finale.');
+      return;
+    }
+
     setEditingQuestions({
       id: chapter.id,
       questions: localQuestions
@@ -88,6 +109,11 @@ const Step1Questions = ({
   };
 
   const handleSaveQuestions = async () => {
+    if (chapterLocked) {
+      setError('Ce chapitre est verrouille apres validation finale.');
+      return;
+    }
+
     if (!editingQuestions) {
       return;
     }
@@ -112,6 +138,10 @@ const Step1Questions = ({
   };
 
   const handleAddQuestion = () => {
+    if (chapterLocked) {
+      return;
+    }
+
     if (!newQuestion.trim() || !editingQuestions) {
       return;
     }
@@ -124,6 +154,10 @@ const Step1Questions = ({
   };
 
   const handleRemoveQuestion = (index) => {
+    if (chapterLocked) {
+      return;
+    }
+
     if (!editingQuestions) {
       return;
     }
@@ -141,6 +175,11 @@ const Step1Questions = ({
   };
 
   const handleValidate = async () => {
+    if (chapterLocked) {
+      setError('Ce chapitre est verrouille apres validation finale.');
+      return;
+    }
+
     try {
       setError('');
       await onUpdateChapter(chapter.id, { questions_validated: true });
@@ -181,6 +220,7 @@ const Step1Questions = ({
                   <button
                     onClick={() => handleRemoveQuestion(index)}
                     className="btn-outline"
+                    disabled={chapterLocked || saving}
                     style={{
                       padding: '2px 8px',
                       borderColor: '#dc3545',
@@ -203,10 +243,12 @@ const Step1Questions = ({
                 onChange={(event) => setNewQuestion(event.target.value)}
                 className="input-luxe"
                 placeholder="Nouvelle question"
+                disabled={chapterLocked || saving}
               />
               <button
                 onClick={handleAddQuestion}
                 className="btn btn-primary"
+                disabled={chapterLocked || saving}
                 style={{ padding: '0 20px', whiteSpace: 'nowrap' }}
               >
                 Ajouter
@@ -275,7 +317,13 @@ const Step1Questions = ({
               )}
         </p>
 
-        {isOrganizer && !isValidated && (
+        {chapterLocked && (
+          <div className="validated-message" style={{ background: 'rgba(255, 255, 255, 0.72)', color: 'var(--text-light)' }}>
+            Chapitre verrouille: la validation finale bloque toute modification des etapes.
+          </div>
+        )}
+
+        {isOrganizer && !isValidated && !chapterLocked && (
           <div className="questions-actions">
             <button
               onClick={generateAIQuestions}
@@ -304,7 +352,7 @@ const Step1Questions = ({
           </div>
         )}
 
-        {!isOrganizer && !isValidated && (
+        {!isOrganizer && !isValidated && !chapterLocked && (
           <div className="validated-message" style={{ background: 'rgba(255, 255, 255, 0.72)', color: 'var(--text-light)' }}>
             Seul l'organisateur peut modifier les questions
           </div>

@@ -1,9 +1,98 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import '../BookLuxe.css';
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
+const EDITABLE_BLOCK_SELECTOR = 'p, li, blockquote';
+
+const escapeHtml = (value = '') => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const normalizePlainText = (text = '') => text.replace(/\r\n/g, '\n').trim();
+
+const splitPlainTextBlocks = (text = '') => normalizePlainText(text)
+  .split(/\n{2,}/)
+  .map((block) => block.trim())
+  .filter(Boolean);
+
+const htmlToPlainText = (html = '') => {
+  if (!html) {
+    return '';
+  }
+
+  if (typeof window !== 'undefined' && typeof window.DOMParser !== 'undefined') {
+    const doc = new window.DOMParser().parseFromString(html, 'text/html');
+    const blocks = Array.from(doc.body.querySelectorAll(EDITABLE_BLOCK_SELECTOR));
+
+    if (blocks.length > 0) {
+      return blocks
+        .map((node) => (node.textContent || '').trim())
+        .filter(Boolean)
+        .join('\n\n');
+    }
+
+    return (doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+};
+
+const plainTextToHtml = (text = '') => {
+  const textBlocks = splitPlainTextBlocks(text);
+  if (textBlocks.length === 0) {
+    return '';
+  }
+
+  return textBlocks
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br />')}</p>`)
+    .join('\n');
+};
+
+const mergePlainTextIntoHtml = (templateHtml = '', text = '') => {
+  const textBlocks = splitPlainTextBlocks(text);
+
+  if (textBlocks.length === 0) {
+    return '';
+  }
+
+  if (!templateHtml || typeof window === 'undefined' || typeof window.DOMParser === 'undefined') {
+    return plainTextToHtml(text);
+  }
+
+  const doc = new window.DOMParser().parseFromString(templateHtml, 'text/html');
+  const editableNodes = Array.from(doc.body.querySelectorAll(EDITABLE_BLOCK_SELECTOR));
+
+  if (editableNodes.length === 0) {
+    return plainTextToHtml(text);
+  }
+
+  const overlapCount = Math.min(editableNodes.length, textBlocks.length);
+
+  for (let index = 0; index < overlapCount; index += 1) {
+    editableNodes[index].innerHTML = escapeHtml(textBlocks[index]).replace(/\n/g, '<br />');
+  }
+
+  for (let index = overlapCount; index < editableNodes.length; index += 1) {
+    editableNodes[index].textContent = '';
+  }
+
+  if (textBlocks.length > editableNodes.length) {
+    const appendTarget = doc.body.querySelector('.draft-book-body') || doc.body;
+
+    textBlocks.slice(editableNodes.length).forEach((blockText) => {
+      const paragraph = doc.createElement('p');
+      paragraph.innerHTML = escapeHtml(blockText).replace(/\n/g, '<br />');
+      appendTarget.appendChild(paragraph);
+    });
+  }
+
+  return doc.body.innerHTML.trim();
+};
 
 const Step4Cloture = ({
   chapter,
@@ -20,7 +109,8 @@ const Step4Cloture = ({
   const [notice, setNotice] = useState('');
   const [summary, setSummary] = useState(null);
   const [busyAction, setBusyAction] = useState('');
-  const [editorHtml, setEditorHtml] = useState(chapter?.chapterDraft?.html || '');
+  const [draftHtmlForPreview, setDraftHtmlForPreview] = useState(chapter?.chapterDraft?.html || '');
+  const [editorText, setEditorText] = useState(htmlToPlainText(chapter?.chapterDraft?.html || ''));
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
@@ -28,7 +118,8 @@ const Step4Cloture = ({
   const isOrganizer = user && book && user.id === book.owner_id;
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
   const contributionsClosed = chapter?.contributionsClosed || false;
-  const generationUnlocked = isSoloMode || contributionsClosed;
+  const chapterLocked = chapter?.isChapterClosed || false;
+  const generationUnlocked = !chapterLocked && (isSoloMode || contributionsClosed);
   const chapterDraft = chapter?.chapterDraft || null;
   const draftStatus = chapterDraft?.status || 'idle';
   const isDraftValidated = draftStatus === 'validated';
@@ -65,10 +156,14 @@ const Step4Cloture = ({
     : fallbackVisibleContributions.filter(
         (contribution) => !contribution.approved && !contribution.needs_revision
       ).length;
-  const normalizedHtml = (editorHtml || '').trim();
+  const normalizedText = (editorText || '').trim();
+  const normalizedHtml = plainTextToHtml(normalizedText);
+  const previewHtml = (draftHtmlForPreview || chapterDraft?.html || normalizedHtml || '').trim();
+  const hasDraftContent = Boolean(previewHtml || normalizedText);
   const canGenerateWithAI = !isDraftValidated && generationUnlocked && remainingGenerations > 0;
-  const canSaveRevision = !isDraftValidated && Boolean(normalizedHtml);
-  const canFinalize = !isDraftValidated && generationUnlocked && Boolean(normalizedHtml);
+  const canSaveRevision = !isDraftValidated && !chapterLocked && Boolean(normalizedText);
+  const canFinalize = !isDraftValidated && generationUnlocked && Boolean(normalizedText);
+  const showFinalizeAction = !isDraftValidated && hasDraftContent;
   const latestDraftTimestamp =
     chapterDraft?.finalizedAt ||
     chapterDraft?.lastEditedAt ||
@@ -113,7 +208,9 @@ const Step4Cloture = ({
   ].filter(Boolean);
 
   useEffect(() => {
-    setEditorHtml(chapter?.chapterDraft?.html || '');
+    const nextDraftHtml = chapter?.chapterDraft?.html || '';
+    setDraftHtmlForPreview(nextDraftHtml);
+    setEditorText(htmlToPlainText(chapter?.chapterDraft?.html || ''));
     setError('');
     setNotice('');
     setShowPreviewModal(false);
@@ -121,54 +218,87 @@ const Step4Cloture = ({
     setShowFinalizeConfirm(false);
   }, [chapter?.id, chapter?.chapterDraft?.html, chapter?.chapterDraft?.status]);
 
+  const loadSummary = useCallback(async () => {
+    if (!chapter?.id) {
+      setSummary(null);
+      return;
+    }
+
+    try {
+      const [{ data: invitesData, error: invitesError }, { data: contributionsData, error: contributionsError }] = await Promise.all([
+        supabase
+          .from('chapter_invites')
+          .select('accepted, contributed')
+          .eq('chapter_id', chapter.id),
+        supabase
+          .from('contributions')
+          .select('contributor_email, approved, needs_revision, is_finalized')
+          .eq('chapter_id', chapter.id)
+      ]);
+
+      if (invitesError) throw invitesError;
+      if (contributionsError) throw contributionsError;
+
+      const externalContributions = (contributionsData || []).filter(
+        (contribution) =>
+          contribution.contributor_email !== user?.email &&
+          contribution.contributor_email !== CHAPTER_STATE_EMAIL &&
+          contribution.contributor_email !== CHAPTER_DRAFT_EMAIL &&
+          contribution.is_finalized !== false
+      );
+      const respondedInvitesCount = (invitesData || []).filter(
+        (invite) => invite.accepted || invite.contributed
+      ).length;
+
+      setSummary({
+        invitationsCount: (invitesData || []).length,
+        receivedCount: Math.max(externalContributions.length, respondedInvitesCount),
+        pendingValidationCount: externalContributions.filter(
+          (contribution) => !contribution.approved && !contribution.needs_revision
+        ).length
+      });
+    } catch (loadError) {
+      console.error('Erreur chargement recap chapitre:', loadError);
+      setSummary(null);
+    }
+  }, [chapter?.id, user?.email]);
+
   useEffect(() => {
-    const loadSummary = async () => {
-      if (!chapter?.id) {
-        setSummary(null);
-        return;
-      }
-
-      try {
-        const [{ data: invitesData, error: invitesError }, { data: contributionsData, error: contributionsError }] = await Promise.all([
-          supabase
-            .from('chapter_invites')
-            .select('accepted, contributed')
-            .eq('chapter_id', chapter.id),
-          supabase
-            .from('contributions')
-            .select('contributor_email, approved, needs_revision, is_finalized')
-            .eq('chapter_id', chapter.id)
-        ]);
-
-        if (invitesError) throw invitesError;
-        if (contributionsError) throw contributionsError;
-
-        const externalContributions = (contributionsData || []).filter(
-          (contribution) =>
-            contribution.contributor_email !== user?.email &&
-            contribution.contributor_email !== CHAPTER_STATE_EMAIL &&
-            contribution.contributor_email !== CHAPTER_DRAFT_EMAIL &&
-            contribution.is_finalized !== false
-        );
-        const respondedInvitesCount = (invitesData || []).filter(
-          (invite) => invite.accepted || invite.contributed
-        ).length;
-
-        setSummary({
-          invitationsCount: (invitesData || []).length,
-          receivedCount: Math.max(externalContributions.length, respondedInvitesCount),
-          pendingValidationCount: externalContributions.filter(
-            (contribution) => !contribution.approved && !contribution.needs_revision
-          ).length
-        });
-      } catch (loadError) {
-        console.error('Erreur chargement recap chapitre:', loadError);
-        setSummary(null);
-      }
-    };
-
     loadSummary();
-  }, [chapter?.id, chapter?.workflowState, chapter?.chapterDraft?.status, user?.email]);
+  }, [loadSummary, chapter?.workflowState, chapter?.chapterDraft?.status]);
+
+  useEffect(() => {
+    if (!chapter?.id) {
+      return undefined;
+    }
+
+    const realtimeChannel = supabase
+      .channel(`step4-summary-${chapter.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contributions', filter: `chapter_id=eq.${chapter.id}` },
+        () => {
+          loadSummary();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chapter_invites', filter: `chapter_id=eq.${chapter.id}` },
+        () => {
+          loadSummary();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(realtimeChannel);
+    };
+  }, [chapter?.id, loadSummary]);
+
+  const buildHtmlToPersist = () => mergePlainTextIntoHtml(
+    draftHtmlForPreview || chapterDraft?.html || '',
+    normalizedText
+  );
 
   const handleGenerate = async () => {
     if (!generationUnlocked) {
@@ -188,9 +318,11 @@ const Step4Cloture = ({
     try {
       const result = await onGenerateChapterDraft(chapter.id);
       if (result?.draft?.html) {
-        setEditorHtml(result.draft.html);
+        setDraftHtmlForPreview(result.draft.html);
+        setEditorText(htmlToPlainText(result.draft.html));
       }
-      setNotice('Brouillon de chapitre genere. Vous pouvez maintenant le relire et le reviser.');
+      setNotice('Chapitre genere. Vous pouvez relire et ajuster le texte avant validation.');
+      setShowEditorModal(true);
     } catch (generationError) {
       setError(generationError.message || 'Erreur lors de la generation du chapitre.');
     } finally {
@@ -198,9 +330,11 @@ const Step4Cloture = ({
     }
   };
 
-  const handleSaveRevision = async () => {
-    if (!normalizedHtml) {
-      setError('Aucun HTML a enregistrer pour ce chapitre.');
+  const handleSaveRevision = async ({ closeAfterSave = false } = {}) => {
+    const htmlToPersist = buildHtmlToPersist();
+
+    if (!htmlToPersist) {
+      setError('Aucun texte a enregistrer pour ce chapitre.');
       return;
     }
 
@@ -214,11 +348,15 @@ const Step4Cloture = ({
     setNotice('');
 
     try {
-      const result = await onSaveChapterDraft(chapter.id, normalizedHtml);
+      const result = await onSaveChapterDraft(chapter.id, htmlToPersist);
       if (result?.draft?.html) {
-        setEditorHtml(result.draft.html);
+        setDraftHtmlForPreview(result.draft.html);
+        setEditorText(htmlToPlainText(result.draft.html));
       }
-      setNotice('Revision enregistree.');
+      setNotice('Texte du chapitre enregistre.');
+      if (closeAfterSave) {
+        setShowEditorModal(false);
+      }
     } catch (saveError) {
       setError(saveError.message || 'Erreur lors de la sauvegarde.');
     } finally {
@@ -227,12 +365,14 @@ const Step4Cloture = ({
   };
 
   const requestFinalize = () => {
+    const htmlToPersist = buildHtmlToPersist();
+
     if (!generationUnlocked) {
       setError('Fermez d abord les contributions avant la validation finale.');
       return;
     }
 
-    if (!normalizedHtml) {
+    if (!htmlToPersist) {
       setError('Generez ou revisez le brouillon avant la validation finale.');
       return;
     }
@@ -248,14 +388,22 @@ const Step4Cloture = ({
   };
 
   const handleFinalize = async () => {
+    const htmlToPersist = buildHtmlToPersist();
+
+    if (!htmlToPersist) {
+      setError('Generez ou revisez le brouillon avant la validation finale.');
+      return;
+    }
+
     setBusyAction('finalize');
     setError('');
     setNotice('');
 
     try {
-      const result = await onFinalizeChapterDraft(chapter.id, normalizedHtml);
+      const result = await onFinalizeChapterDraft(chapter.id, htmlToPersist);
       if (result?.draft?.html) {
-        setEditorHtml(result.draft.html);
+        setDraftHtmlForPreview(result.draft.html);
+        setEditorText(htmlToPlainText(result.draft.html));
       }
       setNotice('Le chapitre a ete valide definitivement et ferme.');
     } catch (finalizeError) {
@@ -267,14 +415,23 @@ const Step4Cloture = ({
   };
 
   const handleRestoreSavedVersion = () => {
-    if (!chapterDraft?.html) {
+    const sourceHtml = draftHtmlForPreview || chapterDraft?.html || '';
+
+    if (!sourceHtml) {
       setError('Aucune version enregistree a restaurer pour ce chapitre.');
       return;
     }
 
-    setEditorHtml(chapterDraft.html);
+    setEditorText(htmlToPlainText(sourceHtml));
     setError('');
-    setNotice('La derniere version enregistree a ete restauree dans l editeur.');
+    setNotice('La derniere version enregistree a ete restauree.');
+  };
+
+  const handleCancelEditing = () => {
+    const sourceHtml = draftHtmlForPreview || chapterDraft?.html || '';
+    setEditorText(htmlToPlainText(sourceHtml));
+    setError('');
+    setShowEditorModal(false);
   };
 
   if (!isOrganizer) {
@@ -306,7 +463,7 @@ const Step4Cloture = ({
         <p style={{ margin: 0, color: 'var(--ink)' }}>
           {isDraftValidated
             ? 'Le chapitre est valide definitivement. Le contenu ne peut plus etre modifie.'
-            : 'Generez un brouillon HTML de 4 pages, ajustez-le si besoin puis validez-le definitivement.'}
+            : 'Generez le chapitre, ajustez le texte si besoin puis lancez la validation finale.'}
         </p>
       </div>
 
@@ -353,53 +510,50 @@ const Step4Cloture = ({
         </div>
 
         <div className="chapter-draft-action-row">
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={handleGenerate}
-            disabled={!canGenerateWithAI || busyAction !== ''}
-          >
-            {busyAction === 'generate'
-              ? 'Generation...'
-              : (generationCount > 0 ? 'Regenerer avec IA' : 'Generer ce chapitre')}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={requestFinalize}
-            disabled={!canFinalize || busyAction !== ''}
-          >
-            {busyAction === 'finalize' ? 'Validation...' : 'Validation finale'}
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => setShowEditorModal(true)}
-            disabled={isDraftValidated ? !normalizedHtml : false}
-          >
-            Modifier le chapitre
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => setShowPreviewModal(true)}
-            disabled={!normalizedHtml}
-          >
-            Voir l apercu
-          </button>
-        </div>
+          {!isDraftValidated && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={handleGenerate}
+              disabled={!canGenerateWithAI || busyAction !== ''}
+            >
+              {busyAction === 'generate'
+                ? 'Generation...'
+                : (
+                  generationCount > 0
+                    ? `Regenerer le chapitre (${remainingGenerations} restant${remainingGenerations > 1 ? 's' : ''})`
+                    : 'Generer le chapitre'
+                )}
+            </button>
+          )}
 
-        {chapterDraft?.summary && (
-          <div className="chapter-draft-summary-callout">
-            <div className="label-gold">Resume retenu pour le chapitre suivant</div>
-            <p style={{ margin: '8px 0 0', color: 'var(--ink)' }}>{chapterDraft.summary}</p>
-          </div>
-        )}
+          {hasDraftContent && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setShowPreviewModal(true)}
+              disabled={!previewHtml}
+            >
+              Voir l apercu
+            </button>
+          )}
+
+          {showFinalizeAction && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={requestFinalize}
+              disabled={!canFinalize || busyAction !== ''}
+            >
+              {busyAction === 'finalize' ? 'Validation...' : 'Validation finale'}
+            </button>
+          )}
+        </div>
 
         <div className="chapter-draft-summary-card is-active" style={{ marginTop: 'var(--space-sm)' }}>
           <div className="chapter-draft-summary-label">Utilisation</div>
           <div className="chapter-draft-summary-value" style={{ fontSize: '14px', fontWeight: '500' }}>
-            Le brouillon se travaille maintenant via le bouton "Modifier le chapitre", puis se relit dans "Voir l apercu".
+            Le texte du chapitre se corrige dans la fenetre d edition, sans afficher les balises HTML.
           </div>
         </div>
       </div>
@@ -430,6 +584,18 @@ const Step4Cloture = ({
             </div>
 
             <div className="book-draft-modal-actions">
+              {!isDraftValidated && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    setShowPreviewModal(false);
+                    setShowEditorModal(true);
+                  }}
+                >
+                  Modifier le texte
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-primary"
@@ -440,8 +606,8 @@ const Step4Cloture = ({
             </div>
 
             <div className="book-draft-preview">
-              {normalizedHtml ? (
-                <div dangerouslySetInnerHTML={{ __html: normalizedHtml }} />
+              {previewHtml ? (
+                <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
               ) : (
                 <p className="draft-book-empty">Aucun brouillon n a encore ete genere pour ce chapitre.</p>
               )}
@@ -490,7 +656,7 @@ const Step4Cloture = ({
       )}
 
       {showEditorModal && (
-        <div className="modal-overlay" onClick={() => setShowEditorModal(false)}>
+        <div className="modal-overlay" onClick={handleCancelEditing}>
           <div
             className="modal-content book-draft-modal chapter-draft-editor-modal"
             onClick={(event) => event.stopPropagation()}
@@ -502,13 +668,13 @@ const Step4Cloture = ({
                   {chapter?.order_index === 0 ? 'Introduction' : chapter?.title}
                 </h3>
                 <div className="book-draft-modal-meta">
-                  Travaillez le HTML confortablement avant de revenir au workflow.
+                  Ajustez uniquement le texte du chapitre, sans balises HTML visibles.
                 </div>
               </div>
               <button
                 type="button"
                 className="modal-close"
-                onClick={() => setShowEditorModal(false)}
+                onClick={handleCancelEditing}
               >
                 x
               </button>
@@ -525,40 +691,29 @@ const Step4Cloture = ({
               </button>
               <button
                 type="button"
-                className="btn btn-outline"
-                onClick={handleSaveRevision}
+                className="btn btn-primary"
+                onClick={() => handleSaveRevision({ closeAfterSave: true })}
                 disabled={!canSaveRevision || busyAction !== ''}
               >
-                {busyAction === 'save' ? 'Enregistrement...' : 'Enregistrer'}
+                {busyAction === 'save' ? 'Enregistrement...' : 'Valider les modifications'}
               </button>
               <button
                 type="button"
                 className="btn btn-outline"
-                onClick={() => {
-                  setShowEditorModal(false);
-                  setShowPreviewModal(true);
-                }}
-                disabled={!normalizedHtml}
+                onClick={handleCancelEditing}
               >
-                Voir l apercu
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setShowEditorModal(false)}
-              >
-                Revenir au chapitre
+                Annuler
               </button>
             </div>
 
             <div className="chapter-draft-editor-modal-body">
               <textarea
-                value={editorHtml}
-                onChange={(event) => setEditorHtml(event.target.value)}
+                value={editorText}
+                onChange={(event) => setEditorText(event.target.value)}
                 className="input-luxe chapter-draft-editor chapter-draft-editor-fullscreen"
                 rows={22}
                 disabled={isDraftValidated}
-                placeholder="Le HTML du chapitre apparaitra ici apres la generation."
+                placeholder="Le texte du chapitre apparaitra ici apres la generation."
               />
             </div>
           </div>

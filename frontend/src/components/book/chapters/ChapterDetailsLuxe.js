@@ -60,16 +60,33 @@ const ChapterDetailsLuxe = ({
     );
   }
 
-  const displayTitle = chapter?.order_index === 0 ? 'Introduction' : chapter?.title;
+  const isSoloMode = Boolean(book?.cover_config?.soloMode);
+  const totalSteps = isSoloMode ? 3 : 4;
+  const completedSteps = [
+    Boolean(chapter?.questions_validated),
+    Boolean(chapter?.isFinalized),
+    ...(isSoloMode ? [] : [Boolean(chapter?.contributionsClosed)]),
+    Boolean(chapter?.isChapterClosed)
+  ].filter(Boolean).length;
+  const progressPercent = Math.round((completedSteps / totalSteps) * 100);
 
   return (
     <>
-      <div className="chapter-details-header">
-        <h2>{displayTitle}</h2>
+      <div className="chapter-progress-wrap" role="status" aria-live="polite">
+        <div className="chapter-progress-row">
+          <span className="chapter-progress-label">Progression du chapitre</span>
+          <span className="chapter-progress-value">{progressPercent}%</span>
+        </div>
+        <div className="chapter-progress-track" aria-hidden="true">
+          <span
+            className="chapter-progress-fill"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
 
       <p className="chapter-subtitle">
-        ALBUM PRESTIGE | {chaptersCount} CHAPITRES
+        ALBUM PRESTIGE | {chaptersCount} CHAPITRES | {completedSteps}/{totalSteps} ETAPES
       </p>
 
       <ChapterWorkflowLuxe

@@ -5,7 +5,7 @@ import Step3Invitations from './Step3Invitations';
 import Step4Cloture from './Step4Cloture';
 import '../BookLuxe.css';
 
-const getDefaultExpandedSections = ({
+const getDefaultActiveStep = ({
   questionsValidated,
   hasContributed,
   contributionsClosed,
@@ -13,56 +13,26 @@ const getDefaultExpandedSections = ({
   isSoloMode
 }) => {
   if (!questionsValidated) {
-    return {
-      step1: true,
-      step2: false,
-      step3: false,
-      step4: false
-    };
+    return 'step1';
   }
 
   if (!hasContributed) {
-    return {
-      step1: false,
-      step2: true,
-      step3: false,
-      step4: false
-    };
+    return 'step2';
   }
 
   if (isSoloMode) {
-    return {
-      step1: false,
-      step2: false,
-      step3: false,
-      step4: !isClosed
-    };
+    return 'step4';
   }
 
   if (!contributionsClosed) {
-    return {
-      step1: false,
-      step2: false,
-      step3: true,
-      step4: false
-    };
+    return 'step3';
   }
 
   if (!isClosed) {
-    return {
-      step1: false,
-      step2: false,
-      step3: false,
-      step4: true
-    };
+    return 'step4';
   }
 
-  return {
-    step1: false,
-    step2: false,
-    step3: false,
-    step4: false
-  };
+  return 'step4';
 };
 
 const ChapterWorkflowLuxe = (props) => {
@@ -84,8 +54,8 @@ const ChapterWorkflowLuxe = (props) => {
   const chapterDraftStatus = chapter?.chapterDraft?.status || null;
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
   const completedMarker = '\u2713';
-  const [expandedSections, setExpandedSections] = useState(() =>
-    getDefaultExpandedSections({
+  const [activeStep, setActiveStep] = useState(() =>
+    getDefaultActiveStep({
       questionsValidated,
       hasContributed,
       contributionsClosed,
@@ -102,10 +72,6 @@ const ChapterWorkflowLuxe = (props) => {
     isSoloMode
   });
 
-  const toggleSection = (step) => {
-    setExpandedSections((prev) => ({ ...prev, [step]: !prev[step] }));
-  };
-
   useEffect(() => {
     const previousState = previousStateRef.current;
     const progressed =
@@ -117,15 +83,13 @@ const ChapterWorkflowLuxe = (props) => {
       previousState.isSoloMode !== isSoloMode;
 
     if (progressed) {
-      setExpandedSections(
-        getDefaultExpandedSections({
-          questionsValidated,
-          hasContributed,
-          contributionsClosed,
-          isClosed,
-          isSoloMode
-        })
-      );
+      setActiveStep(getDefaultActiveStep({
+        questionsValidated,
+        hasContributed,
+        contributionsClosed,
+        isClosed,
+        isSoloMode
+      }));
     }
 
     previousStateRef.current = {
@@ -138,112 +102,168 @@ const ChapterWorkflowLuxe = (props) => {
     };
   }, [questionsValidated, hasContributed, isFinalized, contributionsClosed, isClosed, isSoloMode]);
 
+  const steps = [
+    {
+      key: 'step1',
+      order: 1,
+      title: 'Questions pour vous aider',
+      completed: questionsValidated,
+      locked: isClosed && !questionsValidated,
+      status: {
+        tone: isClosed && !questionsValidated ? 'is-locked' : (questionsValidated ? 'is-complete' : 'is-todo'),
+        label: isClosed && !questionsValidated ? 'Verrouille' : (questionsValidated ? 'Valide' : 'A faire')
+      },
+      content: (
+        <Step1Questions
+          chapter={chapter}
+          user={user}
+          book={book}
+          onUpdateChapter={onUpdateChapter}
+        />
+      )
+    },
+    {
+      key: 'step2',
+      order: 2,
+      title: 'Votre contribution',
+      completed: isFinalized,
+      locked: !questionsValidated || (isClosed && !isFinalized),
+      status: {
+        tone: !questionsValidated
+          ? 'is-locked'
+          : ((isClosed && !isFinalized) ? 'is-locked' : (isFinalized ? 'is-complete' : (hasContributed ? 'is-draft' : 'is-todo'))),
+        label: !questionsValidated
+          ? 'Verrouille'
+          : ((isClosed && !isFinalized) ? 'Verrouille' : (isFinalized ? 'Validee' : (hasContributed ? 'Brouillon' : 'A faire')))
+      },
+      content: questionsValidated ? (
+        <Step2Contribution
+          chapter={chapter}
+          user={user}
+          book={book}
+          onSaveContribution={onSaveContribution}
+          onFinalizeContribution={onFinalizeContribution}
+        />
+      ) : (
+        <div className="workflow-content workflow-empty-state">
+          Validez d abord l etape 1 pour acceder a votre contribution.
+        </div>
+      )
+    },
+    ...(!isSoloMode ? [{
+      key: 'step3',
+      order: 3,
+      title: 'Inviter des contributeurs',
+      completed: contributionsClosed,
+      locked: !hasContributed || (isClosed && !contributionsClosed),
+      status: {
+        tone: !hasContributed
+          ? 'is-locked'
+          : ((isClosed && !contributionsClosed) ? 'is-locked' : (contributionsClosed ? 'is-complete' : (invitationsCount > 0 ? 'is-active' : 'is-todo'))),
+        label: !hasContributed
+          ? 'Verrouille'
+          : ((isClosed && !contributionsClosed) ? 'Verrouille' : (contributionsClosed ? 'Clos' : (invitationsCount > 0 ? `${invitationsCount}` : 'A faire')))
+      },
+      content: hasContributed ? (
+        <Step3Invitations
+          {...props}
+          hasContributed={hasContributed}
+        />
+      ) : (
+        <div className="workflow-content workflow-empty-state">
+          Finalisez d abord votre contribution (etape 2) pour inviter des participants.
+        </div>
+      )
+    }] : []),
+    {
+      key: 'step4',
+      order: 4,
+      title: 'Clore le chapitre',
+      completed: isClosed,
+      locked: false,
+      status: {
+        tone: isClosed ? 'is-complete' : (chapterDraftStatus === 'draft' ? 'is-draft' : 'is-muted'),
+        label: isClosed ? 'Clotur\u00e9' : (chapterDraftStatus === 'draft' ? 'Brouillon' : '')
+      },
+      content: <Step4Cloture {...props} />
+    }
+  ];
+
+  useEffect(() => {
+    if (!isSoloMode || activeStep !== 'step3') {
+      return;
+    }
+
+    setActiveStep(getDefaultActiveStep({
+      questionsValidated,
+      hasContributed,
+      contributionsClosed,
+      isClosed,
+      isSoloMode
+    }));
+  }, [activeStep, isSoloMode, questionsValidated, hasContributed, contributionsClosed, isClosed]);
+
+  const activeStepConfig = steps.find((step) => step.key === activeStep) || steps[0];
+
   return (
-    <div className="workflow-container" style={{ marginBottom: 'var(--space-xl)' }}>
-      <div className={`workflow-step ${questionsValidated ? 'completed' : ''}`}>
-        <div
-          className={`workflow-header ${expandedSections.step1 ? 'expanded' : ''}`}
-          onClick={() => toggleSection('step1')}
-        >
-          <span className="workflow-step-number">{questionsValidated ? completedMarker : '1'}</span>
-          <span className="workflow-step-title">Questions pour vous aider</span>
-          <span className={`workflow-step-status ${questionsValidated ? 'is-complete' : 'is-todo'}`}>
-            {questionsValidated ? 'Valide' : 'A faire'}
-          </span>
-        </div>
-        {expandedSections.step1 && (
-          <Step1Questions
-            chapter={chapter}
-            user={user}
-            book={book}
-            onUpdateChapter={onUpdateChapter}
-          />
-        )}
-      </div>
-
-      <div className={`workflow-step ${isFinalized ? 'completed' : ''} ${!questionsValidated ? 'locked' : ''}`}>
-        <div
-          className={`workflow-header ${expandedSections.step2 ? 'expanded' : ''}`}
-          onClick={() => questionsValidated && toggleSection('step2')}
-          style={{ cursor: questionsValidated ? 'pointer' : 'default' }}
-        >
-          <span className="workflow-step-number">
-            {isFinalized ? completedMarker : '2'}
-          </span>
-          <span className="workflow-step-title">Votre contribution</span>
-          <span
-            className={`workflow-step-status ${
-              !questionsValidated ? 'is-locked' :
-              isFinalized ? 'is-complete' :
-              hasContributed ? 'is-draft' : 'is-todo'
-            }`}
-          >
-            {!questionsValidated ? 'Verrouille' :
-             isFinalized ? 'Validee' :
-             hasContributed ? 'Brouillon' : 'A faire'}
-          </span>
-        </div>
-        {expandedSections.step2 && questionsValidated && (
-          <Step2Contribution
-            chapter={chapter}
-            user={user}
-            book={book}
-            onSaveContribution={onSaveContribution}
-            onFinalizeContribution={onFinalizeContribution}
-          />
-        )}
-      </div>
-
-      {!isSoloMode && (
-        <div className={`workflow-step ${contributionsClosed ? 'completed' : ''} ${!hasContributed ? 'locked' : ''}`}>
-          <div
-            className={`workflow-header ${expandedSections.step3 ? 'expanded' : ''}`}
-            onClick={() => hasContributed && toggleSection('step3')}
-            style={{ cursor: hasContributed ? 'pointer' : 'default' }}
-          >
-            <span className="workflow-step-number">{contributionsClosed ? completedMarker : '3'}</span>
-            <span className="workflow-step-title">Inviter des contributeurs</span>
-            <span
-              className={`workflow-step-status ${
-                !hasContributed ? 'is-locked' :
-                contributionsClosed ? 'is-complete' :
-                (invitationsCount > 0 ? 'is-active' : 'is-todo')
-              }`}
+    <div className="workflow-layout" style={{ marginBottom: 'var(--space-xl)' }}>
+      <aside className="workflow-steps-nav" aria-label="Etapes du chapitre">
+        <div className="workflow-steps-summary" aria-label="Sommaire compact des etapes">
+          {steps.map((step) => (
+            <button
+              key={`${step.key}-summary`}
+              type="button"
+              className={`workflow-step-chip ${step.completed ? 'completed' : ''} ${step.locked ? 'locked' : ''} ${activeStep === step.key ? 'active' : ''}`}
+              onClick={() => setActiveStep(step.key)}
+              aria-current={activeStep === step.key ? 'step' : undefined}
             >
-              {!hasContributed ? 'Verrouille' :
-               contributionsClosed ? 'Clos' :
-               (invitationsCount > 0 ? `${invitationsCount}` : 'A faire')}
-            </span>
-          </div>
-          {expandedSections.step3 && hasContributed && (
-            <Step3Invitations
-              {...props}
-              hasContributed={hasContributed}
-            />
-          )}
+              <span className="workflow-step-chip-number">
+                {step.completed ? completedMarker : `${step.order}`}
+              </span>
+              <span className="workflow-step-chip-text">
+                <span className="workflow-step-chip-label">Etape {step.order}</span>
+                <span className="workflow-step-chip-title">{step.title}</span>
+              </span>
+            </button>
+          ))}
         </div>
-      )}
 
-      <div className={`workflow-step ${isClosed ? 'completed' : ''}`}>
-        <div
-          className={`workflow-header ${expandedSections.step4 ? 'expanded' : ''}`}
-          onClick={() => toggleSection('step4')}
-        >
-          <span className="workflow-step-number">
-            {isClosed ? completedMarker : '4'}
-          </span>
-          <span className="workflow-step-title">Clore le chapitre</span>
-          <span
-            className={`workflow-step-status ${
-              isClosed ? 'is-complete' :
-              (chapterDraftStatus === 'draft' ? 'is-draft' : 'is-muted')
-            }`}
+        {steps.map((step) => (
+          <div
+            key={step.key}
+            className={`workflow-step ${step.completed ? 'completed' : ''} ${step.locked ? 'locked' : ''} ${activeStep === step.key ? 'active' : 'inactive'}`}
           >
-            {isClosed ? 'Clotur\u00e9' : (chapterDraftStatus === 'draft' ? 'Brouillon' : '')}
-          </span>
+            <button
+              type="button"
+              className={`workflow-header ${activeStep === step.key ? 'active' : ''}`}
+              onClick={() => setActiveStep(step.key)}
+              aria-current={activeStep === step.key ? 'step' : undefined}
+            >
+              <span className="workflow-step-number">{step.completed ? completedMarker : `${step.order}`}</span>
+              <span className="workflow-step-title-wrap">
+                <span className="workflow-step-title">{step.title}</span>
+                {activeStep === step.key && (
+                  <span className="workflow-step-focus-tag">
+                    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                      <path d="M8 1l1.85 3.75L14 5.36l-3 2.92.71 4.14L8 10.47l-3.71 1.95L5 8.28 2 5.36l4.15-.61L8 1z" />
+                    </svg>
+                    En cours
+                  </span>
+                )}
+              </span>
+              <span className={`workflow-step-status ${step.status.tone}`}>
+                {step.status.label}
+              </span>
+            </button>
+          </div>
+        ))}
+      </aside>
+
+      <section className="workflow-detail-panel">
+        <div key={activeStep} className="workflow-detail-stage">
+          {activeStepConfig.content}
         </div>
-        {expandedSections.step4 && <Step4Cloture {...props} />}
-      </div>
+      </section>
     </div>
   );
 };

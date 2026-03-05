@@ -5,6 +5,7 @@ import InviteSelectorLuxe from '../contributors/InviteSelectorLuxe';
 import '../BookLuxe.css';
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
+const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
 
 const Step3Invitations = ({
   chapter,
@@ -25,6 +26,7 @@ const Step3Invitations = ({
 
   const isOrganizer = user && book && user.id === book.owner_id;
   const contributionsClosed = chapter?.contributionsClosed || false;
+  const chapterLocked = chapter?.isChapterClosed || false;
 
   useEffect(() => {
     setError('');
@@ -39,6 +41,15 @@ const Step3Invitations = ({
     setInvitations(Array.isArray(chapter?.chapter_invites) ? chapter.chapter_invites : []);
     setLoading(false);
   }, [chapter?.id, chapter?.chapter_invites]);
+
+  useEffect(() => {
+    if (!chapterLocked) {
+      return;
+    }
+
+    setShowInviteSelector(false);
+    setShowCloseModal(false);
+  }, [chapterLocked]);
 
   const loadInvitations = async () => {
     try {
@@ -62,6 +73,7 @@ const Step3Invitations = ({
         (contribution) =>
           contribution.contributor_email !== user?.email &&
           contribution.contributor_email !== CHAPTER_STATE_EMAIL &&
+          contribution.contributor_email !== CHAPTER_DRAFT_EMAIL &&
           contribution.is_finalized !== false
       )
     : [];
@@ -70,16 +82,20 @@ const Step3Invitations = ({
     (contribution) => !contribution.approved && !contribution.needs_revision
   ).length;
 
-  const respondedCount = invitations.filter(
+  const respondedInvitesCount = invitations.filter(
     (invite) => invite.accepted || invite.contributed
   ).length;
+
+  const contributionsReceivedCount = typeof chapter?.contributionsCount === 'number'
+    ? chapter.contributionsCount
+    : Math.max(finalizedContributions.length, respondedInvitesCount);
 
   const nonRespondedCount = invitations.filter(
     (invite) => !invite.accepted && !invite.contributed
   ).length;
 
   const openCloseModal = () => {
-    if (contributionsClosed || typeof onUpdateChapter !== 'function') {
+    if (chapterLocked || contributionsClosed || typeof onUpdateChapter !== 'function') {
       return;
     }
 
@@ -87,7 +103,7 @@ const Step3Invitations = ({
   };
 
   const handleCloseContributions = async () => {
-    if (contributionsClosed || typeof onUpdateChapter !== 'function') {
+    if (chapterLocked || contributionsClosed || typeof onUpdateChapter !== 'function') {
       return;
     }
 
@@ -142,11 +158,17 @@ const Step3Invitations = ({
         <div className="luxe-feedback-banner is-success">{notice}</div>
       )}
 
+      {chapterLocked && (
+        <div className="luxe-feedback-banner is-info">
+          Chapitre verrouille: les invitations et contributions ne sont plus modifiables.
+        </div>
+      )}
+
       {isOrganizer && (
         <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: '15px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setShowInviteSelector(true)}
-            disabled={contributionsClosed || !book?.id}
+            disabled={chapterLocked || contributionsClosed || !book?.id}
             className="btn btn-outline"
             style={{ flex: 1, minWidth: '190px' }}
           >
@@ -157,17 +179,17 @@ const Step3Invitations = ({
             className="btn btn-outline"
             style={{ flex: 1, minWidth: '170px' }}
           >
-            Voir les contributions ({respondedCount})
+            Voir les contributions ({contributionsReceivedCount})
           </button>
           <button
             onClick={openCloseModal}
-            disabled={closing || contributionsClosed}
+            disabled={chapterLocked || closing || contributionsClosed}
             className="btn btn-primary"
             style={{
               flex: 1,
               minWidth: '190px',
               background: contributionsClosed ? '#1f7a3d' : '#dc3545',
-              opacity: (closing || contributionsClosed) ? 0.8 : 1
+              opacity: (chapterLocked || closing || contributionsClosed) ? 0.8 : 1
             }}
           >
             {closing ? 'Cloture...' : (contributionsClosed ? 'Contributions cloturees' : 'Clore les contributions')}
@@ -229,7 +251,7 @@ const Step3Invitations = ({
                 }}
               >
                 <span>Contributions recues</span>
-                <strong>{respondedCount}</strong>
+                <strong>{contributionsReceivedCount}</strong>
               </div>
             </div>
 

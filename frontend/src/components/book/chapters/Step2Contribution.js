@@ -22,6 +22,7 @@ const Step2Contribution = ({
   const existingContribution = chapter?.currentUserContribution || null;
   const hasContributed = chapter?.hasContributed || false;
   const isFinalized = chapter?.isFinalized || false;
+  const chapterLocked = chapter?.isChapterClosed || false;
 
   useEffect(() => {
     setError('');
@@ -54,6 +55,14 @@ const Step2Contribution = ({
     }
   }, [chapter?.id, existingContribution, hasContributed]);
 
+  useEffect(() => {
+    if (!chapterLocked) {
+      return;
+    }
+
+    setIsEditing(false);
+  }, [chapterLocked]);
+
   const uploadPhoto = async (file) => {
     try {
       const fileExt = file.name.split('.').pop();
@@ -81,6 +90,11 @@ const Step2Contribution = ({
   };
 
   const handlePhotoChange = async (event) => {
+    if (chapterLocked) {
+      setError('Ce chapitre est verrouille apres validation finale.');
+      return;
+    }
+
     const files = Array.from(event.target.files || []);
 
     if (photos.length + files.length > 2) {
@@ -110,11 +124,20 @@ const Step2Contribution = ({
   };
 
   const removePhoto = (index) => {
+    if (chapterLocked) {
+      return;
+    }
+
     setPhotos((previous) => previous.filter((_, currentIndex) => currentIndex !== index));
     setPhotoPreviews((previous) => previous.filter((_, currentIndex) => currentIndex !== index));
   };
 
   const handleSave = async () => {
+    if (chapterLocked) {
+      setError('Ce chapitre est verrouille apres validation finale.');
+      return;
+    }
+
     if (!contributionText.trim()) {
       setError('Veuillez ecrire un message.');
       return;
@@ -147,6 +170,11 @@ const Step2Contribution = ({
   };
 
   const handleFinalize = async () => {
+    if (chapterLocked) {
+      setError('Ce chapitre est verrouille apres validation finale.');
+      return;
+    }
+
     if (!existingContribution) {
       return;
     }
@@ -163,6 +191,22 @@ const Step2Contribution = ({
     } finally {
       setFinalizing(false);
     }
+  };
+
+  const handleCancelEdit = () => {
+    if (existingContribution) {
+      const nextPhotos = (existingContribution.photo_urls || []).map((url) => ({
+        url,
+        preview: url
+      }));
+      setContributionText(existingContribution.message || '');
+      setPhotos(nextPhotos);
+      setPhotoPreviews(nextPhotos.map((photo) => photo.preview));
+    }
+
+    setError('');
+    setNotice('');
+    setIsEditing(false);
   };
 
   const renderContentCard = () => (
@@ -196,6 +240,33 @@ const Step2Contribution = ({
       )}
     </div>
   );
+
+  if (chapterLocked) {
+    const hasLockedContent = Boolean(contributionText.trim()) || photos.length > 0;
+
+    return (
+      <div className="workflow-content">
+        <div className="contribution-section finalized">
+          {notice && (
+            <div className="luxe-feedback-banner is-success">{notice}</div>
+          )}
+          {error && (
+            <div className="luxe-feedback-banner is-error">{error}</div>
+          )}
+          <div className="luxe-feedback-banner is-info">
+            Chapitre verrouille: la validation finale bloque toute modification de votre contribution.
+          </div>
+          {hasLockedContent ? (
+            renderContentCard()
+          ) : (
+            <div className="card" style={{ boxShadow: 'none', background: 'rgba(255, 255, 255, 0.72)' }}>
+              Aucune contribution enregistree sur ce chapitre.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (isFinalized) {
     return (
@@ -340,14 +411,35 @@ const Step2Contribution = ({
           </span>
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving || uploading || finalizing || !contributionText.trim()}
-          className="btn btn-primary"
-          style={{ width: '100%' }}
-        >
-          {saving ? 'Enregistrement...' : 'Enregistrer le brouillon'}
-        </button>
+        {hasContributed && isEditing ? (
+          <div className="questions-actions">
+            <button
+              onClick={handleCancelEdit}
+              className="btn btn-outline"
+              style={{ flex: 1 }}
+              disabled={saving || uploading}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || uploading || finalizing || !contributionText.trim()}
+              className="btn btn-primary"
+              style={{ flex: 1 }}
+            >
+              {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleSave}
+            disabled={saving || uploading || finalizing || !contributionText.trim()}
+            className="btn btn-primary"
+            style={{ width: '100%' }}
+          >
+            {saving ? 'Enregistrement...' : 'Enregistrer le brouillon'}
+          </button>
+        )}
       </div>
     </div>
   );

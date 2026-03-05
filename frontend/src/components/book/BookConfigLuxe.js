@@ -1,500 +1,330 @@
-// C:\Users\USER\bookfete\frontend\src\components\book\BookConfigLuxe.js
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './BookLuxe.css';
 import '../../styles/luxe-theme.css';
 
+const FINITIONS = [
+  { id: 'livret', label: 'Livret', description: 'Souple et leger', basePrice: 29 },
+  { id: 'classique', label: 'Classique', description: 'Rigide et elegant', basePrice: 55 },
+  { id: 'luxe', label: 'Luxe', description: 'Toile premium', basePrice: 85 }
+];
+
+const PAPIERS = [
+  { id: 'satine', label: 'Satine', description: 'Brillant et lisse', multiplier: 1.0 },
+  { id: 'mat', label: 'Mat', description: 'Doux et naturel', multiplier: 1.0 },
+  { id: 'verge', label: 'Verge ivoire', description: 'Texture noble', multiplier: 1.15 }
+];
+
+const STYLES = [
+  { id: 'poetique', label: 'Poetique', description: 'Image et emotion', multiplier: 1.0 },
+  { id: 'factuel', label: 'Factuel', description: 'Direct et clair', multiplier: 1.0 },
+  { id: 'intime', label: 'Intime', description: 'Chaleureux et personnel', multiplier: 1.0 }
+];
+
+const MIN_PAGES = 32;
+const MAX_PAGES = 96;
+const DEFAULT_PAGES_PER_CHAPTER = 8;
+
+const clampPages = (value) => {
+  const numericValue = Number(value) || MIN_PAGES;
+  const snapped = Math.round(numericValue / DEFAULT_PAGES_PER_CHAPTER) * DEFAULT_PAGES_PER_CHAPTER;
+  return Math.max(MIN_PAGES, Math.min(MAX_PAGES, snapped));
+};
+
+const buildInitialFormData = (book, chaptersCount) => ({
+  title: book?.title || '',
+  finition: book?.finition || 'classique',
+  papier: book?.papier || 'mat',
+  style_narratif: book?.style_narratif || 'factuel',
+  pages: clampPages(book?.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER || 64)
+});
+
 const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    title: book.title,
-    finition: book.finition,
-    papier: book.papier,
-    style_narratif: book.style_narratif,
-    pages: book.pages || chaptersCount * 8
-  });
+  const [formData, setFormData] = useState(() => buildInitialFormData(book, chaptersCount));
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState(null);
 
-  // État pour savoir si le nombre de chapitres va changer
-  const [willChaptersChange, setWillChaptersChange] = useState(false);
-  const [newChaptersCount, setNewChaptersCount] = useState(chaptersCount);
-
-  // Constantes
-  const MIN_PAGES = 32;
-  const DEFAULT_PAGES_PER_CHAPTER = 8;
-
-  // Recalculer quand le nombre de chapitres change
   useEffect(() => {
-    if (!isEditing) {
-      setFormData(prev => ({
-        ...prev,
-        pages: book.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER
-      }));
-    }
-  }, [chaptersCount, book.pages, isEditing]);
+    setFormData(buildInitialFormData(book, chaptersCount));
+  }, [book?.id, book?.title, book?.finition, book?.papier, book?.style_narratif, book?.pages, chaptersCount]);
 
-  // Mettre à jour le message quand les pages changent
-  useEffect(() => {
-    const calculated = Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER);
-    setNewChaptersCount(calculated);
-    setWillChaptersChange(calculated !== chaptersCount);
-  }, [formData.pages, chaptersCount]);
+  const selectedFinition = useMemo(
+    () => FINITIONS.find((option) => option.id === formData.finition) || FINITIONS[1],
+    [formData.finition]
+  );
+  const selectedPapier = useMemo(
+    () => PAPIERS.find((option) => option.id === formData.papier) || PAPIERS[1],
+    [formData.papier]
+  );
+  const selectedStyle = useMemo(
+    () => STYLES.find((option) => option.id === formData.style_narratif) || STYLES[1],
+    [formData.style_narratif]
+  );
 
-  // Options
-  const finitions = [
-    { id: 'livret', label: 'Livret', description: 'Souple', basePrice: 29 },
-    { id: 'classique', label: 'Classique', description: 'Rigide', basePrice: 55 },
-    { id: 'luxe', label: 'Luxe', description: 'Toilé', basePrice: 85 }
-  ];
+  const currentBookSnapshot = useMemo(
+    () => ({
+      title: book?.title || '',
+      finition: book?.finition || 'classique',
+      papier: book?.papier || 'mat',
+      style_narratif: book?.style_narratif || 'factuel',
+      pages: clampPages(book?.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER || 64)
+    }),
+    [book?.title, book?.finition, book?.papier, book?.style_narratif, book?.pages, chaptersCount]
+  );
 
-  const papiers = [
-    { id: 'satine', label: 'Satiné', description: 'Brillant et lisse', multiplier: 1.0 },
-    { id: 'mat', label: 'Mat', description: 'Doux et élégant', multiplier: 1.0 },
-    { id: 'verge', label: 'Vergé Ivoire', description: 'Texturé et noble', multiplier: 1.15 }
-  ];
-
-  const styles = [
-    { id: 'poetique', label: 'Poétique', description: 'Langage imagé et émouvant', multiplier: 1.0 },
-    { id: 'factuel', label: 'Factuel', description: 'Direct et concret', multiplier: 1.0 },
-    { id: 'intime', label: 'Intime', description: 'Chaleureux et personnel', multiplier: 1.0 }
-  ];
-
-  // Calcul du prix en direct
-  const calculateLivePrice = () => {
-    const finition = finitions.find(f => f.id === formData.finition) || finitions[1];
-    let price = finition.basePrice;
-    
+  const livePrice = useMemo(() => {
+    let price = selectedFinition.basePrice;
     const extraPages = Math.max(0, formData.pages - 64);
     price += extraPages * 0.25;
-    
-    const papier = papiers.find(p => p.id === formData.papier) || papiers[1];
-    price = price * papier.multiplier;
-    
-    const style = styles.find(s => s.id === formData.style_narratif) || styles[1];
-    price = price * style.multiplier;
-    
+    price = price * selectedPapier.multiplier;
+    price = price * selectedStyle.multiplier;
     return Math.round(price);
+  }, [formData.pages, selectedFinition.basePrice, selectedPapier.multiplier, selectedStyle.multiplier]);
+
+  const calculatedChapters = useMemo(
+    () => Math.max(4, Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER)),
+    [formData.pages]
+  );
+
+  const chapterDelta = calculatedChapters - chaptersCount;
+  const willChaptersChange = chapterDelta !== 0;
+
+  const hasPendingChanges = useMemo(() => (
+    formData.title !== currentBookSnapshot.title
+    || formData.finition !== currentBookSnapshot.finition
+    || formData.papier !== currentBookSnapshot.papier
+    || formData.style_narratif !== currentBookSnapshot.style_narratif
+    || formData.pages !== currentBookSnapshot.pages
+  ), [formData, currentBookSnapshot]);
+
+  const updateField = (field, value) => {
+    setFormData((previous) => ({ ...previous, [field]: value }));
+    if (saveFeedback) {
+      setSaveFeedback(null);
+    }
   };
 
-  // Calcul du nombre de chapitres basé sur les pages
-  const calculatedChapters = Math.max(4, Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER));
-  
-  // Gestion du changement de pages
   const handlePagesChange = (newPages) => {
-    setFormData({ ...formData, pages: newPages });
+    updateField('pages', clampPages(newPages));
   };
 
-  // Validation des modifications
-  const handleValidate = () => {
-    // Mettre à jour le livre
-    onUpdateBook(formData);
-    
-    // Si le nombre de chapitres change, appeler onPagesChange
-    if (willChaptersChange) {
-      onPagesChange(formData.pages);
+  const handleValidate = async () => {
+    if (isSaving || !hasPendingChanges) {
+      return;
     }
-    
-    setIsEditing(false);
-  };
 
-  // Icônes pour les finitions
-  const getFinitionIcon = (id) => {
-    switch(id) {
-      case 'livret': return '📘';
-      case 'classique': return '📕';
-      case 'luxe': return '📚';
-      default: return '📖';
-    }
-  };
+    setIsSaving(true);
+    setSaveFeedback(null);
 
-  // Icônes pour les papiers
-  const getPapierIcon = (id) => {
-    switch(id) {
-      case 'satine': return '✨';
-      case 'mat': return '🎨';
-      case 'verge': return '📜';
-      default: return '📄';
-    }
-  };
+    const payload = {
+      title: formData.title.trim() || currentBookSnapshot.title || 'Livre souvenir',
+      finition: formData.finition,
+      papier: formData.papier,
+      style_narratif: formData.style_narratif,
+      pages: formData.pages
+    };
 
-  // Icônes pour les styles
-  const getStyleIcon = (id) => {
-    switch(id) {
-      case 'poetique': return '🌸';
-      case 'factuel': return '📝';
-      case 'intime': return '💝';
-      default: return '✍️';
+    try {
+      await onUpdateBook(payload);
+
+      if (formData.pages !== currentBookSnapshot.pages && typeof onPagesChange === 'function') {
+        await onPagesChange(formData.pages);
+      }
+
+      setSaveFeedback({
+        type: 'success',
+        message: 'Configuration enregistree. Les donnees du livre sont a jour.'
+      });
+    } catch (error) {
+      setSaveFeedback({
+        type: 'error',
+        message: 'La validation a echoue. Merci de reessayer.'
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  if (isEditing) {
-    return (
-      <div className="card" style={{ padding: 'var(--space-xl)' }}>
-        <h2 style={{
-          fontSize: '28px',
-          fontWeight: '600',
-          textAlign: 'center',
-          marginBottom: 'var(--space-xl)',
-          color: 'var(--ink)'
-        }}>
-          Modifier la configuration
-        </h2>
+  const pageProgress = ((formData.pages - MIN_PAGES) / (MAX_PAGES - MIN_PAGES)) * 100;
 
-        <div style={{ marginBottom: 'var(--space-xl)' }}>
-          <span className="label-gold">Titre du livre</span>
-          <input
-            type="text"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="input-luxe"
-            placeholder="Titre du livre"
-          />
-        </div>
-
-        {/* Finition */}
-        <div style={{ marginBottom: 'var(--space-xl)' }}>
-          <span className="label-gold">1. Finition</span>
-          <div className="config-grid">
-            {finitions.map(f => (
-              <div
-                key={f.id}
-                onClick={() => setFormData({ ...formData, finition: f.id })}
-                className={`config-card ${formData.finition === f.id ? 'selected' : ''}`}
-              >
-                <div style={{ fontSize: '32px', marginBottom: 'var(--space-xs)' }}>
-                  {getFinitionIcon(f.id)}
-                </div>
-                <strong>{f.label}</strong>
-                <small>{f.description}</small>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Papier */}
-        <div style={{ marginBottom: 'var(--space-xl)' }}>
-          <span className="label-gold">2. Papier d'Art</span>
-          <div className="config-grid">
-            {papiers.map(p => (
-              <div
-                key={p.id}
-                onClick={() => setFormData({ ...formData, papier: p.id })}
-                className={`config-card ${formData.papier === p.id ? 'selected' : ''}`}
-              >
-                <div style={{ fontSize: '32px', marginBottom: 'var(--space-xs)' }}>
-                  {getPapierIcon(p.id)}
-                </div>
-                <strong>{p.label}</strong>
-                <small>{p.description}</small>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Style narratif */}
-        <div style={{ marginBottom: 'var(--space-xl)' }}>
-          <span className="label-gold">3. Style Narratif de l'IA</span>
-          <div className="config-grid">
-            {styles.map(s => (
-              <div
-                key={s.id}
-                onClick={() => setFormData({ ...formData, style_narratif: s.id })}
-                className={`config-card ${formData.style_narratif === s.id ? 'selected' : ''}`}
-              >
-                <div style={{ fontSize: '32px', marginBottom: 'var(--space-xs)' }}>
-                  {getStyleIcon(s.id)}
-                </div>
-                <strong>{s.label}</strong>
-                <small>{s.description}</small>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Pagination */}
-        <div style={{ marginBottom: 'var(--space-xl)' }}>
-          <div className="slider-header">
-            <span className="label-gold">4. Pagination</span>
-            <span className="slider-value">
-              {formData.pages} <span className="slider-units">pages</span>
-            </span>
-          </div>
-          
-          <div className="slider-stats">
-            <span className="slider-stat">{calculatedChapters} chapitres</span>
-            <span className="slider-stat">8 pages / chapitre</span>
-          </div>
-
-          <input
-            type="range"
-            min={MIN_PAGES}
-            max="216"
-            step="8"
-            value={formData.pages}
-            onChange={(e) => handlePagesChange(parseInt(e.target.value))}
-            className="slider-input"
-          />
-          
-          <div className="slider-minmax">
-            <span>{MIN_PAGES} pages (min)</span>
-            <span>216 pages (max)</span>
-          </div>
-
-          <p className="chapter-note" style={{ marginTop: 'var(--space-md)' }}>
-            💡 Actuellement {chaptersCount} chapitres
+  return (
+    <div className="book-config-live">
+      <div className="book-config-live-head">
+        <div>
+          <span className="label-gold">Configuration dynamique</span>
+          <h2 className="book-config-live-title">Reglez votre edition en direct</h2>
+          <p className="book-config-live-subtitle">
+            Toutes les selections mettent a jour le prix et l apercu immediatement.
           </p>
-
-          {/* Message si le nombre de chapitres change */}
-          {willChaptersChange && (
-            <div style={{
-              marginTop: 'var(--space-lg)',
-              padding: 'var(--space-md)',
-              background: newChaptersCount > chaptersCount ? '#d4edda' : '#fff3cd',
-              border: `1px solid ${newChaptersCount > chaptersCount ? '#c3e6cb' : '#ffeeba'}`,
-              borderRadius: 'var(--radius)',
-              color: newChaptersCount > chaptersCount ? '#155724' : '#856404'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-                <span style={{ fontSize: '20px' }}>
-                  {newChaptersCount > chaptersCount ? '➕' : '➖'}
-                </span>
-                <div>
-                  <p style={{ margin: 0, fontWeight: '600' }}>
-                    {newChaptersCount > chaptersCount 
-                      ? `${newChaptersCount - chaptersCount} chapitre(s) seront ajoutés`
-                      : `${chaptersCount - newChaptersCount} chapitre(s) seront supprimés`
-                    }
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: '13px' }}>
-                    {newChaptersCount > chaptersCount 
-                      ? 'De nouveaux chapitres seront créés automatiquement.'
-                      : 'Les derniers chapitres seront supprimés avec leurs contributions.'
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Prix */}
-        <div className="price-card" style={{ marginBottom: 'var(--space-xl)' }}>
-          <div className="price-label">Prix estimé</div>
-          <div className="price-amount">{calculateLivePrice()}€</div>
-          <div className="price-details">TTC</div>
-        </div>
-
-        {/* Boutons */}
-        <div className="modal-actions" style={{ justifyContent: 'flex-end', gap: 'var(--space-md)' }}>
-          <button
-            onClick={() => setIsEditing(false)}
-            className="modal-btn modal-btn-secondary"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleValidate}
-            className="modal-btn modal-btn-primary"
-          >
-            Valider les modifications
-          </button>
+        <div className="book-config-live-price">
+          <span className="book-config-live-price-label">Prix estime</span>
+          <span className="book-config-live-price-value">{livePrice} EUR</span>
+          <span className="book-config-live-price-note">TTC</span>
         </div>
       </div>
-    );
-  }
 
-  // MODE VISUALISATION
-  return (
-    <div className="card" style={{ padding: 'var(--space-xl)' }}>
-      <h2 style={{
-        fontSize: '28px',
-        fontWeight: '600',
-        textAlign: 'center',
-        marginBottom: 'var(--space-xl)',
-        color: 'var(--ink)'
-      }}>
-        Votre Édition
-      </h2>
-      
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 'var(--space-xl)'
-      }}>
-        {/* Partie gauche - Sélections */}
-        <div>
-          {/* 1. Finition */}
-          <div style={{ marginBottom: 'var(--space-lg)' }}>
-            <span className="label-gold">1. Finition</span>
-            <div className="config-grid" style={{ marginTop: 'var(--space-sm)' }}>
-              {finitions.map(f => (
-                <div
-                  key={f.id}
-                  className={`config-card ${book.finition === f.id ? 'selected' : ''}`}
-                  style={{ cursor: 'default' }}
-                >
-                  <div style={{ fontSize: '24px', marginBottom: 'var(--space-xs)' }}>
-                    {getFinitionIcon(f.id)}
-                  </div>
-                  <strong>{f.label}</strong>
-                  <small>{f.description}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 2. Papier */}
-          <div style={{ marginBottom: 'var(--space-lg)' }}>
-            <span className="label-gold">2. Papier d'Art</span>
-            <div className="config-grid" style={{ marginTop: 'var(--space-sm)' }}>
-              {papiers.map(p => (
-                <div
-                  key={p.id}
-                  className={`config-card ${book.papier === p.id ? 'selected' : ''}`}
-                  style={{ cursor: 'default' }}
-                >
-                  <div style={{ fontSize: '24px', marginBottom: 'var(--space-xs)' }}>
-                    {getPapierIcon(p.id)}
-                  </div>
-                  <strong>{p.label}</strong>
-                  <small>{p.description}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. Style */}
-          <div style={{ marginBottom: 'var(--space-lg)' }}>
-            <span className="label-gold">3. Style Narratif</span>
-            <div className="config-grid" style={{ marginTop: 'var(--space-sm)' }}>
-              {styles.map(s => (
-                <div
-                  key={s.id}
-                  className={`config-card ${book.style_narratif === s.id ? 'selected' : ''}`}
-                  style={{ cursor: 'default' }}
-                >
-                  <div style={{ fontSize: '24px', marginBottom: 'var(--space-xs)' }}>
-                    {getStyleIcon(s.id)}
-                  </div>
-                  <strong>{s.label}</strong>
-                  <small>{s.description}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 4. Pagination */}
-          <div>
-            <span className="label-gold">4. Pagination</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-xs)', marginTop: 'var(--space-sm)' }}>
-              <span className="slider-value" style={{ fontSize: '32px' }}>
-                {book.pages || chaptersCount * 8}
-              </span>
-              <span className="slider-units">pages</span>
-            </div>
-            <div className="slider-stats" style={{ marginTop: '4px' }}>
-              <span className="slider-stat">{chaptersCount} chapitres</span>
-            </div>
-
-            <div className="card-luxe" style={{ marginTop: 'var(--space-lg)', padding: 'var(--space-md)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-sm)' }}>
-                <div>
-                  <span className="label-gold" style={{ fontSize: '9px' }}>Structure</span>
-                  <span style={{ display: 'block', fontSize: '15px', fontWeight: '600' }}>
-                    {chaptersCount} Chapitres
-                  </span>
-                </div>
-                <div>
-                  <span className="label-gold" style={{ fontSize: '9px' }}>Contenu / Chapitre</span>
-                  <span style={{ display: 'block', fontSize: '15px', fontWeight: '600' }}>
-                    3 min • 2 photos
-                  </span>
-                </div>
-              </div>
-              <p style={{ fontSize: '11px', color: 'var(--text-light)', margin: 'var(--space-sm) 0 0', borderTop: 'var(--border-fine)', paddingTop: 'var(--space-sm)' }}>
-                <strong>Collaboratif :</strong> Répartissez les chapitres entre vos proches.
-              </p>
-            </div>
-          </div>
+      {saveFeedback?.message && (
+        <div className={`luxe-feedback-banner is-${saveFeedback.type}`}>
+          <span>{saveFeedback.message}</span>
         </div>
+      )}
 
-        {/* Partie droite - Prévisualisation */}
-        <div className="card" style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          background: 'var(--silk)'
-        }}>
-          {/* Image du livre */}
-          <div style={{
-            width: '100%',
-            height: '280px',
-            borderRadius: 'var(--radius)',
-            overflow: 'hidden',
-            boxShadow: 'var(--shadow-elevated)',
-            marginBottom: 'var(--space-lg)'
-          }}>
-            <img
-              src={
-                book.finition === 'luxe' 
-                  ? 'https://images.unsplash.com/photo-1621351123023-7550a28861bd?auto=format&fit=crop&q=80&w=800'
-                  : book.finition === 'classique'
-                  ? 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?auto=format&fit=crop&q=80&w=800'
-                  : 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=800'
-              }
-              alt="Aperçu du livre"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover'
-              }}
+      <div className="book-config-live-grid">
+        <section className="book-config-panel">
+          <div className="book-config-group">
+            <span className="book-config-group-label">Titre du livre</span>
+            <input
+              type="text"
+              className="input-luxe"
+              value={formData.title}
+              onChange={(event) => updateField('title', event.target.value)}
+              placeholder="Titre du livre"
             />
           </div>
 
-          {/* Prix */}
-          <div className="price-card" style={{ width: '100%', marginBottom: 'var(--space-lg)' }}>
-            <div className="price-amount" style={{ fontSize: '48px' }}>{calculateLivePrice()}€</div>
+          <div className="book-config-group">
+            <span className="book-config-group-label">Finition</span>
+            <div className="book-config-choice-grid">
+              {FINITIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => updateField('finition', option.id)}
+                  className={`book-config-choice ${formData.finition === option.id ? 'is-selected' : ''}`}
+                >
+                  <span className="book-config-choice-title">{option.label}</span>
+                  <span className="book-config-choice-text">{option.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Badge IA */}
-          <div className="badge" style={{
-            padding: '4px 12px',
-            background: 'var(--gold)',
-            color: 'white',
-            fontSize: '10px',
-            fontWeight: '600',
-            borderRadius: '20px',
-            marginBottom: 'var(--space-sm)'
-          }}>
-            MÉTHODE ÉDITORIALE IA
+          <div className="book-config-group">
+            <span className="book-config-group-label">Papier</span>
+            <div className="book-config-choice-grid">
+              {PAPIERS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => updateField('papier', option.id)}
+                  className={`book-config-choice ${formData.papier === option.id ? 'is-selected' : ''}`}
+                >
+                  <span className="book-config-choice-title">{option.label}</span>
+                  <span className="book-config-choice-text">{option.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Validation */}
-          <div style={{
-            fontSize: '10px',
-            color: 'var(--gold)',
-            textTransform: 'uppercase',
-            fontWeight: '600',
-            letterSpacing: '1px',
-            marginBottom: 'var(--space-sm)'
-          }}>
-            🔒 Contrôle & Validation finale
+          <div className="book-config-group">
+            <span className="book-config-group-label">Voix narrative</span>
+            <div className="book-config-choice-grid">
+              {STYLES.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => updateField('style_narratif', option.id)}
+                  className={`book-config-choice ${formData.style_narratif === option.id ? 'is-selected' : ''}`}
+                >
+                  <span className="book-config-choice-title">{option.label}</span>
+                  <span className="book-config-choice-text">{option.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Légende */}
-          <p className="chapter-note" style={{ textAlign: 'center' }}>
-            Finition {finitions.find(f => f.id === book.finition)?.label},<br />
-            Style {styles.find(s => s.id === book.style_narratif)?.label},<br />
-            Papier {papiers.find(p => p.id === book.papier)?.label}.
-          </p>
+          <div className="book-config-group">
+            <div className="book-config-pages-head">
+              <span className="book-config-group-label">Pagination</span>
+              <span className="book-config-pages-value">{formData.pages} pages</span>
+            </div>
 
-          {/* Bouton Modifier */}
-          <button
-            onClick={() => setIsEditing(true)}
-            className="btn btn-primary"
-            style={{ width: '100%', marginTop: 'var(--space-md)' }}
-          >
-            ✏️ Modifier la configuration
-          </button>
-        </div>
+            <div className="book-config-pages-meta">
+              <span>{calculatedChapters} chapitres</span>
+              <span>{DEFAULT_PAGES_PER_CHAPTER} pages / chapitre</span>
+            </div>
+
+            <input
+              type="range"
+              min={MIN_PAGES}
+              max={MAX_PAGES}
+              step={DEFAULT_PAGES_PER_CHAPTER}
+              value={formData.pages}
+              onChange={(event) => handlePagesChange(event.target.value)}
+              className="book-config-slider"
+            />
+
+            <div className="book-config-pages-minmax">
+              <span>{MIN_PAGES} pages</span>
+              <span>{MAX_PAGES} pages</span>
+            </div>
+
+            <div className="book-config-progress-track">
+              <span className="book-config-progress-bar" style={{ width: `${pageProgress}%` }} />
+            </div>
+
+            {willChaptersChange && (
+              <div className={`book-config-delta ${chapterDelta > 0 ? 'is-positive' : 'is-warning'}`}>
+                {chapterDelta > 0
+                  ? `${chapterDelta} chapitre(s) seront ajoutes apres validation.`
+                  : `${Math.abs(chapterDelta)} chapitre(s) seront retires apres validation.`}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <aside className="book-config-preview">
+          <div className={`book-config-preview-cover is-${formData.finition}`}>
+            <div className="book-config-preview-spine" />
+            <div className="book-config-preview-content">
+              <span className="book-config-preview-chip">{selectedStyle.label}</span>
+              <h3>{formData.title || 'Titre du livre'}</h3>
+              <p>{calculatedChapters} chapitres - {formData.pages} pages</p>
+            </div>
+          </div>
+
+          <div className="book-config-preview-grid">
+            <div className="book-config-preview-item">
+              <span>Finition</span>
+              <strong>{selectedFinition.label}</strong>
+            </div>
+            <div className="book-config-preview-item">
+              <span>Papier</span>
+              <strong>{selectedPapier.label}</strong>
+            </div>
+            <div className="book-config-preview-item">
+              <span>Voix</span>
+              <strong>{selectedStyle.label}</strong>
+            </div>
+            <div className="book-config-preview-item">
+              <span>Structure</span>
+              <strong>{calculatedChapters} chapitres</strong>
+            </div>
+          </div>
+
+          <div className="book-config-preview-price-card">
+            <div className="book-config-preview-price-label">Total estime</div>
+            <div className="book-config-preview-price-value">{livePrice} EUR</div>
+            <div className="book-config-preview-price-note">Mise a jour en direct</div>
+          </div>
+        </aside>
+      </div>
+
+      <div className="book-config-live-footer">
+        <span className="book-config-live-footer-text">
+          {hasPendingChanges
+            ? 'Des changements sont en attente de validation.'
+            : 'Configuration deja synchronisee.'}
+        </span>
+        <button
+          type="button"
+          className="btn btn-primary book-config-validate-btn"
+          onClick={handleValidate}
+          disabled={!hasPendingChanges || isSaving}
+        >
+          {isSaving ? 'Validation...' : 'Valider la configuration'}
+        </button>
       </div>
     </div>
   );

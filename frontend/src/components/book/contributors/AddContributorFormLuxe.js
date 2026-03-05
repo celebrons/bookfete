@@ -6,11 +6,11 @@ const AddContributorFormLuxe = ({ onAdd }) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
     if (!email.trim()) {
-      alert('L\'email est obligatoire');
+      alert('L email est obligatoire');
       return;
     }
 
@@ -25,49 +25,49 @@ const AddContributorFormLuxe = ({ onAdd }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card" style={{ marginBottom: 'var(--space-xl)' }}>
-      <h3 style={{ margin: '0 0 var(--space-lg)', fontSize: '16px', fontWeight: '600' }}>
-        Ajouter un contributeur
-      </h3>
-      
-      <div style={{ display: 'flex', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
-        <div style={{ flex: 2, minWidth: '250px' }}>
+    <form onSubmit={handleSubmit} className="contributors-add-form">
+      <div className="contributors-add-head">
+        <h3 className="contributors-add-title">Ajouter un contributeur</h3>
+        <p className="contributors-add-note">
+          Ces contacts seront disponibles dans l etape Invitations de chaque chapitre.
+        </p>
+      </div>
+
+      <div className="contributors-add-grid">
+        <label className="contributors-field" htmlFor="contributor-email">
           <span className="label-gold">Email *</span>
           <input
+            id="contributor-email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
             placeholder="email@exemple.com"
             required
             className="input-luxe"
           />
-        </div>
-        
-        <div style={{ flex: 1, minWidth: '150px' }}>
+        </label>
+
+        <label className="contributors-field" htmlFor="contributor-name">
           <span className="label-gold">Nom (optionnel)</span>
           <input
+            id="contributor-name"
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Prénom Nom"
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Prenom Nom"
             className="input-luxe"
           />
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: '4px' }}>
+        </label>
+
+        <div className="contributors-add-actions">
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ padding: '12px 24px', height: '46px' }}
+            className="btn btn-primary contributors-add-btn"
           >
-            + Ajouter
+            Ajouter
           </button>
         </div>
       </div>
-      
-      <p style={{ margin: 'var(--space-md) 0 0', fontSize: '12px', color: 'var(--text-light)' }}>
-        Les contributeurs pourront être invités chapitre par chapitre
-      </p>
     </form>
   );
 };

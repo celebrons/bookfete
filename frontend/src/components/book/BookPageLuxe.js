@@ -353,6 +353,11 @@ const BookPageLuxe = () => {
 
   const handleUpdateChapter = async (chapterId, updates) => {
     try {
+      const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
+      if (currentChapter?.isChapterClosed) {
+        throw new Error('Ce chapitre est verrouille apres validation finale.');
+      }
+
       const { status, ...chapterUpdates } = updates || {};
       const currentChapterIndex = chapters.findIndex((chapter) => chapter.id === chapterId);
       const safeChapterUpdates = { ...chapterUpdates };
@@ -396,6 +401,10 @@ const BookPageLuxe = () => {
   const handleSaveContribution = async (chapterId, contributionData) => {
     try {
       const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
+      if (currentChapter?.isChapterClosed) {
+        throw new Error('Ce chapitre est verrouille apres validation finale.');
+      }
+
       const existingContribution = currentChapter?.currentUserContribution;
       let savedContribution = null;
 
@@ -454,6 +463,10 @@ const BookPageLuxe = () => {
   const handleFinalizeContribution = async (chapterId) => {
     try {
       const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
+      if (currentChapter?.isChapterClosed) {
+        throw new Error('Ce chapitre est verrouille apres validation finale.');
+      }
+
       const existingContribution = currentChapter?.currentUserContribution;
 
       if (!existingContribution?.id) {

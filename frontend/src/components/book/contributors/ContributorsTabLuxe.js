@@ -1,9 +1,8 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\contributors\ContributorsTabLuxe.js
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import ContributorListLuxe from './ContributorListLuxe';
 import AddContributorFormLuxe from './AddContributorFormLuxe';
-import GuidedTooltip from '../../ui/GuidedTooltip';
 import '../BookLuxe.css';
 
 const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
@@ -11,25 +10,22 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
   const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [updatingSoloMode, setUpdatingSoloMode] = useState(false);
-  const [stats, setStats] = useState({
-    total: 0,
-    invited: 0,
-    pending: 0
-  });
 
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
+  const stats = useMemo(() => {
+    const total = contributors.length;
+    const invited = contributors.filter((contributor) => contributor.invited).length;
+    return {
+      total,
+      invited,
+      pending: Math.max(0, total - invited)
+    };
+  }, [contributors]);
 
-  useEffect(() => {
-    loadContributors();
-    if (!localStorage.getItem('contributors_guide_seen')) {
-      setShowWelcome(true);
-    }
-  }, [bookId]);
-
-  const loadContributors = async () => {
+  const loadContributors = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const { data, error } = await supabase
         .from('book_contributors')
         .select('*')
@@ -37,19 +33,20 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
       setContributors(data || []);
-      
-      const total = data.length;
-      const invited = data.filter(c => c.invited).length;
-      setStats({ total, invited, pending: total - invited });
-
     } catch (error) {
-      console.error('❌ Erreur chargement contributeurs:', error);
+      console.error('Erreur chargement contributeurs:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [bookId]);
+
+  useEffect(() => {
+    loadContributors();
+    if (!localStorage.getItem('contributors_guide_seen')) {
+      setShowWelcome(true);
+    }
+  }, [loadContributors]);
 
   const handleAddContributor = async (email, name) => {
     try {
@@ -65,17 +62,17 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
 
       if (error) {
         if (error.code === '23505') {
-          alert('Cet email est déjà dans la liste');
+          alert('Cet email est deja dans la liste');
         } else {
           throw error;
         }
         return;
       }
 
-      setContributors(prev => [data, ...prev]);
+      setContributors((prev) => [data, ...prev]);
     } catch (error) {
-      console.error('❌ Erreur ajout:', error);
-      alert('Erreur lors de l\'ajout');
+      console.error('Erreur ajout contributeur:', error);
+      alert('Erreur lors de l ajout');
     }
   };
 
@@ -89,10 +86,9 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
         .eq('id', contributorId);
 
       if (error) throw error;
-
-      setContributors(prev => prev.filter(c => c.id !== contributorId));
+      setContributors((prev) => prev.filter((contributor) => contributor.id !== contributorId));
     } catch (error) {
-      console.error('❌ Erreur suppression:', error);
+      console.error('Erreur suppression contributeur:', error);
       alert('Erreur lors de la suppression');
     }
   };
@@ -114,7 +110,6 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
     };
 
     setUpdatingSoloMode(true);
-
     try {
       await onUpdateBook({ cover_config: nextCoverConfig });
     } finally {
@@ -123,138 +118,102 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
   };
 
   return (
-    <div className="card" style={{ position: 'relative', minHeight: '500px' }}>
-      {/* Message de bienvenue / tutoriel - VERSION STYLISÉE */}
+    <div className="contributors-live">
       {showWelcome && !isSoloMode && (
-        <div className="guide-card">
-          <button onClick={dismissWelcome} className="guide-close">✕</button>
-          <div className="guide-title">🎯 Bienvenue dans la gestion des contributeurs !</div>
-          
-          <div style={{ marginBottom: 'var(--space-lg)' }}>
-            <p style={{ fontWeight: '600', marginBottom: 'var(--space-sm)' }}>
-              Voici comment ça marche :
-            </p>
-            <ul className="guide-steps">
-              <li>
-                <span className="guide-step-icon">📧</span>
-                <span><strong>Ajoutez les emails</strong> de toutes les personnes que vous souhaitez inviter</span>
-              </li>
-              <li>
-                <span className="guide-step-icon">📋</span>
-                <span><strong>Retournez dans l'onglet "Chapitres"</strong></span>
-              </li>
-              <li>
-                <span className="guide-step-icon">👥</span>
-                <span><strong>Cliquez sur l'icône 👥</strong> à côté d'un chapitre pour choisir qui inviter</span>
-              </li>
-              <li>
-                <span className="guide-step-icon">✉️</span>
-                <span><strong>Les invitations sont envoyées automatiquement</strong> avec un lien unique</span>
-              </li>
-            </ul>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div className="guide-card contributors-guide-card">
+          <button onClick={dismissWelcome} className="guide-close" aria-label="Fermer le guide">
+            x
+          </button>
+          <div className="guide-title">Guide contributeurs</div>
+          <p className="contributors-guide-intro">
+            Ajoutez vos proches ici, puis invitez-les chapitre par chapitre depuis l onglet Chapitres.
+          </p>
+          <ul className="guide-steps">
+            <li>
+              <span className="guide-step-icon">1</span>
+              <span><strong>Ajoutez les emails</strong> des personnes a inviter.</span>
+            </li>
+            <li>
+              <span className="guide-step-icon">2</span>
+              <span><strong>Ouvrez l onglet Chapitres</strong> pour choisir les invites par chapitre.</span>
+            </li>
+            <li>
+              <span className="guide-step-icon">3</span>
+              <span><strong>Envoyez les invitations</strong> avec les liens uniques automatiques.</span>
+            </li>
+            <li>
+              <span className="guide-step-icon">4</span>
+              <span><strong>Suivez les retours</strong> en moderant les contributions dans le workflow.</span>
+            </li>
+          </ul>
+          <div className="contributors-guide-actions">
             <button onClick={dismissWelcome} className="btn btn-primary">
-              J'ai compris !
+              Fermer le guide
             </button>
           </div>
         </div>
       )}
 
-      <div
-        className="card"
-        style={{
-          marginBottom: 'var(--space-xl)',
-          background: isSoloMode ? '#eef6ee' : 'var(--white)',
-          borderColor: isSoloMode ? '#d5e8d4' : 'var(--mist)'
-        }}
-      >
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-sm)',
-            cursor: updatingSoloMode ? 'wait' : 'pointer'
-          }}
-        >
+      <div className="contributors-live-head">
+        <div className="contributors-live-main">
+          <div className="label-gold">Espace collaborateurs</div>
+          <h2 className="contributors-live-title">Gestion des contributeurs</h2>
+          <p className="contributors-live-subtitle">
+            Centralisez votre liste d invites puis activez les invitations depuis les chapitres.
+          </p>
+          {!isSoloMode && (
+            <div className="contributors-top-note">
+              Ajoutez vos contacts ici, puis selectionnez-les dans chaque chapitre (etape Invitations).
+            </div>
+          )}
+        </div>
+
+        {!isSoloMode && (
+          <div className="contributors-live-stats">
+            <div className="contributors-stat-pill">
+              <span>Total</span>
+              <strong>{stats.total}</strong>
+            </div>
+            <div className="contributors-stat-pill is-invited">
+              <span>Invites</span>
+              <strong>{stats.invited}</strong>
+            </div>
+            <div className="contributors-stat-pill is-pending">
+              <span>En attente</span>
+              <strong>{stats.pending}</strong>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={`contributors-solo-card ${isSoloMode ? 'is-enabled' : ''}`}>
+        <label className="contributors-solo-toggle">
           <input
             type="checkbox"
             checked={isSoloMode}
             onChange={handleSoloModeChange}
             disabled={updatingSoloMode}
           />
-          <span style={{ fontWeight: '600', color: 'var(--ink)' }}>
-            Je souhaite créer le livre seul
-          </span>
+          <span className="contributors-solo-toggle-title">Je souhaite creer le livre seul</span>
         </label>
-        <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--text-light)' }}>
-          En mode solo, tout ce qui concerne les contributeurs et les invitations est masqué.
+        <p className="contributors-solo-note">
+          En mode solo, les invitations et la liste des contributeurs sont masques.
         </p>
       </div>
 
-      {/* En-tête avec stats */}
-      {!isSoloMode && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-xl)', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '600' }}>👥 Gestion des contributeurs</h2>
-          <GuidedTooltip
-            title="📋 Comment ça marche ?"
-            description="Suivez ces étapes pour inviter vos proches :"
-            steps={[
-              "Ajoutez les emails ci-dessous",
-              "Allez dans l'onglet Chapitres",
-              "Cliquez sur 👥 pour choisir qui inviter par chapitre",
-              "Les invitations sont envoyées automatiquement"
-            ]}
-          >
-            <span style={{ color: 'var(--gold)', cursor: 'help' }}>ⓘ</span>
-          </GuidedTooltip>
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
-          <span className="stat-detail-item" style={{ background: 'var(--silk)', padding: '4px 12px', borderRadius: 'var(--radius)' }}>
-            Total: {stats.total}
-          </span>
-          <span className="stat-detail-item" style={{ background: 'var(--gold-light)', color: 'var(--gold)', padding: '4px 12px', borderRadius: 'var(--radius)' }}>
-            Invités: {stats.invited}
-          </span>
-          <span className="stat-detail-item" style={{ background: '#fff3cd', color: '#856404', padding: '4px 12px', borderRadius: 'var(--radius)' }}>
-            En attente: {stats.pending}
-          </span>
-        </div>
-      </div>
-      )}
-
-      {/* Formulaire d'ajout */}
       {!isSoloMode && <AddContributorFormLuxe onAdd={handleAddContributor} />}
 
-      {/* Liste des contributeurs */}
       {isSoloMode ? (
-        <div
-          className="card"
-          style={{
-            textAlign: 'center',
-            background: '#fcfbf8',
-            borderColor: 'var(--mist)'
-          }}
-        >
-          <h3 style={{ marginTop: 0 }}>Mode solo activé</h3>
-          <p style={{ margin: 0, color: 'var(--text-light)' }}>
-            Les listes de contributeurs, les invitations et les relances sont masquées tant que cette option reste cochée.
+        <div className="contributors-solo-empty card">
+          <h3>Mode solo active</h3>
+          <p>
+            Les listes de contributeurs, les invitations et les relances sont masquees tant que cette option reste active.
           </p>
         </div>
       ) : loading ? (
-        <div className="empty-state">
-          <div className="spinner" style={{
-            border: '2px solid var(--mist)',
-            borderTop: '2px solid var(--gold)',
-            borderRadius: '50%',
-            width: '40px',
-            height: '40px',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto var(--space-md)'
-          }} />
-          <p>Chargement...</p>
+        <div className="contributors-loading card">
+          <div className="spinner contributors-spinner" />
+          <p>Chargement des contributeurs...</p>
         </div>
       ) : (
         <ContributorListLuxe

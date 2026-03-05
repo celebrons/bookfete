@@ -39,6 +39,10 @@ const ChapterListLuxe = ({
   } = useChapterActions(onUpdateChapter, onDeleteChapter);
 
   const selectedChapter = chapters.find((chapter) => chapter.id === selectedChapterId) || null;
+  const selectedChapterTitle = selectedChapter
+    ? (selectedChapter.order_index === 0 ? 'Introduction' : selectedChapter.title)
+    : '';
+  const isGalleryOnly = !selectedChapter;
 
   const {
     showContributions,
@@ -83,10 +87,17 @@ const ChapterListLuxe = ({
       return;
     }
 
-    if (!selectedChapterId || !chapters.some((chapter) => chapter.id === selectedChapterId)) {
-      setSelectedChapterId(chapters[0].id);
+    if (selectedChapterId && !chapters.some((chapter) => chapter.id === selectedChapterId)) {
+      setSelectedChapterId(null);
     }
   }, [chapters, selectedChapterId, setSelectedChapterId]);
+
+  const handleBackToGallery = () => {
+    setSelectedChapterId(null);
+    setShowContributions(false);
+    setEditingChapter(null);
+    setEditingQuestions(null);
+  };
 
   const getStatusColor = (contributions) => {
     const count = Array.isArray(contributions) ? contributions.length : 0;
@@ -98,7 +109,7 @@ const ChapterListLuxe = ({
   const getChapterState = (chapter) => {
     if (chapter?.isChapterClosed) {
       return {
-        label: 'Clotur\u00e9',
+        label: 'Cloture',
         color: '#2f6e78',
         background: '#edf7f8'
       };
@@ -106,7 +117,7 @@ const ChapterListLuxe = ({
 
     if (chapter?.contributionsClosed) {
       return {
-        label: 'Contributions closes',
+        label: 'Contributions fermees',
         color: '#5d7183',
         background: '#f1f5f8'
       };
@@ -120,122 +131,180 @@ const ChapterListLuxe = ({
   };
 
   return (
-    <div className="chapters-container">
-      <div className="sidebar">
-        <div className="sidebar-header">
-          <h3>Structure du livre</h3>
-        </div>
-
-        <div className="sidebar-content">
-          {chapters.map((chapter, index) => {
-            const chapterState = getChapterState(chapter);
-            const displayTitle = index === 0 ? 'Introduction' : chapter.title;
-
-            return (
-              <div
-                key={chapter.id}
-                onClick={() => {
-                  handleSelectChapter(chapter.id);
-                  setShowContributions(false);
-                }}
-                className={`chapter-item ${selectedChapterId === chapter.id ? 'selected' : ''}`}
-                style={{
-                  opacity: deleteConfirm?.id === chapter.id ? 0.5 : 1
-                }}
+    <div className={`chapters-container ${isGalleryOnly ? 'gallery-only' : 'chapter-focus'}`}>
+      {deleteConfirm && (
+        <div className="delete-confirm" onClick={cancelDelete}>
+          <div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}>
+            <div className="delete-confirm-icon">!</div>
+            <h3 className="delete-confirm-title">Supprimer le chapitre ?</h3>
+            <p className="delete-confirm-text">
+              Etes-vous sur de vouloir supprimer le chapitre <strong>"{deleteConfirm.title}"</strong> ?
+              <br />
+              Cette action est irreversible. Toutes les contributions associees seront egalement supprimees.
+            </p>
+            <div className="delete-confirm-actions">
+              <button
+                onClick={cancelDelete}
+                className="modal-btn modal-btn-secondary"
               >
-                <div className="chapter-title-row">
-                  <div className="chapter-title">
-                    {index + 1}. {displayTitle}
-                  </div>
+                Annuler
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="modal-btn modal-btn-danger"
+              >
+                Supprimer definitivement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <div className="chapter-actions">
-                    <Tooltip text="Modifier le chapitre">
+      {isGalleryOnly ? (
+        <div className="sidebar">
+          <div className="sidebar-header">
+            <h3>Structure du livre</h3>
+          </div>
+
+          <div className="sidebar-content">
+            {[
+              { id: 'cover-card', type: 'cover' },
+              ...chapters.map((chapter, index) => ({
+                id: chapter.id,
+                type: 'chapter',
+                chapter,
+                index
+              })),
+              { id: 'back-cover-card', type: 'backCover' }
+            ].map((item) => {
+              if (item.type !== 'chapter') {
+                const isFront = item.type === 'cover';
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`chapter-item chapter-special-card ${isFront ? 'chapter-cover-card' : 'chapter-back-cover-card'}`}
+                  >
+                    <div className="chapter-special-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22.5V4.5zm3 0H18v13H8a2.5 2.5 0 0 0-1 .21V5a.5.5 0 0 1 .5-.5z" />
+                      </svg>
+                    </div>
+                    <div className="chapter-special-title">{isFront ? 'Couverture' : '4e de couverture'}</div>
+                    <div className="chapter-special-subtitle">Vierge</div>
+                  </div>
+                );
+              }
+
+              const { chapter, index } = item;
+              const chapterState = getChapterState(chapter);
+              const displayTitle = index === 0 ? 'Introduction' : chapter.title;
+              const chapterShapeClass = `chapter-shape-${(index % 5) + 1}`;
+              const chapterAccent = chapter?.isChapterClosed
+                ? '#2f6e78'
+                : chapter?.contributionsClosed
+                  ? '#7b8e9c'
+                  : getStatusColor(chapter.contributions);
+
+              return (
+                <div
+                  key={chapter.id}
+                  onClick={() => {
+                    handleSelectChapter(chapter.id);
+                    setShowContributions(false);
+                  }}
+                  className={`chapter-item chapter-card-sketch ${chapterShapeClass} ${selectedChapterId === chapter.id ? 'selected' : ''}`}
+                  style={{
+                    opacity: deleteConfirm?.id === chapter.id ? 0.5 : 1
+                  }}
+                >
+                  <div className="chapter-actions chapter-actions-floating">
+                    <Tooltip text="Modifier le chapitre" position="bottom">
                       <button
+                        type="button"
                         className="chapter-action-btn"
+                        aria-label={`Modifier ${displayTitle}`}
                         onClick={(event) => {
                           event.stopPropagation();
+                          handleSelectChapter(chapter.id);
+                          setShowContributions(false);
                           handleEdit({
                             ...chapter,
                             title: displayTitle
                           });
                         }}
                       >
-                        ✎
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M3 17.25V21h3.75L17.8 9.95l-3.75-3.75L3 17.25zm14.71-9.04a1 1 0 0 0 0-1.42l-2.5-2.5a1 1 0 0 0-1.42 0L12 6.08l3.75 3.75 1.96-1.62z" />
+                        </svg>
                       </button>
                     </Tooltip>
 
-                    <Tooltip text="Supprimer">
+                    <Tooltip text="Supprimer" position="bottom">
                       <button
+                        type="button"
                         className="chapter-action-btn"
+                        aria-label={`Supprimer ${displayTitle}`}
                         onClick={(event) => handleDeleteClick(chapter, event)}
                       >
-                        🗑
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-1 6h2v9H8V9zm6 0h2v9h-2V9zM6 9h2v9H6V9zm2 12h8a2 2 0 0 0 2-2V9H6v10a2 2 0 0 0 2 2z" />
+                        </svg>
                       </button>
                     </Tooltip>
                   </div>
-                </div>
 
-                <div className="chapter-footer-row">
-                  <div className="chapter-meta-row">
-                    <div
-                      className="chapter-state-badge"
-                      style={{
-                        color: chapterState.color,
-                        background: chapterState.background
-                      }}
-                    >
-                      {chapterState.label}
+                  <div
+                    className="chapter-book-visual"
+                    style={{ '--chapter-accent': chapterAccent }}
+                  >
+                    <div className="chapter-book-stack" aria-hidden="true">
+                      <span className="chapter-sheet chapter-sheet-back" />
+                      <span className="chapter-sheet chapter-sheet-front">
+                        <svg viewBox="0 0 24 24" focusable="false">
+                          <path d="M6 6h12v2H6V6zm0 4h12v2H6v-2zm0 4h8v2H6v-2z" />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="chapter-book-content">
+                    <div className="chapter-book-heading">
+                      <span className="chapter-book-number">{index + 1}</span>
+                      <div className="chapter-book-title">{displayTitle}</div>
+                    </div>
+
+                    <div className="chapter-book-footer">
+                      <div
+                        className="chapter-state-badge"
+                        style={{
+                          color: chapterState.color,
+                          background: chapterState.background
+                        }}
+                      >
+                        {chapterState.label}
+                      </div>
                     </div>
                   </div>
                 </div>
-
-                <div
-                  className="chapter-status"
-                  style={{
-                    background: chapter?.isChapterClosed
-                      ? '#2f6e78'
-                      : chapter?.contributionsClosed
-                        ? '#7b8e9c'
-                        : getStatusColor(chapter.contributions)
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="right-panel">
-        {deleteConfirm && (
-          <div className="delete-confirm" onClick={cancelDelete}>
-            <div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}>
-              <div className="delete-confirm-icon">⚠</div>
-              <h3 className="delete-confirm-title">Supprimer le chapitre ?</h3>
-              <p className="delete-confirm-text">
-                Etes-vous sur de vouloir supprimer le chapitre <strong>"{deleteConfirm.title}"</strong> ?
-                <br />
-                Cette action est irreversible. Toutes les contributions associees seront egalement supprimees.
-              </p>
-              <div className="delete-confirm-actions">
-                <button
-                  onClick={cancelDelete}
-                  className="modal-btn modal-btn-secondary"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="modal-btn modal-btn-danger"
-                >
-                  Supprimer definitivement
-                </button>
-              </div>
-            </div>
+              );
+            })}
           </div>
-        )}
+        </div>
+      ) : (
+        <div className="right-panel right-panel-full">
+          <div className="chapter-workspace-header">
+            <button
+              type="button"
+              className="sidebar-gallery-btn"
+              onClick={handleBackToGallery}
+            >
+              Retour galerie
+            </button>
+            <h3 className="chapter-workspace-title">{selectedChapterTitle}</h3>
+          </div>
 
-        {selectedChapter ? (
-          editingChapter ? (
+          {editingChapter ? (
             <ChapterEditorLuxe
               editingChapter={editingChapter}
               setEditingChapter={setEditingChapter}
@@ -255,7 +324,7 @@ const ChapterListLuxe = ({
             />
           ) : showContributions ? (
             <ContributionsModerationLuxe
-              chapterTitle={selectedChapter.order_index === 0 ? 'Introduction' : selectedChapter.title}
+              chapterTitle={selectedChapterTitle}
               contributions={chapterContributions}
               loading={loadingContributions}
               onApprove={approveContribution}
@@ -299,15 +368,9 @@ const ChapterListLuxe = ({
               onEditContribution={() => {}}
               invitations={[]}
             />
-          )
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">📖</div>
-            <h3>Selectionnez un chapitre</h3>
-            <p>Cliquez sur un chapitre pour voir son contenu</p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
