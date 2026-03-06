@@ -108,6 +108,44 @@ function parseChapterTitles(content) {
   return lineMatches;
 }
 
+function parseSuggestedBookTitle(content) {
+  if (!content) return '';
+
+  const cleanContent = String(content).replace(/```json|```/g, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleanContent);
+    if (parsed && typeof parsed === 'object') {
+      const titleCandidates = [
+        parsed.bookTitle,
+        parsed.title,
+        parsed.book_title,
+        parsed['Titre de l Ouvrage'],
+        parsed["Titre de l'Ouvrage"],
+        parsed['Titre du livre'],
+        parsed['Titre du Livre']
+      ];
+
+      for (const candidate of titleCandidates) {
+        const normalizedCandidate = normalizeTitle(candidate);
+        if (normalizedCandidate) {
+          return normalizedCandidate;
+        }
+      }
+    }
+  } catch (_error) {
+    // no-op
+  }
+
+  const titleLineRegex = /(?:^|\n)\s*(?:[-*•◦]?\s*)?(?:titre(?:\s+de\s+l['’]ouvrage|\s+du\s+livre)?|book\s*title)\s*[:\-]\s*(.+)/i;
+  const titleMatch = cleanContent.match(titleLineRegex);
+  if (titleMatch?.[1]) {
+    return normalizeTitle(titleMatch[1]);
+  }
+
+  return '';
+}
+
 function shapeChaptersFromTitles(titles, count) {
   const safeTitles = Array.isArray(titles) ? [...titles] : [];
 
@@ -158,6 +196,17 @@ function buildDefaultPromptTestVariables({
     return {
       ...base,
       count: undefined
+    };
+  }
+
+  if (promptKey === promptTemplateService.PROMPT_KEYS.CONTENT_GENERATION) {
+    return {
+      ...base,
+      count: undefined,
+      outputType: 'chapter_content',
+      chapterSummary: 'Synthese des contributions precedentes',
+      narrativeContext: 'Insister sur les details concrets et les emotions authentiques',
+      targetLength: 3200
     };
   }
 
@@ -252,6 +301,7 @@ router.post('/generate-chapters-public', async (req, res) => {
     const content = response.choices[0].message.content;
     console.log('📦 Réponse Mistral reçue');
     
+    const suggestedBookTitle = parseSuggestedBookTitle(content);
     let titles = parseChapterTitles(content);
     if (!Array.isArray(titles) || titles.length === 0) {
       console.log('⚠️ Pas de titres valides, utilisation du fallback');
@@ -263,6 +313,7 @@ router.post('/generate-chapters-public', async (req, res) => {
     console.log(`✅ ${chapters.length} chapitres générés avec succès (public)`);
     res.json({
       chapters,
+      suggestedBookTitle,
       promptSource: promptConfig.source,
       promptVersion: promptConfig.version
     });
@@ -285,6 +336,7 @@ router.post('/generate-chapters-public', async (req, res) => {
     
     res.json({ 
       chapters: fallbackChapters,
+      suggestedBookTitle: '',
       fallback: true,
       error: error.message 
     });
@@ -335,6 +387,8 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
       variables = {},
       runModel = false,
       model = 'mistral-small-latest',
+      systemPrompt,
+      userPromptTemplate,
       temperature,
       maxTokens
     } = req.body || {};
@@ -345,30 +399,47 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
       eventType: normalizedEventType
     });
 
-    const promptConfig = await promptTemplateService.buildPrompt({
+    const mergedVariables = {
+      ...defaultVariables,
+      ...(variables || {})
+    };
+
+    const promptConfig = await promptTemplateService.getActivePromptConfig({
       promptKey,
       eventType: normalizedEventType,
-      locale,
-      variables: {
-        ...defaultVariables,
-        ...(variables || {})
-      }
+      locale
     });
+
+    const hasSystemPromptOverride = typeof systemPrompt === 'string' && systemPrompt.trim().length > 0;
+    const hasUserTemplateOverride = typeof userPromptTemplate === 'string' && userPromptTemplate.trim().length > 0;
+    const hasOverride = hasSystemPromptOverride || hasUserTemplateOverride;
+
+    const resolvedSystemPrompt = hasSystemPromptOverride
+      ? systemPrompt.trim()
+      : promptConfig.systemPrompt;
+    const resolvedUserPromptTemplate = hasUserTemplateOverride
+      ? userPromptTemplate.trim()
+      : promptConfig.userPromptTemplate;
+    const resolvedUserPrompt = promptTemplateService.compileTemplate(
+      resolvedUserPromptTemplate,
+      mergedVariables
+    );
 
     const payload = {
       promptKey,
       eventType: normalizedEventType,
       locale,
-      source: promptConfig.source,
+      source: hasOverride ? 'override' : promptConfig.source,
       version: promptConfig.version,
-      systemPrompt: promptConfig.systemPrompt,
-      userPrompt: promptConfig.userPrompt,
+      systemPrompt: resolvedSystemPrompt,
+      userPromptTemplate: resolvedUserPromptTemplate,
+      userPrompt: resolvedUserPrompt,
       compiledPrompt: [
         '[SYSTEM PROMPT]',
-        promptConfig.systemPrompt || '',
+        resolvedSystemPrompt || '',
         '',
         '[USER TEMPLATE COMPILE]',
-        promptConfig.userPrompt || ''
+        resolvedUserPrompt || ''
       ].join('\n'),
       modelCall: null
     };
@@ -377,8 +448,8 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
       const response = await aiService.mistral.chat.complete({
         model,
         messages: [
-          { role: 'system', content: promptConfig.systemPrompt },
-          { role: 'user', content: promptConfig.userPrompt }
+          { role: 'system', content: resolvedSystemPrompt },
+          { role: 'user', content: resolvedUserPrompt }
         ],
         temperature: Number.isFinite(Number(temperature))
           ? Number(temperature)
@@ -634,7 +705,8 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
     });
 
     const content = response.choices[0].message.content;
-    
+    const suggestedBookTitle = parseSuggestedBookTitle(content);
+
     let titles = parseChapterTitles(content);
     if (!Array.isArray(titles) || titles.length === 0) {
       console.log('⚠️ Pas de titres valides, utilisation du fallback');
@@ -646,6 +718,7 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
     console.log(`✅ ${chapters.length} chapitres générés avec succès (protégé)`);
     res.json({
       chapters,
+      suggestedBookTitle,
       promptSource: promptConfig.source,
       promptVersion: promptConfig.version
     });
@@ -667,6 +740,7 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
     
     res.json({ 
       chapters: fallbackChapters,
+      suggestedBookTitle: '',
       fallback: true,
       error: error.message 
     });

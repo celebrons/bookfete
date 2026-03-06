@@ -377,6 +377,14 @@ const CreateBookWizardLuxe = () => {
       }
 
       console.log('✅ Chapitres générés par l\'IA:', data.chapters);
+      const suggestedTitle = String(data?.suggestedBookTitle || '').trim();
+      if (suggestedTitle) {
+        setBookData((previous) => ({
+          ...previous,
+          title: suggestedTitle
+        }));
+      }
+
       return data.chapters;
     } catch (error) {
       console.error('❌ Erreur IA, utilisation du fallback:', error);

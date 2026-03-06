@@ -2,7 +2,8 @@ const supabase = require('../config/supabase');
 
 const PROMPT_KEYS = {
   CHAPTER_GENERATION: 'chapter_generation',
-  QUESTION_GENERATION: 'question_generation'
+  QUESTION_GENERATION: 'question_generation',
+  CONTENT_GENERATION: 'content_generation'
 };
 
 const TEMPLATE_CACHE_TTL_MS = Number(process.env.AI_PROMPT_CACHE_TTL_MS || 30000);
@@ -66,8 +67,65 @@ const DEFAULT_PROMPTS = {
     ].join('\n'),
     temperature: 0.7,
     maxTokens: 500
+  },
+  [PROMPT_KEYS.CONTENT_GENERATION]: {
+    systemPrompt:
+      'Tu es un biographe haut de gamme. Tu rediges un texte elegant, coherent et vivant, adapte au contexte fourni.',
+    userPromptTemplate: [
+      'Tu dois produire le contenu "{{outputType}}" pour un livre souvenir.',
+      '',
+      'Contexte :',
+      '- Type d evenement : {{eventType}}',
+      '- Style narratif : {{style}}',
+      '- Titre du livre : {{bookTitle}}',
+      '- Titre du chapitre : {{chapterTitle}}',
+      '- Personne celebree : {{recipientName}}',
+      '- Age : {{recipientAge}} ans',
+      '- Genre : {{recipientGender}}',
+      '- Resume de chapitre precedent : {{chapterSummary}}',
+      '- Contexte narratif additionnel : {{narrativeContext}}',
+      '- Longueur cible : {{targetLength}} caracteres',
+      '',
+      'Regles :',
+      '- Respecter le style {{style}}.',
+      '- Si outputType = "introduction", preparer l entree du livre.',
+      '- Si outputType = "chapter_content", produire un contenu narratif riche et concret.',
+      '- Si outputType = "conclusion", cloturer avec emotion et gratitude.',
+      '- Reponse en francais uniquement.',
+      '',
+      'Format attendu :',
+      '- Retourner uniquement le texte final, sans markdown, sans JSON, sans balise HTML.'
+    ].join('\n'),
+    temperature: 0.75,
+    maxTokens: 1400
   }
 };
+
+DEFAULT_PROMPTS[PROMPT_KEYS.QUESTION_GENERATION].userPromptTemplate = [
+  'Tu dois generer 4 questions ouvertes pour un chapitre de livre souvenir.',
+  '',
+  'Contexte :',
+  '- Titre du livre : {{bookTitle}}',
+  '- Type d evenement : {{eventType}}',
+  '- Titre du chapitre : {{chapterTitle}}',
+  '- Style narratif : {{style}}',
+  '- Personne celebree : {{recipientName}}',
+  '- Age : {{recipientAge}} ans {{ageContext}}',
+  '- Genre : {{recipientGender}}',
+  '- Pronom cible : {{pronoun}} / {{subjectPronoun}} / {{possessive}}',
+  '- Indication de style : {{styleInstruction}}',
+  '',
+  'Regles :',
+  '1. Les questions sont adressees a l organisateur et aux contributeurs, pas a {{recipientName}}.',
+  '2. Ne jamais commencer une question par "{{recipientName}},".',
+  '3. Parler de {{recipientName}} a la 3e personne.',
+  '4. Les questions doivent etre en lien direct avec {{chapterTitle}}.',
+  '5. Ton adapte au style {{style}}.',
+  '6. Questions chaleureuses, specifiques, non generiques.',
+  '',
+  'Reponds UNIQUEMENT avec un tableau JSON de 4 chaines de caracteres.',
+  'Format exact : ["Question 1", "Question 2", "Question 3", "Question 4"]'
+].join('\n');
 
 function normalizeText(value, fallback = '') {
   if (value === null || value === undefined) return fallback;

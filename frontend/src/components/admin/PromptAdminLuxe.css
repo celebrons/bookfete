@@ -36,6 +36,12 @@
   flex-shrink: 0;
 }
 
+.prompt-admin-head-links {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .prompt-admin-feedback {
   display: flex;
   align-items: center;
@@ -203,7 +209,7 @@
     radial-gradient(circle at top right, rgba(184, 146, 74, 0.14), transparent 30%),
     linear-gradient(135deg, #f7f6f3 0%, #ecebe7 100%);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 12px;
   align-items: end;
 }
@@ -213,6 +219,21 @@
   gap: 10px;
   align-items: center;
   justify-content: flex-end;
+}
+
+.prompt-admin-mode-toggle {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.prompt-admin-mode-toggle .btn {
+  min-width: 110px;
+}
+
+.prompt-admin-mode-toggle .btn.is-active {
+  background: rgba(184, 146, 74, 0.16);
+  border-color: rgba(184, 146, 74, 0.42);
+  color: #6d5224;
 }
 
 .prompt-admin-grid {
@@ -292,6 +313,58 @@
   letter-spacing: 0.08em;
   font-weight: 700;
   color: #8d6d35;
+}
+
+.prompt-admin-field-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.prompt-admin-simple-summary {
+  border: 1px solid rgba(220, 215, 204, 0.92);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.prompt-admin-simple-summary-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prompt-admin-simple-summary-main strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.prompt-admin-simple-summary-main span {
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.prompt-admin-simple-vars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prompt-admin-json-block {
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prompt-admin-json-toggle {
+  align-self: flex-start;
 }
 
 .prompt-admin-textarea {
@@ -523,6 +596,11 @@
     justify-content: center;
   }
 
+  .prompt-admin-head-links {
+    width: 100%;
+    flex-direction: column;
+  }
+
   .prompt-admin-filters {
     grid-template-columns: 1fr;
   }
@@ -538,6 +616,23 @@
 
   .prompt-admin-inline-fields {
     grid-template-columns: 1fr;
+  }
+
+  .prompt-admin-simple-vars {
+    grid-template-columns: 1fr;
+  }
+
+  .prompt-admin-mode-toggle {
+    width: 100%;
+  }
+
+  .prompt-admin-mode-toggle .btn {
+    flex: 1;
+  }
+
+  .prompt-admin-simple-summary {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .prompt-admin-version-actions {

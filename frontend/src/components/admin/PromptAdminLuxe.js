@@ -6,7 +6,8 @@ import './PromptAdminLuxe.css';
 
 const PROMPT_KEY_OPTIONS = [
   { value: 'chapter_generation', label: 'Generation chapitres' },
-  { value: 'question_generation', label: 'Generation questions' }
+  { value: 'question_generation', label: 'Generation questions' },
+  { value: 'content_generation', label: 'Generation contenu' }
 ];
 
 const EVENT_PRESETS = [
@@ -21,6 +22,45 @@ const EVENT_PRESETS = [
 ];
 
 const DEFAULT_MODEL = 'mistral-small-latest';
+
+const SIMPLE_SCENARIOS = [
+  {
+    value: 'book_title',
+    label: 'Titre du livre',
+    promptKey: 'chapter_generation',
+    objective: 'Produire un titre premium et memorable.'
+  },
+  {
+    value: 'chapter_titles',
+    label: 'Titres des chapitres',
+    promptKey: 'chapter_generation',
+    objective: 'Produire un sommaire elegant et personnalise.'
+  },
+  {
+    value: 'questions',
+    label: 'Questions',
+    promptKey: 'question_generation',
+    objective: 'Produire des questions narratives pour les proches.'
+  },
+  {
+    value: 'chapter_content',
+    label: 'Contenu des chapitres',
+    promptKey: 'content_generation',
+    objective: 'Rediger le texte principal d un chapitre.'
+  },
+  {
+    value: 'introduction',
+    label: 'Introduction',
+    promptKey: 'content_generation',
+    objective: 'Rediger une ouverture de livre fluide et emotionnelle.'
+  },
+  {
+    value: 'conclusion',
+    label: 'Conclusion',
+    promptKey: 'content_generation',
+    objective: 'Rediger une conclusion coherente et touchante.'
+  }
+];
 
 const CHAPTER_PROMPT_VARIABLES = [
   {
@@ -166,16 +206,134 @@ const QUESTION_PROMPT_VARIABLES = [
   }
 ];
 
+const CONTENT_PROMPT_VARIABLES = [
+  {
+    placeholder: '{{outputType}}',
+    frontKey: 'derive UI admin',
+    source: 'PromptAdminLuxe / scenario',
+    description: 'Type de sortie cible (chapter_content, introduction, conclusion).'
+  },
+  {
+    placeholder: '{{eventType}}',
+    frontKey: 'book.event_type',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Type d evenement.'
+  },
+  {
+    placeholder: '{{style}}',
+    frontKey: 'book.style_narratif',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Style narratif.'
+  },
+  {
+    placeholder: '{{bookTitle}}',
+    frontKey: 'book.title',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Titre du livre.'
+  },
+  {
+    placeholder: '{{chapterTitle}}',
+    frontKey: 'chapter.title',
+    source: 'ChapterWorkflowLuxe',
+    description: 'Titre du chapitre en cours.'
+  },
+  {
+    placeholder: '{{recipientName}}',
+    frontKey: 'book.recipient_name',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Nom de la personne cible.'
+  },
+  {
+    placeholder: '{{recipientAge}}',
+    frontKey: 'book.recipient_age',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Age cible.'
+  },
+  {
+    placeholder: '{{recipientGender}}',
+    frontKey: 'book.recipient_gender',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Genre cible.'
+  },
+  {
+    placeholder: '{{chapterSummary}}',
+    frontKey: 'derive workflow chapitre',
+    source: 'resume inter-chapitres (IA)',
+    description: 'Resume utile pour la coherence narrative.'
+  },
+  {
+    placeholder: '{{narrativeContext}}',
+    frontKey: 'book.cover_config.aiProjectBrief',
+    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    description: 'Contexte narratif additionnel.'
+  },
+  {
+    placeholder: '{{targetLength}}',
+    frontKey: 'derive workflow',
+    source: 'regle de longueur',
+    description: 'Longueur cible en caracteres.'
+  }
+];
+
 const PROMPT_TEST_STEPS = [
-  'Choisir prompt key, event type, locale puis cliquer sur "Charger".',
-  'Verifier/editer System prompt et User prompt template.',
+  'Mode simple: choisir un cas d usage (titre, chapitres, questions, contenu, introduction, conclusion).',
+  'Cliquer sur "Charger" pour recuperer la version active du prompt.',
+  'Verifier/editer les consignes de role IA et les consignes de production.',
   'Configurer Temperature et Max tokens pour la version a publier.',
-  'Renseigner les variables JSON dans "Test" (elles doivent matcher les {{placeholders}}).',
+  'Remplir les variables de test dans les champs guides (ou en JSON en mode expert).',
   'Cliquer sur "Tester le prompt" pour verifier le compile (system + user).',
   'Activer "Executer aussi le modele" seulement si tu veux un run IA reel.',
-  'Publier la version quand le rendu compile est valide.',
+  'Publier la version quand le rendu est valide.',
   'Dans "Versions", ajouter une note (contexte, objectif) ou supprimer une version obsolete.'
 ];
+
+const VARIABLE_LABELS = {
+  count: 'Nombre de chapitres',
+  eventType: 'Type d evenement',
+  style: 'Ton narratif',
+  bookTitle: 'Titre du livre',
+  chapterTitle: 'Titre du chapitre',
+  recipientName: 'Nom de la personne',
+  recipientAge: 'Age',
+  recipientGender: 'Genre',
+  recipientNickname: 'Surnom',
+  recipientTrait: 'Trait marquant',
+  recipientAnecdote: 'Anecdote centrale',
+  additionalContext: 'Contexte additionnel',
+  pronoun: 'Pronom objet',
+  subjectPronoun: 'Pronom sujet',
+  possessive: 'Possessif',
+  ageContext: 'Contexte age',
+  styleInstruction: 'Instruction de ton',
+  outputType: 'Type de sortie',
+  chapterSummary: 'Resume precedent',
+  narrativeContext: 'Contexte narratif',
+  targetLength: 'Longueur cible'
+};
+
+const VARIABLE_PLACEHOLDERS = {
+  count: 'Ex: 8',
+  eventType: 'Ex: anniversaire',
+  style: 'Ex: emotion',
+  bookTitle: 'Ex: Pour tes 40 ans',
+  chapterTitle: 'Ex: Les moments qui marquent',
+  recipientName: 'Ex: Juliette',
+  recipientAge: 'Ex: 40',
+  recipientGender: 'Ex: femme',
+  recipientNickname: 'Ex: Ju',
+  recipientTrait: 'Ex: Genereuse et solaire',
+  recipientAnecdote: 'Ex: Son fameux gateau sale-sucre',
+  additionalContext: 'Ex: Ton complice et elegant',
+  pronoun: 'Ex: elle',
+  subjectPronoun: 'Ex: elle',
+  possessive: 'Ex: sa',
+  ageContext: 'Ex: adulte de 40 ans',
+  styleInstruction: 'Ex: Ton chaleureux et detaille',
+  outputType: 'chapter_content | introduction | conclusion',
+  chapterSummary: 'Synthese du chapitre precedent',
+  narrativeContext: 'Elements a respecter',
+  targetLength: 'Ex: 3200'
+};
 
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -222,6 +380,22 @@ const buildDefaultVariables = (promptKey, rawEventType) => {
     };
   }
 
+  if (promptKey === 'content_generation') {
+    return {
+      eventType,
+      style: 'emotion',
+      bookTitle: 'Pour tes 40 ans',
+      chapterTitle: 'Les moments qui marquent',
+      recipientName: 'Juliette',
+      recipientAge: 40,
+      recipientGender: 'femme',
+      outputType: 'chapter_content',
+      chapterSummary: 'Juliette rassemble tout le monde avec son energie et sa generosite.',
+      narrativeContext: 'Conserver une voix elegante, concrete et chaleureuse.',
+      targetLength: 3200
+    };
+  }
+
   return {
     eventType,
     style: 'emotion',
@@ -237,8 +411,69 @@ const buildDefaultVariables = (promptKey, rawEventType) => {
   };
 };
 
+const buildScenarioVariables = ({ promptKey, scenarioValue, rawEventType }) => {
+  const base = buildDefaultVariables(promptKey, rawEventType);
+
+  if (scenarioValue === 'book_title') {
+    return {
+      ...base,
+      additionalContext: 'Priorite au titre du livre, luxe et emotion.'
+    };
+  }
+
+  if (scenarioValue === 'chapter_titles') {
+    return {
+      ...base,
+      additionalContext: 'Priorite au sommaire des chapitres, titres courts et memorables.'
+    };
+  }
+
+  if (scenarioValue === 'introduction') {
+    return {
+      ...base,
+      outputType: 'introduction',
+      chapterTitle: 'Ouverture',
+      targetLength: 1800
+    };
+  }
+
+  if (scenarioValue === 'conclusion') {
+    return {
+      ...base,
+      outputType: 'conclusion',
+      chapterTitle: 'Epilogue',
+      targetLength: 1600
+    };
+  }
+
+  if (scenarioValue === 'chapter_content') {
+    return {
+      ...base,
+      outputType: 'chapter_content',
+      targetLength: 3200
+    };
+  }
+
+  return base;
+};
+
+const parseVariablesObject = (rawText) => {
+  try {
+    const parsed = JSON.parse(rawText || '{}');
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+      return null;
+    }
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+};
+
 const PromptAdminLuxe = () => {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [uiMode, setUiMode] = useState('simple');
+  const [simpleScenario, setSimpleScenario] = useState('chapter_titles');
+  const [showVariablesJson, setShowVariablesJson] = useState(false);
   const [promptKey, setPromptKey] = useState('chapter_generation');
   const [eventType, setEventType] = useState('*');
   const [locale, setLocale] = useState('fr');
@@ -317,6 +552,24 @@ const PromptAdminLuxe = () => {
   };
 
   const getVersionRowKey = (versionRow) => String(versionRow?.id || versionRow?.version || '');
+  const selectedScenario = SIMPLE_SCENARIOS.find((scenario) => scenario.value === simpleScenario)
+    || SIMPLE_SCENARIOS[0];
+
+  const handlePromptKeyChange = (nextPromptKey) => {
+    setPromptKey(nextPromptKey);
+    const matchingScenario = SIMPLE_SCENARIOS.find((scenario) => scenario.promptKey === nextPromptKey);
+    if (matchingScenario) {
+      setSimpleScenario(matchingScenario.value);
+    }
+  };
+
+  const handleSimpleScenarioChange = (nextScenarioValue) => {
+    setSimpleScenario(nextScenarioValue);
+    const matchingScenario = SIMPLE_SCENARIOS.find((scenario) => scenario.value === nextScenarioValue);
+    if (matchingScenario && matchingScenario.promptKey !== promptKey) {
+      setPromptKey(matchingScenario.promptKey);
+    }
+  };
 
   const loadTemplate = async () => {
     setLoading(true);
@@ -343,9 +596,17 @@ const PromptAdminLuxe = () => {
 
   useEffect(() => {
     setTestVariablesText(
-      JSON.stringify(buildDefaultVariables(promptKey, eventType), null, 2)
+      JSON.stringify(
+        buildScenarioVariables({
+          promptKey,
+          scenarioValue: simpleScenario,
+          rawEventType: eventType
+        }),
+        null,
+        2
+      )
     );
-  }, [promptKey, eventType]);
+  }, [promptKey, eventType, simpleScenario]);
 
   useEffect(() => {
     const rows = templateVersions?.versions || [];
@@ -384,7 +645,11 @@ const PromptAdminLuxe = () => {
       return;
     }
 
-    const fallbackVariables = buildDefaultVariables(promptKey, eventType);
+    const fallbackVariables = buildScenarioVariables({
+      promptKey,
+      scenarioValue: simpleScenario,
+      rawEventType: eventType
+    });
     const nextVariables = {};
     expectedKeys.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(parsedVariables, key)) {
@@ -402,7 +667,7 @@ const PromptAdminLuxe = () => {
     if (nextVariablesText !== testVariablesText) {
       setTestVariablesText(nextVariablesText);
     }
-  }, [systemPrompt, userPromptTemplate, promptKey, eventType, testVariablesText]); // sync when prompt template changes
+  }, [systemPrompt, userPromptTemplate, promptKey, eventType, simpleScenario, testVariablesText]); // sync when prompt template changes
 
   useEffect(() => {
     loadTemplate();
@@ -487,8 +752,8 @@ const PromptAdminLuxe = () => {
     setTestResult(null);
 
     try {
-      const parsedVariables = JSON.parse(testVariablesText || '{}');
-      if (!parsedVariables || Array.isArray(parsedVariables) || typeof parsedVariables !== 'object') {
+      const parsedVariables = parseVariablesObject(testVariablesText);
+      if (!parsedVariables) {
         throw new Error('Variables de test: JSON objet attendu.');
       }
 
@@ -498,6 +763,8 @@ const PromptAdminLuxe = () => {
         variables: parsedVariables,
         runModel,
         model: (modelName || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
+        systemPrompt: systemPrompt.trim(),
+        userPromptTemplate: userPromptTemplate.trim(),
         temperature: parseOptionalNumber(testTemperature, 'Temperature test'),
         maxTokens: parseOptionalNumber(testMaxTokens, 'Max tokens test')
       };
@@ -517,6 +784,12 @@ const PromptAdminLuxe = () => {
     } finally {
       setTesting(false);
     }
+  };
+
+  const handleSimpleVariableChange = (variableName, value) => {
+    const parsed = parseVariablesObject(testVariablesText) || {};
+    parsed[variableName] = value;
+    setTestVariablesText(JSON.stringify(parsed, null, 2));
   };
 
   const handleVersionNoteChange = (versionRow, value) => {
@@ -586,6 +859,11 @@ const PromptAdminLuxe = () => {
   };
 
   const activeVersion = templateVersions?.active_version || activePrompt?.version || null;
+  const expectedVariableNames = Array.from(new Set([
+    ...extractTemplateVariables(systemPrompt),
+    ...extractTemplateVariables(userPromptTemplate)
+  ]));
+  const parsedTestVariables = parseVariablesObject(testVariablesText) || {};
   const compiledPromptPreview = testResult
     ? (
         testResult.compiledPrompt
@@ -607,12 +885,17 @@ const PromptAdminLuxe = () => {
             <span className="label-gold">Prompt lab</span>
             <h1 className="prompt-admin-title">Administration des prompts IA</h1>
             <p className="prompt-admin-subtitle">
-              Chargez une version, testez le rendu compile, puis publiez une nouvelle version.
+              Mode simple pour configurer rapidement les cas metier, mode expert pour le controle technique complet.
             </p>
           </div>
-          <Link to="/dashboard" className="btn btn-outline prompt-admin-back-link">
-            Retour dashboard
-          </Link>
+          <div className="prompt-admin-head-links">
+            <Link to="/admin/prompts/journey" className="btn btn-outline prompt-admin-back-link">
+              Parcours prompts
+            </Link>
+            <Link to="/dashboard" className="btn btn-outline prompt-admin-back-link">
+              Retour dashboard
+            </Link>
+          </div>
         </div>
 
         <section className={`prompt-admin-guide ${isGuideOpen ? 'is-open' : ''}`}>
@@ -630,10 +913,11 @@ const PromptAdminLuxe = () => {
           {isGuideOpen ? (
             <div id="prompt-admin-guide-content" className="prompt-admin-guide-content">
               <p>
-                <strong>promptKey</strong>: type de prompt gere (<code>chapter_generation</code> ou
-                <code>question_generation</code>). <strong>eventType</strong>: contexte metier du prompt
-                (<code>anniversaire</code>, <code>projet</code>, etc.). <strong>locale</strong>: langue cible
-                (<code>fr</code>, <code>en</code>...).
+                <strong>promptKey</strong>: type de prompt gere (<code>chapter_generation</code>,
+                <code>question_generation</code>, <code>content_generation</code>).
+                <strong> eventType</strong>: contexte metier du prompt
+                (<code>anniversaire</code>, <code>projet</code>, etc.).
+                <strong> locale</strong>: langue cible (<code>fr</code>, <code>en</code>...).
               </p>
               <p>
                 <strong>temperature</strong>: creativite de sortie. <strong>maxTokens</strong>: longueur maximale
@@ -658,6 +942,19 @@ const PromptAdminLuxe = () => {
                   <h3>Variables question_generation</h3>
                   <ul className="prompt-admin-guide-list">
                     {QUESTION_PROMPT_VARIABLES.map((item) => (
+                      <li key={item.placeholder} className="prompt-admin-guide-list-item">
+                        <code>{item.placeholder}</code>
+                        <span><strong>Front:</strong> {item.frontKey}</span>
+                        <span><strong>Source:</strong> {item.source}</span>
+                        <span>{item.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="prompt-admin-guide-card">
+                  <h3>Variables content_generation</h3>
+                  <ul className="prompt-admin-guide-list">
+                    {CONTENT_PROMPT_VARIABLES.map((item) => (
                       <li key={item.placeholder} className="prompt-admin-guide-list-item">
                         <code>{item.placeholder}</code>
                         <span><strong>Front:</strong> {item.frontKey}</span>
@@ -695,20 +992,67 @@ const PromptAdminLuxe = () => {
 
         <section className="prompt-admin-filters">
           <div className="prompt-admin-field">
-            <label htmlFor="prompt-key">Prompt key</label>
-            <select
-              id="prompt-key"
-              className="input-luxe"
-              value={promptKey}
-              onChange={(event) => setPromptKey(event.target.value)}
-            >
-              {PROMPT_KEY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <label>Mode</label>
+            <div className="prompt-admin-mode-toggle">
+              <button
+                type="button"
+                className={`btn btn-outline ${uiMode === 'simple' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setUiMode('simple');
+                  setShowVariablesJson(false);
+                }}
+              >
+                Simple
+              </button>
+              <button
+                type="button"
+                className={`btn btn-outline ${uiMode === 'expert' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setUiMode('expert');
+                  setShowVariablesJson(true);
+                }}
+              >
+                Expert
+              </button>
+            </div>
           </div>
+
+          {uiMode === 'simple' ? (
+            <div className="prompt-admin-field">
+              <label htmlFor="simple-scenario">Resultat a configurer</label>
+              <select
+                id="simple-scenario"
+                className="input-luxe"
+                value={simpleScenario}
+                onChange={(event) => handleSimpleScenarioChange(event.target.value)}
+              >
+                {SIMPLE_SCENARIOS.map((scenario) => (
+                  <option key={scenario.value} value={scenario.value}>
+                    {scenario.label}
+                  </option>
+                ))}
+              </select>
+              <span className="prompt-admin-field-help">
+                {selectedScenario?.objective || ''}
+              </span>
+            </div>
+          ) : (
+            <div className="prompt-admin-field">
+              <label htmlFor="prompt-key">Prompt key</label>
+              <select
+                id="prompt-key"
+                className="input-luxe"
+                value={promptKey}
+                onChange={(event) => handlePromptKeyChange(event.target.value)}
+              >
+                {PROMPT_KEY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="prompt-admin-field">
             <label htmlFor="prompt-event-type">Event type</label>
@@ -758,17 +1102,36 @@ const PromptAdminLuxe = () => {
           </div>
         </section>
 
+        {uiMode === 'simple' ? (
+          <section className="prompt-admin-simple-summary">
+            <div className="prompt-admin-simple-summary-main">
+              <strong>{selectedScenario?.label || 'Scenario'}</strong>
+              <span>{selectedScenario?.objective || ''}</span>
+            </div>
+            <span className="prompt-admin-active-pill">
+              Prompt technique: {selectedScenario?.promptKey || promptKey}
+            </span>
+          </section>
+        ) : null}
+
         <section className="prompt-admin-grid">
           <article className="prompt-admin-editor">
             <div className="prompt-admin-panel-head">
-              <h2>Edition</h2>
+              <h2>{uiMode === 'simple' ? 'Configuration' : 'Edition'}</h2>
               <span className="prompt-admin-active-pill">
                 Source: {activePrompt?.source || '-'} | Active: {activeVersion || '-'}
               </span>
             </div>
 
             <div className="prompt-admin-field">
-              <label htmlFor="system-prompt">System prompt</label>
+              <label htmlFor="system-prompt">
+                {uiMode === 'simple' ? 'Role IA' : 'System prompt'}
+              </label>
+              {uiMode === 'simple' ? (
+                <span className="prompt-admin-field-help">
+                  Definis le role de l IA: posture, niveau de style, intention globale.
+                </span>
+              ) : null}
               <textarea
                 id="system-prompt"
                 className="input-luxe prompt-admin-textarea prompt-admin-textarea-system"
@@ -779,7 +1142,14 @@ const PromptAdminLuxe = () => {
             </div>
 
             <div className="prompt-admin-field">
-              <label htmlFor="user-prompt-template">User prompt template</label>
+              <label htmlFor="user-prompt-template">
+                {uiMode === 'simple' ? 'Consignes de production' : 'User prompt template'}
+              </label>
+              {uiMode === 'simple' ? (
+                <span className="prompt-admin-field-help">
+                  Precise le resultat attendu, les contraintes et le format de sortie final.
+                </span>
+              ) : null}
               <textarea
                 id="user-prompt-template"
                 className="input-luxe prompt-admin-textarea prompt-admin-textarea-user"
@@ -841,15 +1211,40 @@ const PromptAdminLuxe = () => {
               <h2>Test</h2>
             </div>
 
-            <div className="prompt-admin-field">
-              <label htmlFor="test-vars">Variables (JSON)</label>
-              <textarea
-                id="test-vars"
-                className="input-luxe prompt-admin-textarea prompt-admin-textarea-test-vars"
-                value={testVariablesText}
-                onChange={(event) => setTestVariablesText(event.target.value)}
-              />
-            </div>
+            {uiMode === 'simple' ? (
+              <div className="prompt-admin-simple-vars">
+                {expectedVariableNames.length === 0 ? (
+                  <p className="prompt-admin-empty">
+                    Ajoute des variables <code>{'{{variable}}'}</code> dans les prompts pour obtenir des champs guides.
+                  </p>
+                ) : (
+                  expectedVariableNames.map((variableName) => (
+                    <div key={variableName} className="prompt-admin-field">
+                      <label htmlFor={`var-${variableName}`}>
+                        {VARIABLE_LABELS[variableName] || variableName}
+                      </label>
+                      <input
+                        id={`var-${variableName}`}
+                        className="input-luxe"
+                        value={String(parsedTestVariables[variableName] ?? '')}
+                        onChange={(event) => handleSimpleVariableChange(variableName, event.target.value)}
+                        placeholder={VARIABLE_PLACEHOLDERS[variableName] || `Valeur de ${variableName}`}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="prompt-admin-field">
+                <label htmlFor="test-vars">Variables (JSON)</label>
+                <textarea
+                  id="test-vars"
+                  className="input-luxe prompt-admin-textarea prompt-admin-textarea-test-vars"
+                  value={testVariablesText}
+                  onChange={(event) => setTestVariablesText(event.target.value)}
+                />
+              </div>
+            )}
 
             <div className="prompt-admin-check-row">
               <input
@@ -895,6 +1290,29 @@ const PromptAdminLuxe = () => {
                 />
               </div>
             </div>
+
+            {uiMode === 'simple' ? (
+              <div className="prompt-admin-json-block">
+                <button
+                  type="button"
+                  className="btn btn-outline prompt-admin-json-toggle"
+                  onClick={() => setShowVariablesJson((previous) => !previous)}
+                >
+                  {showVariablesJson ? 'Masquer JSON technique' : 'Afficher JSON technique'}
+                </button>
+                {showVariablesJson ? (
+                  <div className="prompt-admin-field">
+                    <label htmlFor="test-vars">Variables (JSON)</label>
+                    <textarea
+                      id="test-vars"
+                      className="input-luxe prompt-admin-textarea prompt-admin-textarea-test-vars"
+                      value={testVariablesText}
+                      onChange={(event) => setTestVariablesText(event.target.value)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="prompt-admin-editor-actions">
               <button
