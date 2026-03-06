@@ -234,7 +234,7 @@ const PromptJourneyLabLuxe = () => {
         ageContext: ageContextLabel
           ? `${pronouns.pronoun} est ${ageContextLabel} de ${common.recipientAge} ans`
           : '',
-        styleInstruction: `${getStyleInstruction(common.style)} Les questions sont adressees a l organisateur et aux contributeurs, et parlent de ${common.recipientName} a la 3e personne.`
+        styleInstruction: getStyleInstruction(common.style)
       };
     }
 
