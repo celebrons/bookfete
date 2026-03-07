@@ -5,10 +5,41 @@ import ChapterDetailsLuxe from './chapters/ChapterDetailsLuxe';
 import ContributionsModerationLuxe from './chapters/ContributionsModerationLuxe';
 import ChapterEditorLuxe from './chapters/ChapterEditorLuxe';
 import QuestionsEditorLuxe from './chapters/QuestionsEditorLuxe';
+import BookCoverDesignerLuxe from './BookCoverDesignerLuxe';
 import { useChapterActions } from './hooks/useChapterActions';
 import { useContributions } from './hooks/useContributions';
 import { useQuestions } from './hooks/useQuestions';
 import './BookLuxe.css';
+
+const COVER_CARD_ID = 'cover-card';
+const BACK_COVER_CARD_ID = 'back-cover-card';
+const SPECIAL_VIEW_IDS = new Set([COVER_CARD_ID, BACK_COVER_CARD_ID]);
+
+const PROGRESSION_STATUS = {
+  done: {
+    key: 'done',
+    label: 'Termine',
+    color: '#1f7a3d',
+    background: '#e9f7ee'
+  },
+  inProgress: {
+    key: 'inProgress',
+    label: 'En cours',
+    color: '#9a5a00',
+    background: '#fff4df'
+  },
+  notStarted: {
+    key: 'notStarted',
+    label: 'Non commence',
+    color: '#5f6770',
+    background: '#f2f4f6'
+  }
+};
+
+const normalizeText = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+};
 
 const ChapterListLuxe = ({
   chapters,
@@ -20,9 +51,11 @@ const ChapterListLuxe = ({
   onFinalizeChapterDraft,
   onDeleteChapter,
   bookId,
-  book
+  book,
+  onUpdateBook
 }) => {
   const [user, setUser] = useState(null);
+  const [editionLayout, setEditionLayout] = useState('gallery');
 
   const {
     selectedChapterId,
@@ -39,10 +72,16 @@ const ChapterListLuxe = ({
   } = useChapterActions(onUpdateChapter, onDeleteChapter);
 
   const selectedChapter = chapters.find((chapter) => chapter.id === selectedChapterId) || null;
+  const selectedSpecialFace = selectedChapterId === COVER_CARD_ID
+    ? 'front'
+    : selectedChapterId === BACK_COVER_CARD_ID
+      ? 'back'
+      : null;
+  const isSpecialWorkspace = Boolean(selectedSpecialFace);
   const selectedChapterTitle = selectedChapter
     ? (selectedChapter.order_index === 0 ? 'Introduction' : selectedChapter.title)
-    : '';
-  const isGalleryOnly = !selectedChapter;
+    : (selectedSpecialFace === 'front' ? 'Couverture' : selectedSpecialFace === 'back' ? '4e de couverture' : '');
+  const isGalleryOnly = !selectedChapter && !isSpecialWorkspace;
 
   const {
     showContributions,
@@ -87,7 +126,11 @@ const ChapterListLuxe = ({
       return;
     }
 
-    if (selectedChapterId && !chapters.some((chapter) => chapter.id === selectedChapterId)) {
+    if (
+      selectedChapterId
+      && !SPECIAL_VIEW_IDS.has(selectedChapterId)
+      && !chapters.some((chapter) => chapter.id === selectedChapterId)
+    ) {
       setSelectedChapterId(null);
     }
   }, [chapters, selectedChapterId, setSelectedChapterId]);
@@ -102,32 +145,72 @@ const ChapterListLuxe = ({
   const getStatusColor = (contributions) => {
     const count = Array.isArray(contributions) ? contributions.length : 0;
     if (count === 0) return '#b9c4cf';
-    if (count < 3) return '#7f95a5';
+    if (count < 3) return '#d89434';
     return '#2f6e78';
   };
 
-  const getChapterState = (chapter) => {
-    if (chapter?.isChapterClosed) {
-      return {
-        label: 'Cloture',
-        color: '#2f6e78',
-        background: '#edf7f8'
-      };
+  const getChapterProgressState = (chapter) => {
+    const isDone = Boolean(chapter?.isChapterClosed || chapter?.chapterDraft?.status === 'validated');
+    if (isDone) {
+      return PROGRESSION_STATUS.done;
     }
 
-    if (chapter?.contributionsClosed) {
-      return {
-        label: 'Contributions fermees',
-        color: '#5d7183',
-        background: '#f1f5f8'
-      };
+    const hasStarted = Boolean(
+      chapter?.questions_validated
+      || chapter?.workflowState
+      || chapter?.hasContributed
+      || Number(chapter?.contributionsCount || 0) > 0
+      || Number(chapter?.chapterDraft?.generationCount || 0) > 0
+      || normalizeText(chapter?.chapterDraft?.html)
+    );
+
+    return hasStarted ? PROGRESSION_STATUS.inProgress : PROGRESSION_STATUS.notStarted;
+  };
+
+  const getCoverProgressState = (face) => {
+    const coverConfig = (book?.cover_config && typeof book.cover_config === 'object')
+      ? book.cover_config
+      : {};
+    const backCoverConfig = (book?.back_cover_config && typeof book.back_cover_config === 'object')
+      ? book.back_cover_config
+      : {};
+
+    if (face === 'front') {
+      const title = normalizeText(coverConfig.title || book?.title);
+      const recipientLine = normalizeText(coverConfig.recipientLine);
+      const eventLine = normalizeText(coverConfig.eventLine);
+      const subtitle = normalizeText(coverConfig.subtitle);
+      const hasStarted = Boolean(subtitle || recipientLine || eventLine);
+      const isDone = Boolean(title && recipientLine && eventLine);
+      if (isDone) return PROGRESSION_STATUS.done;
+      return hasStarted ? PROGRESSION_STATUS.inProgress : PROGRESSION_STATUS.notStarted;
     }
 
-    return {
-      label: 'En cours',
-      color: '#5f6770',
-      background: '#f4f6f8'
-    };
+    const blurb = normalizeText(backCoverConfig.blurb);
+    const quote = normalizeText(backCoverConfig.quote);
+    const signature = normalizeText(backCoverConfig.signature);
+    const hasStarted = Boolean(blurb || quote || signature);
+    const isDone = Boolean(blurb && signature);
+    if (isDone) return PROGRESSION_STATUS.done;
+    return hasStarted ? PROGRESSION_STATUS.inProgress : PROGRESSION_STATUS.notStarted;
+  };
+
+  const editionItems = [
+    { id: COVER_CARD_ID, type: 'cover' },
+    ...chapters.map((chapter, index) => ({
+      id: chapter.id,
+      type: 'chapter',
+      chapter,
+      index
+    })),
+    { id: BACK_COVER_CARD_ID, type: 'backCover' }
+  ];
+
+  const openEditionItem = (itemId) => {
+    handleSelectChapter(itemId);
+    setShowContributions(false);
+    setEditingChapter(null);
+    setEditingQuestions(null);
   };
 
   return (
@@ -162,134 +245,207 @@ const ChapterListLuxe = ({
 
       {isGalleryOnly ? (
         <div className="sidebar">
-          <div className="sidebar-header">
+          <div className="sidebar-header sidebar-header-edition">
             <h3>Structure du livre</h3>
+            <div className="edition-layout-toggle">
+              <button
+                type="button"
+                className={`edition-layout-btn ${editionLayout === 'gallery' ? 'is-active' : ''}`}
+                onClick={() => setEditionLayout('gallery')}
+              >
+                Galerie
+              </button>
+              <button
+                type="button"
+                className={`edition-layout-btn ${editionLayout === 'summary' ? 'is-active' : ''}`}
+                onClick={() => setEditionLayout('summary')}
+              >
+                Sommaire
+              </button>
+            </div>
           </div>
 
-          <div className="sidebar-content">
-            {[
-              { id: 'cover-card', type: 'cover' },
-              ...chapters.map((chapter, index) => ({
-                id: chapter.id,
-                type: 'chapter',
-                chapter,
-                index
-              })),
-              { id: 'back-cover-card', type: 'backCover' }
-            ].map((item) => {
-              if (item.type !== 'chapter') {
-                const isFront = item.type === 'cover';
+          {editionLayout === 'gallery' ? (
+            <div className="sidebar-content">
+              {editionItems.map((item) => {
+                if (item.type !== 'chapter') {
+                  const isFront = item.type === 'cover';
+                  const coverProgress = getCoverProgressState(isFront ? 'front' : 'back');
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => openEditionItem(item.id)}
+                      className={`chapter-item chapter-special-card is-interactive ${selectedChapterId === item.id ? 'selected' : ''} ${isFront ? 'chapter-cover-card' : 'chapter-back-cover-card'}`}
+                    >
+                      <div className="chapter-special-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" focusable="false">
+                          <path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22.5V4.5zm3 0H18v13H8a2.5 2.5 0 0 0-1 .21V5a.5.5 0 0 1 .5-.5z" />
+                        </svg>
+                      </div>
+                      <div className="chapter-special-title">{isFront ? 'Couverture' : '4e de couverture'}</div>
+                      <div className="chapter-special-subtitle">Configurer</div>
+                      <div
+                        className="chapter-state-badge chapter-state-badge-pinned"
+                        style={{
+                          color: coverProgress.color,
+                          background: coverProgress.background
+                        }}
+                      >
+                        {coverProgress.label}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const { chapter, index } = item;
+                const chapterProgress = getChapterProgressState(chapter);
+                const displayTitle = index === 0 ? 'Introduction' : chapter.title;
+                const chapterShapeClass = `chapter-shape-${(index % 5) + 1}`;
+                const chapterAccent = chapterProgress.key === 'done'
+                  ? '#2f8f58'
+                  : chapterProgress.key === 'inProgress'
+                    ? '#d89434'
+                    : getStatusColor(chapter.contributions);
 
                 return (
                   <div
-                    key={item.id}
-                    className={`chapter-item chapter-special-card ${isFront ? 'chapter-cover-card' : 'chapter-back-cover-card'}`}
+                    key={chapter.id}
+                    onClick={() => openEditionItem(chapter.id)}
+                    className={`chapter-item chapter-card-sketch ${chapterShapeClass} ${selectedChapterId === chapter.id ? 'selected' : ''}`}
+                    style={{
+                      opacity: deleteConfirm?.id === chapter.id ? 0.5 : 1
+                    }}
                   >
-                    <div className="chapter-special-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" focusable="false">
-                        <path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22.5V4.5zm3 0H18v13H8a2.5 2.5 0 0 0-1 .21V5a.5.5 0 0 1 .5-.5z" />
-                      </svg>
-                    </div>
-                    <div className="chapter-special-title">{isFront ? 'Couverture' : '4e de couverture'}</div>
-                    <div className="chapter-special-subtitle">Vierge</div>
-                  </div>
-                );
-              }
+                    <div className="chapter-actions chapter-actions-floating">
+                      <Tooltip text="Modifier le chapitre" position="bottom">
+                        <button
+                          type="button"
+                          className="chapter-action-btn"
+                          aria-label={`Modifier ${displayTitle}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEditionItem(chapter.id);
+                            handleEdit({
+                              ...chapter,
+                              title: displayTitle
+                            });
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M3 17.25V21h3.75L17.8 9.95l-3.75-3.75L3 17.25zm14.71-9.04a1 1 0 0 0 0-1.42l-2.5-2.5a1 1 0 0 0-1.42 0L12 6.08l3.75 3.75 1.96-1.62z" />
+                          </svg>
+                        </button>
+                      </Tooltip>
 
-              const { chapter, index } = item;
-              const chapterState = getChapterState(chapter);
-              const displayTitle = index === 0 ? 'Introduction' : chapter.title;
-              const chapterShapeClass = `chapter-shape-${(index % 5) + 1}`;
-              const chapterAccent = chapter?.isChapterClosed
-                ? '#2f6e78'
-                : chapter?.contributionsClosed
-                  ? '#7b8e9c'
-                  : getStatusColor(chapter.contributions);
-
-              return (
-                <div
-                  key={chapter.id}
-                  onClick={() => {
-                    handleSelectChapter(chapter.id);
-                    setShowContributions(false);
-                  }}
-                  className={`chapter-item chapter-card-sketch ${chapterShapeClass} ${selectedChapterId === chapter.id ? 'selected' : ''}`}
-                  style={{
-                    opacity: deleteConfirm?.id === chapter.id ? 0.5 : 1
-                  }}
-                >
-                  <div className="chapter-actions chapter-actions-floating">
-                    <Tooltip text="Modifier le chapitre" position="bottom">
-                      <button
-                        type="button"
-                        className="chapter-action-btn"
-                        aria-label={`Modifier ${displayTitle}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleSelectChapter(chapter.id);
-                          setShowContributions(false);
-                          handleEdit({
-                            ...chapter,
-                            title: displayTitle
-                          });
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                          <path d="M3 17.25V21h3.75L17.8 9.95l-3.75-3.75L3 17.25zm14.71-9.04a1 1 0 0 0 0-1.42l-2.5-2.5a1 1 0 0 0-1.42 0L12 6.08l3.75 3.75 1.96-1.62z" />
-                        </svg>
-                      </button>
-                    </Tooltip>
-
-                    <Tooltip text="Supprimer" position="bottom">
-                      <button
-                        type="button"
-                        className="chapter-action-btn"
-                        aria-label={`Supprimer ${displayTitle}`}
-                        onClick={(event) => handleDeleteClick(chapter, event)}
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                          <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-1 6h2v9H8V9zm6 0h2v9h-2V9zM6 9h2v9H6V9zm2 12h8a2 2 0 0 0 2-2V9H6v10a2 2 0 0 0 2 2z" />
-                        </svg>
-                      </button>
-                    </Tooltip>
-                  </div>
-
-                  <div
-                    className="chapter-book-visual"
-                    style={{ '--chapter-accent': chapterAccent }}
-                  >
-                    <div className="chapter-book-stack" aria-hidden="true">
-                      <span className="chapter-sheet chapter-sheet-back" />
-                      <span className="chapter-sheet chapter-sheet-front">
-                        <svg viewBox="0 0 24 24" focusable="false">
-                          <path d="M6 6h12v2H6V6zm0 4h12v2H6v-2zm0 4h8v2H6v-2z" />
-                        </svg>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="chapter-book-content">
-                    <div className="chapter-book-heading">
-                      <span className="chapter-book-number">{index + 1}</span>
-                      <div className="chapter-book-title">{displayTitle}</div>
+                      <Tooltip text="Supprimer" position="bottom">
+                        <button
+                          type="button"
+                          className="chapter-action-btn"
+                          aria-label={`Supprimer ${displayTitle}`}
+                          onClick={(event) => handleDeleteClick(chapter, event)}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-1 6h2v9H8V9zm6 0h2v9h-2V9zM6 9h2v9H6V9zm2 12h8a2 2 0 0 0 2-2V9H6v10a2 2 0 0 0 2 2z" />
+                          </svg>
+                        </button>
+                      </Tooltip>
                     </div>
 
-                    <div className="chapter-book-footer">
-                      <div
-                        className="chapter-state-badge"
-                        style={{
-                          color: chapterState.color,
-                          background: chapterState.background
-                        }}
-                      >
-                        {chapterState.label}
+                    <div
+                      className="chapter-book-visual"
+                      style={{ '--chapter-accent': chapterAccent }}
+                    >
+                      <div className="chapter-book-stack" aria-hidden="true">
+                        <span className="chapter-sheet chapter-sheet-back" />
+                        <span className="chapter-sheet chapter-sheet-front">
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M6 6h12v2H6V6zm0 4h12v2H6v-2zm0 4h8v2H6v-2z" />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="chapter-book-content">
+                      <div className="chapter-book-heading">
+                        <span className="chapter-book-number">{index + 1}</span>
+                        <div className="chapter-book-title">{displayTitle}</div>
+                      </div>
+
+                      <div className="chapter-book-footer">
+                        <div
+                          className="chapter-state-badge chapter-state-badge-pinned"
+                          style={{
+                            color: chapterProgress.color,
+                            background: chapterProgress.background
+                          }}
+                        >
+                          {chapterProgress.label}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="edition-summary-list">
+              {editionItems.map((item) => {
+                if (item.type !== 'chapter') {
+                  const isFront = item.type === 'cover';
+                  const coverProgress = getCoverProgressState(isFront ? 'front' : 'back');
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`edition-summary-row ${selectedChapterId === item.id ? 'selected' : ''}`}
+                      onClick={() => openEditionItem(item.id)}
+                    >
+                      <div className="edition-summary-main">
+                        <span className="edition-summary-index">{isFront ? 'C' : '4'}</span>
+                        <span className="edition-summary-title">{isFront ? 'Couverture' : '4e de couverture'}</span>
+                      </div>
+                      <span
+                        className="chapter-state-badge"
+                        style={{
+                          color: coverProgress.color,
+                          background: coverProgress.background
+                        }}
+                      >
+                        {coverProgress.label}
+                      </span>
+                    </button>
+                  );
+                }
+
+                const { chapter, index } = item;
+                const chapterProgress = getChapterProgressState(chapter);
+                const displayTitle = index === 0 ? 'Introduction' : chapter.title;
+                return (
+                  <button
+                    key={chapter.id}
+                    type="button"
+                    className={`edition-summary-row ${selectedChapterId === chapter.id ? 'selected' : ''}`}
+                    onClick={() => openEditionItem(chapter.id)}
+                  >
+                    <div className="edition-summary-main">
+                      <span className="edition-summary-index">{index + 1}</span>
+                      <span className="edition-summary-title">{displayTitle}</span>
+                    </div>
+                    <span
+                      className="chapter-state-badge"
+                      style={{
+                        color: chapterProgress.color,
+                        background: chapterProgress.background
+                      }}
+                    >
+                      {chapterProgress.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : (
         <div className="right-panel right-panel-full">
@@ -299,12 +455,18 @@ const ChapterListLuxe = ({
               className="sidebar-gallery-btn"
               onClick={handleBackToGallery}
             >
-              Retour galerie
+              Retour structure
             </button>
             <h3 className="chapter-workspace-title">{selectedChapterTitle}</h3>
           </div>
 
-          {editingChapter ? (
+          {isSpecialWorkspace ? (
+            <BookCoverDesignerLuxe
+              book={book}
+              onUpdateBook={onUpdateBook}
+              initialFace={selectedSpecialFace}
+            />
+          ) : editingChapter ? (
             <ChapterEditorLuxe
               editingChapter={editingChapter}
               setEditingChapter={setEditingChapter}

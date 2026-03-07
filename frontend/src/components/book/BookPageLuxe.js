@@ -632,6 +632,10 @@ const BookPageLuxe = () => {
       }
 
       setChapters(normalizeChaptersForState(remainingChapters));
+      const syncedPages = Math.max(8, remainingChapters.length * 8);
+      if (Number(book?.pages || 0) !== syncedPages) {
+        await handleUpdateBook({ pages: syncedPages });
+      }
       showPageNotice('Chapitre supprimé.', 'success');
     } catch (error) {
       console.error('❌ Erreur suppression:', error);
@@ -842,7 +846,7 @@ const BookPageLuxe = () => {
               className={`tab ${activeTab === 'chapitres' ? 'active' : ''}`}
             >
               <span>📑</span>
-              Chapitres
+              Edition du livre
             </button>
             <button
               onClick={() => setActiveTab('contributeurs')}
@@ -945,6 +949,7 @@ const BookPageLuxe = () => {
             onPagesChange={handleUpdateChaptersFromPages}
           />
         )}
+
       </div>
 
       {draftPreview && (

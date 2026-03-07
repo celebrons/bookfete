@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import ChapterInvitationsLuxe from './ChapterInvitationsLuxe';
 import InviteSelectorLuxe from '../contributors/InviteSelectorLuxe';
@@ -23,9 +23,20 @@ const Step3Invitations = ({
   const [inviteRefreshToken, setInviteRefreshToken] = useState(0);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [forceClosed, setForceClosed] = useState(false);
+  const [liveSummary, setLiveSummary] = useState({
+    invitationsCount: 0,
+    respondedInvitesCount: 0,
+    contributionsReceivedCount: 0,
+    pendingValidationCount: 0,
+    nonRespondedCount: 0,
+    contributionsClosed: false
+  });
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
+  const [checkingInviteList, setCheckingInviteList] = useState(false);
 
   const isOrganizer = user && book && user.id === book.owner_id;
-  const contributionsClosed = chapter?.contributionsClosed || false;
+  const contributionsClosed = (chapter?.contributionsClosed || false) || liveSummary.contributionsClosed || forceClosed;
   const chapterLocked = chapter?.isChapterClosed || false;
 
   useEffect(() => {
@@ -35,12 +46,140 @@ const Step3Invitations = ({
     if (!chapter?.id) {
       setInvitations([]);
       setLoading(false);
+      setSummaryLoaded(false);
+      setForceClosed(false);
+      setLiveSummary({
+        invitationsCount: 0,
+        respondedInvitesCount: 0,
+        contributionsReceivedCount: 0,
+        pendingValidationCount: 0,
+        nonRespondedCount: 0,
+        contributionsClosed: false
+      });
       return;
     }
 
-    setInvitations(Array.isArray(chapter?.chapter_invites) ? chapter.chapter_invites : []);
+    const chapterInvites = Array.isArray(chapter?.chapter_invites) ? chapter.chapter_invites : [];
+    const respondedInvitesCount = chapterInvites.filter(
+      (invite) => invite.accepted || invite.contributed
+    ).length;
+
+    setSummaryLoaded(false);
+    setForceClosed(false);
+    setInvitations(chapterInvites);
+    setLiveSummary({
+      invitationsCount: chapterInvites.length,
+      respondedInvitesCount,
+      contributionsReceivedCount: typeof chapter?.contributionsCount === 'number'
+        ? chapter.contributionsCount
+        : Math.max(respondedInvitesCount, 0),
+      pendingValidationCount: 0,
+      nonRespondedCount: Math.max(chapterInvites.length - respondedInvitesCount, 0),
+      contributionsClosed: Boolean(chapter?.contributionsClosed)
+    });
     setLoading(false);
-  }, [chapter?.id, chapter?.chapter_invites]);
+  }, [chapter?.id, chapter?.chapter_invites, chapter?.contributionsCount, chapter?.contributionsClosed]);
+
+  useEffect(() => {
+    if (!forceClosed || !chapter?.contributionsClosed) {
+      return;
+    }
+
+    setForceClosed(false);
+  }, [forceClosed, chapter?.contributionsClosed]);
+
+  const loadSnapshot = useCallback(async () => {
+    if (!chapter?.id) {
+      return;
+    }
+
+    try {
+      const [{ data: invitesData, error: invitesError }, { data: contributionsData, error: contributionsError }] = await Promise.all([
+        supabase
+          .from('chapter_invites')
+          .select('*')
+          .eq('chapter_id', chapter.id),
+        supabase
+          .from('contributions')
+          .select('contributor_email, approved, needs_revision, is_finalized, message, created_at')
+          .eq('chapter_id', chapter.id)
+      ]);
+
+      if (invitesError) throw invitesError;
+      if (contributionsError) throw contributionsError;
+
+      const invites = invitesData || [];
+      setInvitations(invites);
+
+      const respondedInvitesCount = invites.filter(
+        (invite) => invite.accepted || invite.contributed
+      ).length;
+      const nonRespondedCount = invites.filter(
+        (invite) => !invite.accepted && !invite.contributed
+      ).length;
+      const visibleContributions = (contributionsData || []).filter(
+        (contribution) =>
+          contribution.contributor_email !== user?.email &&
+          contribution.contributor_email !== CHAPTER_STATE_EMAIL &&
+          contribution.contributor_email !== CHAPTER_DRAFT_EMAIL &&
+          contribution.is_finalized !== false
+      );
+      const latestStateContribution = (contributionsData || [])
+        .filter((contribution) => contribution.contributor_email === CHAPTER_STATE_EMAIL)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
+      const workflowState = String(latestStateContribution?.message || '').trim().toLowerCase();
+      const isClosedByWorkflow = workflowState === 'contributions_closed' || workflowState === 'closed';
+
+      setLiveSummary({
+        invitationsCount: invites.length,
+        respondedInvitesCount,
+        contributionsReceivedCount: Math.max(visibleContributions.length, respondedInvitesCount),
+        pendingValidationCount: visibleContributions.filter(
+          (contribution) => !contribution.approved && !contribution.needs_revision
+        ).length,
+        nonRespondedCount,
+        contributionsClosed: isClosedByWorkflow
+      });
+      setSummaryLoaded(true);
+    } catch (loadError) {
+      console.error('Error loading invitations summary:', loadError);
+    }
+  }, [chapter?.id, user?.email]);
+
+  useEffect(() => {
+    if (!chapter?.id) {
+      return undefined;
+    }
+
+    loadSnapshot();
+
+    const realtimeChannel = supabase
+      .channel(`step3-live-${chapter.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chapter_invites', filter: `chapter_id=eq.${chapter.id}` },
+        () => {
+          loadSnapshot();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contributions', filter: `chapter_id=eq.${chapter.id}` },
+        () => {
+          loadSnapshot();
+        }
+      )
+      .subscribe();
+
+    const intervalId = setInterval(() => {
+      loadSnapshot();
+    }, 4000);
+
+    return () => {
+      clearInterval(intervalId);
+      supabase.removeChannel(realtimeChannel);
+    };
+  }, [chapter?.id, loadSnapshot]);
 
   useEffect(() => {
     if (!chapterLocked) {
@@ -78,21 +217,31 @@ const Step3Invitations = ({
       )
     : [];
 
-  const pendingValidationCount = finalizedContributions.filter(
-    (contribution) => !contribution.approved && !contribution.needs_revision
-  ).length;
+  const pendingValidationCount = summaryLoaded
+    ? liveSummary.pendingValidationCount
+    : finalizedContributions.filter(
+        (contribution) => !contribution.approved && !contribution.needs_revision
+      ).length;
 
-  const respondedInvitesCount = invitations.filter(
-    (invite) => invite.accepted || invite.contributed
-  ).length;
+  const respondedInvitesCount = summaryLoaded
+    ? liveSummary.respondedInvitesCount
+    : invitations.filter(
+        (invite) => invite.accepted || invite.contributed
+      ).length;
 
-  const contributionsReceivedCount = typeof chapter?.contributionsCount === 'number'
-    ? chapter.contributionsCount
-    : Math.max(finalizedContributions.length, respondedInvitesCount);
+  const contributionsReceivedCount = summaryLoaded
+    ? liveSummary.contributionsReceivedCount
+    : (
+        typeof chapter?.contributionsCount === 'number'
+          ? chapter.contributionsCount
+          : Math.max(finalizedContributions.length, respondedInvitesCount)
+      );
 
-  const nonRespondedCount = invitations.filter(
-    (invite) => !invite.accepted && !invite.contributed
-  ).length;
+  const nonRespondedCount = summaryLoaded
+    ? liveSummary.nonRespondedCount
+    : invitations.filter(
+        (invite) => !invite.accepted && !invite.contributed
+      ).length;
 
   const openCloseModal = () => {
     if (chapterLocked || contributionsClosed || typeof onUpdateChapter !== 'function') {
@@ -113,6 +262,12 @@ const Step3Invitations = ({
 
     try {
       await onUpdateChapter(chapter.id, { status: 'contributions_closed' });
+      setForceClosed(true);
+      setLiveSummary((previous) => ({
+        ...previous,
+        contributionsClosed: true
+      }));
+      await loadSnapshot();
       setShowCloseModal(false);
       setNotice('Contributions cloturees pour ce chapitre.');
     } catch (loadError) {
@@ -125,7 +280,40 @@ const Step3Invitations = ({
 
   const handleInvitesSent = async () => {
     setInviteRefreshToken((prev) => prev + 1);
-    await loadInvitations();
+    await Promise.all([loadInvitations(), loadSnapshot()]);
+  };
+
+  const handleOpenInviteSelector = async () => {
+    if (chapterLocked || contributionsClosed || !book?.id) {
+      return;
+    }
+
+    setError('');
+    setNotice('');
+    setCheckingInviteList(true);
+
+    try {
+      const { count, error: countError } = await supabase
+        .from('book_contributors')
+        .select('id', { count: 'exact', head: true })
+        .eq('book_id', book.id);
+
+      if (countError) {
+        throw countError;
+      }
+
+      if (!count || count < 1) {
+        setNotice("Merci d'ajouter des contributeurs dans l'onglet contributeurs, ils apparaitront ensuite ici.");
+        return;
+      }
+
+      setShowInviteSelector(true);
+    } catch (loadError) {
+      console.error('Error checking contributors list:', loadError);
+      setError('Impossible de charger la liste des contributeurs.');
+    } finally {
+      setCheckingInviteList(false);
+    }
   };
 
   if (!hasContributed) {
@@ -167,15 +355,18 @@ const Step3Invitations = ({
       {isOrganizer && (
         <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: '15px', flexWrap: 'wrap' }}>
           <button
-            onClick={() => setShowInviteSelector(true)}
-            disabled={chapterLocked || contributionsClosed || !book?.id}
+            onClick={handleOpenInviteSelector}
+            disabled={chapterLocked || contributionsClosed || !book?.id || checkingInviteList}
             className="btn btn-outline"
             style={{ flex: 1, minWidth: '190px' }}
           >
-            Inviter des contributeurs
+            {checkingInviteList ? 'Verification...' : 'Inviter des contributeurs'}
           </button>
           <button
-            onClick={() => onLoadContributions(chapter.id)}
+            onClick={async () => {
+              await loadSnapshot();
+              onLoadContributions(chapter.id);
+            }}
             className="btn btn-outline"
             style={{ flex: 1, minWidth: '170px' }}
           >

@@ -120,6 +120,7 @@ const Step4Cloture = ({
   const contributionsClosed = chapter?.contributionsClosed || false;
   const chapterLocked = chapter?.isChapterClosed || false;
   const generationUnlocked = !chapterLocked && (isSoloMode || contributionsClosed);
+  const showContributionsGateWarning = !chapterLocked && !isSoloMode && !contributionsClosed;
   const chapterDraft = chapter?.chapterDraft || null;
   const draftStatus = chapterDraft?.status || 'idle';
   const isDraftValidated = draftStatus === 'validated';
@@ -207,6 +208,54 @@ const Step4Cloture = ({
     }
   ].filter(Boolean);
 
+  const buildLocalSummary = useCallback(() => {
+    if (!chapter?.id) {
+      return null;
+    }
+
+    const localInvites = Array.isArray(chapter?.chapter_invites)
+      ? chapter.chapter_invites
+      : (Array.isArray(invitations) ? invitations : []);
+    const localContributions = Array.isArray(chapter?.contributions) ? chapter.contributions : [];
+    const externalContributions = localContributions.filter(
+      (contribution) =>
+        contribution.contributor_email !== user?.email &&
+        contribution.contributor_email !== CHAPTER_STATE_EMAIL &&
+        contribution.contributor_email !== CHAPTER_DRAFT_EMAIL &&
+        contribution.is_finalized !== false
+    );
+    const respondedInvitesCount = localInvites.filter(
+      (invite) => invite.accepted || invite.contributed
+    ).length;
+
+    return {
+      invitationsCount: localInvites.length,
+      receivedCount: Math.max(externalContributions.length, respondedInvitesCount),
+      pendingValidationCount: externalContributions.filter(
+        (contribution) => !contribution.approved && !contribution.needs_revision
+      ).length
+    };
+  }, [chapter?.id, chapter?.chapter_invites, chapter?.contributions, invitations, user?.email]);
+
+  const updateSummaryState = useCallback((nextSummary) => {
+    if (!nextSummary) {
+      return;
+    }
+
+    setSummary((previous) => {
+      if (
+        previous &&
+        previous.invitationsCount === nextSummary.invitationsCount &&
+        previous.receivedCount === nextSummary.receivedCount &&
+        previous.pendingValidationCount === nextSummary.pendingValidationCount
+      ) {
+        return previous;
+      }
+
+      return nextSummary;
+    });
+  }, []);
+
   useEffect(() => {
     const nextDraftHtml = chapter?.chapterDraft?.html || '';
     setDraftHtmlForPreview(nextDraftHtml);
@@ -217,6 +266,11 @@ const Step4Cloture = ({
     setShowEditorModal(false);
     setShowFinalizeConfirm(false);
   }, [chapter?.id, chapter?.chapterDraft?.html, chapter?.chapterDraft?.status]);
+
+  useEffect(() => {
+    const localSummary = buildLocalSummary();
+    updateSummaryState(localSummary);
+  }, [buildLocalSummary, updateSummaryState]);
 
   const loadSummary = useCallback(async () => {
     if (!chapter?.id) {
@@ -250,7 +304,7 @@ const Step4Cloture = ({
         (invite) => invite.accepted || invite.contributed
       ).length;
 
-      setSummary({
+      updateSummaryState({
         invitationsCount: (invitesData || []).length,
         receivedCount: Math.max(externalContributions.length, respondedInvitesCount),
         pendingValidationCount: externalContributions.filter(
@@ -259,9 +313,9 @@ const Step4Cloture = ({
       });
     } catch (loadError) {
       console.error('Erreur chargement recap chapitre:', loadError);
-      setSummary(null);
+      updateSummaryState(buildLocalSummary());
     }
-  }, [chapter?.id, user?.email]);
+  }, [chapter?.id, user?.email, buildLocalSummary, updateSummaryState]);
 
   useEffect(() => {
     loadSummary();
@@ -290,7 +344,12 @@ const Step4Cloture = ({
       )
       .subscribe();
 
+    const intervalId = setInterval(() => {
+      loadSummary();
+    }, 4000);
+
     return () => {
+      clearInterval(intervalId);
       supabase.removeChannel(realtimeChannel);
     };
   }, [chapter?.id, loadSummary]);
@@ -301,6 +360,11 @@ const Step4Cloture = ({
   );
 
   const handleGenerate = async () => {
+    if (chapterLocked) {
+      setError('Ce chapitre est deja valide et verrouille.');
+      return;
+    }
+
     if (!generationUnlocked) {
       setError('Fermez d abord les contributions avant de generer le brouillon de ce chapitre.');
       return;
@@ -366,6 +430,11 @@ const Step4Cloture = ({
 
   const requestFinalize = () => {
     const htmlToPersist = buildHtmlToPersist();
+
+    if (chapterLocked) {
+      setError('Ce chapitre est deja valide et verrouille.');
+      return;
+    }
 
     if (!generationUnlocked) {
       setError('Fermez d abord les contributions avant la validation finale.');
@@ -479,7 +548,7 @@ const Step4Cloture = ({
         ))}
       </div>
 
-      {!generationUnlocked && (
+      {showContributionsGateWarning && (
         <div className="card chapter-draft-warning-card">
           Fermez d abord les contributions a l etape 3. Les commentaires non valides ne sont jamais pris en compte
           dans cette generation.

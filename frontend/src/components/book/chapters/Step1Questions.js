@@ -15,12 +15,22 @@ const Step1Questions = ({
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [showPromptPayload, setShowPromptPayload] = useState(false);
   const [localQuestions, setLocalQuestions] = useState(chapter?.questions_ia || []);
 
   const isValidated = chapter?.questions_validated || false;
   const isOrganizer = Boolean(user && book && user.id === book.owner_id);
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
   const chapterLocked = chapter?.isChapterClosed || false;
+  const questionsPromptPayload = {
+    chapterTitle: chapter?.title || '',
+    bookTitle: book?.title || '',
+    eventType: book?.event_type || 'default',
+    style: book?.style_narratif || 'factuel',
+    recipientName: book?.recipient_name || '',
+    recipientAge: book?.recipient_age || '',
+    recipientGender: book?.recipient_gender || ''
+  };
 
   useEffect(() => {
     setLocalQuestions(chapter?.questions_ia || []);
@@ -34,6 +44,7 @@ const Step1Questions = ({
     setIsEditing(false);
     setEditingQuestions(null);
     setNewQuestion('');
+    setShowPromptPayload(false);
   }, [chapterLocked]);
 
   const generateAIQuestions = async () => {
@@ -60,15 +71,7 @@ const Step1Questions = ({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({
-          chapterTitle: chapter.title,
-          bookTitle: book.title,
-          eventType: book.event_type || 'default',
-          style: book.style_narratif || 'factuel',
-          recipientName: book.recipient_name,
-          recipientAge: book.recipient_age,
-          recipientGender: book.recipient_gender
-        })
+        body: JSON.stringify(questionsPromptPayload)
       });
 
       if (!response.ok) {
@@ -282,16 +285,75 @@ const Step1Questions = ({
       <div className={`questions-section ${isValidated ? 'validated' : ''}`}>
         <div className="questions-header">
           <h3>Questions pour vous aider</h3>
-          <Tooltip
-            text={
-              isSoloMode
-                ? 'Ces questions vous aident a cadrer votre chapitre en mode solo'
-                : "Ces questions vous aident a cadrer le chapitre avant d'inviter les contributeurs"
-            }
-          >
-            <span style={{ color: 'var(--gold)', cursor: 'help' }}>i</span>
-          </Tooltip>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Tooltip
+              text={
+                isSoloMode
+                  ? 'Ces questions vous aident a cadrer votre chapitre en mode solo'
+                  : "Ces questions vous aident a cadrer le chapitre avant d'inviter les contributeurs"
+              }
+            >
+              <span style={{ color: 'var(--gold)', cursor: 'help' }}>i</span>
+            </Tooltip>
+
+            <Tooltip text="Voir les elements envoyes au prompt questions">
+              <button
+                type="button"
+                onClick={() => setShowPromptPayload((previous) => !previous)}
+                className="btn-outline"
+                style={{
+                  padding: '2px 8px',
+                  lineHeight: 1.2,
+                  minHeight: 'auto',
+                  borderColor: 'var(--mist)',
+                  color: 'var(--ink)',
+                  background: showPromptPayload ? '#f6f3ec' : '#fff'
+                }}
+                aria-label="Afficher le payload prompt questions"
+              >
+                (p)
+              </button>
+            </Tooltip>
+          </div>
         </div>
+
+        {showPromptPayload && (
+          <div
+            className="card"
+            style={{
+              marginBottom: 'var(--space-md)',
+              padding: 'var(--space-md)',
+              background: '#f8f7f4',
+              borderColor: 'var(--mist)',
+              boxShadow: 'none'
+            }}
+          >
+            <div
+              style={{
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: 'var(--text-light)',
+                marginBottom: '8px'
+              }}
+            >
+              Elements envoyes au prompt
+            </div>
+            <pre
+              style={{
+                margin: 0,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                fontSize: '12px',
+                lineHeight: 1.45,
+                color: 'var(--ink)'
+              }}
+            >
+              {JSON.stringify(questionsPromptPayload, null, 2)}
+            </pre>
+          </div>
+        )}
 
         {error && (
           <div style={{ color: '#dc3545', marginBottom: '15px' }}>{error}</div>

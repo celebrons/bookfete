@@ -775,6 +775,10 @@ function renderValidatedBookPreviewHtml({ book, chaptersWithDrafts }) {
     .map(({ draft }) => draft?.html || '')
     .filter(Boolean)
     .join('');
+  const frontCoverBlock = renderAssembledFrontCover(book);
+  const backCoverBlock = renderAssembledBackCover(book);
+  const chaptersContent = chapterBlocks
+    || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
 
   return `
     <article class="draft-book">
@@ -789,9 +793,213 @@ function renderValidatedBookPreviewHtml({ book, chaptersWithDrafts }) {
           ].filter(Boolean).join(' | '))}
         </div>
       </header>
-      ${chapterBlocks || '<p class="draft-book-empty">Aucun chapitre valide.</p>'}
+      ${frontCoverBlock}
+      ${chaptersContent}
+      ${backCoverBlock}
     </article>
   `;
+}
+
+function renderAssembledFrontCover(book) {
+  const {
+    styleId,
+    styleTag,
+    frontBg,
+    textColor,
+    accentColor,
+    titleFont,
+    bodyFont,
+    coverConfig
+  } = resolveCoverPreviewConfig(book);
+  const title = cleanText(coverConfig.title, 180) || cleanText(book?.title, 180) || 'Livre souvenir';
+  const subtitle = cleanText(coverConfig.subtitle, 220);
+  const recipientLine = cleanText(coverConfig.recipientLine, 180) || cleanText(book?.recipient_name, 180);
+  const eventLine = cleanText(coverConfig.eventLine, 180)
+    || [
+      cleanText(book?.event_type, 120),
+      book?.recipient_age ? `${book.recipient_age} ans` : ''
+    ].filter(Boolean).join(' | ');
+  const motif = cleanText(coverConfig.motif, 30) || 'line';
+  const showMonogram = coverConfig.showMonogram !== false;
+  const monogram = buildCoverMonogram(recipientLine || title);
+
+  return `
+    <section class="draft-book-section">
+      <div class="draft-book-mini-title">Couverture</div>
+      <div class="cover-preview-spread" style="grid-template-columns: minmax(0, 1fr);">
+        <article
+          class="cover-preview-card is-front cover-style-${styleId} is-active"
+          style="--cover-bg:${escapeHtml(frontBg)};--cover-text:${escapeHtml(textColor)};--cover-accent:${escapeHtml(accentColor)};--cover-title-font:${escapeHtml(titleFont)};--cover-body-font:${escapeHtml(bodyFont)};"
+        >
+          <div class="cover-preview-safe-zone"></div>
+          <div class="cover-preview-tag">${escapeHtml(styleTag)}</div>
+          ${showMonogram ? `<div class="cover-preview-monogram">${escapeHtml(monogram)}</div>` : ''}
+          <div class="cover-preview-front-copy">
+            ${eventLine ? `<div class="cover-preview-front-event">${escapeHtml(eventLine)}</div>` : ''}
+            <h3>${escapeHtml(title)}</h3>
+            ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}
+            ${recipientLine ? `<div class="cover-preview-front-recipient">${escapeHtml(recipientLine)}</div>` : ''}
+          </div>
+          ${motif === 'line' ? '<div class="cover-preview-motif-line" aria-hidden="true"></div>' : ''}
+          ${motif === 'corner' ? '<div class="cover-preview-motif-corner" aria-hidden="true"></div>' : ''}
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function renderAssembledBackCover(book) {
+  const {
+    styleId,
+    backBg,
+    textColor,
+    accentColor,
+    titleFont,
+    bodyFont,
+    backCoverConfig
+  } = resolveCoverPreviewConfig(book);
+  const blurb = cleanText(backCoverConfig.blurb, 1800);
+  const quote = cleanText(backCoverConfig.quote, 420);
+  const signature = cleanText(backCoverConfig.signature, 180)
+    || (book?.recipient_name ? `Les proches de ${book.recipient_name}` : 'Les proches');
+  const showContributors = Boolean(
+    backCoverConfig.show_contributors ?? backCoverConfig.showContributors ?? true
+  );
+  const showQrHint = Boolean(backCoverConfig.showQrHint);
+  const chips = [];
+
+  if (showContributors) {
+    chips.push('Contributions collectives');
+  }
+  if (showQrHint) {
+    chips.push('Emplacement QR');
+  }
+
+  return `
+    <section class="draft-book-section">
+      <div class="draft-book-mini-title">4e de couverture</div>
+      <div class="cover-preview-spread" style="grid-template-columns: minmax(0, 1fr);">
+        <article
+          class="cover-preview-card is-back cover-style-${styleId} is-active"
+          style="--cover-bg:${escapeHtml(backBg)};--cover-text:${escapeHtml(textColor)};--cover-accent:${escapeHtml(accentColor)};--cover-title-font:${escapeHtml(titleFont)};--cover-body-font:${escapeHtml(bodyFont)};"
+        >
+          <div class="cover-preview-safe-zone"></div>
+          <div class="cover-preview-back-copy">${escapeHtml(blurb || 'Texte de quatrieme de couverture a definir.')}</div>
+          ${quote ? `<blockquote class="cover-preview-back-quote">"${escapeHtml(quote)}"</blockquote>` : ''}
+          <div class="cover-preview-back-footer">
+            ${chips.length > 0 ? `<div class="cover-preview-chip">${escapeHtml(chips.join(' | '))}</div>` : '<span></span>'}
+            ${showQrHint ? '<div class="cover-preview-qr">QR</div>' : ''}
+          </div>
+          <div class="cover-preview-back-signature">${escapeHtml(signature)}</div>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function buildCoverMonogram(value) {
+  const words = cleanText(value, 80)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (words.length === 0) {
+    return 'LB';
+  }
+
+  return words.map((word) => word.charAt(0).toUpperCase()).join('');
+}
+
+function resolveCoverPreviewConfig(book) {
+  const coverConfig = book?.cover_config && typeof book.cover_config === 'object'
+    ? book.cover_config
+    : {};
+  const backCoverConfig = book?.back_cover_config && typeof book.back_cover_config === 'object'
+    ? book.back_cover_config
+    : {};
+
+  const stylePresets = {
+    editorial_classic: {
+      id: 'editorial_classic',
+      tag: 'Edition prestige',
+      titleFont: "'Baskerville', 'Palatino Linotype', serif",
+      bodyFont: "'Inter', sans-serif"
+    },
+    minimal_contemporary: {
+      id: 'minimal_contemporary',
+      tag: 'Collection moderne',
+      titleFont: "'Avenir Next', 'Inter', sans-serif",
+      bodyFont: "'Inter', sans-serif"
+    },
+    heritage_emotion: {
+      id: 'heritage_emotion',
+      tag: 'Memoire intime',
+      titleFont: "'Garamond', 'Times New Roman', serif",
+      bodyFont: "'Inter', sans-serif"
+    }
+  };
+  const palettePresets = {
+    ivoire_dore: {
+      front: '#f6f1e7',
+      back: '#efe7da',
+      text: '#1f2228',
+      accent: '#b8924a'
+    },
+    sauge_precieuse: {
+      front: '#eaf0ea',
+      back: '#e2ebe2',
+      text: '#1f2a28',
+      accent: '#8f9f8f'
+    },
+    bleu_poudre: {
+      front: '#e9edf4',
+      back: '#e1e7f0',
+      text: '#1f2530',
+      accent: '#7f90a8'
+    }
+  };
+
+  const requestedStyleId = cleanText(coverConfig.template || backCoverConfig.template, 80);
+  const style = stylePresets[requestedStyleId] || stylePresets.editorial_classic;
+  const requestedPaletteId = cleanText(coverConfig.palette || backCoverConfig.palette, 80);
+  const palette = palettePresets[requestedPaletteId] || palettePresets.ivoire_dore;
+  const frontBg = sanitizeCssValue(coverConfig.color, palette.front);
+  const backBg = sanitizeCssValue(backCoverConfig.color, palette.back);
+  const textColor = sanitizeCssValue(coverConfig.textColor || backCoverConfig.textColor, palette.text);
+  const accentColor = sanitizeCssValue(coverConfig.accentColor || backCoverConfig.accentColor, palette.accent);
+  const titleFont = sanitizeCssFont(coverConfig.font, style.titleFont);
+  const bodyFont = sanitizeCssFont(backCoverConfig.font, style.bodyFont);
+
+  return {
+    styleId: style.id,
+    styleTag: style.tag,
+    frontBg,
+    backBg,
+    textColor,
+    accentColor,
+    titleFont,
+    bodyFont,
+    coverConfig,
+    backCoverConfig
+  };
+}
+
+function sanitizeCssValue(value, fallback) {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const normalized = value.trim();
+  return /^[#(),.%\-\s\w]+$/.test(normalized) ? normalized : fallback;
+}
+
+function sanitizeCssFont(value, fallback) {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const normalized = value.trim();
+  return /^[\w\s,'"-]+$/.test(normalized) ? normalized : fallback;
 }
 
 function summarizeHtmlForChapter(html) {

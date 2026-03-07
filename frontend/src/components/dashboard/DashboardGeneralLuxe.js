@@ -1,14 +1,13 @@
-// C:\Users\USER\bookfete\frontend\src\components\dashboard\DashboardGeneralLuxe.js
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import BookCardLuxe from './BookCardLuxe';
 import Loading from '../common/Loading';
-import { 
-  IconBook, 
-  IconCheckCircle, 
-  IconArchive, 
-  IconChapter, 
+import {
+  IconBook,
+  IconCheckCircle,
+  IconArchive,
+  IconChapter,
   IconContribution,
   IconPlus
 } from './DashboardIcons';
@@ -22,7 +21,8 @@ const DashboardGeneralLuxe = () => {
   const [archivedBooks, setArchivedBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
-  
+  const [pageNotice, setPageNotice] = useState(null);
+
   const [stats, setStats] = useState({
     enCours: { count: 0, chapitres: 0, contributions: 0 },
     termines: { count: 0, chapitres: 0, contributions: 0 },
@@ -48,17 +48,32 @@ const DashboardGeneralLuxe = () => {
     checkUser();
   }, []);
 
+  const getBookContributionsCount = (book) => (
+    (book?.contributions || []).reduce(
+      (sum, chapter) => sum + (chapter.contributions?.[0]?.count || 0),
+      0
+    )
+  );
+
+  const showNotice = (message, type = 'info') => {
+    setPageNotice({ message, type });
+  };
+
+  const dismissNotice = () => {
+    setPageNotice(null);
+  };
+
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
         navigate('/login');
         return;
       }
-      setUser(user);
-      loadUserBooks(user.id);
+      setUser(authUser);
+      loadUserBooks(authUser.id);
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur utilisateur dashboard:', error);
       navigate('/login');
     }
   };
@@ -66,7 +81,7 @@ const DashboardGeneralLuxe = () => {
   const loadUserBooks = async (userId) => {
     try {
       setLoading(true);
-      
+
       const { data: booksData, error: booksError } = await supabase
         .from('books')
         .select(`
@@ -97,60 +112,52 @@ const DashboardGeneralLuxe = () => {
 
       if (archivedError) throw archivedError;
 
-      setBooks(booksData || []);
-      setArchivedBooks(archivedData || []);
+      const activeBooks = booksData || [];
+      const archivedBooksList = archivedData || [];
+      setBooks(activeBooks);
+      setArchivedBooks(archivedBooksList);
 
-      const enCoursLivres = booksData?.filter(b => b.statut === 'en_cours') || [];
-      const terminesLivres = booksData?.filter(b => b.statut === 'termine') || [];
-      
-      let chapitresEnCours = 0;
-      let contributionsEnCours = 0;
-      let chapitresTermines = 0;
-      let contributionsTermines = 0;
+      const enCoursLivres = activeBooks.filter((book) => book.statut === 'en_cours');
+      const terminesLivres = activeBooks.filter((book) => book.statut === 'termine');
 
-      enCoursLivres.forEach(book => {
-        chapitresEnCours += book.chapters?.[0]?.count || 0;
-        book.contributions?.forEach(chapter => {
-          contributionsEnCours += chapter.contributions?.[0]?.count || 0;
+      const aggregate = (bookList) => {
+        let chapitres = 0;
+        let contributions = 0;
+
+        bookList.forEach((book) => {
+          chapitres += book.chapters?.[0]?.count || 0;
+          (book.contributions || []).forEach((chapter) => {
+            contributions += chapter.contributions?.[0]?.count || 0;
+          });
         });
-      });
 
-      terminesLivres.forEach(book => {
-        chapitresTermines += book.chapters?.[0]?.count || 0;
-        book.contributions?.forEach(chapter => {
-          contributionsTermines += chapter.contributions?.[0]?.count || 0;
-        });
-      });
+        return { chapitres, contributions };
+      };
 
-      let chapitresArchives = 0;
-      let contributionsArchives = 0;
-      archivedData?.forEach(book => {
-        chapitresArchives += book.chapters?.[0]?.count || 0;
-        book.contributions?.forEach(chapter => {
-          contributionsArchives += chapter.contributions?.[0]?.count || 0;
-        });
-      });
+      const enCoursAgg = aggregate(enCoursLivres);
+      const terminesAgg = aggregate(terminesLivres);
+      const archivesAgg = aggregate(archivedBooksList);
 
       setStats({
         enCours: {
           count: enCoursLivres.length,
-          chapitres: chapitresEnCours,
-          contributions: contributionsEnCours
+          chapitres: enCoursAgg.chapitres,
+          contributions: enCoursAgg.contributions
         },
         termines: {
           count: terminesLivres.length,
-          chapitres: chapitresTermines,
-          contributions: contributionsTermines
+          chapitres: terminesAgg.chapitres,
+          contributions: terminesAgg.contributions
         },
         archives: {
-          count: archivedData?.length || 0,
-          chapitres: chapitresArchives,
-          contributions: contributionsArchives
+          count: archivedBooksList.length,
+          chapitres: archivesAgg.chapitres,
+          contributions: archivesAgg.contributions
         }
       });
-
     } catch (error) {
       console.error('Erreur chargement livres:', error);
+      showNotice('Impossible de charger la bibliotheque.', 'error');
     } finally {
       setLoading(false);
     }
@@ -178,7 +185,8 @@ const DashboardGeneralLuxe = () => {
 
   const handleArchiveBook = async () => {
     if (!archiveModal.bookId) return;
-    setArchiveModal(prev => ({ ...prev, archiving: true }));
+    setArchiveModal((prev) => ({ ...prev, archiving: true }));
+
     try {
       const bookId = archiveModal.bookId;
       const months = archiveModal.duration;
@@ -196,29 +204,51 @@ const DashboardGeneralLuxe = () => {
 
       if (error) throw error;
 
-      const archivedBook = books.find(b => b.id === bookId);
-      const newStats = { ...stats };
-      
-      if (archivedBook.statut === 'en_cours') {
-        newStats.enCours.count -= 1;
-        newStats.enCours.chapitres -= archivedBook.chapters?.[0]?.count || 0;
-      } else if (archivedBook.statut === 'termine') {
-        newStats.termines.count -= 1;
-        newStats.termines.chapitres -= archivedBook.chapters?.[0]?.count || 0;
+      const archivedBook = books.find((book) => book.id === bookId);
+      if (!archivedBook) {
+        closeArchiveModal();
+        await loadUserBooks(user.id);
+        return;
       }
-      
-      newStats.archives.count += 1;
-      setStats(newStats);
-      setBooks(prev => prev.filter(b => b.id !== bookId));
-      setArchivedBooks(prev => [{ ...archivedBook, status: 'archive' }, ...prev]);
+
+      const chaptersCount = archivedBook.chapters?.[0]?.count || 0;
+      const contributionsCount = getBookContributionsCount(archivedBook);
+
+      setStats((prev) => {
+        const newStats = {
+          enCours: { ...prev.enCours },
+          termines: { ...prev.termines },
+          archives: { ...prev.archives }
+        };
+
+        if (archivedBook.statut === 'en_cours') {
+          newStats.enCours.count -= 1;
+          newStats.enCours.chapitres -= chaptersCount;
+          newStats.enCours.contributions -= contributionsCount;
+        } else if (archivedBook.statut === 'termine') {
+          newStats.termines.count -= 1;
+          newStats.termines.chapitres -= chaptersCount;
+          newStats.termines.contributions -= contributionsCount;
+        }
+
+        newStats.archives.count += 1;
+        newStats.archives.chapitres += chaptersCount;
+        newStats.archives.contributions += contributionsCount;
+
+        return newStats;
+      });
+      setBooks((prev) => prev.filter((book) => book.id !== bookId));
+      setArchivedBooks((prev) => [{ ...archivedBook, status: 'archive' }, ...prev]);
 
       closeArchiveModal();
-      alert(`✅ Livre archivé pour ${months} mois. Il sera automatiquement supprimé le ${autoDeleteDate.toLocaleDateString('fr-FR')}.`);
-      
+      showNotice(
+        `Livre archive pour ${months} mois. Suppression automatique le ${autoDeleteDate.toLocaleDateString('fr-FR')}.`,
+        'success'
+      );
     } catch (error) {
-      console.error('❌ Erreur archivage:', error);
-      alert(`Erreur lors de l'archivage: ${error.message}`);
-      setArchiveModal(prev => ({ ...prev, archiving: false }));
+      console.error('Erreur archivage:', error);
+      showNotice(`Erreur lors de l'archivage: ${error.message}`, 'error');
+      setArchiveModal((prev) => ({ ...prev, archiving: false }));
     }
   };
 
@@ -235,25 +265,45 @@ const DashboardGeneralLuxe = () => {
 
       if (error) throw error;
 
-      const restoredBook = archivedBooks.find(b => b.id === bookId);
-      const newStats = { ...stats };
-      newStats.archives.count -= 1;
-      
-      if (restoredBook.statut === 'en_cours') {
-        newStats.enCours.count += 1;
-      } else if (restoredBook.statut === 'termine') {
-        newStats.termines.count += 1;
+      const restoredBook = archivedBooks.find((book) => book.id === bookId);
+      if (!restoredBook) {
+        await loadUserBooks(user.id);
+        return;
       }
-      
-      setStats(newStats);
-      setArchivedBooks(prev => prev.filter(b => b.id !== bookId));
-      setBooks(prev => [{ ...restoredBook, status: 'actif' }, ...prev]);
 
-      alert('✅ Livre restauré avec succès');
-      
+      const chaptersCount = restoredBook.chapters?.[0]?.count || 0;
+      const contributionsCount = getBookContributionsCount(restoredBook);
+
+      setStats((prev) => {
+        const newStats = {
+          enCours: { ...prev.enCours },
+          termines: { ...prev.termines },
+          archives: { ...prev.archives }
+        };
+
+        newStats.archives.count -= 1;
+        newStats.archives.chapitres -= chaptersCount;
+        newStats.archives.contributions -= contributionsCount;
+
+        if (restoredBook.statut === 'en_cours') {
+          newStats.enCours.count += 1;
+          newStats.enCours.chapitres += chaptersCount;
+          newStats.enCours.contributions += contributionsCount;
+        } else if (restoredBook.statut === 'termine') {
+          newStats.termines.count += 1;
+          newStats.termines.chapitres += chaptersCount;
+          newStats.termines.contributions += contributionsCount;
+        }
+
+        return newStats;
+      });
+      setArchivedBooks((prev) => prev.filter((book) => book.id !== bookId));
+      setBooks((prev) => [{ ...restoredBook, status: 'actif' }, ...prev]);
+
+      showNotice('Livre restaure avec succes.', 'success');
     } catch (error) {
-      console.error('❌ Erreur restauration:', error);
-      alert(`Erreur lors de la restauration: ${error.message}`);
+      console.error('Erreur restauration:', error);
+      showNotice(`Erreur lors de la restauration: ${error.message}`, 'error');
     }
   };
 
@@ -277,11 +327,11 @@ const DashboardGeneralLuxe = () => {
 
   const handleDeleteBook = async () => {
     if (!deleteModal.bookId) return;
-    setDeleteModal(prev => ({ ...prev, deleting: true }));
+    setDeleteModal((prev) => ({ ...prev, deleting: true }));
 
     try {
       const bookId = deleteModal.bookId;
-      
+
       const { data: chapters, error: chaptersError } = await supabase
         .from('chapters')
         .select('id')
@@ -289,7 +339,7 @@ const DashboardGeneralLuxe = () => {
 
       if (chaptersError) throw chaptersError;
 
-      const chapterIds = chapters.map(ch => ch.id);
+      const chapterIds = (chapters || []).map((chapter) => chapter.id);
 
       if (chapterIds.length > 0) {
         const { error: contributionsError } = await supabase
@@ -328,164 +378,169 @@ const DashboardGeneralLuxe = () => {
 
       if (bookError) throw bookError;
 
-      const isActive = books.some(b => b.id === bookId);
-      
+      const isActive = books.some((book) => book.id === bookId);
+
       if (isActive) {
-        const deletedBook = books.find(b => b.id === bookId);
-        setBooks(prev => prev.filter(b => b.id !== bookId));
-        const newStats = { ...stats };
-        if (deletedBook.statut === 'en_cours') {
-          newStats.enCours.count -= 1;
-        } else if (deletedBook.statut === 'termine') {
-          newStats.termines.count -= 1;
-        }
-        setStats(newStats);
+        const deletedBook = books.find((book) => book.id === bookId);
+        const chaptersCount = deletedBook?.chapters?.[0]?.count || 0;
+        const contributionsCount = getBookContributionsCount(deletedBook);
+        setBooks((prev) => prev.filter((book) => book.id !== bookId));
+        setStats((prev) => {
+          const newStats = {
+            enCours: { ...prev.enCours },
+            termines: { ...prev.termines },
+            archives: { ...prev.archives }
+          };
+
+          if (deletedBook?.statut === 'en_cours') {
+            newStats.enCours.count -= 1;
+            newStats.enCours.chapitres -= chaptersCount;
+            newStats.enCours.contributions -= contributionsCount;
+          } else if (deletedBook?.statut === 'termine') {
+            newStats.termines.count -= 1;
+            newStats.termines.chapitres -= chaptersCount;
+            newStats.termines.contributions -= contributionsCount;
+          }
+
+          return newStats;
+        });
       } else {
-        setArchivedBooks(prev => prev.filter(b => b.id !== bookId));
-        setStats(prev => ({
+        const deletedBook = archivedBooks.find((book) => book.id === bookId);
+        const chaptersCount = deletedBook?.chapters?.[0]?.count || 0;
+        const contributionsCount = getBookContributionsCount(deletedBook);
+        setArchivedBooks((prev) => prev.filter((book) => book.id !== bookId));
+        setStats((prev) => ({
           ...prev,
           archives: {
             ...prev.archives,
-            count: prev.archives.count - 1
+            count: prev.archives.count - 1,
+            chapitres: prev.archives.chapitres - chaptersCount,
+            contributions: prev.archives.contributions - contributionsCount
           }
         }));
       }
 
       closeDeleteModal();
-      alert('✅ Livre supprimé définitivement');
-      
+      showNotice('Livre supprime definitivement.', 'success');
     } catch (error) {
-      console.error('❌ Erreur suppression:', error);
-      alert(`Erreur lors de la suppression: ${error.message}`);
-      setDeleteModal(prev => ({ ...prev, deleting: false }));
+      console.error('Erreur suppression:', error);
+      showNotice(`Erreur lors de la suppression: ${error.message}`, 'error');
+      setDeleteModal((prev) => ({ ...prev, deleting: false }));
     }
   };
 
-  if (loading) return <Loading message="Chargement de votre bibliothèque..." />;
+  if (loading) return <Loading message="Chargement de votre bibliotheque..." />;
 
   return (
     <div className="dashboard-container">
       <div className="dashboard-content">
-        {/* En-tête */}
-        <div className="dashboard-header">
-          <h1>
-            Bonjour {user?.user_metadata?.full_name || user?.email}
-          </h1>
-          <p>Gérez vos livres et suivez leur avancement</p>
+        <div className="dashboard-hero">
+          <div className="dashboard-header">
+            <div className="dashboard-eyebrow">Bibliotheque personnelle</div>
+            <h1>Bonjour {user?.user_metadata?.full_name || user?.email}</h1>
+            <p>Gerez vos livres, suivez leur avancement et pilotez les actions prioritaires.</p>
+          </div>
+
+          <div className="quick-actions dashboard-header-actions">
+            <Link to="/create-book" className="btn-new">
+              <IconPlus />
+              Nouveau livre
+            </Link>
+
+            <Link to="/admin/prompts" className="btn-admin">
+              Prompts IA
+            </Link>
+
+            {stats.archives.count > 0 && (
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className={`btn-archive-toggle ${showArchived ? 'active' : ''}`}
+              >
+                <IconArchive />
+                {showArchived ? 'Masquer archives' : `Archives (${stats.archives.count})`}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Statistiques avec icônes épurées */}
+        {pageNotice?.message && (
+          <div className={`dashboard-feedback-banner is-${pageNotice.type || 'info'}`}>
+            <span>{pageNotice.message}</span>
+            <button
+              type="button"
+              className="dashboard-feedback-close"
+              onClick={dismissNotice}
+              aria-label="Fermer le message"
+            >
+              x
+            </button>
+          </div>
+        )}
+
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-header">
-              <span className="stat-icon">
-                <IconBook />
-              </span>
+              <span className="stat-icon"><IconBook /></span>
               <span className="stat-title">En cours</span>
             </div>
             <div className="stat-number">{stats.enCours.count}</div>
             <div className="stat-details">
-              <span className="stat-detail-item">
-                <IconChapter />
-                {stats.enCours.chapitres}
-              </span>
-              <span className="stat-detail-item">
-                <IconContribution />
-                {stats.enCours.contributions}
-              </span>
+              <span className="stat-detail-item"><IconChapter />{stats.enCours.chapitres}</span>
+              <span className="stat-detail-item"><IconContribution />{stats.enCours.contributions}</span>
             </div>
           </div>
 
           <div className="stat-card">
             <div className="stat-header">
-              <span className="stat-icon">
-                <IconCheckCircle />
-              </span>
-              <span className="stat-title">Terminés</span>
+              <span className="stat-icon"><IconCheckCircle /></span>
+              <span className="stat-title">Termines</span>
             </div>
             <div className="stat-number">{stats.termines.count}</div>
             <div className="stat-details">
-              <span className="stat-detail-item">
-                <IconChapter />
-                {stats.termines.chapitres}
-              </span>
-              <span className="stat-detail-item">
-                <IconContribution />
-                {stats.termines.contributions}
-              </span>
+              <span className="stat-detail-item"><IconChapter />{stats.termines.chapitres}</span>
+              <span className="stat-detail-item"><IconContribution />{stats.termines.contributions}</span>
             </div>
           </div>
 
           <div className="stat-card">
             <div className="stat-header">
-              <span className="stat-icon">
-                <IconArchive />
-              </span>
-              <span className="stat-title">Archivés</span>
+              <span className="stat-icon"><IconArchive /></span>
+              <span className="stat-title">Archives</span>
             </div>
             <div className="stat-number">{stats.archives.count}</div>
             <div className="stat-details">
-              <span className="stat-detail-item">
-                <IconChapter />
-                {stats.archives.chapitres}
-              </span>
-              <span className="stat-detail-item">
-                <IconContribution />
-                {stats.archives.contributions}
-              </span>
+              <span className="stat-detail-item"><IconChapter />{stats.archives.chapitres}</span>
+              <span className="stat-detail-item"><IconContribution />{stats.archives.contributions}</span>
             </div>
           </div>
         </div>
 
-        {/* Actions rapides */}
-        <div className="quick-actions">
-          <Link to="/create-book" className="btn-new">
-            <IconPlus />
-            Nouveau livre
-          </Link>
-
-          <Link to="/admin/prompts" className="btn-admin">
-            Prompts IA
-          </Link>
-
-          {stats.archives.count > 0 && (
-            <button
-              onClick={() => setShowArchived(!showArchived)}
-              className={`btn-archive-toggle ${showArchived ? 'active' : ''}`}
-            >
-              <IconArchive />
-              {showArchived ? 'Masquer archives' : `Archives (${stats.archives.count})`}
-            </button>
-          )}
-        </div>
-
-        {/* Livres actifs */}
         {!showArchived && (
-          <div>
+          <div className="dashboard-section-panel">
             <div className="section-title">
-              <h2>📚 Mes livres</h2>
+              <h2>Mes livres</h2>
               <span className="section-count">{books.length}</span>
             </div>
-            
+
             {books.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-state-icon">📖</div>
+                <div className="empty-state-icon"><IconBook /></div>
                 <h3>Vous n'avez pas encore de livre</h3>
-                <p>Créez votre premier livre pour commencer</p>
-                <Link to="/create-book" className="btn-new" style={{ display: 'inline-block' }}>
+                <p>Creez votre premier livre pour commencer.</p>
+                <Link to="/create-book" className="btn-new">
                   <IconPlus />
-                  Créer un livre
+                  Creer un livre
                 </Link>
               </div>
             ) : (
               <div className="books-grid">
-                {books.map(book => (
-                  <BookCardLuxe 
-                    key={book.id} 
-                    book={book} 
+                {books.map((book) => (
+                  <BookCardLuxe
+                    key={book.id}
+                    book={book}
                     onArchive={() => openArchiveModal(book.id, book.title)}
                     onDelete={() => openDeleteModal(book.id, book.title)}
-                    showArchive={true}
+                    showArchive
                   />
                 ))}
               </div>
@@ -493,29 +548,28 @@ const DashboardGeneralLuxe = () => {
           </div>
         )}
 
-        {/* Livres archivés */}
         {showArchived && (
-          <div>
+          <div className="dashboard-section-panel">
             <div className="section-title">
-              <h2>📦 Livres archivés</h2>
+              <h2>Livres archives</h2>
               <span className="section-count">{archivedBooks.length}</span>
             </div>
-            
+
             {archivedBooks.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-state-icon">📦</div>
-                <h3>Aucun livre archivé</h3>
-                <p>Les livres que vous archivez apparaîtront ici</p>
+                <div className="empty-state-icon"><IconArchive /></div>
+                <h3>Aucun livre archive</h3>
+                <p>Les livres que vous archivez apparaitront ici.</p>
               </div>
             ) : (
-              <div className="books-grid" style={{ opacity: 0.8 }}>
-                {archivedBooks.map(book => (
-                  <BookCardLuxe 
-                    key={book.id} 
-                    book={book} 
+              <div className="books-grid books-grid-archived">
+                {archivedBooks.map((book) => (
+                  <BookCardLuxe
+                    key={book.id}
+                    book={book}
                     onRestore={() => handleRestoreBook(book.id)}
                     onDelete={() => openDeleteModal(book.id, book.title)}
-                    showRestore={true}
+                    showRestore
                     autoDeleteDate={book.auto_delete_at}
                   />
                 ))}
@@ -525,7 +579,6 @@ const DashboardGeneralLuxe = () => {
         )}
       </div>
 
-      {/* Modal d'archivage */}
       {archiveModal.show && (
         <div className="modal-overlay">
           <div className="modal-card">
@@ -535,7 +588,7 @@ const DashboardGeneralLuxe = () => {
             </p>
             <select
               value={archiveModal.duration}
-              onChange={(e) => setArchiveModal({ ...archiveModal, duration: parseInt(e.target.value) })}
+              onChange={(event) => setArchiveModal({ ...archiveModal, duration: parseInt(event.target.value, 10) })}
               className="modal-select"
             >
               <option value={3}>3 mois</option>
@@ -546,40 +599,43 @@ const DashboardGeneralLuxe = () => {
               <button
                 onClick={closeArchiveModal}
                 className="modal-btn modal-btn-cancel"
+                disabled={archiveModal.archiving}
               >
                 Annuler
               </button>
               <button
                 onClick={handleArchiveBook}
                 className="modal-btn modal-btn-archive"
+                disabled={archiveModal.archiving}
               >
-                Archiver
+                {archiveModal.archiving ? 'Archivage...' : 'Archiver'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de suppression */}
       {deleteModal.show && (
         <div className="modal-overlay">
           <div className="modal-card">
-            <h3 className="modal-title" style={{ color: '#dc3545' }}>Supprimer définitivement ?</h3>
+            <h3 className="modal-title modal-title-danger">Supprimer definitivement ?</h3>
             <p className="modal-text">
-              Êtes-vous sûr de vouloir supprimer "{deleteModal.bookTitle}" ? Cette action est irréversible.
+              Etes-vous sur de vouloir supprimer "{deleteModal.bookTitle}" ? Cette action est irreversible.
             </p>
             <div className="modal-actions">
               <button
                 onClick={closeDeleteModal}
                 className="modal-btn modal-btn-cancel"
+                disabled={deleteModal.deleting}
               >
                 Annuler
               </button>
               <button
                 onClick={handleDeleteBook}
                 className="modal-btn modal-btn-delete"
+                disabled={deleteModal.deleting}
               >
-                Supprimer
+                {deleteModal.deleting ? 'Suppression...' : 'Supprimer'}
               </button>
             </div>
           </div>

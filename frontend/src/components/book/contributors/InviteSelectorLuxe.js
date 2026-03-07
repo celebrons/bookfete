@@ -239,6 +239,25 @@ const InviteSelectorLuxe = ({ chapterId, bookId, onClose, onInvitesSent }) => {
     );
   }
 
+  if (contributors.length === 0) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-content modal-content-compact">
+          <button onClick={onClose} className="modal-close">x</button>
+          <h3 className="modal-title">Aucun contributeur</h3>
+          <p className="modal-text">
+            Merci d'ajouter des contributeurs dans l'onglet contributeurs, ils apparaitront ensuite ici.
+          </p>
+          <div className="modal-actions">
+            <button onClick={onClose} className="btn btn-primary">
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const availableContributors = contributors.filter(c => !c.alreadyInvited);
   const invitedContributors = contributors.filter(c => c.alreadyInvited);
   const orderedContributors = [...invitedContributors, ...availableContributors];

@@ -62,12 +62,13 @@ const ChapterDetailsLuxe = ({
 
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
   const totalSteps = isSoloMode ? 3 : 4;
-  const completedSteps = [
+  const baseCompletedSteps = [
     Boolean(chapter?.questions_validated),
     Boolean(chapter?.isFinalized),
     ...(isSoloMode ? [] : [Boolean(chapter?.contributionsClosed)]),
     Boolean(chapter?.isChapterClosed)
   ].filter(Boolean).length;
+  const completedSteps = chapter?.isChapterClosed ? totalSteps : baseCompletedSteps;
   const progressPercent = Math.round((completedSteps / totalSteps) * 100);
 
   return (
