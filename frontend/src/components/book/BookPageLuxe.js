@@ -6,6 +6,13 @@ import ChapterListLuxe from './ChapterListLuxe';
 import BookConfigLuxe from './BookConfigLuxe';
 import ContributorsTabLuxe from './contributors/ContributorsTabLuxe';
 import Loading from '../common/Loading';
+import {
+  BOOK_LIFECYCLE_ORDER,
+  getBookLifecycleConfig,
+  getBookLifecycleStatusFromBook,
+  isBookLifecycleAtLeast,
+  normalizeBookLifecycleStatus
+} from '../../utils/bookLifecycle';
 import '../../styles/luxe-theme.css';
 import './BookLuxe.css';
 
@@ -70,9 +77,18 @@ const BookPageLuxe = () => {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [draftPreview, setDraftPreview] = useState(null);
+  const [startingPdfExport, setStartingPdfExport] = useState(false);
+  const [pdfExportJob, setPdfExportJob] = useState(null);
+  const [downloadingPdfKind, setDownloadingPdfKind] = useState('');
+  const [updatingLifecycleStatus, setUpdatingLifecycleStatus] = useState('');
   const [user, setUser] = useState(null);
   const [pageNotice, setPageNotice] = useState(null);
   const chapterIdsRef = useRef(new Set());
+  const pdfExportPollRef = useRef(null);
+  const pdfPanelRef = useRef(null);
+  const areAllChaptersValidated = chapters.length > 0 && chapters.every(
+    (chapter) => chapter?.chapterDraft?.status === 'validated'
+  );
 
   useEffect(() => {
     getUser();
@@ -91,6 +107,15 @@ const BookPageLuxe = () => {
         .filter(Boolean)
     );
   }, [chapters]);
+
+  useEffect(() => (
+    () => {
+      if (pdfExportPollRef.current) {
+        clearInterval(pdfExportPollRef.current);
+        pdfExportPollRef.current = null;
+      }
+    }
+  ), []);
 
   useEffect(() => {
     if (!bookId || !user) {
@@ -154,6 +179,31 @@ const BookPageLuxe = () => {
   };
   const dismissPageNotice = () => {
     setPageNotice(null);
+  };
+
+  const stopPdfExportPolling = () => {
+    if (pdfExportPollRef.current) {
+      clearInterval(pdfExportPollRef.current);
+      pdfExportPollRef.current = null;
+    }
+  };
+
+  const parseFileNameFromDisposition = (disposition, fallback) => {
+    if (!disposition) {
+      return fallback;
+    }
+
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+      return decodeURIComponent(utf8Match[1]);
+    }
+
+    const standardMatch = disposition.match(/filename="?([^";]+)"?/i);
+    if (standardMatch?.[1]) {
+      return standardMatch[1];
+    }
+
+    return fallback;
   };
 
   const decorateChapter = (chapter) => {
@@ -652,10 +702,114 @@ const BookPageLuxe = () => {
 
       if (error) throw error;
       setBook(prev => ({ ...prev, ...updates }));
+      return true;
     } catch (error) {
       console.error('❌ Erreur mise à jour livre:', error);
+      throw error;
     }
   };
+
+  const setBookLifecycleStatus = async (
+    nextStatus,
+    { silent = false, onlyForward = false } = {}
+  ) => {
+    const normalizedStatus = normalizeBookLifecycleStatus(nextStatus);
+    if (!normalizedStatus || !book) {
+      return false;
+    }
+
+    const currentStatus = getBookLifecycleStatusFromBook(book);
+    if (currentStatus === normalizedStatus) {
+      return true;
+    }
+
+    if (onlyForward && !isBookLifecycleAtLeast(normalizedStatus, currentStatus)) {
+      return false;
+    }
+
+    const currentCoverConfig = (book?.cover_config && typeof book.cover_config === 'object')
+      ? book.cover_config
+      : {};
+    const nowIso = new Date().toISOString();
+    const nextCoverConfig = {
+      ...currentCoverConfig,
+      lifecycleStatus: normalizedStatus,
+      lifecycleUpdatedAt: nowIso
+    };
+
+    if (normalizedStatus === 'preview_available' && !nextCoverConfig.previewAvailableAt) {
+      nextCoverConfig.previewAvailableAt = nowIso;
+    }
+    if (normalizedStatus === 'finalized' && !nextCoverConfig.finalPdfReadyAt) {
+      nextCoverConfig.finalPdfReadyAt = nowIso;
+    }
+    if (normalizedStatus === 'sent_to_printer' && !nextCoverConfig.sentToPrinterAt) {
+      nextCoverConfig.sentToPrinterAt = nowIso;
+    }
+    if (normalizedStatus === 'printed' && !nextCoverConfig.printedAt) {
+      nextCoverConfig.printedAt = nowIso;
+    }
+    if (normalizedStatus === 'shipped' && !nextCoverConfig.shippedAt) {
+      nextCoverConfig.shippedAt = nowIso;
+    }
+
+    setUpdatingLifecycleStatus(normalizedStatus);
+    try {
+      await handleUpdateBook({
+        cover_config: nextCoverConfig
+      });
+
+      if (!silent) {
+        showPageNotice(
+          `Etat du livre: ${getBookLifecycleConfig(normalizedStatus).label}.`,
+          'success'
+        );
+      }
+      return true;
+    } catch (error) {
+      if (!silent) {
+        showPageNotice('Impossible de mettre a jour l etat du livre.', 'error');
+      }
+      return false;
+    } finally {
+      setUpdatingLifecycleStatus('');
+    }
+  };
+
+  const getAutomaticLifecycleStatus = () => {
+    if (!book) {
+      return 'editing';
+    }
+
+    let inferredStatus = areAllChaptersValidated ? 'preview_available' : 'editing';
+    if (pdfExportJob?.status === 'ready' || String(book?.statut || '').toLowerCase() === 'termine') {
+      inferredStatus = 'finalized';
+    }
+
+    const persistedStatus = getBookLifecycleStatusFromBook(book);
+    return isBookLifecycleAtLeast(persistedStatus, inferredStatus)
+      ? persistedStatus
+      : inferredStatus;
+  };
+
+  useEffect(() => {
+    if (!book || updatingLifecycleStatus) {
+      return;
+    }
+
+    const currentStatus = getBookLifecycleStatusFromBook(book);
+    const automaticStatus = getAutomaticLifecycleStatus();
+    if (currentStatus !== automaticStatus) {
+      setBookLifecycleStatus(automaticStatus, { silent: true, onlyForward: true });
+    }
+  }, [
+    book?.id,
+    book?.statut,
+    book?.cover_config?.lifecycleStatus,
+    areAllChaptersValidated,
+    pdfExportJob?.status,
+    updatingLifecycleStatus
+  ]);
 
   const handleGenerateDraft = async () => {
     try {
@@ -688,11 +842,158 @@ const BookPageLuxe = () => {
 
       setDraftPreview(data);
       dismissPageNotice();
+      await setBookLifecycleStatus('preview_available', { silent: true, onlyForward: true });
     } catch (error) {
       console.error('Erreur apercu livre:', error);
       showPageNotice(error.message || 'Erreur lors de l apercu du livre', 'error');
     } finally {
       setGeneratingDraft(false);
+    }
+  };
+
+  const fetchPdfExportStatus = async (jobId) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    if (!token) {
+      throw new Error('Session introuvable');
+    }
+
+    const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/export-final-pdf/${jobId}/status`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Impossible de recuperer le statut export');
+    }
+
+    return data;
+  };
+
+  const startPdfExportPolling = (jobId) => {
+    stopPdfExportPolling();
+
+    const pollStatus = async () => {
+      try {
+        const nextStatus = await fetchPdfExportStatus(jobId);
+        setPdfExportJob(nextStatus);
+
+        if (nextStatus.status === 'ready') {
+          stopPdfExportPolling();
+          await setBookLifecycleStatus('finalized', { silent: true, onlyForward: true });
+          showPageNotice('PDF final pret. Vous pouvez telecharger interieur et couverture.', 'success');
+        } else if (nextStatus.status === 'failed') {
+          stopPdfExportPolling();
+          showPageNotice(nextStatus.error || 'La generation PDF a echoue.', 'error');
+        }
+      } catch (error) {
+        stopPdfExportPolling();
+        showPageNotice(error.message || 'Erreur lors du suivi de generation PDF.', 'error');
+      }
+    };
+
+    pollStatus();
+    pdfExportPollRef.current = setInterval(pollStatus, 2500);
+  };
+
+  const handleStartPdfExport = async () => {
+    try {
+      if (!chapters.length || chapters.some((chapter) => chapter?.chapterDraft?.status !== 'validated')) {
+        throw new Error('Validez tous les chapitres avant la generation PDF finale');
+      }
+
+      setStartingPdfExport(true);
+      stopPdfExportPolling();
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Session introuvable');
+      }
+
+      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/export-final-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors du lancement export PDF');
+      }
+
+      setPdfExportJob(data);
+      showPageNotice('Generation PDF finale lancee. Nous preparons les fichiers imprimeur...', 'info');
+      startPdfExportPolling(data.jobId);
+    } catch (error) {
+      showPageNotice(error.message || 'Erreur lors de la generation PDF finale.', 'error');
+    } finally {
+      setStartingPdfExport(false);
+    }
+  };
+
+  const handleDownloadPdfFile = async (kind) => {
+    if (!pdfExportJob?.jobId) {
+      return;
+    }
+
+    try {
+      setDownloadingPdfKind(kind);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Session introuvable');
+      }
+
+      const response = await fetch(
+        `${getApiBaseUrl()}/books/${bookId}/export-final-pdf/${pdfExportJob.jobId}/download/${kind}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        throw new Error(errorPayload.error || 'Erreur lors du telechargement du PDF');
+      }
+
+      const blob = await response.blob();
+      const fallbackFileName = kind === 'cover' ? 'couverture.pdf' : 'interieur.pdf';
+      const fileName = parseFileNameFromDisposition(
+        response.headers.get('content-disposition'),
+        fallbackFileName
+      );
+
+      const objectUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      showPageNotice(error.message || 'Erreur lors du telechargement du PDF.', 'error');
+    } finally {
+      setDownloadingPdfKind('');
+    }
+  };
+
+  const focusPdfPanel = () => {
+    if (pdfPanelRef.current) {
+      pdfPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
@@ -781,24 +1082,104 @@ const BookPageLuxe = () => {
   if (!book) return <div>Livre non trouvé</div>;
 
   const isSoloMode = getSoloMode(book);
-  const allChaptersDraftValidated = chapters.length > 0 && chapters.every(
-    (chapter) => chapter?.chapterDraft?.status === 'validated'
-  );
   const visibleGuideSteps = isSoloMode
     ? WRITING_GUIDE_STEPS.filter((step) => step.title !== 'Invitations')
     : WRITING_GUIDE_STEPS;
+  const bookLifecycleStatus = getAutomaticLifecycleStatus();
+  const bookLifecycleConfig = getBookLifecycleConfig(bookLifecycleStatus);
+  const lifecycleUpdatedAt = book?.cover_config?.lifecycleUpdatedAt;
+  const lifecycleUpdatedLabel = lifecycleUpdatedAt
+    ? new Date(lifecycleUpdatedAt).toLocaleString('fr-FR')
+    : '';
   const bookMetaItems = [
     { label: 'Finition', value: book.finition || 'Classique' },
     { label: 'Papier', value: book.papier || 'Mat' },
     { label: 'Voix', value: book.style_narratif || 'Factuel' }
   ];
+  const pdfExportStatusLabel = (() => {
+    switch (pdfExportJob?.status) {
+      case 'queued':
+        return 'File en attente';
+      case 'rendering':
+        return 'Generation en cours';
+      case 'ready':
+        return 'Pret au telechargement';
+      case 'failed':
+        return 'Generation en erreur';
+      default:
+        return 'Non lance';
+    }
+  })();
+  const isPdfReady = pdfExportJob?.status === 'ready';
+  const currentLifecycleAction = (() => {
+    if (bookLifecycleStatus === 'editing') {
+      return {
+        label: 'Continuer l edition',
+        note: 'Aller aux chapitres',
+        onClick: () => setActiveTab('chapitres'),
+        disabled: false
+      };
+    }
+
+    if (bookLifecycleStatus === 'preview_available') {
+      return {
+        label: generatingDraft ? 'Generation...' : 'Ouvrir l apercu',
+        note: 'Apercu assemble du livre',
+        onClick: handleGenerateDraft,
+        disabled: generatingDraft || !areAllChaptersValidated
+      };
+    }
+
+    if (bookLifecycleStatus === 'finalized') {
+      if (isPdfReady) {
+        return {
+          label: 'Voir les PDF finaux',
+          note: 'Aller au panneau PDF',
+          onClick: focusPdfPanel,
+          disabled: false
+        };
+      }
+
+      return {
+        label: startingPdfExport ? 'Lancement...' : 'Lancer PDF imprimeur',
+        note: pdfExportStatusLabel,
+        onClick: handleStartPdfExport,
+        disabled: startingPdfExport || !areAllChaptersValidated
+      };
+    }
+
+    if (bookLifecycleStatus === 'sent_to_printer') {
+      return {
+        label: updatingLifecycleStatus === 'printed' ? 'Mise a jour...' : 'Marquer imprime',
+        note: 'Suivi de production',
+        onClick: () => setBookLifecycleStatus('printed'),
+        disabled: Boolean(updatingLifecycleStatus)
+      };
+    }
+
+    if (bookLifecycleStatus === 'printed') {
+      return {
+        label: updatingLifecycleStatus === 'shipped' ? 'Mise a jour...' : 'Marquer envoye',
+        note: 'Suivi de livraison',
+        onClick: () => setBookLifecycleStatus('shipped'),
+        disabled: Boolean(updatingLifecycleStatus)
+      };
+    }
+
+    return {
+      label: 'Livre envoye',
+      note: 'Workflow termine',
+      onClick: () => {},
+      disabled: true
+    };
+  })();
 
   return (
     <div className="book-container">
       <div className="book-header">
         <div className="book-header-content">
           <div className="book-title">
-            <div className="book-eyebrow">Edition en cours</div>
+            <div className="book-eyebrow">{bookLifecycleConfig.label}</div>
             <h1>{book.title}</h1>
             <div className="book-meta">
               <div className="book-meta-grid">
@@ -813,14 +1194,56 @@ const BookPageLuxe = () => {
               <span>📄 {book.papier || 'Mat'}</span>
               <span>✍️ {book.style_narratif || 'Factuel'}</span>
             </div>
+            <div className="book-lifecycle-panel">
+              <div className="book-lifecycle-top">
+                <span className={`book-lifecycle-chip ${bookLifecycleConfig.tone}`}>
+                  {bookLifecycleConfig.label}
+                </span>
+                {lifecycleUpdatedLabel && (
+                  <span className="book-lifecycle-updated">
+                    Mis a jour: {lifecycleUpdatedLabel}
+                  </span>
+                )}
+              </div>
+              <div className="book-lifecycle-line">
+                {BOOK_LIFECYCLE_ORDER.map((statusKey, index) => {
+                  const config = getBookLifecycleConfig(statusKey);
+                  const isCurrent = statusKey === bookLifecycleStatus;
+                  const isDone = !isCurrent && isBookLifecycleAtLeast(bookLifecycleStatus, statusKey);
+                  return (
+                    <button
+                      key={statusKey}
+                      type="button"
+                      className={`book-lifecycle-step ${isCurrent ? 'is-current' : ''} ${isDone ? 'is-done' : ''}`}
+                      onClick={isCurrent ? currentLifecycleAction.onClick : undefined}
+                      disabled={!isCurrent || currentLifecycleAction.disabled}
+                      title={isCurrent ? `${config.label} - ${currentLifecycleAction.note}` : config.label}
+                    >
+                      <span className="book-lifecycle-marker">{isDone ? '✓' : index + 1}</span>
+                      <span>{config.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                className="book-lifecycle-current-action"
+                onClick={currentLifecycleAction.onClick}
+                disabled={currentLifecycleAction.disabled}
+              >
+                <span className="book-lifecycle-current-label">{currentLifecycleAction.label}</span>
+                <span className="book-lifecycle-current-note">{currentLifecycleAction.note}</span>
+              </button>
+            </div>
           </div>
           <div className="book-header-actions">
+            <div className="book-header-actions-row is-primary">
           <button
             type="button"
             className="book-header-btn book-header-btn-primary book-generate-btn"
             onClick={handleGenerateDraft}
-            disabled={generatingDraft || !allChaptersDraftValidated}
-            title={allChaptersDraftValidated
+            disabled={generatingDraft || !areAllChaptersValidated}
+            title={areAllChaptersValidated
               ? 'Afficher l apercu assemble du livre'
               : 'Generez et validez chaque chapitre avant l apercu global'}
           >
@@ -829,6 +1252,22 @@ const BookPageLuxe = () => {
             </span>
             <span className="book-action-note">Apercu assemble du livre</span>
           </button>
+          <button
+            type="button"
+            className="book-header-btn book-header-btn-primary book-export-btn"
+            onClick={handleStartPdfExport}
+            disabled={startingPdfExport || !areAllChaptersValidated}
+            title={areAllChaptersValidated
+              ? 'Lancer la generation des PDF finaux imprimeur'
+              : 'Validez tous les chapitres avant la generation PDF finale'}
+          >
+            <span className="book-action-label">
+              {startingPdfExport ? 'Lancement...' : 'PDF final imprimeur'}
+            </span>
+            <span className="book-action-note">{pdfExportStatusLabel}</span>
+          </button>
+            </div>
+            <div className="book-header-actions-row is-secondary">
           <Link to="/dashboard" className="dashboard-link book-header-btn book-header-link">
             <span>📊</span>
             <span className="book-action-label">Tableau de bord</span>
@@ -836,6 +1275,7 @@ const BookPageLuxe = () => {
           </Link>
           </div>
         </div>
+      </div>
       </div>
 
       <div className="tabs-container">
@@ -914,6 +1354,47 @@ const BookPageLuxe = () => {
             >
               x
             </button>
+          </div>
+        )}
+
+        {pdfExportJob?.jobId && (
+          <div ref={pdfPanelRef} className={`book-pdf-panel is-${pdfExportJob.status || 'queued'}`}>
+            <div className="book-pdf-head">
+              <div className="book-pdf-title">Export PDF final</div>
+              <div className="book-pdf-status">{pdfExportStatusLabel}</div>
+            </div>
+            <div className="book-pdf-meta">
+              Job: {pdfExportJob.jobId}
+              {pdfExportJob.renderer && (
+                <span> | Moteur: {pdfExportJob.renderer === 'browser' ? 'rendu navigateur fidele' : 'fallback simplifie'}</span>
+              )}
+              {pdfExportJob.completedAt && (
+                <span> | Termine le {new Date(pdfExportJob.completedAt).toLocaleString('fr-FR')}</span>
+              )}
+            </div>
+            {pdfExportJob.error && (
+              <div className="book-pdf-error">{pdfExportJob.error}</div>
+            )}
+            {isPdfReady && (
+              <div className="book-pdf-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => handleDownloadPdfFile('interior')}
+                  disabled={downloadingPdfKind === 'interior'}
+                >
+                  {downloadingPdfKind === 'interior' ? 'Telechargement...' : 'Telecharger interieur.pdf'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => handleDownloadPdfFile('cover')}
+                  disabled={downloadingPdfKind === 'cover'}
+                >
+                  {downloadingPdfKind === 'cover' ? 'Telechargement...' : 'Telecharger couverture.pdf'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

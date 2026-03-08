@@ -1,5 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const fsp = require('fs/promises');
+const path = require('path');
+const crypto = require('crypto');
+const { execFile } = require('child_process');
+const { pathToFileURL } = require('url');
+const PDFDocument = require('pdfkit');
 const supabase = require('../config/supabase');
 const aiService = require('../services/aiService');
 const authenticate = require('../middleware/auth');
@@ -7,6 +14,18 @@ const authenticate = require('../middleware/auth');
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
 const MAX_CHAPTER_AI_GENERATIONS = 3;
+const MM_TO_PT = 72 / 25.4;
+const PDF_EXPORT_JOB_TTL_MS = 6 * 60 * 60 * 1000;
+const PDF_EXPORT_DIR = path.join(__dirname, '..', 'tmp', 'pdf-exports');
+const pdfExportJobs = new Map();
+
+const pdfExportCleanupTimer = setInterval(() => {
+  cleanupExpiredPdfExportJobs();
+}, 30 * 60 * 1000);
+
+if (typeof pdfExportCleanupTimer.unref === 'function') {
+  pdfExportCleanupTimer.unref();
+}
 
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -321,6 +340,167 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Erreur apercu livre:', error);
     res.status(error.status || 500).json({ error: error.message || 'Erreur lors de la generation du brouillon' });
+  }
+});
+
+router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
+  try {
+    const bookId = req.params.id;
+    const { book, chapters } = await loadOwnedBookChapterContext({
+      bookId,
+      ownerId: req.user.id
+    });
+
+    const chaptersWithDrafts = (chapters || []).map((chapter) => ({
+      chapter,
+      draft: extractChapterDraftState(chapter)
+    }));
+    const incompleteCount = chaptersWithDrafts.filter(
+      ({ draft }) => draft?.status !== 'validated'
+    ).length;
+
+    if (!chaptersWithDrafts.length) {
+      return res.status(400).json({
+        error: 'Aucun chapitre disponible pour generer le PDF final'
+      });
+    }
+
+    if (incompleteCount > 0) {
+      return res.status(400).json({
+        error: `Tous les chapitres doivent etre valides avant l export PDF (${incompleteCount} restant(s))`
+      });
+    }
+
+    const jobId = createPdfExportJobId();
+    const createdAt = new Date().toISOString();
+
+    pdfExportJobs.set(jobId, {
+      jobId,
+      bookId,
+      ownerId: req.user.id,
+      status: 'queued',
+      createdAt,
+      startedAt: null,
+      completedAt: null,
+      error: null,
+      files: null
+    });
+
+    processPdfExportJob({
+      jobId,
+      book,
+      chaptersWithDrafts
+    }).catch((error) => {
+      console.error('Erreur pipeline export PDF:', error);
+    });
+
+    return res.status(202).json({
+      jobId,
+      status: 'queued',
+      createdAt
+    });
+  } catch (error) {
+    console.error('Erreur lancement export PDF:', error);
+    return res.status(error.status || 500).json({
+      error: error.message || 'Erreur lors du lancement de la generation PDF'
+    });
+  }
+});
+
+router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res) => {
+  try {
+    const bookId = req.params.id;
+    const jobId = req.params.jobId;
+    const job = getOwnedPdfExportJob({
+      jobId,
+      bookId,
+      ownerId: req.user.id
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job export introuvable' });
+    }
+
+    return res.json({
+      jobId: job.jobId,
+      status: job.status,
+      createdAt: job.createdAt,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+      error: job.error,
+      renderer: job.files?.renderer || null,
+      files: job.status === 'ready'
+        ? {
+            interior: {
+              kind: 'interior',
+              fileName: job.files?.interior?.fileName || 'interieur.pdf'
+            },
+            cover: {
+              kind: 'cover',
+              fileName: job.files?.cover?.fileName || 'couverture.pdf'
+            }
+          }
+        : null
+    });
+  } catch (error) {
+    console.error('Erreur statut export PDF:', error);
+    return res.status(500).json({
+      error: error.message || 'Erreur lors de la recuperation du statut export'
+    });
+  }
+});
+
+router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (req, res) => {
+  try {
+    const bookId = req.params.id;
+    const jobId = req.params.jobId;
+    const kind = req.params.kind;
+    const job = getOwnedPdfExportJob({
+      jobId,
+      bookId,
+      ownerId: req.user.id
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job export introuvable' });
+    }
+
+    if (job.status !== 'ready') {
+      return res.status(409).json({
+        error: 'Le PDF final nest pas encore disponible'
+      });
+    }
+
+    if (kind !== 'interior' && kind !== 'cover') {
+      return res.status(400).json({ error: 'Type de fichier invalide' });
+    }
+
+    const targetFile = job.files?.[kind];
+    if (!targetFile?.path || !fs.existsSync(targetFile.path)) {
+      return res.status(404).json({ error: 'Fichier PDF introuvable' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${targetFile.fileName || `${kind}.pdf`}"`
+    );
+
+    const fileStream = fs.createReadStream(targetFile.path);
+    fileStream.on('error', (streamError) => {
+      console.error('Erreur lecture fichier PDF:', streamError);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Impossible de lire le fichier PDF' });
+      } else {
+        res.end();
+      }
+    });
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error('Erreur telechargement PDF:', error);
+    return res.status(500).json({
+      error: error.message || 'Erreur lors du telechargement du PDF'
+    });
   }
 });
 
@@ -982,6 +1162,1235 @@ function resolveCoverPreviewConfig(book) {
     coverConfig,
     backCoverConfig
   };
+}
+
+function createPdfExportJobId() {
+  return crypto.randomBytes(10).toString('hex');
+}
+
+function getOwnedPdfExportJob({ jobId, bookId, ownerId }) {
+  const job = pdfExportJobs.get(jobId);
+  if (!job) {
+    return null;
+  }
+
+  if (String(job.bookId) !== String(bookId)) {
+    return null;
+  }
+
+  if (String(job.ownerId) !== String(ownerId)) {
+    return null;
+  }
+
+  return job;
+}
+
+async function processPdfExportJob({ jobId, book, chaptersWithDrafts }) {
+  const queuedJob = pdfExportJobs.get(jobId);
+  if (!queuedJob) {
+    return;
+  }
+
+  queuedJob.status = 'rendering';
+  queuedJob.startedAt = new Date().toISOString();
+  queuedJob.error = null;
+  pdfExportJobs.set(jobId, queuedJob);
+
+  try {
+    const files = await generateFinalBookPdfFiles({
+      book,
+      chaptersWithDrafts,
+      jobId
+    });
+    const readyJob = pdfExportJobs.get(jobId);
+    if (!readyJob) {
+      return;
+    }
+
+    readyJob.status = 'ready';
+    readyJob.completedAt = new Date().toISOString();
+    readyJob.error = null;
+    readyJob.files = files;
+    pdfExportJobs.set(jobId, readyJob);
+  } catch (error) {
+    const failedJob = pdfExportJobs.get(jobId);
+    if (!failedJob) {
+      return;
+    }
+
+    failedJob.status = 'failed';
+    failedJob.completedAt = new Date().toISOString();
+    failedJob.error = cleanText(error?.message || 'Generation PDF impossible', 260);
+    pdfExportJobs.set(jobId, failedJob);
+  }
+}
+
+function cleanupExpiredPdfExportJobs() {
+  const now = Date.now();
+
+  for (const [jobId, job] of pdfExportJobs.entries()) {
+    const createdAtTimestamp = Date.parse(job.createdAt || '');
+    const createdAt = Number.isFinite(createdAtTimestamp) ? createdAtTimestamp : 0;
+
+    if (now - createdAt <= PDF_EXPORT_JOB_TTL_MS) {
+      continue;
+    }
+
+    deletePdfExportFiles(job);
+    pdfExportJobs.delete(jobId);
+  }
+}
+
+function deletePdfExportFiles(job) {
+  const candidateFiles = [
+    job?.files?.interior?.path,
+    job?.files?.cover?.path
+  ].filter(Boolean);
+
+  candidateFiles.forEach((targetPath) => {
+    try {
+      if (fs.existsSync(targetPath)) {
+        fs.unlinkSync(targetPath);
+      }
+    } catch (error) {
+      console.error('Erreur nettoyage fichier PDF:', error);
+    }
+  });
+}
+
+async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId }) {
+  await fsp.mkdir(PDF_EXPORT_DIR, { recursive: true });
+  const safeBookName = normalizePdfFileName(cleanText(book?.title, 120), 'livre');
+  const interiorPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-interieur.pdf`);
+  const coverPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-couverture.pdf`);
+  const rendererMode = String(process.env.PDF_RENDERER_MODE || 'browser').toLowerCase();
+  const shouldUseBrowserRenderer = rendererMode !== 'legacy' && rendererMode !== 'pdfkit';
+  let rendererUsed = shouldUseBrowserRenderer ? 'browser' : 'legacy';
+
+  if (shouldUseBrowserRenderer) {
+    try {
+      await generateBookPdfFilesFromHtml({
+        interiorPath,
+        coverPath,
+        book,
+        chaptersWithDrafts,
+        jobId
+      });
+    } catch (browserError) {
+      const strictBrowserMode = rendererMode === 'browser-strict';
+      if (strictBrowserMode) {
+        throw browserError;
+      }
+
+      console.error('Generation PDF navigateur indisponible, fallback PDFKit:', browserError);
+      rendererUsed = 'legacy';
+      await generateInteriorPdfFile({
+        filePath: interiorPath,
+        book,
+        chaptersWithDrafts
+      });
+
+      await generateCoverPdfFile({
+        filePath: coverPath,
+        book,
+        chaptersWithDrafts
+      });
+    }
+  } else {
+    await generateInteriorPdfFile({
+      filePath: interiorPath,
+      book,
+      chaptersWithDrafts
+    });
+
+    await generateCoverPdfFile({
+      filePath: coverPath,
+      book,
+      chaptersWithDrafts
+    });
+    rendererUsed = 'legacy';
+  }
+
+  return {
+    renderer: rendererUsed,
+    interior: {
+      path: interiorPath,
+      fileName: `${safeBookName}-interieur.pdf`
+    },
+    cover: {
+      path: coverPath,
+      fileName: `${safeBookName}-couverture.pdf`
+    }
+  };
+}
+
+async function generateBookPdfFilesFromHtml({
+  interiorPath,
+  coverPath,
+  book,
+  chaptersWithDrafts,
+  jobId
+}) {
+  const browserPath = resolvePdfBrowserPath();
+  if (!browserPath) {
+    throw new Error(
+      'Aucun navigateur headless trouve pour un rendu PDF fidele. Definissez PDF_BROWSER_PATH (Chrome/Edge).'
+    );
+  }
+
+  const interiorHtml = renderValidatedBookInteriorHtml({
+    book,
+    chaptersWithDrafts
+  });
+  const coverHtml = renderValidatedBookCoverHtml({
+    book
+  });
+
+  const interiorDocument = buildPrintableBookHtmlDocument({
+    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Interieur`,
+    bodyHtml: interiorHtml,
+    mode: 'interior'
+  });
+  const coverDocument = buildPrintableBookHtmlDocument({
+    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Couverture`,
+    bodyHtml: coverHtml,
+    mode: 'cover'
+  });
+
+  await renderPdfFromHtmlWithBrowser({
+    browserPath,
+    html: interiorDocument,
+    outputPath: interiorPath,
+    htmlPath: path.join(PDF_EXPORT_DIR, `job-${jobId}-interieur.html`)
+  });
+  await renderPdfFromHtmlWithBrowser({
+    browserPath,
+    html: coverDocument,
+    outputPath: coverPath,
+    htmlPath: path.join(PDF_EXPORT_DIR, `job-${jobId}-couverture.html`)
+  });
+}
+
+function resolvePdfBrowserPath() {
+  const candidatePaths = [
+    process.env.PDF_BROWSER_PATH,
+    process.env.CHROME_BIN,
+    process.env.GOOGLE_CHROME_BIN
+  ].filter(Boolean);
+
+  if (process.platform === 'win32') {
+    candidatePaths.push(
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+    );
+  } else if (process.platform === 'darwin') {
+    candidatePaths.push(
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+    );
+  } else {
+    candidatePaths.push(
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium',
+      '/usr/bin/microsoft-edge',
+      '/usr/bin/microsoft-edge-stable'
+    );
+  }
+
+  return candidatePaths.find((browserPath) => (
+    typeof browserPath === 'string' &&
+    browserPath.trim() &&
+    fs.existsSync(browserPath)
+  )) || null;
+}
+
+async function renderPdfFromHtmlWithBrowser({ browserPath, html, outputPath, htmlPath }) {
+  await fsp.writeFile(htmlPath, html, 'utf8');
+  const htmlUrl = pathToFileURL(htmlPath).href;
+
+  const args = [
+    '--headless=new',
+    '--disable-gpu',
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
+    '--run-all-compositor-stages-before-draw',
+    '--virtual-time-budget=15000',
+    '--print-to-pdf-no-header',
+    `--print-to-pdf=${outputPath}`,
+    htmlUrl
+  ];
+
+  try {
+    await execFilePromise(browserPath, args, { timeout: 90000 });
+
+    if (!fs.existsSync(outputPath)) {
+      throw new Error('Le navigateur n a pas produit de fichier PDF');
+    }
+  } finally {
+    try {
+      if (fs.existsSync(htmlPath)) {
+        await fsp.unlink(htmlPath);
+      }
+    } catch (cleanupError) {
+      console.error('Erreur suppression fichier HTML temporaire:', cleanupError);
+    }
+  }
+}
+
+function execFilePromise(command, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, options, (error, stdout, stderr) => {
+      if (error) {
+        const stderrMessage = cleanText(stderr || '', 400);
+        const stdoutMessage = cleanText(stdout || '', 400);
+        const extraMessage = stderrMessage || stdoutMessage;
+        if (extraMessage) {
+          error.message = `${error.message} | ${extraMessage}`;
+        }
+        reject(error);
+        return;
+      }
+
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+function renderValidatedBookInteriorHtml({ book, chaptersWithDrafts }) {
+  const chapterBlocks = chaptersWithDrafts
+    .map(({ draft }) => draft?.html || '')
+    .filter(Boolean)
+    .join('');
+  const chaptersContent = chapterBlocks
+    || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
+
+  return `
+    <article class="draft-book">
+      <header class="draft-book-header">
+        <div class="draft-book-eyebrow">Version finale</div>
+        <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
+        <div class="draft-book-meta">
+          ${escapeHtml([
+            book.recipient_name ? `Destinataire : ${book.recipient_name}` : '',
+            book.style_narratif ? `Style : ${book.style_narratif}` : '',
+            book.event_type ? `Evenement : ${book.event_type}` : ''
+          ].filter(Boolean).join(' | '))}
+        </div>
+      </header>
+      ${chaptersContent}
+    </article>
+  `;
+}
+
+function renderValidatedBookCoverHtml({ book }) {
+  const frontCard = extractCoverCardMarkup(renderAssembledFrontCover(book));
+  const backCard = extractCoverCardMarkup(renderAssembledBackCover(book));
+
+  return `
+    <article class="draft-book draft-book-cover-print">
+      <header class="draft-book-header">
+        <div class="draft-book-eyebrow">Couverture finale</div>
+        <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
+        <div class="draft-book-meta">Couverture et 4e de couverture</div>
+      </header>
+      <section class="cover-print-spread">
+        ${backCard}
+        ${frontCard}
+      </section>
+    </article>
+  `;
+}
+
+function extractCoverCardMarkup(sectionHtml) {
+  const match = String(sectionHtml || '').match(/<article[\s\S]*?<\/article>/i);
+  return match ? match[0] : '';
+}
+
+function buildPrintableBookHtmlDocument({ title, bodyHtml, mode }) {
+  const isCoverMode = mode === 'cover';
+
+  return `<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(title || 'Livre')}</title>
+    <style>
+      ${getPrintableBookStyles({ isCoverMode })}
+    </style>
+  </head>
+  <body class="${isCoverMode ? 'mode-cover' : 'mode-interior'}">
+    <div class="book-draft-preview">
+      ${bodyHtml}
+    </div>
+  </body>
+</html>`;
+}
+
+function getPrintableBookStyles({ isCoverMode }) {
+  const pageSizeRule = isCoverMode
+    ? 'size: A4 landscape;'
+    : 'size: 148mm 210mm;';
+
+  return `
+    @page {
+      ${pageSizeRule}
+      margin: 8mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: "Inter", "Segoe UI", Arial, sans-serif;
+      color: #1f2228;
+      background: #ffffff;
+    }
+
+    .book-draft-preview {
+      padding: 0;
+      background: #ffffff;
+    }
+
+    .draft-book {
+      color: #1f2228;
+    }
+
+    .draft-book-header {
+      padding-bottom: 10mm;
+      margin-bottom: 8mm;
+      border-bottom: 1px solid rgba(184, 146, 74, 0.2);
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .draft-book-eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8b6a2f;
+      margin-bottom: 4mm;
+    }
+
+    .draft-book-header h1 {
+      margin: 0 0 4mm;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    .draft-book-meta {
+      font-size: 11px;
+      color: #5f6770;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      line-height: 1.5;
+    }
+
+    .draft-book-section {
+      background: #ffffff;
+      border: 1px solid rgba(232, 232, 232, 0.9);
+      border-radius: 10px;
+      padding: 6mm;
+      margin-bottom: 6mm;
+      box-shadow: none;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .draft-book-section h2,
+    .draft-book-chapter h3 {
+      margin: 0 0 4mm;
+    }
+
+    .draft-book-chapter {
+      margin: 0;
+    }
+
+    .draft-book-chapter-shell {
+      display: block;
+    }
+
+    .draft-book-page {
+      background: #ffffff;
+      border: 1px solid rgba(223, 216, 201, 0.9);
+      border-radius: 10px;
+      padding: 6mm;
+      min-height: 188mm;
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .draft-book-page-opening {
+      border-color: rgba(184, 146, 74, 0.45);
+    }
+
+    .draft-book-page-gallery {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(249, 245, 236, 0.96) 100%);
+    }
+
+    .draft-book-page-label {
+      display: inline-flex;
+      align-self: flex-start;
+      margin-bottom: 4mm;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(184, 146, 74, 0.16);
+      color: #8b6a2f;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .draft-book-chapter-index {
+      font-size: 10px;
+      font-weight: 700;
+      color: #8b6a2f;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 3mm;
+    }
+
+    .draft-book-intro {
+      margin: 0 0 4mm;
+      font-style: italic;
+      color: #5f6770;
+      line-height: 1.7;
+    }
+
+    .draft-book-body {
+      flex: 1;
+    }
+
+    .draft-book-body p,
+    .draft-book-section p,
+    .draft-book-callout p,
+    .draft-book-contributor-item p {
+      margin: 0 0 3.5mm;
+      line-height: 1.72;
+      font-size: 12px;
+    }
+
+    .draft-book-body p:last-child,
+    .draft-book-section p:last-child,
+    .draft-book-callout p:last-child,
+    .draft-book-contributor-item p:last-child {
+      margin-bottom: 0;
+    }
+
+    .draft-book-closing {
+      margin: 4mm 0 0;
+      font-weight: 500;
+    }
+
+    .draft-book-source {
+      margin: 0 0 4mm;
+      padding-bottom: 3.5mm;
+      border-bottom: 1px solid rgba(232, 232, 232, 0.9);
+      font-size: 10px;
+      color: #5f6770;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .draft-book-mini-title {
+      margin-bottom: 3.5mm;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8b6a2f;
+    }
+
+    .draft-book-question-block {
+      margin-top: auto;
+      padding: 4mm;
+      border-radius: 8px;
+      background: rgba(245, 237, 220, 0.55);
+    }
+
+    .draft-book-question-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+    }
+
+    .draft-book-question-list li {
+      margin-bottom: 7px;
+      line-height: 1.55;
+    }
+
+    .draft-book-question-list li:last-child {
+      margin-bottom: 0;
+    }
+
+    .draft-book-callout,
+    .draft-book-contributor-list {
+      padding: 4mm;
+      border-radius: 8px;
+      background: rgba(247, 241, 231, 0.55);
+      border: 1px solid rgba(184, 146, 74, 0.12);
+    }
+
+    .draft-book-contributor-list {
+      margin-top: 4mm;
+    }
+
+    .draft-book-contributor-item + .draft-book-contributor-item {
+      margin-top: 4mm;
+      padding-top: 4mm;
+      border-top: 1px solid rgba(184, 146, 74, 0.12);
+    }
+
+    .draft-book-gallery-wrap {
+      margin-top: 5mm;
+    }
+
+    .draft-book-gallery {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 3.5mm;
+    }
+
+    .draft-book-photo {
+      margin: 0;
+      min-height: 42mm;
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(232, 232, 232, 0.45);
+    }
+
+    .draft-book-photo img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 42mm;
+      object-fit: cover;
+    }
+
+    .draft-book-gallery-note {
+      margin-top: 3mm;
+      font-size: 11px;
+      color: #5f6770;
+    }
+
+    .draft-book-empty {
+      color: #5f6770;
+      font-style: italic;
+    }
+
+    .cover-print-spread {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .cover-preview-card {
+      position: relative;
+      min-height: 175mm;
+      border-radius: 14px;
+      border: 1px solid rgba(200, 184, 148, 0.62);
+      background: var(--cover-bg, #f6f1e7);
+      color: var(--cover-text, #1f2228);
+      box-shadow: none;
+      overflow: hidden;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+    }
+
+    .cover-preview-card.is-active {
+      border-color: rgba(184, 146, 74, 0.62);
+    }
+
+    .cover-preview-safe-zone {
+      position: absolute;
+      inset: 16px;
+      border: 1px dashed rgba(31, 34, 40, 0.16);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .cover-preview-tag {
+      align-self: flex-start;
+      border: 1px solid rgba(184, 146, 74, 0.35);
+      background: rgba(255, 255, 255, 0.58);
+      color: var(--cover-accent, #b8924a);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .cover-preview-monogram {
+      margin-top: 16px;
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      border: 1px solid rgba(184, 146, 74, 0.35);
+      background: rgba(255, 255, 255, 0.45);
+      color: var(--cover-accent, #b8924a);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Baskerville", "Palatino Linotype", serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .cover-preview-front-copy {
+      margin-top: auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cover-preview-front-event {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: rgba(31, 34, 40, 0.62);
+      margin-bottom: 8px;
+    }
+
+    .cover-preview-front-copy h3 {
+      margin: 0 0 8px;
+      color: var(--cover-text, #1f2228);
+      font-family: "Baskerville", "Palatino Linotype", serif;
+      font-size: 30px;
+      line-height: 1.1;
+      letter-spacing: 0.01em;
+    }
+
+    .cover-preview-front-copy p {
+      margin: 0 0 12px;
+      color: rgba(31, 34, 40, 0.72);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .cover-preview-front-recipient {
+      font-family: "Baskerville", "Palatino Linotype", serif;
+      font-size: 15px;
+      color: var(--cover-accent, #b8924a);
+      letter-spacing: 0.04em;
+    }
+
+    .cover-preview-motif-line {
+      position: absolute;
+      top: 74px;
+      right: 24px;
+      width: 2px;
+      height: 124px;
+      background: linear-gradient(180deg, rgba(184, 146, 74, 0.12) 0%, rgba(184, 146, 74, 0.58) 50%, rgba(184, 146, 74, 0.12) 100%);
+    }
+
+    .cover-preview-motif-corner {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      width: 48px;
+      height: 48px;
+      border-top: 2px solid rgba(184, 146, 74, 0.62);
+      border-right: 2px solid rgba(184, 146, 74, 0.62);
+      border-radius: 0 10px 0 0;
+    }
+
+    .cover-preview-back-copy {
+      margin-top: 6px;
+      color: var(--cover-text, #1f2228);
+      font-size: 13px;
+      line-height: 1.68;
+      white-space: pre-wrap;
+    }
+
+    .cover-preview-back-quote {
+      margin: auto 0 0;
+      border-left: 2px solid rgba(184, 146, 74, 0.62);
+      padding-left: 12px;
+      color: rgba(31, 34, 40, 0.8);
+      font-family: "Baskerville", "Palatino Linotype", serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    .cover-preview-back-footer {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .cover-preview-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      border: 1px solid rgba(184, 146, 74, 0.35);
+      padding: 2px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--cover-accent, #b8924a);
+      background: rgba(255, 255, 255, 0.56);
+    }
+
+    .cover-preview-qr {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid rgba(31, 34, 40, 0.2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(31, 34, 40, 0.74);
+    }
+
+    .cover-preview-back-signature {
+      margin-top: auto;
+      color: var(--cover-accent, #b8924a);
+      font-family: "Baskerville", "Palatino Linotype", serif;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+    }
+
+    .cover-preview-card.cover-style-minimal_contemporary .cover-preview-front-copy h3 {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 24px;
+    }
+
+    .cover-preview-card.cover-style-minimal_contemporary .cover-preview-tag {
+      border-style: solid;
+      letter-spacing: 0.12em;
+    }
+
+    .cover-preview-card.cover-style-heritage_emotion .cover-preview-front-copy h3 {
+      font-style: italic;
+      line-height: 1.18;
+    }
+
+    .cover-preview-card.cover-style-heritage_emotion .cover-preview-back-quote {
+      font-size: 17px;
+    }
+
+    body.mode-cover .draft-book-header {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+  `;
+}
+
+async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts }) {
+  const pageWidth = mmToPt(148);
+  const pageHeight = mmToPt(210);
+  const margins = {
+    top: mmToPt(16),
+    right: mmToPt(14),
+    bottom: mmToPt(16),
+    left: mmToPt(14)
+  };
+
+  await writePdfFile({
+    filePath,
+    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Interieur`,
+    draw: (doc) => {
+      const addPage = () => {
+        doc.addPage({
+          size: [pageWidth, pageHeight],
+          margins
+        });
+      };
+
+      addPage();
+      doc.fillColor('#8b6a2f').font('Helvetica-Bold').fontSize(10).text('Version finale imprimeur');
+      doc.moveDown(0.6);
+      doc.fillColor('#1f2228').font('Helvetica-Bold').fontSize(22).text(
+        cleanText(book?.title, 180) || 'Livre souvenir',
+        { align: 'left' }
+      );
+      doc.moveDown(0.35);
+      doc.font('Helvetica').fontSize(11).fillColor('#4b5563').text(
+        [
+          cleanText(book?.event_type, 80),
+          cleanText(book?.recipient_name, 120),
+          cleanText(book?.style_narratif, 80)
+        ].filter(Boolean).join(' | ') || 'Edition personnalisee'
+      );
+      doc.moveDown(0.7);
+      doc.fontSize(10).fillColor('#6b7280').text(
+        `Genere le ${new Date().toLocaleString('fr-FR')} | Format de travail: 148 x 210 mm`,
+        { align: 'left' }
+      );
+
+      chaptersWithDrafts.forEach(({ chapter, draft }, chapterIndex) => {
+        addPage();
+        doc.fillColor('#8b6a2f').font('Helvetica-Bold').fontSize(10).text(`Chapitre ${chapterIndex + 1}`);
+        doc.moveDown(0.3);
+        doc.fillColor('#1f2228').font('Helvetica-Bold').fontSize(18).text(
+          cleanText(draft?.title, 180) || cleanText(chapter?.title, 180) || `Chapitre ${chapterIndex + 1}`
+        );
+        doc.moveDown(0.45);
+        doc.fillColor('#1f2228').font('Helvetica').fontSize(11);
+        doc.text(
+          buildInteriorChapterText({ chapter, draft }),
+          {
+            align: 'left',
+            lineGap: 3
+          }
+        );
+      });
+    }
+  });
+}
+
+async function generateCoverPdfFile({ filePath, book, chaptersWithDrafts }) {
+  const trimWidthMm = 148;
+  const trimHeightMm = 210;
+  const bleedMm = 3;
+  const estimatedPages = Math.max(
+    32,
+    Number(book?.pages || chaptersWithDrafts.length * 8 + 8) || 32
+  );
+  const spineMm = estimateSpineWidthMm(estimatedPages, cleanText(book?.papier, 80));
+  const spreadWidthMm = trimWidthMm * 2 + spineMm + bleedMm * 2;
+  const spreadHeightMm = trimHeightMm + bleedMm * 2;
+
+  const spreadWidthPt = mmToPt(spreadWidthMm);
+  const spreadHeightPt = mmToPt(spreadHeightMm);
+  const bleedPt = mmToPt(bleedMm);
+  const trimWidthPt = mmToPt(trimWidthMm);
+  const trimHeightPt = mmToPt(trimHeightMm);
+  const spinePt = mmToPt(spineMm);
+  const safeMarginPt = mmToPt(9);
+
+  const {
+    coverConfig,
+    backCoverConfig,
+    frontBg,
+    backBg,
+    textColor,
+    accentColor
+  } = resolveCoverPreviewConfig(book);
+
+  const frontTitle = cleanText(coverConfig?.title, 180) || cleanText(book?.title, 180) || 'Livre souvenir';
+  const frontSubtitle = cleanText(coverConfig?.subtitle, 220);
+  const frontRecipient = cleanText(coverConfig?.recipientLine, 180) || cleanText(book?.recipient_name, 180);
+  const frontEventLine = cleanText(coverConfig?.eventLine, 180)
+    || [cleanText(book?.event_type, 120), book?.recipient_age ? `${book.recipient_age} ans` : '']
+      .filter(Boolean)
+      .join(' | ');
+  const backBlurb = cleanText(backCoverConfig?.blurb, 1800) || 'Texte de quatrieme de couverture a finaliser.';
+  const backQuote = cleanText(backCoverConfig?.quote, 360);
+  const backSignature = cleanText(backCoverConfig?.signature, 180)
+    || (book?.recipient_name ? `Les proches de ${book.recipient_name}` : 'Les proches');
+
+  const resolvedFrontBg = normalizePdfColor(frontBg, '#f6f1e7');
+  const resolvedBackBg = normalizePdfColor(backBg, '#efe7da');
+  const resolvedTextColor = normalizePdfColor(textColor, '#1f2228');
+  const resolvedAccentColor = normalizePdfColor(accentColor, '#b8924a');
+  const backX = bleedPt;
+  const spineX = backX + trimWidthPt;
+  const frontX = spineX + spinePt;
+  const trimY = bleedPt;
+
+  await writePdfFile({
+    filePath,
+    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Couverture`,
+    draw: (doc) => {
+      doc.addPage({
+        size: [spreadWidthPt, spreadHeightPt],
+        margins: { top: 0, right: 0, bottom: 0, left: 0 }
+      });
+
+      doc.rect(0, 0, spreadWidthPt, spreadHeightPt).fill('#ffffff');
+      doc.rect(backX, trimY, trimWidthPt, trimHeightPt).fill(resolvedBackBg);
+      doc.rect(spineX, trimY, spinePt, trimHeightPt).fill('#f3ecdd');
+      doc.rect(frontX, trimY, trimWidthPt, trimHeightPt).fill(resolvedFrontBg);
+
+      doc.save();
+      doc.dash(3, { space: 3 });
+      doc.lineWidth(0.45).strokeColor('#adb5bd');
+      doc.rect(backX + safeMarginPt, trimY + safeMarginPt, trimWidthPt - safeMarginPt * 2, trimHeightPt - safeMarginPt * 2).stroke();
+      doc.rect(frontX + safeMarginPt, trimY + safeMarginPt, trimWidthPt - safeMarginPt * 2, trimHeightPt - safeMarginPt * 2).stroke();
+      doc.undash();
+      doc.restore();
+
+      doc.lineWidth(0.8).strokeColor('#9aa0a6');
+      doc.rect(backX, trimY, trimWidthPt, trimHeightPt).stroke();
+      doc.rect(spineX, trimY, spinePt, trimHeightPt).stroke();
+      doc.rect(frontX, trimY, trimWidthPt, trimHeightPt).stroke();
+
+      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(9).text(
+        'COUVERTURE',
+        frontX + safeMarginPt,
+        trimY + mmToPt(12),
+        { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+      );
+      if (frontEventLine) {
+        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(9).text(
+          frontEventLine,
+          frontX + safeMarginPt,
+          trimY + mmToPt(22),
+          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+        );
+      }
+      doc.fillColor(resolvedTextColor).font('Helvetica-Bold').fontSize(24).text(
+        frontTitle,
+        frontX + safeMarginPt,
+        trimY + mmToPt(56),
+        { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+      );
+      if (frontSubtitle) {
+        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(11).text(
+          frontSubtitle,
+          frontX + safeMarginPt,
+          trimY + mmToPt(95),
+          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+        );
+      }
+      if (frontRecipient) {
+        doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(12).text(
+          frontRecipient,
+          frontX + safeMarginPt,
+          trimY + trimHeightPt - mmToPt(22),
+          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+        );
+      }
+
+      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(9).text(
+        '4E DE COUVERTURE',
+        backX + safeMarginPt,
+        trimY + mmToPt(12),
+        { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+      );
+      doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(10).text(
+        backBlurb,
+        backX + safeMarginPt,
+        trimY + mmToPt(26),
+        { width: trimWidthPt - safeMarginPt * 2, align: 'left', lineGap: 2 }
+      );
+      if (backQuote) {
+        doc.fillColor(resolvedTextColor).font('Helvetica-Oblique').fontSize(10).text(
+          `"${backQuote}"`,
+          backX + safeMarginPt,
+          trimY + trimHeightPt - mmToPt(48),
+          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+        );
+      }
+      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(10).text(
+        backSignature,
+        backX + safeMarginPt,
+        trimY + trimHeightPt - mmToPt(18),
+        { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+      );
+
+      if (spinePt > mmToPt(4)) {
+        doc.save();
+        doc.fillColor(resolvedTextColor).font('Helvetica-Bold').fontSize(10);
+        doc.rotate(-90, {
+          origin: [spineX + spinePt / 2, trimY + trimHeightPt / 2]
+        });
+        doc.text(
+          frontTitle,
+          spineX + mmToPt(1),
+          trimY + trimHeightPt / 2 - mmToPt(45),
+          { width: trimHeightPt - mmToPt(2), align: 'center' }
+        );
+        doc.restore();
+      }
+
+      doc.fillColor('#6b7280').font('Helvetica').fontSize(8).text(
+        `Fond perdu: ${bleedMm} mm | Dos estime: ${spineMm.toFixed(1)} mm | Pages estimees: ${estimatedPages}`,
+        mmToPt(6),
+        spreadHeightPt - mmToPt(8),
+        { width: spreadWidthPt - mmToPt(12), align: 'left' }
+      );
+    }
+  });
+}
+
+async function writePdfFile({ filePath, title, draw }) {
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({
+      autoFirstPage: false,
+      info: {
+        Title: title || 'Livre PDF',
+        Producer: 'BookFete'
+      }
+    });
+    const output = fs.createWriteStream(filePath);
+    let settled = false;
+
+    const resolveOnce = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve();
+    };
+
+    const rejectOnce = (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(error);
+    };
+
+    output.on('finish', resolveOnce);
+    output.on('error', rejectOnce);
+    doc.on('error', rejectOnce);
+
+    doc.pipe(output);
+
+    try {
+      draw(doc);
+      doc.end();
+    } catch (error) {
+      rejectOnce(error);
+      try {
+        doc.end();
+      } catch (endError) {
+        // No-op
+      }
+    }
+  });
+}
+
+function buildInteriorChapterText({ chapter, draft }) {
+  const sections = [];
+  const summary = cleanText(draft?.summary, 1200);
+  const chapterText = htmlToPlainText(draft?.html || '', 42000);
+
+  if (summary) {
+    sections.push(`Resume du chapitre:\n${summary}`);
+  }
+
+  if (chapterText) {
+    sections.push(chapterText);
+  } else {
+    sections.push(
+      cleanText(chapter?.description, 1800) || 'Ce chapitre est valide mais ne contient pas de texte exploitable pour l impression.'
+    );
+  }
+
+  return sections.join('\n\n');
+}
+
+function htmlToPlainText(value, maxLength = 30000) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const withoutScripts = value
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ');
+  const withLineBreaks = withoutScripts
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|section|article|h1|h2|h3|h4|h5|h6)>/gi, '\n\n')
+    .replace(/<li[^>]*>/gi, '\n- ')
+    .replace(/<\/li>/gi, '\n');
+  const withoutTags = withLineBreaks.replace(/<[^>]+>/g, ' ');
+  const decoded = decodeHtmlEntities(withoutTags);
+  const normalized = decoded
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+
+  if (!normalized) {
+    return '';
+  }
+
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength).trim()}...`
+    : normalized;
+}
+
+function decodeHtmlEntities(value) {
+  if (!value) {
+    return '';
+  }
+
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, '\'')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+function estimateSpineWidthMm(totalPages, paperType) {
+  const pages = Math.max(32, Number(totalPages) || 32);
+  const normalizedPaper = cleanText(paperType, 80).toLowerCase();
+  let sheetCaliperMm = 0.1;
+
+  if (normalizedPaper.includes('premium') || normalizedPaper.includes('luxe')) {
+    sheetCaliperMm = 0.12;
+  } else if (normalizedPaper.includes('satine')) {
+    sheetCaliperMm = 0.11;
+  }
+
+  const sheetCount = Math.ceil(pages / 2);
+  const spineMm = Math.max(4, sheetCount * sheetCaliperMm);
+
+  return Number(spineMm.toFixed(2));
+}
+
+function mmToPt(valueMm) {
+  return Number(valueMm || 0) * MM_TO_PT;
+}
+
+function normalizePdfFileName(value, fallback = 'livre') {
+  const normalized = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || fallback;
+}
+
+function normalizePdfColor(value, fallback) {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const normalized = value.trim();
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalized)) {
+    return normalized;
+  }
+
+  return fallback;
 }
 
 function sanitizeCssValue(value, fallback) {

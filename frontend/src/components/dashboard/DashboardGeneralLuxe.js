@@ -11,6 +11,10 @@ import {
   IconContribution,
   IconPlus
 } from './DashboardIcons';
+import {
+  getBookLifecycleStatusFromBook,
+  isBookLifecycleAtLeast
+} from '../../utils/bookLifecycle';
 import '../../styles/luxe-theme.css';
 import './DashboardLuxe.css';
 
@@ -53,6 +57,10 @@ const DashboardGeneralLuxe = () => {
       (sum, chapter) => sum + (chapter.contributions?.[0]?.count || 0),
       0
     )
+  );
+
+  const isFinalizedBook = (book) => (
+    isBookLifecycleAtLeast(getBookLifecycleStatusFromBook(book), 'finalized')
   );
 
   const showNotice = (message, type = 'info') => {
@@ -117,8 +125,8 @@ const DashboardGeneralLuxe = () => {
       setBooks(activeBooks);
       setArchivedBooks(archivedBooksList);
 
-      const enCoursLivres = activeBooks.filter((book) => book.statut === 'en_cours');
-      const terminesLivres = activeBooks.filter((book) => book.statut === 'termine');
+      const enCoursLivres = activeBooks.filter((book) => !isFinalizedBook(book));
+      const terminesLivres = activeBooks.filter((book) => isFinalizedBook(book));
 
       const aggregate = (bookList) => {
         let chapitres = 0;
@@ -221,14 +229,14 @@ const DashboardGeneralLuxe = () => {
           archives: { ...prev.archives }
         };
 
-        if (archivedBook.statut === 'en_cours') {
-          newStats.enCours.count -= 1;
-          newStats.enCours.chapitres -= chaptersCount;
-          newStats.enCours.contributions -= contributionsCount;
-        } else if (archivedBook.statut === 'termine') {
+        if (isFinalizedBook(archivedBook)) {
           newStats.termines.count -= 1;
           newStats.termines.chapitres -= chaptersCount;
           newStats.termines.contributions -= contributionsCount;
+        } else {
+          newStats.enCours.count -= 1;
+          newStats.enCours.chapitres -= chaptersCount;
+          newStats.enCours.contributions -= contributionsCount;
         }
 
         newStats.archives.count += 1;
@@ -285,14 +293,14 @@ const DashboardGeneralLuxe = () => {
         newStats.archives.chapitres -= chaptersCount;
         newStats.archives.contributions -= contributionsCount;
 
-        if (restoredBook.statut === 'en_cours') {
-          newStats.enCours.count += 1;
-          newStats.enCours.chapitres += chaptersCount;
-          newStats.enCours.contributions += contributionsCount;
-        } else if (restoredBook.statut === 'termine') {
+        if (isFinalizedBook(restoredBook)) {
           newStats.termines.count += 1;
           newStats.termines.chapitres += chaptersCount;
           newStats.termines.contributions += contributionsCount;
+        } else {
+          newStats.enCours.count += 1;
+          newStats.enCours.chapitres += chaptersCount;
+          newStats.enCours.contributions += contributionsCount;
         }
 
         return newStats;
@@ -392,14 +400,14 @@ const DashboardGeneralLuxe = () => {
             archives: { ...prev.archives }
           };
 
-          if (deletedBook?.statut === 'en_cours') {
-            newStats.enCours.count -= 1;
-            newStats.enCours.chapitres -= chaptersCount;
-            newStats.enCours.contributions -= contributionsCount;
-          } else if (deletedBook?.statut === 'termine') {
+          if (isFinalizedBook(deletedBook)) {
             newStats.termines.count -= 1;
             newStats.termines.chapitres -= chaptersCount;
             newStats.termines.contributions -= contributionsCount;
+          } else {
+            newStats.enCours.count -= 1;
+            newStats.enCours.chapitres -= chaptersCount;
+            newStats.enCours.contributions -= contributionsCount;
           }
 
           return newStats;

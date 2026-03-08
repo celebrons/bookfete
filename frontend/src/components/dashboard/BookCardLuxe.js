@@ -9,13 +9,11 @@ import {
   IconContribution,
   IconBook
 } from './DashboardIcons';
+import {
+  getBookLifecycleConfig,
+  getBookLifecycleStatusFromBook
+} from '../../utils/bookLifecycle';
 import './DashboardLuxe.css';
-
-const getStatusConfig = (statut) => (
-  statut === 'termine'
-    ? { label: 'Termine', tone: 'is-complete' }
-    : { label: 'En cours', tone: 'is-active' }
-);
 
 const BookCardLuxe = ({
   book,
@@ -26,7 +24,8 @@ const BookCardLuxe = ({
   showRestore = false,
   autoDeleteDate
 }) => {
-  const status = getStatusConfig(book?.statut);
+  const lifecycleStatus = getBookLifecycleStatusFromBook(book);
+  const lifecycleConfig = getBookLifecycleConfig(lifecycleStatus);
   const contributionsCount = book.contributions?.reduce(
     (acc, chapter) => acc + (chapter.contributions?.[0]?.count || 0),
     0
@@ -41,7 +40,7 @@ const BookCardLuxe = ({
   return (
     <article className="card dashboard-book-card">
       <div className="dashboard-book-top">
-        <span className={`dashboard-book-status ${status.tone}`}>{status.label}</span>
+        <span className={`dashboard-book-status ${lifecycleConfig.tone}`}>{lifecycleConfig.label}</span>
 
         <div className="dashboard-book-tools">
           {autoDeleteDate && (

@@ -350,8 +350,9 @@
 .dashboard-book-status {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 24px;
-  padding: 0 10px;
+  padding: 0 10px 0 8px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
@@ -360,16 +361,61 @@
   border: 1px solid transparent;
 }
 
+.dashboard-book-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+}
+
 .dashboard-book-status.is-active {
-  color: #2f6e78;
-  background: rgba(47, 110, 120, 0.12);
-  border-color: rgba(47, 110, 120, 0.2);
+  color: #4f6478;
+  background: #edf2f7;
+  border-color: #c9d4df;
 }
 
 .dashboard-book-status.is-complete {
   color: #1f7a3d;
-  background: rgba(31, 122, 61, 0.12);
-  border-color: rgba(31, 122, 61, 0.22);
+  background: #ebf8ef;
+  border-color: #bfe3c9;
+}
+
+.dashboard-book-status.is-editing {
+  color: #4f6478;
+  background: #edf2f7;
+  border-color: #c9d4df;
+}
+
+.dashboard-book-status.is-preview {
+  color: #1f6f8b;
+  background: #e8f6fb;
+  border-color: #b9dbe8;
+}
+
+.dashboard-book-status.is-finalized {
+  color: #1f7a3d;
+  background: #ebf8ef;
+  border-color: #bfe3c9;
+}
+
+.dashboard-book-status.is-printer {
+  color: #9a6617;
+  background: #fff3df;
+  border-color: #f0d2a3;
+}
+
+.dashboard-book-status.is-printed {
+  color: #7a4a2e;
+  background: #f8ece3;
+  border-color: #e5c1aa;
+}
+
+.dashboard-book-status.is-shipped {
+  color: #6a3fa1;
+  background: #f2eaff;
+  border-color: #d5c0f3;
 }
 
 .dashboard-book-tools {
