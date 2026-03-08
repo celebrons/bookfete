@@ -17,6 +17,37 @@ const MAX_CHAPTER_AI_GENERATIONS = 3;
 const MM_TO_PT = 72 / 25.4;
 const PDF_EXPORT_JOB_TTL_MS = 6 * 60 * 60 * 1000;
 const PDF_EXPORT_DIR = path.join(__dirname, '..', 'tmp', 'pdf-exports');
+const ORDER_STATUSES_WITH_PDF_ACCESS = new Set([
+  'paid',
+  'pdf_generating',
+  'pdf_ready',
+  'print_queued',
+  'sent_to_printer',
+  'printed',
+  'shipped',
+  'delivered'
+]);
+const DEFAULT_PREVIEW_FORMAT = 'prestige';
+const PREVIEW_FORMATS = {
+  prestige: {
+    id: 'prestige',
+    label: 'Prestige',
+    trimWidthMm: 148,
+    trimHeightMm: 210
+  },
+  livret: {
+    id: 'livret',
+    label: 'Livret',
+    trimWidthMm: 130,
+    trimHeightMm: 190
+  },
+  carre: {
+    id: 'carre',
+    label: 'Carre',
+    trimWidthMm: 210,
+    trimHeightMm: 210
+  }
+};
 const pdfExportJobs = new Map();
 
 const pdfExportCleanupTimer = setInterval(() => {
@@ -307,6 +338,76 @@ router.post('/:id/chapters/:chapterId/finalize-draft', authenticate, async (req,
   }
 });
 
+function normalizeCoverField(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function getBookCoverValidationState(book) {
+  const coverConfig = book?.cover_config && typeof book.cover_config === 'object'
+    ? book.cover_config
+    : {};
+  const backCoverConfig = book?.back_cover_config && typeof book.back_cover_config === 'object'
+    ? book.back_cover_config
+    : {};
+  const isFrontCoverValidated = Boolean(
+    normalizeCoverField(coverConfig.title || book?.title)
+    && normalizeCoverField(coverConfig.recipientLine)
+    && normalizeCoverField(coverConfig.eventLine)
+  );
+  const isBackCoverValidated = Boolean(
+    normalizeCoverField(backCoverConfig.blurb)
+    && normalizeCoverField(backCoverConfig.signature)
+  );
+
+  return {
+    isFrontCoverValidated,
+    isBackCoverValidated,
+    isBookCoverValidated: isFrontCoverValidated && isBackCoverValidated
+  };
+}
+
+function normalizePreviewFormat(value) {
+  const normalized = cleanText(value, 40).toLowerCase();
+  return PREVIEW_FORMATS[normalized] ? normalized : '';
+}
+
+function resolveBookPreviewFormat(book, requestedFormat = '') {
+  const requested = normalizePreviewFormat(requestedFormat);
+  if (requested) {
+    return requested;
+  }
+
+  const configured = normalizePreviewFormat(book?.cover_config?.previewFormat);
+  if (configured) {
+    return configured;
+  }
+
+  return DEFAULT_PREVIEW_FORMAT;
+}
+
+function getPreviewFormatSpec(previewFormat = '') {
+  const formatId = resolveBookPreviewFormat(null, previewFormat);
+  return PREVIEW_FORMATS[formatId] || PREVIEW_FORMATS[DEFAULT_PREVIEW_FORMAT];
+}
+
+async function hasPaidPdfAccessForBook({ ownerId, bookId }) {
+  const allowedStatuses = Array.from(ORDER_STATUSES_WITH_PDF_ACCESS);
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, status')
+    .eq('owner_id', ownerId)
+    .eq('book_id', bookId)
+    .in('status', allowedStatuses)
+    .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  return Array.isArray(data) && data.length > 0;
+}
+
 router.post('/:id/generate-draft', authenticate, async (req, res) => {
   try {
     const bookId = req.params.id;
@@ -314,6 +415,7 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
       bookId,
       ownerId: req.user.id
     });
+    const previewFormat = resolveBookPreviewFormat(book, req.body?.previewFormat);
     const chaptersWithDrafts = (chapters || []).map((chapter) => ({
       chapter,
       draft: extractChapterDraftState(chapter)
@@ -328,14 +430,23 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
       });
     }
 
+    const coverValidation = getBookCoverValidationState(book);
+    if (!coverValidation.isBookCoverValidated) {
+      return res.status(400).json({
+        error: 'La couverture et la 4e de couverture doivent etre validees avant l apercu global.'
+      });
+    }
+
     const html = renderValidatedBookPreviewHtml({
       book,
-      chaptersWithDrafts
+      chaptersWithDrafts,
+      previewFormat
     });
 
     res.json({
       generatedAt: new Date().toISOString(),
-      html
+      html,
+      previewFormat
     });
   } catch (error) {
     console.error('Erreur apercu livre:', error);
@@ -350,6 +461,7 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       bookId,
       ownerId: req.user.id
     });
+    const previewFormat = resolveBookPreviewFormat(book, req.body?.previewFormat);
 
     const chaptersWithDrafts = (chapters || []).map((chapter) => ({
       chapter,
@@ -371,6 +483,24 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       });
     }
 
+    const coverValidation = getBookCoverValidationState(book);
+    if (!coverValidation.isBookCoverValidated) {
+      return res.status(400).json({
+        error: 'La couverture et la 4e de couverture doivent etre validees avant l export PDF final.'
+      });
+    }
+
+    const hasPaidAccess = await hasPaidPdfAccessForBook({
+      ownerId: req.user.id,
+      bookId
+    });
+
+    if (!hasPaidAccess) {
+      return res.status(403).json({
+        error: 'Le PDF final est disponible uniquement apres paiement.'
+      });
+    }
+
     const jobId = createPdfExportJobId();
     const createdAt = new Date().toISOString();
 
@@ -383,13 +513,15 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       startedAt: null,
       completedAt: null,
       error: null,
-      files: null
+      files: null,
+      previewFormat
     });
 
     processPdfExportJob({
       jobId,
       book,
-      chaptersWithDrafts
+      chaptersWithDrafts,
+      previewFormat
     }).catch((error) => {
       console.error('Erreur pipeline export PDF:', error);
     });
@@ -397,7 +529,8 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
     return res.status(202).json({
       jobId,
       status: 'queued',
-      createdAt
+      createdAt,
+      previewFormat
     });
   } catch (error) {
     console.error('Erreur lancement export PDF:', error);
@@ -411,6 +544,17 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
   try {
     const bookId = req.params.id;
     const jobId = req.params.jobId;
+    const hasPaidAccess = await hasPaidPdfAccessForBook({
+      ownerId: req.user.id,
+      bookId
+    });
+
+    if (!hasPaidAccess) {
+      return res.status(403).json({
+        error: 'Le PDF final est disponible uniquement apres paiement.'
+      });
+    }
+
     const job = getOwnedPdfExportJob({
       jobId,
       bookId,
@@ -429,6 +573,7 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
       completedAt: job.completedAt,
       error: job.error,
       renderer: job.files?.renderer || null,
+      previewFormat: job.previewFormat || DEFAULT_PREVIEW_FORMAT,
       files: job.status === 'ready'
         ? {
             interior: {
@@ -455,6 +600,17 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
     const bookId = req.params.id;
     const jobId = req.params.jobId;
     const kind = req.params.kind;
+    const hasPaidAccess = await hasPaidPdfAccessForBook({
+      ownerId: req.user.id,
+      bookId
+    });
+
+    if (!hasPaidAccess) {
+      return res.status(403).json({
+        error: 'Le telechargement PDF est disponible uniquement apres paiement.'
+      });
+    }
+
     const job = getOwnedPdfExportJob({
       jobId,
       bookId,
@@ -950,7 +1106,9 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
   `;
 }
 
-function renderValidatedBookPreviewHtml({ book, chaptersWithDrafts }) {
+function renderValidatedBookPreviewHtml({ book, chaptersWithDrafts, previewFormat }) {
+  const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
+  const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
   const chapterBlocks = chaptersWithDrafts
     .map(({ draft }) => draft?.html || '')
     .filter(Boolean)
@@ -961,7 +1119,7 @@ function renderValidatedBookPreviewHtml({ book, chaptersWithDrafts }) {
     || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
 
   return `
-    <article class="draft-book">
+    <article class="draft-book ${previewFormatClass}" data-preview-format="${resolvedPreviewFormat}">
       <header class="draft-book-header">
         <div class="draft-book-eyebrow">Apercu assemble</div>
         <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
@@ -1064,7 +1222,9 @@ function renderAssembledBackCover(book) {
           style="--cover-bg:${escapeHtml(backBg)};--cover-text:${escapeHtml(textColor)};--cover-accent:${escapeHtml(accentColor)};--cover-title-font:${escapeHtml(titleFont)};--cover-body-font:${escapeHtml(bodyFont)};"
         >
           <div class="cover-preview-safe-zone"></div>
-          <div class="cover-preview-back-copy">${escapeHtml(blurb || 'Texte de quatrieme de couverture a definir.')}</div>
+          <div class="cover-preview-back-copy">
+            ${formatParagraphs(blurb || 'Texte de quatrieme de couverture a definir.')}
+          </div>
           ${quote ? `<blockquote class="cover-preview-back-quote">"${escapeHtml(quote)}"</blockquote>` : ''}
           <div class="cover-preview-back-footer">
             ${chips.length > 0 ? `<div class="cover-preview-chip">${escapeHtml(chips.join(' | '))}</div>` : '<span></span>'}
@@ -1185,7 +1345,7 @@ function getOwnedPdfExportJob({ jobId, bookId, ownerId }) {
   return job;
 }
 
-async function processPdfExportJob({ jobId, book, chaptersWithDrafts }) {
+async function processPdfExportJob({ jobId, book, chaptersWithDrafts, previewFormat }) {
   const queuedJob = pdfExportJobs.get(jobId);
   if (!queuedJob) {
     return;
@@ -1200,7 +1360,8 @@ async function processPdfExportJob({ jobId, book, chaptersWithDrafts }) {
     const files = await generateFinalBookPdfFiles({
       book,
       chaptersWithDrafts,
-      jobId
+      jobId,
+      previewFormat
     });
     const readyJob = pdfExportJobs.get(jobId);
     if (!readyJob) {
@@ -1258,11 +1419,12 @@ function deletePdfExportFiles(job) {
   });
 }
 
-async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId }) {
+async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId, previewFormat }) {
   await fsp.mkdir(PDF_EXPORT_DIR, { recursive: true });
   const safeBookName = normalizePdfFileName(cleanText(book?.title, 120), 'livre');
   const interiorPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-interieur.pdf`);
   const coverPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-couverture.pdf`);
+  const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
   const rendererMode = String(process.env.PDF_RENDERER_MODE || 'browser').toLowerCase();
   const shouldUseBrowserRenderer = rendererMode !== 'legacy' && rendererMode !== 'pdfkit';
   let rendererUsed = shouldUseBrowserRenderer ? 'browser' : 'legacy';
@@ -1274,7 +1436,8 @@ async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId }) {
         coverPath,
         book,
         chaptersWithDrafts,
-        jobId
+        jobId,
+        previewFormat: resolvedPreviewFormat
       });
     } catch (browserError) {
       const strictBrowserMode = rendererMode === 'browser-strict';
@@ -1287,26 +1450,30 @@ async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId }) {
       await generateInteriorPdfFile({
         filePath: interiorPath,
         book,
-        chaptersWithDrafts
+        chaptersWithDrafts,
+        previewFormat: resolvedPreviewFormat
       });
 
       await generateCoverPdfFile({
         filePath: coverPath,
         book,
-        chaptersWithDrafts
+        chaptersWithDrafts,
+        previewFormat: resolvedPreviewFormat
       });
     }
   } else {
     await generateInteriorPdfFile({
       filePath: interiorPath,
       book,
-      chaptersWithDrafts
+      chaptersWithDrafts,
+      previewFormat: resolvedPreviewFormat
     });
 
     await generateCoverPdfFile({
       filePath: coverPath,
       book,
-      chaptersWithDrafts
+      chaptersWithDrafts,
+      previewFormat: resolvedPreviewFormat
     });
     rendererUsed = 'legacy';
   }
@@ -1329,7 +1496,8 @@ async function generateBookPdfFilesFromHtml({
   coverPath,
   book,
   chaptersWithDrafts,
-  jobId
+  jobId,
+  previewFormat
 }) {
   const browserPath = resolvePdfBrowserPath();
   if (!browserPath) {
@@ -1340,21 +1508,25 @@ async function generateBookPdfFilesFromHtml({
 
   const interiorHtml = renderValidatedBookInteriorHtml({
     book,
-    chaptersWithDrafts
+    chaptersWithDrafts,
+    previewFormat
   });
   const coverHtml = renderValidatedBookCoverHtml({
-    book
+    book,
+    previewFormat
   });
 
   const interiorDocument = buildPrintableBookHtmlDocument({
     title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Interieur`,
     bodyHtml: interiorHtml,
-    mode: 'interior'
+    mode: 'interior',
+    previewFormat
   });
   const coverDocument = buildPrintableBookHtmlDocument({
     title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Couverture`,
     bodyHtml: coverHtml,
-    mode: 'cover'
+    mode: 'cover',
+    previewFormat
   });
 
   await renderPdfFromHtmlWithBrowser({
@@ -1460,7 +1632,9 @@ function execFilePromise(command, args, options = {}) {
   });
 }
 
-function renderValidatedBookInteriorHtml({ book, chaptersWithDrafts }) {
+function renderValidatedBookInteriorHtml({ book, chaptersWithDrafts, previewFormat }) {
+  const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
+  const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
   const chapterBlocks = chaptersWithDrafts
     .map(({ draft }) => draft?.html || '')
     .filter(Boolean)
@@ -1469,7 +1643,7 @@ function renderValidatedBookInteriorHtml({ book, chaptersWithDrafts }) {
     || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
 
   return `
-    <article class="draft-book">
+    <article class="draft-book ${previewFormatClass}" data-preview-format="${resolvedPreviewFormat}">
       <header class="draft-book-header">
         <div class="draft-book-eyebrow">Version finale</div>
         <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
@@ -1486,12 +1660,14 @@ function renderValidatedBookInteriorHtml({ book, chaptersWithDrafts }) {
   `;
 }
 
-function renderValidatedBookCoverHtml({ book }) {
+function renderValidatedBookCoverHtml({ book, previewFormat }) {
+  const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
+  const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
   const frontCard = extractCoverCardMarkup(renderAssembledFrontCover(book));
   const backCard = extractCoverCardMarkup(renderAssembledBackCover(book));
 
   return `
-    <article class="draft-book draft-book-cover-print">
+    <article class="draft-book draft-book-cover-print ${previewFormatClass}" data-preview-format="${resolvedPreviewFormat}">
       <header class="draft-book-header">
         <div class="draft-book-eyebrow">Couverture finale</div>
         <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
@@ -1510,7 +1686,7 @@ function extractCoverCardMarkup(sectionHtml) {
   return match ? match[0] : '';
 }
 
-function buildPrintableBookHtmlDocument({ title, bodyHtml, mode }) {
+function buildPrintableBookHtmlDocument({ title, bodyHtml, mode, previewFormat }) {
   const isCoverMode = mode === 'cover';
 
   return `<!doctype html>
@@ -1520,10 +1696,10 @@ function buildPrintableBookHtmlDocument({ title, bodyHtml, mode }) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title || 'Livre')}</title>
     <style>
-      ${getPrintableBookStyles({ isCoverMode })}
+      ${getPrintableBookStyles({ isCoverMode, previewFormat })}
     </style>
   </head>
-  <body class="${isCoverMode ? 'mode-cover' : 'mode-interior'}">
+  <body class="${isCoverMode ? 'mode-cover' : 'mode-interior'} format-${resolveBookPreviewFormat(null, previewFormat)}">
     <div class="book-draft-preview">
       ${bodyHtml}
     </div>
@@ -1531,15 +1707,25 @@ function buildPrintableBookHtmlDocument({ title, bodyHtml, mode }) {
 </html>`;
 }
 
-function getPrintableBookStyles({ isCoverMode }) {
+function getPrintableBookStyles({ isCoverMode, previewFormat }) {
+  const formatSpec = getPreviewFormatSpec(previewFormat);
+  const trimWidthMm = formatSpec.trimWidthMm;
+  const trimHeightMm = formatSpec.trimHeightMm;
+  const interiorPageMarginMm = 8;
+  const coverPageMarginMm = 6;
+  const coverWidthMm = trimWidthMm * 2 + 18;
+  const coverHeightMm = trimHeightMm + 12;
   const pageSizeRule = isCoverMode
-    ? 'size: A4 landscape;'
-    : 'size: 148mm 210mm;';
+    ? `size: ${coverWidthMm}mm ${coverHeightMm}mm;`
+    : `size: ${trimWidthMm}mm ${trimHeightMm}mm;`;
+  const pageMarginMm = isCoverMode ? coverPageMarginMm : interiorPageMarginMm;
+  const interiorPageMinHeightMm = Math.max(110, trimHeightMm - pageMarginMm * 2 - 6);
+  const coverCardMinHeightMm = Math.max(120, trimHeightMm - pageMarginMm * 2 - 2);
 
   return `
     @page {
       ${pageSizeRule}
-      margin: 8mm;
+      margin: ${pageMarginMm}mm;
     }
 
     * {
@@ -1625,7 +1811,7 @@ function getPrintableBookStyles({ isCoverMode }) {
       border: 1px solid rgba(223, 216, 201, 0.9);
       border-radius: 10px;
       padding: 6mm;
-      min-height: 188mm;
+      min-height: ${interiorPageMinHeightMm}mm;
       box-shadow: none;
       display: flex;
       flex-direction: column;
@@ -1682,6 +1868,10 @@ function getPrintableBookStyles({ isCoverMode }) {
       margin: 0 0 3.5mm;
       line-height: 1.72;
       font-size: 12px;
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+      orphans: 3;
+      widows: 3;
     }
 
     .draft-book-body p:last-child,
@@ -1743,6 +1933,8 @@ function getPrintableBookStyles({ isCoverMode }) {
       border-radius: 8px;
       background: rgba(247, 241, 231, 0.55);
       border: 1px solid rgba(184, 146, 74, 0.12);
+      page-break-inside: avoid;
+      break-inside: avoid-page;
     }
 
     .draft-book-contributor-list {
@@ -1781,6 +1973,15 @@ function getPrintableBookStyles({ isCoverMode }) {
       object-fit: cover;
     }
 
+    .draft-book-question-block,
+    .draft-book-gallery-wrap,
+    .draft-book-contributor-item,
+    .cover-preview-card,
+    .cover-preview-back-copy p {
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+    }
+
     .draft-book-gallery-note {
       margin-top: 3mm;
       font-size: 11px;
@@ -1802,7 +2003,7 @@ function getPrintableBookStyles({ isCoverMode }) {
 
     .cover-preview-card {
       position: relative;
-      min-height: 175mm;
+      min-height: ${coverCardMinHeightMm}mm;
       border-radius: 14px;
       border: 1px solid rgba(200, 184, 148, 0.62);
       background: var(--cover-bg, #f6f1e7);
@@ -1922,6 +2123,14 @@ function getPrintableBookStyles({ isCoverMode }) {
       white-space: pre-wrap;
     }
 
+    .cover-preview-back-copy p {
+      margin: 0 0 2.6mm;
+    }
+
+    .cover-preview-back-copy p:last-child {
+      margin-bottom: 0;
+    }
+
     .cover-preview-back-quote {
       margin: auto 0 0;
       border-left: 2px solid rgba(184, 146, 74, 0.62);
@@ -2004,9 +2213,10 @@ function getPrintableBookStyles({ isCoverMode }) {
   `;
 }
 
-async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts }) {
-  const pageWidth = mmToPt(148);
-  const pageHeight = mmToPt(210);
+async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts, previewFormat }) {
+  const formatSpec = getPreviewFormatSpec(resolveBookPreviewFormat(book, previewFormat));
+  const pageWidth = mmToPt(formatSpec.trimWidthMm);
+  const pageHeight = mmToPt(formatSpec.trimHeightMm);
   const margins = {
     top: mmToPt(16),
     right: mmToPt(14),
@@ -2042,7 +2252,7 @@ async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts }) {
       );
       doc.moveDown(0.7);
       doc.fontSize(10).fillColor('#6b7280').text(
-        `Genere le ${new Date().toLocaleString('fr-FR')} | Format de travail: 148 x 210 mm`,
+        `Genere le ${new Date().toLocaleString('fr-FR')} | Format ${formatSpec.label}: ${formatSpec.trimWidthMm} x ${formatSpec.trimHeightMm} mm`,
         { align: 'left' }
       );
 
@@ -2067,9 +2277,10 @@ async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts }) {
   });
 }
 
-async function generateCoverPdfFile({ filePath, book, chaptersWithDrafts }) {
-  const trimWidthMm = 148;
-  const trimHeightMm = 210;
+async function generateCoverPdfFile({ filePath, book, chaptersWithDrafts, previewFormat }) {
+  const formatSpec = getPreviewFormatSpec(resolveBookPreviewFormat(book, previewFormat));
+  const trimWidthMm = formatSpec.trimWidthMm;
+  const trimHeightMm = formatSpec.trimHeightMm;
   const bleedMm = 3;
   const estimatedPages = Math.max(
     32,
@@ -2924,7 +3135,64 @@ function splitTextToParagraphs(value, maxLength = 6000) {
   return trimmed
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.replace(/[ \t]+/g, ' ').replace(/\n/g, ' ').trim())
+    .flatMap((paragraph) => splitLongParagraphIntoChunks(paragraph, 420))
     .filter(Boolean);
+}
+
+function splitLongParagraphIntoChunks(paragraph, chunkSize = 420) {
+  if (!paragraph) {
+    return [];
+  }
+
+  if (paragraph.length <= chunkSize) {
+    return [paragraph];
+  }
+
+  const sentenceParts = paragraph
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (sentenceParts.length <= 1) {
+    const wordParts = paragraph.split(/\s+/).filter(Boolean);
+    const chunks = [];
+    let current = '';
+
+    wordParts.forEach((word) => {
+      const next = current ? `${current} ${word}` : word;
+      if (next.length > chunkSize && current) {
+        chunks.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    });
+
+    if (current) {
+      chunks.push(current);
+    }
+
+    return chunks;
+  }
+
+  const chunks = [];
+  let current = '';
+
+  sentenceParts.forEach((sentence) => {
+    const next = current ? `${current} ${sentence}` : sentence;
+    if (next.length > chunkSize && current) {
+      chunks.push(current);
+      current = sentence;
+    } else {
+      current = next;
+    }
+  });
+
+  if (current) {
+    chunks.push(current);
+  }
+
+  return chunks;
 }
 
 function formatParagraphs(text) {

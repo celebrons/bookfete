@@ -1,11 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
-import {
-  getBookLifecycleConfig,
-  getBookLifecycleStatusFromBook,
-  isBookLifecycleAtLeast
-} from '../../utils/bookLifecycle';
+import { listOrders } from '../../services/ordersApi';
+import { getOrderStatusConfig } from '../../utils/orderWorkflow';
 import '../../styles/luxe-theme.css';
 import './AccountSpaceLuxe.css';
 
@@ -24,6 +21,7 @@ const AccountSpaceLuxe = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [books, setBooks] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [addressForm, setAddressForm] = useState(DEFAULT_ADDRESS);
   const [passwordForm, setPasswordForm] = useState({
     newPassword: '',
@@ -59,6 +57,9 @@ const AccountSpaceLuxe = () => {
 
         if (booksError) throw booksError;
         setBooks(Array.isArray(booksData) ? booksData : []);
+
+        const loadedOrders = await listOrders();
+        setOrders(Array.isArray(loadedOrders) ? loadedOrders : []);
       } catch (error) {
         setNotice({
           type: 'error',
@@ -72,14 +73,8 @@ const AccountSpaceLuxe = () => {
     loadAccountData();
   }, [navigate]);
 
-  const orders = useMemo(
-    () => books.filter((book) => (
-      isBookLifecycleAtLeast(getBookLifecycleStatusFromBook(book), 'finalized')
-    )),
-    [books]
-  );
-
   const projectCount = books.length;
+  const recentOrders = useMemo(() => orders.slice(0, 5), [orders]);
 
   const setAddressField = (event) => {
     const { name, value } = event.target;
@@ -199,25 +194,31 @@ const AccountSpaceLuxe = () => {
             </div>
 
             {orders.length === 0 ? (
-              <p className="account-muted">Aucune commande finalisee pour le moment.</p>
+              <p className="account-muted">Aucune commande pour le moment.</p>
             ) : (
               <ul className="account-list">
-                {orders.map((book) => {
-                  const lifecycle = getBookLifecycleConfig(getBookLifecycleStatusFromBook(book));
+                {recentOrders.map((order) => {
+                  const statusConfig = getOrderStatusConfig(order.status);
                   return (
-                    <li key={book.id} className="account-list-item">
+                    <li key={order.id} className="account-list-item">
                       <div>
-                        <strong>{book.title || 'Livre sans titre'}</strong>
-                        <span>{lifecycle.label}</span>
+                        <strong>{order.book_title || 'Livre sans titre'}</strong>
+                        <span>{statusConfig.label}</span>
                       </div>
-                      <Link to={`/book/${book.id}`} className="account-link">
-                        Ouvrir
+                      <Link to="/orders" className="account-link">
+                        Voir
                       </Link>
                     </li>
                   );
                 })}
               </ul>
             )}
+
+            <div className="account-actions">
+              <Link to="/orders" className="btn btn-outline">
+                Gerer mes commandes
+              </Link>
+            </div>
           </article>
 
           <article className="account-panel">

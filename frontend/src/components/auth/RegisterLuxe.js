@@ -1,9 +1,13 @@
-// C:\Users\USER\bookfete\frontend\src\components\auth\RegisterLuxe.js
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../../services/supabaseClient';
 import '../../styles/luxe-theme.css';
 import './AuthLuxe.css';
+
+const buildApiBaseUrl = () => {
+  const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  const trimmed = configured.replace(/\/$/, '');
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
 
 const RegisterLuxe = () => {
   const [email, setEmail] = useState('');
@@ -13,52 +17,53 @@ const RegisterLuxe = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  
-  // États pour afficher/masquer les mots de passe
+  const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   const navigate = useNavigate();
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
+  const handleRegister = async (event) => {
+    event.preventDefault();
     setLoading(true);
     setError(null);
 
     if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
+      setError('Les mots de passe ne correspondent pas.');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Le mot de passe doit contenir au moins 8 caracteres.');
       setLoading(false);
       return;
     }
 
     try {
-      console.log('📝 Tentative d\'inscription pour:', email);
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName
-          }
-        }
+      const response = await fetch(`${buildApiBaseUrl()}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          full_name: fullName
+        })
       });
 
-      if (error) throw error;
-      
-      console.log('✅ Inscription réussie:', data);
-
-      if (data.user) {
-        setTimeout(() => {
-          setSuccess(true);
-        }, 1000);
-      } else {
-        setSuccess(true);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur lors de la creation du compte.');
       }
 
-    } catch (error) {
-      console.error('❌ Erreur inscription:', error);
-      setError(error.message);
+      if (payload?.requiresEmailConfirmation) {
+        setSuccessMessage('Compte cree. La confirmation email est activee sur Supabase.');
+      } else {
+        setSuccessMessage('Votre compte est actif. Vous pouvez vous connecter immediatement.');
+      }
+      setSuccess(true);
+    } catch (registerError) {
+      setError(registerError.message);
     } finally {
       setLoading(false);
     }
@@ -68,30 +73,35 @@ const RegisterLuxe = () => {
     return (
       <div className="auth-container">
         <div className="auth-card" style={{ textAlign: 'center' }}>
-          <div style={{
-            fontSize: '64px',
-            marginBottom: 'var(--space-lg)',
-            animation: 'fadeIn 0.6s ease'
-          }}>
-            ✨
+          <div
+            style={{
+              fontSize: '64px',
+              marginBottom: 'var(--space-lg)',
+              animation: 'fadeIn 0.6s ease'
+            }}
+          >
+            OK
           </div>
-          <span className="label-gold">FÉLICITATIONS</span>
-          <h2 style={{ marginBottom: 'var(--space-md)' }}>Inscription réussie !</h2>
+          <span className="label-gold">COMPTE CREE</span>
+          <h2 style={{ marginBottom: 'var(--space-md)' }}>Inscription reussie</h2>
           <p className="body-text" style={{ color: 'var(--text-light)' }}>
-            Votre compte a été créé avec succès.
+            {successMessage || 'Compte cree avec succes.'}
           </p>
-          <p className="body-text" style={{ 
-            color: 'var(--text-light)',
-            marginBottom: 'var(--space-xl)' 
-          }}>
-            Vous pouvez maintenant vous connecter.
+          <p
+            className="body-text"
+            style={{
+              color: 'var(--text-light)',
+              marginBottom: 'var(--space-xl)'
+            }}
+          >
+            Vous pouvez vous connecter immediatement.
           </p>
-          <button 
+          <button
             onClick={() => navigate('/login')}
             className="btn btn-primary"
             style={{ padding: '14px 40px' }}
           >
-            Aller à la connexion
+            Aller a la connexion
           </button>
         </div>
       </div>
@@ -104,14 +114,10 @@ const RegisterLuxe = () => {
         <div className="auth-header">
           <span className="label-gold">BIENVENUE</span>
           <h2>Inscription</h2>
-          <p>Créez votre compte gratuitement</p>
+          <p>Creez votre compte utilisateur</p>
         </div>
 
-        {error && (
-          <div className="auth-error">
-            {error}
-          </div>
-        )}
+        {error && <div className="auth-error">{error}</div>}
 
         <form onSubmit={handleRegister} className="auth-form">
           <div className="auth-field">
@@ -120,7 +126,7 @@ const RegisterLuxe = () => {
               id="fullName"
               type="text"
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              onChange={(event) => setFullName(event.target.value)}
               placeholder="Jean Dupont"
               required
               disabled={loading}
@@ -134,7 +140,7 @@ const RegisterLuxe = () => {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="vous@exemple.com"
               required
               disabled={loading}
@@ -147,19 +153,19 @@ const RegisterLuxe = () => {
             <div style={{ position: 'relative' }}>
               <input
                 id="password"
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="********"
                 required
-                minLength="6"
+                minLength="8"
                 disabled={loading}
                 style={{ paddingRight: '45px' }}
                 autoComplete="new-password"
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPassword((value) => !value)}
                 style={{
                   position: 'absolute',
                   right: '12px',
@@ -174,16 +180,18 @@ const RegisterLuxe = () => {
                 }}
                 tabIndex="-1"
               >
-                {showPassword ? "👁️" : "👁️‍🗨️"}
+                {showPassword ? 'O' : 'o'}
               </button>
             </div>
-            <small style={{
-              fontSize: '11px',
-              color: 'var(--text-light)',
-              marginTop: '4px',
-              display: 'block'
-            }}>
-              Minimum 6 caractères
+            <small
+              style={{
+                fontSize: '11px',
+                color: 'var(--text-light)',
+                marginTop: '4px',
+                display: 'block'
+              }}
+            >
+              Minimum 8 caracteres
             </small>
           </div>
 
@@ -192,10 +200,10 @@ const RegisterLuxe = () => {
             <div style={{ position: 'relative' }}>
               <input
                 id="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
+                type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="********"
                 required
                 disabled={loading}
                 style={{ paddingRight: '45px' }}
@@ -203,7 +211,7 @@ const RegisterLuxe = () => {
               />
               <button
                 type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                onClick={() => setShowConfirmPassword((value) => !value)}
                 style={{
                   position: 'absolute',
                   right: '12px',
@@ -218,7 +226,7 @@ const RegisterLuxe = () => {
                 }}
                 tabIndex="-1"
               >
-                {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+                {showConfirmPassword ? 'O' : 'o'}
               </button>
             </div>
           </div>
@@ -237,7 +245,7 @@ const RegisterLuxe = () => {
         </div>
 
         <div className="auth-footer">
-          Déjà un compte ?
+          Deja un compte ?
           <Link to="/login">
             Se connecter
           </Link>

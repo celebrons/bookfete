@@ -9,23 +9,23 @@ const BOOK_LIFECYCLE_ORDER = [
 
 const BOOK_LIFECYCLE_CONFIG = {
   editing: {
-    label: 'En cours d edition',
+    label: 'Edition en cours',
     shortLabel: 'Edition',
     tone: 'is-editing'
   },
   preview_available: {
-    label: 'Apercu disponible',
+    label: 'Apercu genere',
     shortLabel: 'Apercu',
     tone: 'is-preview'
   },
   finalized: {
-    label: 'Finalise',
-    shortLabel: 'Finalise',
+    label: 'Valide definitivement',
+    shortLabel: 'Valide',
     tone: 'is-finalized'
   },
   sent_to_printer: {
-    label: 'Envoye a l imprimeur',
-    shortLabel: 'Imprimeur',
+    label: 'Commande en production',
+    shortLabel: 'Commande',
     tone: 'is-printer'
   },
   printed: {
@@ -34,7 +34,7 @@ const BOOK_LIFECYCLE_CONFIG = {
     tone: 'is-printed'
   },
   shipped: {
-    label: 'Envoye',
+    label: 'Expedie',
     shortLabel: 'Envoye',
     tone: 'is-shipped'
   }

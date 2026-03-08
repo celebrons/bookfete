@@ -22,6 +22,7 @@ const bookRoutes = require('./routes/books'); // À créer si nécessaire
 const chapterRoutes = require('./routes/chapters');
 const inviteRoutes = require('./routes/invites');
 const aiRoutes = require('./routes/ai');
+const orderRoutes = require('./routes/orders');
 
 // ============================================
 // ANCIENNES ROUTES À SUPPRIMER (commentées)
@@ -37,6 +38,7 @@ app.use('/api/books', bookRoutes);
 app.use('/api/chapters', chapterRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/orders', orderRoutes);
 
 // Route de test
 app.get('/api/health', (req, res) => {
@@ -62,5 +64,6 @@ app.listen(PORT, () => {
   console.log(`   - /api/chapters`);
   console.log(`   - /api/invites`);
   console.log(`   - /api/ai`);
+  console.log(`   - /api/orders`);
   console.log(`   - /api/health`);
 });

@@ -1,7 +1,8 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\BookPageLuxe.js
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
+import { listOrdersByBook } from '../../services/ordersApi';
 import ChapterListLuxe from './ChapterListLuxe';
 import BookConfigLuxe from './BookConfigLuxe';
 import ContributorsTabLuxe from './contributors/ContributorsTabLuxe';
@@ -37,12 +38,12 @@ const WRITING_GUIDE_STEPS = [
     text: 'Les compteurs et statuts se mettent a jour en direct sans rafraichir la page.'
   },
   {
-    title: 'Apercu et PDF final',
-    text: 'Apercu du livre puis export PDF imprimeur. Les boutons deviennent actifs quand les chapitres sont valides.'
+    title: 'Apercu puis validation',
+    text: 'Quand chapitres + couverture + 4e sont valides, generez un apercu. Vous pouvez encore modifier avant validation finale.'
   },
   {
     title: 'Suivi de production',
-    text: 'La timeline suit les statuts reel: edition, apercu, finalise, imprimeur, imprime, envoye.'
+    text: 'Apres validation definitive, la commande devient disponible puis la timeline suit production et expedition.'
   }
 ];
 
@@ -53,6 +54,86 @@ const TAB_HELP = {
 };
 
 const getSoloMode = (book) => Boolean(book?.cover_config?.soloMode);
+const normalizeText = (value) => (value === null || value === undefined ? '' : String(value).trim());
+const ORDER_STATUSES_WITH_PDF_ACCESS = new Set([
+  'paid',
+  'pdf_generating',
+  'pdf_ready',
+  'print_queued',
+  'sent_to_printer',
+  'printed',
+  'shipped',
+  'delivered'
+]);
+const BOOK_PREVIEW_FORMATS = [
+  {
+    id: 'prestige',
+    label: 'Prestige',
+    note: 'Grand format'
+  },
+  {
+    id: 'livret',
+    label: 'Livret',
+    note: 'Compact'
+  },
+  {
+    id: 'carre',
+    label: 'Carre',
+    note: 'Photo-book'
+  }
+];
+
+const buildDraftPreviewPages = (html) => {
+  if (!html || typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const parser = new window.DOMParser();
+    const document = parser.parseFromString(html, 'text/html');
+    const root = document.querySelector('.draft-book') || document.body;
+    if (!root) {
+      return [];
+    }
+
+    const pages = [];
+    Array.from(root.children || []).forEach((child) => {
+      if (!(child instanceof window.HTMLElement)) {
+        return;
+      }
+
+      if (child.classList.contains('draft-book-chapter')) {
+        const chapterPages = Array.from(
+          child.querySelectorAll('.draft-book-chapter-shell > .draft-book-page')
+        );
+
+        chapterPages.forEach((page) => {
+          if (page instanceof window.HTMLElement && page.outerHTML) {
+            pages.push(page.outerHTML);
+          }
+        });
+
+        const chapterSections = Array.from(
+          child.querySelectorAll(':scope > .draft-book-section')
+        );
+        chapterSections.forEach((section) => {
+          if (section instanceof window.HTMLElement && section.outerHTML) {
+            pages.push(section.outerHTML);
+          }
+        });
+        return;
+      }
+
+      if (child.outerHTML) {
+        pages.push(child.outerHTML);
+      }
+    });
+
+    return pages.filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
+};
 
 const parseChapterDraftState = (rawValue) => {
   if (!rawValue) {
@@ -91,21 +172,53 @@ const BookPageLuxe = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('chapitres');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [selectedPreviewFormat, setSelectedPreviewFormat] = useState(BOOK_PREVIEW_FORMATS[0].id);
+  const [draftReadingMode, setDraftReadingMode] = useState('horizontal');
+  const [draftSpreadIndex, setDraftSpreadIndex] = useState(0);
+  const [isDraftToolbarVisible, setIsDraftToolbarVisible] = useState(false);
+  const [isDraftToolbarPinned, setIsDraftToolbarPinned] = useState(false);
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [draftPreview, setDraftPreview] = useState(null);
-  const [startingPdfExport, setStartingPdfExport] = useState(false);
   const [pdfExportJob, setPdfExportJob] = useState(null);
   const [downloadingPdfKind, setDownloadingPdfKind] = useState('');
+  const [loadingPdfPreview, setLoadingPdfPreview] = useState(false);
+  const [pdfPreviewModal, setPdfPreviewModal] = useState({
+    open: false,
+    kind: 'interior',
+    url: ''
+  });
   const [updatingLifecycleStatus, setUpdatingLifecycleStatus] = useState('');
+  const [hasPaidOrderAccess, setHasPaidOrderAccess] = useState(false);
   const [user, setUser] = useState(null);
   const [pageNotice, setPageNotice] = useState(null);
   const [editionGalleryRequest, setEditionGalleryRequest] = useState(0);
   const chapterIdsRef = useRef(new Set());
   const pdfExportPollRef = useRef(null);
+  const draftToolbarHideTimeoutRef = useRef(null);
   const pdfPanelRef = useRef(null);
   const mainContentRef = useRef(null);
   const areAllChaptersValidated = chapters.length > 0 && chapters.every(
     (chapter) => chapter?.chapterDraft?.status === 'validated'
+  );
+  const coverConfig = (book?.cover_config && typeof book.cover_config === 'object')
+    ? book.cover_config
+    : {};
+  const backCoverConfig = (book?.back_cover_config && typeof book.back_cover_config === 'object')
+    ? book.back_cover_config
+    : {};
+  const isFrontCoverValidated = Boolean(
+    normalizeText(coverConfig.title || book?.title)
+    && normalizeText(coverConfig.recipientLine)
+    && normalizeText(coverConfig.eventLine)
+  );
+  const isBackCoverValidated = Boolean(
+    normalizeText(backCoverConfig.blurb)
+    && normalizeText(backCoverConfig.signature)
+  );
+  const isBookReadyForPreview = Boolean(
+    areAllChaptersValidated
+    && isFrontCoverValidated
+    && isBackCoverValidated
   );
 
   useEffect(() => {
@@ -141,6 +254,22 @@ const BookPageLuxe = () => {
   }, [bookId, user]);
 
   useEffect(() => {
+    if (!bookId || !user) {
+      return;
+    }
+
+    loadBookOrderAccess();
+  }, [bookId, user]);
+
+  useEffect(() => {
+    const configuredFormat = normalizeText(book?.cover_config?.previewFormat || '').toLowerCase();
+    const isSupported = BOOK_PREVIEW_FORMATS.some((format) => format.id === configuredFormat);
+    if (isSupported && configuredFormat !== selectedPreviewFormat) {
+      setSelectedPreviewFormat(configuredFormat);
+    }
+  }, [book?.id, book?.cover_config?.previewFormat, selectedPreviewFormat]);
+
+  useEffect(() => {
     chapterIdsRef.current = new Set(
       chapters
         .map((chapter) => chapter?.id)
@@ -154,8 +283,11 @@ const BookPageLuxe = () => {
         clearInterval(pdfExportPollRef.current);
         pdfExportPollRef.current = null;
       }
+      if (pdfPreviewModal.url && typeof window !== 'undefined') {
+        window.URL.revokeObjectURL(pdfPreviewModal.url);
+      }
     }
-  ), []);
+  ), [pdfPreviewModal.url]);
 
   useEffect(() => {
     if (!bookId || !user) {
@@ -213,6 +345,51 @@ const BookPageLuxe = () => {
     setUser(user);
   };
 
+  const loadBookOrderAccess = async () => {
+    try {
+      const orders = await listOrdersByBook(bookId);
+      const paidAccess = Array.isArray(orders) && orders.some((order) => (
+        ORDER_STATUSES_WITH_PDF_ACCESS.has(String(order?.status || '').toLowerCase())
+      ));
+      setHasPaidOrderAccess(paidAccess);
+    } catch (error) {
+      setHasPaidOrderAccess(false);
+    }
+  };
+
+  const handlePreviewFormatChange = async (nextFormat) => {
+    const formatId = String(nextFormat || '').toLowerCase();
+    const isSupported = BOOK_PREVIEW_FORMATS.some((format) => format.id === formatId);
+    if (!isSupported || formatId === selectedPreviewFormat) {
+      return;
+    }
+
+    stopPdfExportPolling();
+    setPdfExportJob(null);
+    if (pdfPreviewModal.open) {
+      closePdfPreviewModal();
+    }
+    setSelectedPreviewFormat(formatId);
+    setDraftSpreadIndex(0);
+    if (!book?.id) {
+      return;
+    }
+
+    try {
+      const currentCoverConfig = (book?.cover_config && typeof book.cover_config === 'object')
+        ? book.cover_config
+        : {};
+      await handleUpdateBook({
+        cover_config: {
+          ...currentCoverConfig,
+          previewFormat: formatId
+        }
+      });
+    } catch (_error) {
+      showPageNotice('Le format est applique localement. Reessayez pour l enregistrer.', 'info');
+    }
+  };
+
   const getApiBaseUrl = () => process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const showPageNotice = (message, type = 'info') => {
     setPageNotice({ message, type });
@@ -244,6 +421,93 @@ const BookPageLuxe = () => {
     }
 
     return fallback;
+  };
+
+  const closePdfPreviewModal = () => {
+    setPdfPreviewModal((previous) => {
+      if (previous.url && typeof window !== 'undefined') {
+        window.URL.revokeObjectURL(previous.url);
+      }
+
+      return {
+        ...previous,
+        open: false,
+        url: ''
+      };
+    });
+    setLoadingPdfPreview(false);
+  };
+
+  const fetchPdfFileBlob = async ({ kind, jobId }) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    if (!token) {
+      throw new Error('Session introuvable');
+    }
+
+    const response = await fetch(
+      `${getApiBaseUrl()}/books/${bookId}/export-final-pdf/${jobId}/download/${kind}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      throw new Error(errorPayload.error || 'Erreur lors du telechargement du PDF');
+    }
+
+    const fallbackFileName = kind === 'cover' ? 'couverture.pdf' : 'interieur.pdf';
+    const fileName = parseFileNameFromDisposition(
+      response.headers.get('content-disposition'),
+      fallbackFileName
+    );
+    const blob = await response.blob();
+
+    return {
+      blob,
+      fileName
+    };
+  };
+
+  const openPdfPreviewModal = async (kind = 'interior', jobOverride = null) => {
+    if (!hasPaidOrderAccess) {
+      showPageNotice('Le PDF fidele est disponible apres paiement. Utilisez l apercu protege en attendant.', 'info');
+      return;
+    }
+
+    const targetJob = jobOverride || pdfExportJob;
+    if (!targetJob?.jobId) {
+      showPageNotice('Aucun PDF disponible pour l apercu.', 'info');
+      return;
+    }
+
+    setLoadingPdfPreview(true);
+
+    try {
+      const { blob } = await fetchPdfFileBlob({ kind, jobId: targetJob.jobId });
+      const objectUrl = window.URL.createObjectURL(blob);
+
+      setPdfPreviewModal((previous) => {
+        if (previous.url && typeof window !== 'undefined') {
+          window.URL.revokeObjectURL(previous.url);
+        }
+
+        return {
+          open: true,
+          kind,
+          url: objectUrl
+        };
+      });
+    } catch (error) {
+      showPageNotice(error.message || 'Impossible de charger l apercu PDF.', 'error');
+    } finally {
+      setLoadingPdfPreview(false);
+    }
   };
 
   const decorateChapter = (chapter) => {
@@ -783,6 +1047,9 @@ const BookPageLuxe = () => {
     if (normalizedStatus === 'finalized' && !nextCoverConfig.finalPdfReadyAt) {
       nextCoverConfig.finalPdfReadyAt = nowIso;
     }
+    if (normalizedStatus === 'finalized' && !nextCoverConfig.finalValidatedAt) {
+      nextCoverConfig.finalValidatedAt = nowIso;
+    }
     if (normalizedStatus === 'sent_to_printer' && !nextCoverConfig.sentToPrinterAt) {
       nextCoverConfig.sentToPrinterAt = nowIso;
     }
@@ -821,15 +1088,16 @@ const BookPageLuxe = () => {
       return 'editing';
     }
 
-    let inferredStatus = areAllChaptersValidated ? 'preview_available' : 'editing';
-    if (pdfExportJob?.status === 'ready' || String(book?.statut || '').toLowerCase() === 'termine') {
-      inferredStatus = 'finalized';
+    const persistedStatus = getBookLifecycleStatusFromBook(book);
+    if (isBookLifecycleAtLeast(persistedStatus, 'finalized')) {
+      return persistedStatus;
     }
 
-    const persistedStatus = getBookLifecycleStatusFromBook(book);
-    return isBookLifecycleAtLeast(persistedStatus, inferredStatus)
-      ? persistedStatus
-      : inferredStatus;
+    if (persistedStatus === 'preview_available') {
+      return 'preview_available';
+    }
+
+    return 'editing';
   };
 
   useEffect(() => {
@@ -846,15 +1114,13 @@ const BookPageLuxe = () => {
     book?.id,
     book?.statut,
     book?.cover_config?.lifecycleStatus,
-    areAllChaptersValidated,
-    pdfExportJob?.status,
     updatingLifecycleStatus
   ]);
 
   const handleGenerateDraft = async () => {
     try {
-      if (!chapters.length || chapters.some((chapter) => chapter?.chapterDraft?.status !== 'validated')) {
-        throw new Error('Generez et validez tous les chapitres avant l apercu global');
+      if (!isBookReadyForPreview) {
+        throw new Error('Validez tous les chapitres, la couverture et la 4e avant l apercu global');
       }
 
       setGeneratingDraft(true);
@@ -871,7 +1137,10 @@ const BookPageLuxe = () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({
+          previewFormat: selectedPreviewFormat
+        })
       });
 
       const data = await response.json();
@@ -880,7 +1149,11 @@ const BookPageLuxe = () => {
         throw new Error(data.error || 'Erreur lors de l apercu du livre');
       }
 
-      setDraftPreview(data);
+      setDraftPreview({
+        ...data,
+        previewFormat: selectedPreviewFormat
+      });
+      setDraftSpreadIndex(0);
       dismissPageNotice();
       await setBookLifecycleStatus('preview_available', { silent: true, onlyForward: true });
     } catch (error) {
@@ -891,91 +1164,25 @@ const BookPageLuxe = () => {
     }
   };
 
-  const fetchPdfExportStatus = async (jobId) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-
-    if (!token) {
-      throw new Error('Session introuvable');
-    }
-
-    const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/export-final-pdf/${jobId}/status`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Impossible de recuperer le statut export');
-    }
-
-    return data;
-  };
-
-  const startPdfExportPolling = (jobId) => {
-    stopPdfExportPolling();
-
-    const pollStatus = async () => {
-      try {
-        const nextStatus = await fetchPdfExportStatus(jobId);
-        setPdfExportJob(nextStatus);
-
-        if (nextStatus.status === 'ready') {
-          stopPdfExportPolling();
-          await setBookLifecycleStatus('finalized', { silent: true, onlyForward: true });
-          showPageNotice('PDF final pret. Vous pouvez telecharger interieur et couverture.', 'success');
-        } else if (nextStatus.status === 'failed') {
-          stopPdfExportPolling();
-          showPageNotice(nextStatus.error || 'La generation PDF a echoue.', 'error');
-        }
-      } catch (error) {
-        stopPdfExportPolling();
-        showPageNotice(error.message || 'Erreur lors du suivi de generation PDF.', 'error');
-      }
-    };
-
-    pollStatus();
-    pdfExportPollRef.current = setInterval(pollStatus, 2500);
-  };
-
-  const handleStartPdfExport = async () => {
+  const handleFinalizeBook = async () => {
     try {
-      if (!chapters.length || chapters.some((chapter) => chapter?.chapterDraft?.status !== 'validated')) {
-        throw new Error('Validez tous les chapitres avant la generation PDF finale');
+      if (!isBookReadyForPreview) {
+        throw new Error('Le livre doit etre complet (chapitres + couverture + 4e) avant validation finale.');
       }
 
-      setStartingPdfExport(true);
-      stopPdfExportPolling();
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error('Session introuvable');
+      const lifecycleStatus = getAutomaticLifecycleStatus();
+      if (!isBookLifecycleAtLeast(lifecycleStatus, 'preview_available')) {
+        throw new Error('Generez d abord un apercu avant la validation finale.');
       }
 
-      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/export-final-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors du lancement export PDF');
+      const updated = await setBookLifecycleStatus('finalized', { onlyForward: true });
+      if (!updated) {
+        throw new Error('Impossible de valider le livre pour le moment.');
       }
 
-      setPdfExportJob(data);
-      showPageNotice('Generation PDF finale lancee. Nous preparons les fichiers imprimeur...', 'info');
-      startPdfExportPolling(data.jobId);
+      showPageNotice('Livre valide definitivement. Vous pouvez maintenant commander.', 'success');
     } catch (error) {
-      showPageNotice(error.message || 'Erreur lors de la generation PDF finale.', 'error');
-    } finally {
-      setStartingPdfExport(false);
+      showPageNotice(error.message || 'Erreur lors de la validation finale du livre.', 'error');
     }
   };
 
@@ -984,37 +1191,17 @@ const BookPageLuxe = () => {
       return;
     }
 
+    if (!hasPaidOrderAccess) {
+      showPageNotice('Telechargement bloque avant paiement.', 'error');
+      return;
+    }
+
     try {
       setDownloadingPdfKind(kind);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error('Session introuvable');
-      }
-
-      const response = await fetch(
-        `${getApiBaseUrl()}/books/${bookId}/export-final-pdf/${pdfExportJob.jobId}/download/${kind}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      if (!response.ok) {
-        const errorPayload = await response.json().catch(() => ({}));
-        throw new Error(errorPayload.error || 'Erreur lors du telechargement du PDF');
-      }
-
-      const blob = await response.blob();
-      const fallbackFileName = kind === 'cover' ? 'couverture.pdf' : 'interieur.pdf';
-      const fileName = parseFileNameFromDisposition(
-        response.headers.get('content-disposition'),
-        fallbackFileName
-      );
+      const { blob, fileName } = await fetchPdfFileBlob({
+        kind,
+        jobId: pdfExportJob.jobId
+      });
 
       const objectUrl = window.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -1028,12 +1215,6 @@ const BookPageLuxe = () => {
       showPageNotice(error.message || 'Erreur lors du telechargement du PDF.', 'error');
     } finally {
       setDownloadingPdfKind('');
-    }
-  };
-
-  const focusPdfPanel = () => {
-    if (pdfPanelRef.current) {
-      pdfPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
@@ -1118,6 +1299,100 @@ const BookPageLuxe = () => {
     }
   };
 
+  const draftPreviewPages = useMemo(
+    () => buildDraftPreviewPages(draftPreview?.html || ''),
+    [draftPreview?.html]
+  );
+  const draftSpreadCount = Math.max(1, Math.ceil(draftPreviewPages.length / 2));
+  const currentDraftSpreadIndex = Math.min(
+    draftSpreadIndex,
+    Math.max(0, draftSpreadCount - 1)
+  );
+  const leftDraftPageHtml = draftPreviewPages[currentDraftSpreadIndex * 2] || '';
+  const rightDraftPageHtml = draftPreviewPages[currentDraftSpreadIndex * 2 + 1] || '';
+  const canGoToPreviousSpread = currentDraftSpreadIndex > 0;
+  const canGoToNextSpread = currentDraftSpreadIndex < draftSpreadCount - 1;
+  const isHorizontalDraftMode = draftReadingMode === 'horizontal';
+
+  const shiftDraftSpread = (direction) => {
+    setDraftSpreadIndex((previous) => {
+      const max = Math.max(0, draftSpreadCount - 1);
+      const next = previous + direction;
+      return Math.min(max, Math.max(0, next));
+    });
+  };
+
+  useEffect(() => {
+    setDraftSpreadIndex((previous) => {
+      const max = Math.max(0, draftSpreadCount - 1);
+      return Math.min(previous, max);
+    });
+  }, [draftSpreadCount]);
+
+  useEffect(() => {
+    if (!draftPreview) {
+      if (draftToolbarHideTimeoutRef.current) {
+        clearTimeout(draftToolbarHideTimeoutRef.current);
+        draftToolbarHideTimeoutRef.current = null;
+      }
+      setIsDraftToolbarVisible(false);
+      setIsDraftToolbarPinned(false);
+      return;
+    }
+
+    if (!isHorizontalDraftMode) {
+      setIsDraftToolbarVisible(true);
+      return;
+    }
+
+    if (isDraftToolbarPinned) {
+      setIsDraftToolbarVisible(true);
+      return;
+    }
+
+    setIsDraftToolbarVisible(false);
+  }, [draftPreview, isHorizontalDraftMode, isDraftToolbarPinned]);
+
+  useEffect(() => () => {
+    if (draftToolbarHideTimeoutRef.current) {
+      clearTimeout(draftToolbarHideTimeoutRef.current);
+      draftToolbarHideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const showDraftToolbar = () => {
+    if (draftToolbarHideTimeoutRef.current) {
+      clearTimeout(draftToolbarHideTimeoutRef.current);
+      draftToolbarHideTimeoutRef.current = null;
+    }
+    setIsDraftToolbarVisible(true);
+  };
+
+  const scheduleDraftToolbarHide = (delayMs = 420) => {
+    if (!draftPreview || !isHorizontalDraftMode || isDraftToolbarPinned) {
+      return;
+    }
+
+    if (draftToolbarHideTimeoutRef.current) {
+      clearTimeout(draftToolbarHideTimeoutRef.current);
+    }
+
+    draftToolbarHideTimeoutRef.current = setTimeout(() => {
+      setIsDraftToolbarVisible(false);
+      draftToolbarHideTimeoutRef.current = null;
+    }, delayMs);
+  };
+
+  const handleDraftToolbarPinToggle = () => {
+    setIsDraftToolbarPinned((previous) => {
+      const nextPinned = !previous;
+      if (nextPinned) {
+        showDraftToolbar();
+      }
+      return nextPinned;
+    });
+  };
+
   if (loading) return <Loading message="Chargement du livre..." />;
   if (!book) return <div>Livre non trouvé</div>;
 
@@ -1127,6 +1402,16 @@ const BookPageLuxe = () => {
     : WRITING_GUIDE_STEPS;
   const bookLifecycleStatus = getAutomaticLifecycleStatus();
   const bookLifecycleConfig = getBookLifecycleConfig(bookLifecycleStatus);
+  const hasPreviewBeenGenerated = isBookLifecycleAtLeast(bookLifecycleStatus, 'preview_available');
+  const canGenerateBookPreview = isBookReadyForPreview;
+  const canFinalizeBook = (
+    hasPreviewBeenGenerated
+    && !isBookLifecycleAtLeast(bookLifecycleStatus, 'finalized')
+    && isBookReadyForPreview
+  );
+  const selectedPreviewFormatMeta = BOOK_PREVIEW_FORMATS.find(
+    (format) => format.id === selectedPreviewFormat
+  ) || BOOK_PREVIEW_FORMATS[0];
   const lifecycleUpdatedAt = book?.cover_config?.lifecycleUpdatedAt;
   const lifecycleUpdatedLabel = lifecycleUpdatedAt
     ? new Date(lifecycleUpdatedAt).toLocaleString('fr-FR')
@@ -1201,11 +1486,23 @@ const BookPageLuxe = () => {
       window.setTimeout(scrollToMainContent, 120);
     }
   };
+  const openCheckout = () => {
+    navigate(`/book/${bookId}/checkout`);
+  };
   const currentLifecycleAction = (() => {
     if (bookLifecycleStatus === 'editing') {
+      if (canGenerateBookPreview) {
+        return {
+          label: generatingDraft ? 'Generation...' : 'Generer un apercu',
+          note: 'Apercu protege du livre. Modifications toujours possibles.',
+          onClick: handleGenerateDraft,
+          disabled: generatingDraft
+        };
+      }
+
       return {
         label: 'Continuer l edition',
-        note: 'Aller aux chapitres',
+        note: 'Aller aux chapitres et finaliser les contenus',
         onClick: openEditionGallery,
         disabled: false
       };
@@ -1213,28 +1510,21 @@ const BookPageLuxe = () => {
 
     if (bookLifecycleStatus === 'preview_available') {
       return {
-        label: generatingDraft ? 'Generation...' : 'Ouvrir l apercu',
-        note: 'Apercu assemble du livre',
-        onClick: handleGenerateDraft,
-        disabled: generatingDraft || !areAllChaptersValidated
+        label: updatingLifecycleStatus === 'finalized'
+          ? 'Validation...'
+          : 'Valider definitivement',
+        note: 'Figer le livre puis ouvrir la commande',
+        onClick: handleFinalizeBook,
+        disabled: !canFinalizeBook || Boolean(updatingLifecycleStatus)
       };
     }
 
     if (bookLifecycleStatus === 'finalized') {
-      if (isPdfReady) {
-        return {
-          label: 'Voir les PDF finaux',
-          note: 'Aller au panneau PDF',
-          onClick: focusPdfPanel,
-          disabled: false
-        };
-      }
-
       return {
-        label: startingPdfExport ? 'Lancement...' : 'Lancer PDF imprimeur',
-        note: pdfExportStatusLabel,
-        onClick: handleStartPdfExport,
-        disabled: startingPdfExport || !areAllChaptersValidated
+        label: 'Commander',
+        note: 'Choisir PDF, impression ou pack',
+        onClick: openCheckout,
+        disabled: false
       };
     }
 
@@ -1286,6 +1576,7 @@ const BookPageLuxe = () => {
               <span>✍️ {book.style_narratif || 'Factuel'}</span>
             </div>
             </div>
+            <div className="book-progress-shell">
             <div className="book-lifecycle-panel">
               <div className="book-lifecycle-top">
                 <span className={`book-lifecycle-chip ${bookLifecycleConfig.tone}`}>
@@ -1303,15 +1594,12 @@ const BookPageLuxe = () => {
                   const isCurrent = statusKey === bookLifecycleStatus;
                   const isDone = !isCurrent && isBookLifecycleAtLeast(bookLifecycleStatus, statusKey);
                   const isUpcoming = !isCurrent && !isDone;
-                  const isEditingStep = statusKey === 'editing';
                   const nextStatusKey = BOOK_LIFECYCLE_ORDER[index + 1] || null;
                   const isConnectorDone = Boolean(
                     nextStatusKey && isBookLifecycleAtLeast(bookLifecycleStatus, nextStatusKey)
                   );
                   const isConnectorCurrent = Boolean(nextStatusKey && isCurrent && !isConnectorDone);
-                  const lifecycleStepClick = isCurrent
-                    ? (isEditingStep ? openEditionGallery : currentLifecycleAction.onClick)
-                    : undefined;
+                  const lifecycleStepClick = isCurrent ? currentLifecycleAction.onClick : undefined;
                   return (
                     <React.Fragment key={statusKey}>
                       <button
@@ -1334,56 +1622,35 @@ const BookPageLuxe = () => {
               <button
                 type="button"
                 className="book-lifecycle-current-action"
-                onClick={bookLifecycleStatus === 'editing' ? openEditionGallery : currentLifecycleAction.onClick}
+                onClick={currentLifecycleAction.onClick}
                 disabled={currentLifecycleAction.disabled}
               >
                 <span className="book-lifecycle-current-label">{currentLifecycleAction.label}</span>
                 <span className="book-lifecycle-current-note">{currentLifecycleAction.note}</span>
               </button>
             </div>
-          </div>
           <div className="book-header-actions">
-            <div className="book-header-actions-top">
-              <Link to="/dashboard" className="book-dashboard-mini" title="Tableau de bord">
-                <span className="book-dashboard-mini-icon">📊</span>
-              </Link>
-            </div>
             <div className="book-header-actions-row is-primary">
-          <button
-            type="button"
-            className="book-header-btn book-header-btn-primary book-generate-btn"
-            onClick={handleGenerateDraft}
-            disabled={generatingDraft || !areAllChaptersValidated}
-            title={areAllChaptersValidated
-              ? 'Afficher l apercu assemble du livre'
-              : 'Generez et validez chaque chapitre avant l apercu global'}
-          >
-            <span className="book-action-label">
-              {generatingDraft ? 'Generation...' : 'Apercu du livre'}
-            </span>
-            <span className="book-action-note">Apercu assemble du livre</span>
-          </button>
-          <button
-            type="button"
-            className="book-header-btn book-header-btn-primary book-export-btn"
-            onClick={handleStartPdfExport}
-            disabled={startingPdfExport || !areAllChaptersValidated}
-            title={areAllChaptersValidated
-              ? 'Lancer la generation des PDF finaux imprimeur'
-              : 'Validez tous les chapitres avant la generation PDF finale'}
-          >
-            <span className="book-action-label">
-              {startingPdfExport ? 'Lancement...' : 'PDF final imprimeur'}
-            </span>
-            <span className="book-action-note">{pdfExportStatusLabel}</span>
-          </button>
+              <button
+                type="button"
+                className="book-header-btn book-header-btn-primary book-generate-btn"
+                onClick={handleGenerateDraft}
+                disabled={generatingDraft || !canGenerateBookPreview}
+                title={canGenerateBookPreview
+                  ? 'Afficher l apercu assemble du livre'
+                  : 'Validez chapitres + couverture + 4e avant l apercu'}
+              >
+                <span className="book-action-label">
+                  {generatingDraft
+                    ? 'Generation...'
+                    : hasPreviewBeenGenerated ? 'Regenerer un apercu' : 'Generer un apercu'}
+                </span>
+                <span className="book-action-note">
+                  Rendu livre assemble
+                </span>
+              </button>
             </div>
-            <div className="book-header-actions-row is-secondary">
-          <Link to="/dashboard" className="book-dashboard-bottom-link">
-            Tableau de bord
-            <span>📊</span>
-            
-          </Link>
+        </div>
           </div>
         </div>
       </div>
@@ -1509,8 +1776,16 @@ const BookPageLuxe = () => {
             {pdfExportJob.error && (
               <div className="book-pdf-error">{pdfExportJob.error}</div>
             )}
-            {isPdfReady && (
+            {isPdfReady && hasPaidOrderAccess && (
               <div className="book-pdf-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => openPdfPreviewModal('interior')}
+                  disabled={loadingPdfPreview}
+                >
+                  {loadingPdfPreview ? 'Chargement...' : 'Voir apercu imprimeur'}
+                </button>
                 <button
                   type="button"
                   className="btn btn-outline"
@@ -1527,6 +1802,11 @@ const BookPageLuxe = () => {
                 >
                   {downloadingPdfKind === 'cover' ? 'Telechargement...' : 'Telecharger couverture.pdf'}
                 </button>
+              </div>
+            )}
+            {isPdfReady && !hasPaidOrderAccess && (
+              <div className="book-pdf-error">
+                PDF final verrouille avant paiement.
               </div>
             )}
           </div>
@@ -1572,47 +1852,231 @@ const BookPageLuxe = () => {
       {draftPreview && (
         <div className="modal-overlay">
           <div className="modal-content book-draft-modal">
-            <div className="book-draft-modal-header">
-              <div>
-                <div className="label-gold">Apercu HTML grand format</div>
-                <h3 className="book-draft-modal-title">Apercu du livre</h3>
-                {draftPreview.generatedAt && (
-                  <div className="book-draft-modal-meta">
-                    Genere le {new Date(draftPreview.generatedAt).toLocaleString('fr-FR')}
+            {isHorizontalDraftMode && !isDraftToolbarVisible && (
+              <button
+                type="button"
+                className="book-draft-toolbar-reveal"
+                onMouseEnter={showDraftToolbar}
+                onFocus={showDraftToolbar}
+                onClick={showDraftToolbar}
+                aria-label="Afficher les options de l apercu"
+              >
+                Afficher les options
+              </button>
+            )}
+
+            <div
+              className={`book-draft-modal-toolbar ${isDraftToolbarVisible ? 'is-visible' : 'is-hidden'} ${isHorizontalDraftMode ? 'is-horizontal' : 'is-vertical'}`}
+              onMouseEnter={showDraftToolbar}
+              onMouseLeave={() => scheduleDraftToolbarHide()}
+            >
+              <div className="book-draft-modal-header">
+                <div>
+                  <div className="label-gold">Apercu livre</div>
+                  <h3 className="book-draft-modal-title">Apercu du livre</h3>
+                  {draftPreview.generatedAt && (
+                    <div className="book-draft-modal-meta">
+                      Genere le {new Date(draftPreview.generatedAt).toLocaleString('fr-FR')} | Format {selectedPreviewFormatMeta.label}
+                    </div>
+                  )}
+                </div>
+                <div className="book-draft-modal-header-actions">
+                  {isHorizontalDraftMode && (
+                    <button
+                      type="button"
+                      className={`book-draft-toolbar-pin ${isDraftToolbarPinned ? 'is-active' : ''}`}
+                      onClick={handleDraftToolbarPinToggle}
+                      title={isDraftToolbarPinned ? 'Barre fixe' : 'Fixer la barre en haut'}
+                    >
+                      {isDraftToolbarPinned ? 'Fixe' : 'Auto'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="modal-close"
+                    onClick={() => setDraftPreview(null)}
+                  >
+                    x
+                  </button>
+                </div>
+              </div>
+
+              <div className="book-draft-modal-format">
+                <div className="book-draft-modal-format-block">
+                  <span className="book-preview-format-label">Formats</span>
+                  <div className="book-preview-format-switch is-modal">
+                    {BOOK_PREVIEW_FORMATS.map((format) => (
+                      <button
+                        key={format.id}
+                        type="button"
+                        className={`book-preview-format-btn ${selectedPreviewFormat === format.id ? 'is-active' : ''}`}
+                        onClick={() => handlePreviewFormatChange(format.id)}
+                      >
+                        <span>{format.label}</span>
+                        <small>{format.note}</small>
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
+                <div className="book-draft-reading-toggle" role="group" aria-label="Mode de lecture">
+                  <button
+                    type="button"
+                    className={`book-draft-reading-btn ${isHorizontalDraftMode ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setDraftReadingMode('horizontal');
+                      setDraftSpreadIndex(0);
+                    }}
+                  >
+                    Feuilletage
+                  </button>
+                  <button
+                    type="button"
+                    className={`book-draft-reading-btn ${!isHorizontalDraftMode ? 'is-active' : ''}`}
+                    onClick={() => setDraftReadingMode('vertical')}
+                  >
+                    Vertical
+                  </button>
+                </div>
+              </div>
+
+              <div className="book-draft-modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={handleGenerateDraft}
+                  disabled={generatingDraft}
+                  title="Relance la generation de l apercu avec les dernieres modifications du livre"
+                >
+                  {generatingDraft ? 'Generation...' : 'Regenerer l apercu'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setDraftPreview(null)}
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+
+            <div
+              className={`book-draft-preview book-draft-preview-format-${selectedPreviewFormat} ${isHorizontalDraftMode ? 'is-horizontal' : 'is-vertical'}`}
+              onMouseMove={(event) => {
+                const containerTop = event.currentTarget.getBoundingClientRect().top;
+                const offsetTop = event.clientY - containerTop;
+                if (isHorizontalDraftMode && !isDraftToolbarPinned && !isDraftToolbarVisible && offsetTop <= 28) {
+                  showDraftToolbar();
+                }
+              }}
+              onMouseLeave={() => scheduleDraftToolbarHide(250)}
+            >
+              {isHorizontalDraftMode && draftPreviewPages.length > 0 ? (
+                <div className="book-draft-preview-stage book-draft-preview-stage-spread">
+                  <button
+                    type="button"
+                    className="book-draft-nav-arrow is-left"
+                    onClick={() => shiftDraftSpread(-1)}
+                    disabled={!canGoToPreviousSpread}
+                    aria-label="Page precedente"
+                  >
+                    ‹
+                  </button>
+                  <div className="book-draft-book-spread">
+                    <article className="draft-book-leaf is-left">
+                      <div
+                        className="draft-book-leaf-content"
+                        dangerouslySetInnerHTML={{ __html: leftDraftPageHtml }}
+                      />
+                    </article>
+                    <article className="draft-book-leaf is-right">
+                      <div
+                        className="draft-book-leaf-content"
+                        dangerouslySetInnerHTML={{
+                          __html: rightDraftPageHtml || '<div class="draft-book-leaf-empty"></div>'
+                        }}
+                      />
+                    </article>
+                  </div>
+                  <button
+                    type="button"
+                    className="book-draft-nav-arrow is-right"
+                    onClick={() => shiftDraftSpread(1)}
+                    disabled={!canGoToNextSpread}
+                    aria-label="Page suivante"
+                  >
+                    ›
+                  </button>
+                </div>
+              ) : (
+                <div className="book-draft-preview-stage">
+                  <div
+                    className="book-draft-preview-paper"
+                    dangerouslySetInnerHTML={{ __html: draftPreview.html }}
+                  />
+                </div>
+              )}
+              {isHorizontalDraftMode && draftPreviewPages.length > 0 && (
+                <div className="book-draft-spread-meta">
+                  Pages {currentDraftSpreadIndex * 2 + 1}-{Math.min((currentDraftSpreadIndex + 1) * 2, draftPreviewPages.length)} / {draftPreviewPages.length}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pdfPreviewModal.open && (
+        <div className="modal-overlay" onClick={closePdfPreviewModal}>
+          <div className="modal-content book-pdf-preview-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="book-pdf-preview-head">
+              <div>
+                <div className="label-gold">Apercu imprimeur</div>
+                <h3 className="book-pdf-preview-title">Rendu PDF fidele</h3>
+                <div className="book-pdf-preview-meta">
+                  Visualisation de l {pdfPreviewModal.kind === 'cover' ? 'a couverture' : 'interieur'}
+                </div>
               </div>
               <button
                 type="button"
                 className="modal-close"
-                onClick={() => setDraftPreview(null)}
+                onClick={closePdfPreviewModal}
+                aria-label="Fermer l apercu PDF"
               >
                 x
               </button>
             </div>
 
-            <div className="book-draft-modal-actions">
+            <div className="book-pdf-preview-toolbar">
               <button
                 type="button"
-                className="btn btn-outline"
-                onClick={handleGenerateDraft}
-                disabled={generatingDraft}
+                className={`btn btn-outline ${pdfPreviewModal.kind === 'interior' ? 'is-active' : ''}`}
+                onClick={() => openPdfPreviewModal('interior')}
+                disabled={loadingPdfPreview}
               >
-                {generatingDraft ? 'Generation...' : 'Actualiser l apercu'}
+                Interieur
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
-                onClick={() => setDraftPreview(null)}
+                className={`btn btn-outline ${pdfPreviewModal.kind === 'cover' ? 'is-active' : ''}`}
+                onClick={() => openPdfPreviewModal('cover')}
+                disabled={loadingPdfPreview}
               >
-                Fermer
+                Couverture
               </button>
             </div>
 
-            <div
-              className="book-draft-preview"
-              dangerouslySetInnerHTML={{ __html: draftPreview.html }}
-            />
+            <div className="book-pdf-preview-frame-wrap">
+              {loadingPdfPreview && (
+                <div className="book-pdf-preview-loading">Chargement du PDF...</div>
+              )}
+              {!loadingPdfPreview && pdfPreviewModal.url && (
+                <iframe
+                  title={`Apercu PDF ${pdfPreviewModal.kind}`}
+                  className="book-pdf-preview-frame"
+                  src={pdfPreviewModal.url}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

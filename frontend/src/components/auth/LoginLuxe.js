@@ -1,4 +1,3 @@
-// C:\Users\USER\bookfete\frontend\src\components\auth\LoginLuxe.js
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
@@ -12,37 +11,31 @@ const LoginLuxe = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async (event) => {
+    event.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      if (error) throw error;
+      if (loginError) throw loginError;
 
-      // Vérifier s'il y a des données en attente (logique conservée)
       const pendingData = localStorage.getItem('pendingBookData');
       const pendingChapters = localStorage.getItem('pendingChapters');
-      
+
       if (pendingData) {
-        // Récupérer les données
         const bookData = JSON.parse(pendingData);
         const chapters = pendingChapters ? JSON.parse(pendingChapters) : [];
-        
-        // Lancer directement la création
         await createBookAfterLogin(bookData, chapters);
       } else {
-        // Sinon, aller au dashboard
         navigate('/dashboard');
       }
-      
-    } catch (error) {
-      setError(error.message);
+    } catch (loginError) {
+      setError(loginError.message);
     } finally {
       setLoading(false);
     }
@@ -51,13 +44,8 @@ const LoginLuxe = () => {
   const createBookAfterLogin = async (bookData, chapters) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) throw new Error('Utilisateur non connecté');
+      if (!user) throw new Error('Utilisateur non connecte');
 
-      console.log('📦 Création du livre avec les données:', bookData);
-      console.log('📦 Chapitres à créer:', chapters);
-
-      // 1. Créer le livre
       const { data: book, error: bookError } = await supabase
         .from('books')
         .insert([{
@@ -78,20 +66,17 @@ const LoginLuxe = () => {
 
       if (bookError) throw bookError;
 
-      console.log('✅ Livre créé avec ID:', book.id);
-
-      // 2. Créer les chapitres
       if (chapters && chapters.length > 0) {
-        const chaptersToInsert = chapters.map((ch, index) => ({
+        const chaptersToInsert = chapters.map((chapter, index) => ({
           book_id: book.id,
-          title: ch.title,
-          description: ch.description || `Chapitre ${index + 1}`,
+          title: chapter.title,
+          description: chapter.description || `Chapitre ${index + 1}`,
           order_index: index,
           questions_ia: [
-            `Quel est votre plus beau souvenir lié à "${ch.title}" ?`,
-            `Que retenez-vous de ce moment ?`,
-            `Quelle émotion cela évoque-t-il ?`,
-            `Un détail qui vous a marqué ?`
+            `Quel est votre plus beau souvenir lie a "${chapter.title}" ?`,
+            'Que retenez-vous de ce moment ?',
+            'Quelle emotion cela evoque-t-il ?',
+            'Un detail qui vous a marque ?'
           ]
         }));
 
@@ -102,9 +87,6 @@ const LoginLuxe = () => {
         if (chaptersError) throw chaptersError;
       }
 
-      console.log(`✅ ${chapters.length} chapitres créés`);
-
-      // 3. Mettre à jour avec les configs
       await supabase
         .from('books')
         .update({
@@ -122,26 +104,15 @@ const LoginLuxe = () => {
         })
         .eq('id', book.id);
 
-      // Nettoyer le localStorage
       localStorage.removeItem('pendingBookData');
       localStorage.removeItem('pendingChapters');
       localStorage.removeItem('returnTo');
 
-      console.log('🎉 Livre créé avec succès, redirection vers:', `/book/${book.id}`);
-      
-      // Rediriger vers le livre créé
       navigate(`/book/${book.id}`);
-
-    } catch (error) {
-      console.error('❌ Erreur création:', error);
-      alert(`Erreur lors de la création du livre: ${error.message}`);
-      navigate('/dashboard'); // En cas d'erreur, aller au dashboard
+    } catch (createError) {
+      alert(`Erreur lors de la creation du livre: ${createError.message}`);
+      navigate('/dashboard');
     }
-  };
-
-  const handleTestLogin = (testEmail) => {
-    setEmail(testEmail);
-    setPassword('password123');
   };
 
   return (
@@ -150,14 +121,12 @@ const LoginLuxe = () => {
         <div className="auth-header">
           <span className="label-gold">BIENVENUE</span>
           <h2>Connexion</h2>
-          <p>Accédez à votre espace personnel</p>
+          <p>Accedez a votre espace personnel</p>
         </div>
 
         {error && (
           <div className="auth-error">
-            {error === 'Invalid login credentials' 
-              ? 'Email ou mot de passe incorrect' 
-              : error}
+            {error === 'Invalid login credentials' ? 'Email ou mot de passe incorrect' : error}
           </div>
         )}
 
@@ -168,7 +137,7 @@ const LoginLuxe = () => {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="vous@exemple.com"
               required
               autoComplete="email"
@@ -181,8 +150,8 @@ const LoginLuxe = () => {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="********"
               required
               autoComplete="current-password"
             />
@@ -193,9 +162,9 @@ const LoginLuxe = () => {
               <input type="checkbox" />
               <span>Se souvenir de moi</span>
             </label>
-            <Link to="/forgot-password" className="forgot-link">
-              Mot de passe oublié ?
-            </Link>
+            <span className="forgot-link" style={{ opacity: 0.7 }}>
+              Reinitialisation bientot disponible
+            </span>
           </div>
 
           <button
@@ -214,61 +183,8 @@ const LoginLuxe = () => {
         <div className="auth-footer">
           Pas encore de compte ?
           <Link to="/register">
-            Créer un compte
+            Creer un compte
           </Link>
-        </div>
-
-        {/* Section de test - conservée mais stylisée */}
-        <div style={{
-          marginTop: 'var(--space-xl)',
-          paddingTop: 'var(--space-lg)',
-          borderTop: 'var(--border-fine)'
-        }}>
-          <p style={{
-            textAlign: 'center',
-            color: 'var(--text-light)',
-            fontSize: '12px',
-            marginBottom: 'var(--space-md)'
-          }}>
-            🔧 Comptes de test
-          </p>
-          <div style={{
-            display: 'grid',
-            gap: 'var(--space-sm)'
-          }}>
-            <button
-              onClick={() => handleTestLogin('test1@test.com')}
-              className="btn btn-outline"
-              style={{ 
-                width: '100%',
-                justifyContent: 'space-between',
-                padding: '12px 16px'
-              }}
-            >
-              <span>test1@test.com</span>
-              <span style={{ opacity: 0.7 }}>Organisateur →</span>
-            </button>
-            <button
-              onClick={() => handleTestLogin('test2@test.com')}
-              className="btn btn-outline"
-              style={{ 
-                width: '100%',
-                justifyContent: 'space-between',
-                padding: '12px 16px'
-              }}
-            >
-              <span>test2@test.com</span>
-              <span style={{ opacity: 0.7 }}>Contributeur →</span>
-            </button>
-          </div>
-          <p style={{
-            textAlign: 'center',
-            fontSize: '11px',
-            color: 'var(--text-light)',
-            marginTop: 'var(--space-sm)'
-          }}>
-            Mot de passe : <strong>password123</strong>
-          </p>
         </div>
       </div>
     </div>
