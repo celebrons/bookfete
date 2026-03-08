@@ -21,6 +21,7 @@ import PromptAdminLuxe from './components/admin/PromptAdminLuxe';
 import PromptJourneyLabLuxe from './components/admin/PromptJourneyLabLuxe';
 import InvitationPageLuxe from './components/contributeur/InvitationPageLuxe';
 import TokenContributePageLuxe from './components/contributeur/TokenContributePageLuxe';
+import AccountSpaceLuxe from './components/account/AccountSpaceLuxe';
 
 
 
@@ -101,6 +102,12 @@ function App() {
           <Route path="/book/:bookId" element={
             <ProtectedRoute>
               <BookPageLuxe  />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/account" element={
+            <ProtectedRoute>
+              <AccountSpaceLuxe />
             </ProtectedRoute>
           } />
 

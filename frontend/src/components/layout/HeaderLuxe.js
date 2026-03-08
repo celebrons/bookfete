@@ -4,6 +4,21 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import '../../styles/luxe-theme.css';
 
+const IconGear = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+    <path
+      d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+  </svg>
+);
+
 const HeaderLuxe = () => {
   const navigate = useNavigate();
   const [user, setUser] = React.useState(null);
@@ -102,6 +117,35 @@ const HeaderLuxe = () => {
                 onMouseLeave={(e) => e.target.style.color = 'var(--ink)'}
               >
                 Prompts IA
+              </Link>
+              <Link
+                to="/account"
+                title="Espace client"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  border: '1px solid var(--mist)',
+                  borderRadius: '10px',
+                  textDecoration: 'none',
+                  color: 'var(--ink)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all var(--transition-fast)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--gold)';
+                  e.currentTarget.style.borderColor = 'rgba(184,146,74,0.45)';
+                  e.currentTarget.style.backgroundColor = 'rgba(184,146,74,0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--ink)';
+                  e.currentTarget.style.borderColor = 'var(--mist)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                aria-label="Espace client"
+              >
+                <IconGear />
               </Link>
               <button
                 onClick={handleLogout}

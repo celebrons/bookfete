@@ -46,6 +46,12 @@ const WRITING_GUIDE_STEPS = [
   }
 ];
 
+const TAB_HELP = {
+  chapitres: 'Structure du livre, couverture/4e et travail chapitre par chapitre.',
+  contributeurs: 'Ajout, suivi et gestion des personnes qui peuvent contribuer au livre.',
+  config: 'Reglages du livre: style, papier, finition, volume et prix.'
+};
+
 const getSoloMode = (book) => Boolean(book?.cover_config?.soloMode);
 
 const parseChapterDraftState = (rawValue) => {
@@ -1390,25 +1396,34 @@ const BookPageLuxe = () => {
               data-tab="chapitres"
               onClick={() => setActiveTab('chapitres')}
               className={`tab ${activeTab === 'chapitres' ? 'active' : ''}`}
+              title={TAB_HELP.chapitres}
+              aria-label={`Edition du livre. ${TAB_HELP.chapitres}`}
             >
               <span>📑</span>
               Edition du livre
+              <span className="tab-help" aria-hidden="true">?</span>
             </button>
             <button
               data-tab="contributeurs"
               onClick={() => setActiveTab('contributeurs')}
               className={`tab ${activeTab === 'contributeurs' ? 'active' : ''}`}
+              title={TAB_HELP.contributeurs}
+              aria-label={`Contributeurs. ${TAB_HELP.contributeurs}`}
             >
               <span>👥</span>
               Contributeurs
+              <span className="tab-help" aria-hidden="true">?</span>
             </button>
             <button
               data-tab="config"
               onClick={() => setActiveTab('config')}
               className={`tab ${activeTab === 'config' ? 'active' : ''}`}
+              title={TAB_HELP.config}
+              aria-label={`Configuration. ${TAB_HELP.config}`}
             >
               <span>⚙️</span>
               Configuration
+              <span className="tab-help" aria-hidden="true">?</span>
             </button>
           </div>
 

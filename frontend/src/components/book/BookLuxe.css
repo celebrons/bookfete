@@ -754,6 +754,26 @@
   color: var(--gold);
   border-bottom-color: var(--gold);
 }
+
+.tab-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(184, 146, 74, 0.42);
+  background: rgba(184, 146, 74, 0.12);
+  color: #8b6a2f;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tab.active .tab-help {
+  border-color: rgba(184, 146, 74, 0.58);
+  background: rgba(184, 146, 74, 0.22);
+}
 .book-main-content {
   max-width: 1400px;
   margin: 0 auto;
