@@ -1,6 +1,6 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\BookPageLuxe.js
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import ChapterListLuxe from './ChapterListLuxe';
 import BookConfigLuxe from './BookConfigLuxe';
@@ -21,20 +21,28 @@ const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
 const MAX_CHAPTERS = 12;
 const WRITING_GUIDE_STEPS = [
   {
-    title: 'Questions',
-    text: 'Validez les questions du chapitre avant d\'ouvrir la suite du workflow.'
+    title: 'Edition du livre',
+    text: 'Travaillez en galerie ou en sommaire. Cliquez un chapitre, la zone de travail s ouvre a droite.'
   },
   {
-    title: 'Contribution',
-    text: 'Ajoutez votre texte et vos photos pour debloquer les invitations.'
+    title: 'Workflow chapitre (1 a 4)',
+    text: 'Suivez l ordre Questions > Contribution > Invitations > Generation. Les etapes valides passent en bas.'
   },
   {
-    title: 'Invitations',
-    text: 'Invitez, relancez puis fermez les contributions quand tout est pret.'
+    title: 'Couverture et 4e',
+    text: 'Configurez la couverture et la 4e de couverture depuis la meme galerie, comme des elements du livre.'
   },
   {
-    title: 'Configuration',
-    text: 'Ajustez les options du livre et le nombre de pages depuis l\'onglet dedie.'
+    title: 'Contributeurs et temps reel',
+    text: 'Les compteurs et statuts se mettent a jour en direct sans rafraichir la page.'
+  },
+  {
+    title: 'Apercu et PDF final',
+    text: 'Apercu du livre puis export PDF imprimeur. Les boutons deviennent actifs quand les chapitres sont valides.'
+  },
+  {
+    title: 'Suivi de production',
+    text: 'La timeline suit les statuts reel: edition, apercu, finalise, imprimeur, imprime, envoye.'
   }
 ];
 
@@ -70,6 +78,8 @@ const parseChapterDraftState = (rawValue) => {
 
 const BookPageLuxe = () => {
   const { bookId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [book, setBook] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,9 +93,11 @@ const BookPageLuxe = () => {
   const [updatingLifecycleStatus, setUpdatingLifecycleStatus] = useState('');
   const [user, setUser] = useState(null);
   const [pageNotice, setPageNotice] = useState(null);
+  const [editionGalleryRequest, setEditionGalleryRequest] = useState(0);
   const chapterIdsRef = useRef(new Set());
   const pdfExportPollRef = useRef(null);
   const pdfPanelRef = useRef(null);
+  const mainContentRef = useRef(null);
   const areAllChaptersValidated = chapters.length > 0 && chapters.every(
     (chapter) => chapter?.chapterDraft?.status === 'validated'
   );
@@ -93,6 +105,28 @@ const BookPageLuxe = () => {
   useEffect(() => {
     getUser();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || '');
+    const requestedTab = params.get('tab');
+    const requestedView = params.get('view');
+
+    if (requestedTab === 'chapitres' || requestedTab === 'contributeurs' || requestedTab === 'config') {
+      setActiveTab(requestedTab);
+    }
+
+    if (requestedTab === 'chapitres' && requestedView === 'gallery') {
+      setEditionGalleryRequest((previous) => previous + 1);
+      if (typeof window !== 'undefined') {
+        window.requestAnimationFrame(() => {
+          scrollToMainContent();
+        });
+        window.setTimeout(() => {
+          scrollToMainContent();
+        }, 120);
+      }
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (bookId && user) {
@@ -1111,12 +1145,62 @@ const BookPageLuxe = () => {
     }
   })();
   const isPdfReady = pdfExportJob?.status === 'ready';
+  function scrollToMainContent() {
+    if (typeof window === 'undefined' || !mainContentRef.current) {
+      return;
+    }
+
+    const top = mainContentRef.current.getBoundingClientRect().top + window.scrollY - 96;
+    window.scrollTo({
+      top: Math.max(top, 0),
+      behavior: 'smooth'
+    });
+  }
+  const forceOpenEditionGalleryDom = () => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const chapterTab = document.querySelector('button.tab[data-tab="chapitres"]');
+    if (chapterTab instanceof HTMLButtonElement) {
+      chapterTab.click();
+    }
+
+    const backToStructureButton = document.querySelector('button.sidebar-gallery-btn');
+    if (backToStructureButton instanceof HTMLButtonElement) {
+      backToStructureButton.click();
+    }
+
+    const galleryLayoutButton = document.querySelector('button.edition-layout-btn[data-layout="gallery"]');
+    if (galleryLayoutButton instanceof HTMLButtonElement) {
+      galleryLayoutButton.click();
+    }
+  };
+  const openEditionGallery = () => {
+    setActiveTab('chapitres');
+    setEditionGalleryRequest((previous) => previous + 1);
+
+    const nextParams = new URLSearchParams(location.search || '');
+    nextParams.set('tab', 'chapitres');
+    nextParams.set('view', 'gallery');
+    nextParams.set('reset', String(Date.now()));
+    navigate({
+      pathname: `/book/${bookId}`,
+      search: `?${nextParams.toString()}`
+    });
+
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(forceOpenEditionGalleryDom);
+      window.setTimeout(forceOpenEditionGalleryDom, 0);
+      window.setTimeout(scrollToMainContent, 120);
+    }
+  };
   const currentLifecycleAction = (() => {
     if (bookLifecycleStatus === 'editing') {
       return {
         label: 'Continuer l edition',
         note: 'Aller aux chapitres',
-        onClick: () => setActiveTab('chapitres'),
+        onClick: openEditionGallery,
         disabled: false
       };
     }
@@ -1179,6 +1263,7 @@ const BookPageLuxe = () => {
       <div className="book-header">
         <div className="book-header-content">
           <div className="book-title">
+            <div className="book-header-identity">
             <div className="book-eyebrow">{bookLifecycleConfig.label}</div>
             <h1>{book.title}</h1>
             <div className="book-meta">
@@ -1193,6 +1278,7 @@ const BookPageLuxe = () => {
               <span>📖 {book.finition || 'Classique'}</span>
               <span>📄 {book.papier || 'Mat'}</span>
               <span>✍️ {book.style_narratif || 'Factuel'}</span>
+            </div>
             </div>
             <div className="book-lifecycle-panel">
               <div className="book-lifecycle-top">
@@ -1210,25 +1296,39 @@ const BookPageLuxe = () => {
                   const config = getBookLifecycleConfig(statusKey);
                   const isCurrent = statusKey === bookLifecycleStatus;
                   const isDone = !isCurrent && isBookLifecycleAtLeast(bookLifecycleStatus, statusKey);
+                  const isUpcoming = !isCurrent && !isDone;
+                  const isEditingStep = statusKey === 'editing';
+                  const nextStatusKey = BOOK_LIFECYCLE_ORDER[index + 1] || null;
+                  const isConnectorDone = Boolean(
+                    nextStatusKey && isBookLifecycleAtLeast(bookLifecycleStatus, nextStatusKey)
+                  );
+                  const isConnectorCurrent = Boolean(nextStatusKey && isCurrent && !isConnectorDone);
+                  const lifecycleStepClick = isCurrent
+                    ? (isEditingStep ? openEditionGallery : currentLifecycleAction.onClick)
+                    : undefined;
                   return (
-                    <button
-                      key={statusKey}
-                      type="button"
-                      className={`book-lifecycle-step ${isCurrent ? 'is-current' : ''} ${isDone ? 'is-done' : ''}`}
-                      onClick={isCurrent ? currentLifecycleAction.onClick : undefined}
+                    <React.Fragment key={statusKey}>
+                      <button
+                        type="button"
+                      className={`book-lifecycle-step ${isCurrent ? 'is-current' : ''} ${isDone ? 'is-done' : ''} ${isUpcoming ? 'is-upcoming' : ''}`}
+                      onClick={lifecycleStepClick}
                       disabled={!isCurrent || currentLifecycleAction.disabled}
                       title={isCurrent ? `${config.label} - ${currentLifecycleAction.note}` : config.label}
                     >
                       <span className="book-lifecycle-marker">{isDone ? '✓' : index + 1}</span>
-                      <span>{config.shortLabel}</span>
+                      <span className="book-lifecycle-label">{config.shortLabel}</span>
                     </button>
+                    {nextStatusKey && (
+                      <span className={`book-lifecycle-connector ${isConnectorDone ? 'is-done' : ''} ${isConnectorCurrent ? 'is-current' : ''}`} />
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </div>
               <button
                 type="button"
                 className="book-lifecycle-current-action"
-                onClick={currentLifecycleAction.onClick}
+                onClick={bookLifecycleStatus === 'editing' ? openEditionGallery : currentLifecycleAction.onClick}
                 disabled={currentLifecycleAction.disabled}
               >
                 <span className="book-lifecycle-current-label">{currentLifecycleAction.label}</span>
@@ -1237,6 +1337,11 @@ const BookPageLuxe = () => {
             </div>
           </div>
           <div className="book-header-actions">
+            <div className="book-header-actions-top">
+              <Link to="/dashboard" className="book-dashboard-mini" title="Tableau de bord">
+                <span className="book-dashboard-mini-icon">📊</span>
+              </Link>
+            </div>
             <div className="book-header-actions-row is-primary">
           <button
             type="button"
@@ -1268,10 +1373,10 @@ const BookPageLuxe = () => {
           </button>
             </div>
             <div className="book-header-actions-row is-secondary">
-          <Link to="/dashboard" className="dashboard-link book-header-btn book-header-link">
+          <Link to="/dashboard" className="book-dashboard-bottom-link">
+            Tableau de bord
             <span>📊</span>
-            <span className="book-action-label">Tableau de bord</span>
-            <span className="book-action-note">Retour au pilotage</span>
+            
           </Link>
           </div>
         </div>
@@ -1282,6 +1387,7 @@ const BookPageLuxe = () => {
         <div className="tabs-toolbar">
           <div className="tabs">
             <button
+              data-tab="chapitres"
               onClick={() => setActiveTab('chapitres')}
               className={`tab ${activeTab === 'chapitres' ? 'active' : ''}`}
             >
@@ -1289,6 +1395,7 @@ const BookPageLuxe = () => {
               Edition du livre
             </button>
             <button
+              data-tab="contributeurs"
               onClick={() => setActiveTab('contributeurs')}
               className={`tab ${activeTab === 'contributeurs' ? 'active' : ''}`}
             >
@@ -1296,6 +1403,7 @@ const BookPageLuxe = () => {
               Contributeurs
             </button>
             <button
+              data-tab="config"
               onClick={() => setActiveTab('config')}
               className={`tab ${activeTab === 'config' ? 'active' : ''}`}
             >
@@ -1309,40 +1417,51 @@ const BookPageLuxe = () => {
               type="button"
               className={`guide-toggle-btn ${isGuideOpen ? 'active' : ''}`}
               onClick={() => setIsGuideOpen((prev) => !prev)}
+              aria-expanded={isGuideOpen}
+              aria-controls="book-writing-guide"
+              title="Guide rapide"
             >
-              <span>Guide rapide</span>
-              <span className="guide-toggle-icon">{isGuideOpen ? '-' : '+'}</span>
+              <span className="guide-toggle-question" aria-hidden="true">?</span>
+              <span className="guide-toggle-label">Guide rapide</span>
             </button>
-
-            {isGuideOpen && (
-              <div className="writing-guide-popover">
-                <div className="writing-guide-top">
-                  <div className="writing-guide-header">Guide rapide</div>
-                  <button
-                    type="button"
-                    className="writing-guide-close"
-                    onClick={() => setIsGuideOpen(false)}
-                    aria-label="Fermer le guide"
-                  >
-                    x
-                  </button>
-                </div>
-
-                <div className="writing-guide-list">
-                  {visibleGuideSteps.map((step) => (
-                    <div key={step.title} className="writing-guide-item">
-                      <span className="writing-guide-label">{step.title}</span>
-                      <span className="writing-guide-text">{step.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
+
+        {isGuideOpen && (
+          <div id="book-writing-guide" className="writing-guide-popover is-expanded">
+            <div className="writing-guide-top">
+              <div>
+                <div className="writing-guide-header">Guide rapide</div>
+                <div className="writing-guide-subtitle">
+                  Parcours recommande pour avancer vite et proprement.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="writing-guide-close"
+                onClick={() => setIsGuideOpen(false)}
+                aria-label="Fermer le guide"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="writing-guide-list">
+              {visibleGuideSteps.map((step, index) => (
+                <div key={step.title} className="writing-guide-item">
+                  <span className="writing-guide-index">{index + 1}</span>
+                  <div className="writing-guide-copy">
+                    <span className="writing-guide-label">{step.title}</span>
+                    <span className="writing-guide-text">{step.text}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="book-main-content">
+      <div ref={mainContentRef} className="book-main-content">
         {pageNotice?.message && (
           <div className={`luxe-feedback-banner is-${pageNotice.type || 'info'}`}>
             <span>{pageNotice.message}</span>
@@ -1400,6 +1519,7 @@ const BookPageLuxe = () => {
 
         {activeTab === 'chapitres' && (
           <ChapterListLuxe
+            key={`edition-gallery-${editionGalleryRequest}`}
             chapters={chapters}
             bookId={bookId}
             book={book}
@@ -1411,6 +1531,7 @@ const BookPageLuxe = () => {
             onFinalizeChapterDraft={handleFinalizeChapterDraft}
             onDeleteChapter={handleDeleteChapter}
             onUpdateBook={handleUpdateBook}
+            editionGalleryRequest={editionGalleryRequest}
           />
         )}
         

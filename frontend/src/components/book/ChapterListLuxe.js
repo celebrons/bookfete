@@ -52,7 +52,8 @@ const ChapterListLuxe = ({
   onDeleteChapter,
   bookId,
   book,
-  onUpdateBook
+  onUpdateBook,
+  editionGalleryRequest = 0
 }) => {
   const [user, setUser] = useState(null);
   const [editionLayout, setEditionLayout] = useState('gallery');
@@ -134,6 +135,20 @@ const ChapterListLuxe = ({
       setSelectedChapterId(null);
     }
   }, [chapters, selectedChapterId, setSelectedChapterId]);
+
+  useEffect(() => {
+    setEditionLayout('gallery');
+    setSelectedChapterId(null);
+    setShowContributions(false);
+    setEditingChapter(null);
+    setEditingQuestions(null);
+  }, [
+    editionGalleryRequest,
+    setEditingChapter,
+    setEditingQuestions,
+    setSelectedChapterId,
+    setShowContributions
+  ]);
 
   const handleBackToGallery = () => {
     setSelectedChapterId(null);
@@ -250,6 +265,7 @@ const ChapterListLuxe = ({
             <div className="edition-layout-toggle">
               <button
                 type="button"
+                data-layout="gallery"
                 className={`edition-layout-btn ${editionLayout === 'gallery' ? 'is-active' : ''}`}
                 onClick={() => setEditionLayout('gallery')}
               >
@@ -257,6 +273,7 @@ const ChapterListLuxe = ({
               </button>
               <button
                 type="button"
+                data-layout="summary"
                 className={`edition-layout-btn ${editionLayout === 'summary' ? 'is-active' : ''}`}
                 onClick={() => setEditionLayout('summary')}
               >
