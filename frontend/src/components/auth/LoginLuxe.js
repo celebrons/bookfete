@@ -4,6 +4,11 @@ import { supabase } from '../../services/supabaseClient';
 import '../../styles/luxe-theme.css';
 import './AuthLuxe.css';
 
+const TEST1_CREDENTIALS = {
+  email: 'test1@test.com',
+  password: 'password123'
+};
+
 const LoginLuxe = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -11,15 +16,14 @@ const LoginLuxe = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleLogin = async (event) => {
-    event.preventDefault();
+  const runLogin = async (emailValue, passwordValue) => {
     setLoading(true);
     setError(null);
 
     try {
       const { error: loginError } = await supabase.auth.signInWithPassword({
-        email,
-        password
+        email: String(emailValue || '').trim().toLowerCase(),
+        password: String(passwordValue || '')
       });
 
       if (loginError) throw loginError;
@@ -39,6 +43,18 @@ const LoginLuxe = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    await runLogin(email, password);
+  };
+
+  const handleTest1Login = async () => {
+    if (loading) return;
+    setEmail(TEST1_CREDENTIALS.email);
+    setPassword(TEST1_CREDENTIALS.password);
+    await runLogin(TEST1_CREDENTIALS.email, TEST1_CREDENTIALS.password);
   };
 
   const createBookAfterLogin = async (bookData, chapters) => {
@@ -175,6 +191,24 @@ const LoginLuxe = () => {
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
+
+        <div className="test-accounts">
+          <p className="test-accounts-title">Acces rapide compte test</p>
+          <div className="test-accounts-grid">
+            <button
+              type="button"
+              className="btn test-account-btn"
+              onClick={handleTest1Login}
+              disabled={loading}
+            >
+              <span className="test-account-email">{TEST1_CREDENTIALS.email}</span>
+              <span className="test-account-role">test1</span>
+            </button>
+          </div>
+          <p className="test-accounts-note">
+            Mot de passe: <strong>{TEST1_CREDENTIALS.password}</strong>
+          </p>
+        </div>
 
         <div className="auth-divider">
           <span>OU</span>

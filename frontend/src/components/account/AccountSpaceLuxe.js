@@ -19,6 +19,8 @@ const DEFAULT_ADDRESS = {
 const AccountSpaceLuxe = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loadingBooks, setLoadingBooks] = useState(true);
   const [user, setUser] = useState(null);
   const [books, setBooks] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -34,8 +36,9 @@ const AccountSpaceLuxe = () => {
   useEffect(() => {
     const loadAccountData = async () => {
       try {
-        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const authUser = session?.user || null;
         if (!authUser) {
           navigate('/login');
           return;
@@ -49,23 +52,47 @@ const AccountSpaceLuxe = () => {
           ...metadataAddress
         });
 
-        const { data: booksData, error: booksError } = await supabase
+        setLoading(false);
+
+        const booksPromise = supabase
           .from('books')
-          .select('*')
+          .select('id, title, created_at')
           .eq('owner_id', authUser.id)
           .order('created_at', { ascending: false });
 
-        if (booksError) throw booksError;
-        setBooks(Array.isArray(booksData) ? booksData : []);
+        const [booksResult, ordersResult] = await Promise.allSettled([
+          booksPromise,
+          listOrders()
+        ]);
 
-        const loadedOrders = await listOrders();
-        setOrders(Array.isArray(loadedOrders) ? loadedOrders : []);
+        if (booksResult.status === 'fulfilled') {
+          if (booksResult.value?.error) {
+            throw booksResult.value.error;
+          }
+          setBooks(Array.isArray(booksResult.value?.data) ? booksResult.value.data : []);
+        } else {
+          setNotice({
+            type: 'error',
+            message: `Projets: ${booksResult.reason?.message || 'chargement impossible'}`
+          });
+        }
+
+        if (ordersResult.status === 'fulfilled') {
+          setOrders(Array.isArray(ordersResult.value) ? ordersResult.value : []);
+        } else {
+          setNotice({
+            type: 'error',
+            message: `Commandes: ${ordersResult.reason?.message || 'chargement impossible'}`
+          });
+        }
       } catch (error) {
         setNotice({
           type: 'error',
           message: `Impossible de charger votre espace: ${error.message}`
         });
       } finally {
+        setLoadingBooks(false);
+        setLoadingOrders(false);
         setLoading(false);
       }
     };
@@ -193,7 +220,9 @@ const AccountSpaceLuxe = () => {
               <span className="account-badge">{orders.length}</span>
             </div>
 
-            {orders.length === 0 ? (
+            {loadingOrders ? (
+              <p className="account-muted">Chargement des commandes...</p>
+            ) : orders.length === 0 ? (
               <p className="account-muted">Aucune commande pour le moment.</p>
             ) : (
               <ul className="account-list">
@@ -227,7 +256,9 @@ const AccountSpaceLuxe = () => {
               <span className="account-badge">{projectCount}</span>
             </div>
 
-            {projectCount === 0 ? (
+            {loadingBooks ? (
+              <p className="account-muted">Chargement des projets...</p>
+            ) : projectCount === 0 ? (
               <p className="account-muted">Aucun projet enregistre.</p>
             ) : (
               <ul className="account-list">

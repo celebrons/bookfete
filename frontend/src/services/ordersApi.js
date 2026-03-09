@@ -5,6 +5,7 @@ const buildApiBaseUrl = () => {
   const trimmed = configured.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };
+const REQUEST_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 15000);
 
 const buildHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -29,26 +30,71 @@ const parseJsonSafe = async (response) => {
 
 const request = async (path, options = {}) => {
   const headers = await buildHeaders();
-  const response = await fetch(`${buildApiBaseUrl()}${path}`, {
-    ...options,
-    headers: {
-      ...headers,
-      ...(options.headers || {})
-    }
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const payload = await parseJsonSafe(response);
-  if (!response.ok) {
-    throw new Error(payload?.error || 'Erreur API commandes.');
+  try {
+    const response = await fetch(`${buildApiBaseUrl()}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        ...headers,
+        ...(options.headers || {})
+      }
+    });
+
+    const payload = await parseJsonSafe(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur API commandes.');
+    }
+    return payload;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Le serveur met trop de temps a repondre. Reessayez dans quelques secondes.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return payload;
 };
 
-export const listOrders = () => request('/orders');
+export const listOrders = async () => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-export const listOrdersByBook = (bookId) => request(`/orders/book/${bookId}`);
+  if (error) {
+    throw new Error(error.message || 'Erreur chargement commandes.');
+  }
+  return Array.isArray(data) ? data : [];
+};
 
-export const getOrderById = (orderId) => request(`/orders/${orderId}`);
+export const listOrdersByBook = async (bookId) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('book_id', bookId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || 'Erreur chargement commandes du livre.');
+  }
+  return Array.isArray(data) ? data : [];
+};
+
+export const getOrderById = async (orderId) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Commande introuvable.');
+  }
+  return data;
+};
 
 export const createOrder = (payload) => request('/orders', {
   method: 'POST',
@@ -69,4 +115,3 @@ export const updateOrderStatus = (orderId, status, metadata = null) => request(`
 });
 
 export const getApiBaseUrl = buildApiBaseUrl;
-
