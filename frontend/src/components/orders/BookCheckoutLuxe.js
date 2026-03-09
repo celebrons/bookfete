@@ -20,6 +20,11 @@ import {
   getBookLifecycleStatusFromBook,
   isBookLifecycleAtLeast
 } from '../../utils/bookLifecycle';
+import {
+  getJourneyPrimaryAction,
+  getJourneyStatusConfig,
+  resolveBookJourneyStatus
+} from '../../utils/clientJourney';
 import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
 
@@ -108,6 +113,31 @@ const BookCheckoutLuxe = () => {
     [book]
   );
   const stripeTestEnabled = process.env.REACT_APP_STRIPE_ENABLED === '1';
+  const checkoutJourneyStatus = useMemo(
+    () => resolveBookJourneyStatus({ book, latestOrder }),
+    [book, latestOrder]
+  );
+  const checkoutJourneyConfig = useMemo(
+    () => getJourneyStatusConfig(checkoutJourneyStatus),
+    [checkoutJourneyStatus]
+  );
+  const checkoutJourneyAction = useMemo(
+    () => getJourneyPrimaryAction(checkoutJourneyStatus, latestOrder),
+    [checkoutJourneyStatus, latestOrder]
+  );
+  const hasPendingPaymentOrder = (
+    String(latestOrder?.status || '').toLowerCase() === 'awaiting_payment'
+  );
+  const checkoutFormLocked = hasPendingPaymentOrder;
+  const effectiveOrderType = checkoutFormLocked
+    ? String(latestOrder?.type || orderType).toLowerCase()
+    : orderType;
+  const effectiveTotal = checkoutFormLocked
+    ? Number(latestOrder?.total_cents || estimate.total)
+    : estimate.total;
+  const effectiveQuantity = checkoutFormLocked
+    ? Math.max(1, Number(latestOrder?.quantity || quantity || 1))
+    : quantity;
 
   useEffect(() => {
     const loadData = async () => {
@@ -155,6 +185,28 @@ const BookCheckoutLuxe = () => {
 
     loadData();
   }, [bookId, navigate]);
+
+  useEffect(() => {
+    if (!checkoutFormLocked || !latestOrder) {
+      return;
+    }
+
+    const normalizedType = String(latestOrder?.type || '').toLowerCase();
+    if (normalizedType === 'pdf' || normalizedType === 'print' || normalizedType === 'pack') {
+      setOrderType(normalizedType);
+    }
+    setQuantity(Math.max(1, Number(latestOrder?.quantity || 1)));
+
+    if (includesPrint(normalizedType)) {
+      const shipping = latestOrder?.shipping_address && typeof latestOrder.shipping_address === 'object'
+        ? latestOrder.shipping_address
+        : {};
+      setAddress((previous) => ({
+        ...previous,
+        ...shipping
+      }));
+    }
+  }, [checkoutFormLocked, latestOrder]);
 
   const setAddressField = (event) => {
     const { name, value } = event.target;
@@ -408,6 +460,30 @@ const BookCheckoutLuxe = () => {
       }
       window.location.assign(checkoutSession.checkoutUrl);
       return;
+    } catch (error) {
+      setNotice({ type: 'error', message: error.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const payPendingOrder = async () => {
+    try {
+      setSubmitting(true);
+      setNotice(null);
+
+      if (!stripeTestEnabled) {
+        throw new Error('Le paiement Stripe doit etre active pour lancer la commande.');
+      }
+      if (!latestOrder?.id || String(latestOrder.status || '').toLowerCase() !== 'awaiting_payment') {
+        throw new Error('Aucune commande en attente de paiement.');
+      }
+
+      const checkoutSession = await createStripeCheckoutSession(latestOrder.id);
+      if (!checkoutSession?.checkoutUrl) {
+        throw new Error('Impossible d ouvrir Stripe Checkout');
+      }
+      window.location.assign(checkoutSession.checkoutUrl);
     } catch (error) {
       setNotice({ type: 'error', message: error.message });
     } finally {
@@ -747,6 +823,14 @@ const BookCheckoutLuxe = () => {
           <p>
             Livre: <strong>{book?.title || 'Sans titre'}</strong>
           </p>
+          <div className="orders-journey">
+            <span className={`orders-status-chip ${checkoutJourneyConfig.tone}`}>
+              {checkoutJourneyConfig.label}
+            </span>
+            <span className="orders-journey-next">
+              Prochaine action: {checkoutJourneyAction.label}
+            </span>
+          </div>
           <div className="orders-hero-links">
             <Link to={`/book/${bookId}`} className="btn btn-outline">Retour au livre</Link>
             <Link to="/orders" className="btn btn-outline">Mes commandes</Link>
@@ -764,10 +848,15 @@ const BookCheckoutLuxe = () => {
             Ce livre n est pas encore finalise. Terminez l apercu/PDF final avant la commande.
           </div>
         )}
+        {checkoutFormLocked && (
+          <div className="orders-notice is-info">
+            Une commande est deja en attente de paiement. La creation d une nouvelle commande est temporairement bloquee.
+          </div>
+        )}
 
         <section className="orders-grid">
           <article className="orders-panel">
-            <h2>1. Choix du produit</h2>
+            <h2>{checkoutFormLocked ? '1. Commande en attente' : '1. Choix du produit'}</h2>
             <div className="product-choice-grid">
               {[
                 { key: 'pdf', title: 'PDF seul', note: 'Telechargement uniquement' },
@@ -777,8 +866,13 @@ const BookCheckoutLuxe = () => {
                 <button
                   key={choice.key}
                   type="button"
-                  className={`product-choice ${orderType === choice.key ? 'is-active' : ''}`}
-                  onClick={() => setOrderType(choice.key)}
+                  className={`product-choice ${effectiveOrderType === choice.key ? 'is-active' : ''}`}
+                  onClick={() => {
+                    if (!checkoutFormLocked) {
+                      setOrderType(choice.key);
+                    }
+                  }}
+                  disabled={checkoutFormLocked}
                 >
                   <strong>{choice.title}</strong>
                   <span>{choice.note}</span>
@@ -794,37 +888,38 @@ const BookCheckoutLuxe = () => {
                 min="1"
                 max="20"
                 className="input-luxe"
-                value={quantity}
+                value={effectiveQuantity}
                 onChange={(event) => setQuantity(Number(event.target.value || 1))}
+                disabled={checkoutFormLocked}
               />
             </div>
           </article>
 
-          {includesPrint(orderType) && (
+          {includesPrint(effectiveOrderType) && (
             <article className="orders-panel">
               <h2>2. Adresse de livraison</h2>
               <div className="orders-form-grid">
-                <input className="input-luxe" name="fullName" value={address.fullName} onChange={setAddressField} placeholder="Nom complet" />
-                <input className="input-luxe" name="line1" value={address.line1} onChange={setAddressField} placeholder="Adresse" />
-                <input className="input-luxe" name="line2" value={address.line2} onChange={setAddressField} placeholder="Complement" />
-                <input className="input-luxe" name="postalCode" value={address.postalCode} onChange={setAddressField} placeholder="Code postal" />
-                <input className="input-luxe" name="city" value={address.city} onChange={setAddressField} placeholder="Ville" />
-                <input className="input-luxe" name="country" value={address.country} onChange={setAddressField} placeholder="Pays" />
-                <input className="input-luxe" name="phone" value={address.phone} onChange={setAddressField} placeholder="Telephone" />
+                <input className="input-luxe" name="fullName" value={address.fullName} onChange={setAddressField} placeholder="Nom complet" disabled={checkoutFormLocked} />
+                <input className="input-luxe" name="line1" value={address.line1} onChange={setAddressField} placeholder="Adresse" disabled={checkoutFormLocked} />
+                <input className="input-luxe" name="line2" value={address.line2} onChange={setAddressField} placeholder="Complement" disabled={checkoutFormLocked} />
+                <input className="input-luxe" name="postalCode" value={address.postalCode} onChange={setAddressField} placeholder="Code postal" disabled={checkoutFormLocked} />
+                <input className="input-luxe" name="city" value={address.city} onChange={setAddressField} placeholder="Ville" disabled={checkoutFormLocked} />
+                <input className="input-luxe" name="country" value={address.country} onChange={setAddressField} placeholder="Pays" disabled={checkoutFormLocked} />
+                <input className="input-luxe" name="phone" value={address.phone} onChange={setAddressField} placeholder="Telephone" disabled={checkoutFormLocked} />
               </div>
             </article>
           )}
 
           <article className="orders-panel">
-            <h2>{includesPrint(orderType) ? '3' : '2'}. Paiement et execution</h2>
+            <h2>{includesPrint(effectiveOrderType) ? '3' : '2'}. Paiement et execution</h2>
             <div className="orders-summary">
               <div>
                 <span>Produit</span>
-                <strong>{orderType === 'pdf' ? 'PDF seul' : orderType === 'print' ? 'Livre imprime' : 'Pack PDF + imprime'}</strong>
+                <strong>{effectiveOrderType === 'pdf' ? 'PDF seul' : effectiveOrderType === 'print' ? 'Livre imprime' : 'Pack PDF + imprime'}</strong>
               </div>
               <div>
                 <span>Total</span>
-                <strong>{formatPriceCents(estimate.total)}</strong>
+                <strong>{formatPriceCents(effectiveTotal)}</strong>
               </div>
             </div>
 
@@ -832,13 +927,19 @@ const BookCheckoutLuxe = () => {
               type="button"
               className="btn btn-primary"
               disabled={submitting || !canOrder || !stripeTestEnabled}
-              onClick={submitOrder}
+              onClick={hasPendingPaymentOrder ? payPendingOrder : submitOrder}
             >
-              {submitting ? 'Traitement...' : 'Payer avec Stripe (test)'}
+              {submitting
+                ? 'Traitement...'
+                : hasPendingPaymentOrder
+                  ? 'Payer la commande en attente'
+                  : 'Payer avec Stripe (test)'}
             </button>
             <p className="orders-disclaimer">
               {stripeTestEnabled
-                ? 'Stripe Checkout en mode test. Utilisez une carte de test Stripe.'
+                ? hasPendingPaymentOrder
+                  ? 'Une commande en attente existe deja. Finalisez d abord ce paiement.'
+                  : 'Stripe Checkout en mode test. Utilisez une carte de test Stripe.'
                 : 'Le paiement est temporairement indisponible: activez Stripe pour lancer la commande.'}
             </p>
           </article>

@@ -14,6 +14,10 @@ import {
   isBookLifecycleAtLeast,
   normalizeBookLifecycleStatus
 } from '../../utils/bookLifecycle';
+import {
+  getJourneyStatusConfig,
+  resolveBookJourneyStatus
+} from '../../utils/clientJourney';
 import '../../styles/luxe-theme.css';
 import './BookLuxe.css';
 
@@ -196,6 +200,7 @@ const BookPageLuxe = () => {
   const [updatingLifecycleStatus, setUpdatingLifecycleStatus] = useState('');
   const [hasPaidOrderAccess, setHasPaidOrderAccess] = useState(false);
   const [latestPdfOrder, setLatestPdfOrder] = useState(null);
+  const [latestBookOrder, setLatestBookOrder] = useState(null);
   const [user, setUser] = useState(null);
   const [pageNotice, setPageNotice] = useState(null);
   const [editionGalleryRequest, setEditionGalleryRequest] = useState(0);
@@ -355,21 +360,25 @@ const BookPageLuxe = () => {
   const loadBookOrderAccess = async () => {
     try {
       const orders = await listOrdersByBook(bookId);
-      const latestOrder = Array.isArray(orders)
+      const latestBookLevelOrder = Array.isArray(orders) && orders.length > 0
+        ? orders[0]
+        : null;
+      const latestPdfRelatedOrder = Array.isArray(orders)
         ? orders.find((order) => ['pdf', 'pack'].includes(String(order?.type || '').toLowerCase()))
         : null;
       const paidAccess = Array.isArray(orders) && orders.some((order) => (
         ORDER_STATUSES_WITH_PDF_ACCESS.has(String(order?.status || '').toLowerCase())
       ));
       setHasPaidOrderAccess(paidAccess);
-      setLatestPdfOrder(latestOrder || null);
+      setLatestPdfOrder(latestPdfRelatedOrder || null);
+      setLatestBookOrder(latestBookLevelOrder || null);
 
-      const jobId = String(latestOrder?.metadata?.pdfJobId || '').trim();
+      const jobId = String(latestPdfRelatedOrder?.metadata?.pdfJobId || '').trim();
       if (jobId) {
         setPdfExportJob((previous) => {
-          const orderStatus = String(latestOrder?.status || '').toLowerCase();
+          const orderStatus = String(latestPdfRelatedOrder?.status || '').toLowerCase();
           const inferredStatus = (
-            latestOrder?.metadata?.pdfReady || orderStatus === 'pdf_ready'
+            latestPdfRelatedOrder?.metadata?.pdfReady || orderStatus === 'pdf_ready'
           )
             ? 'ready'
             : orderStatus === 'pdf_generating'
@@ -379,24 +388,27 @@ const BookPageLuxe = () => {
           return {
             jobId,
             status: inferredStatus,
-            createdAt: previous?.createdAt || latestOrder?.metadata?.pdfRequestedAt || null,
-            completedAt: latestOrder?.metadata?.pdfCompletedAt || previous?.completedAt || null,
-            renderer: latestOrder?.metadata?.pdfRenderer || previous?.renderer || null,
-            error: latestOrder?.metadata?.pdfError || null
+            createdAt: previous?.createdAt || latestPdfRelatedOrder?.metadata?.pdfRequestedAt || null,
+            completedAt: latestPdfRelatedOrder?.metadata?.pdfCompletedAt || previous?.completedAt || null,
+            renderer: latestPdfRelatedOrder?.metadata?.pdfRenderer || previous?.renderer || null,
+            error: latestPdfRelatedOrder?.metadata?.pdfError || null
           };
         });
       }
 
       return {
         paidAccess,
-        latestPdfOrder: latestOrder || null
+        latestPdfOrder: latestPdfRelatedOrder || null,
+        latestBookOrder: latestBookLevelOrder || null
       };
     } catch (error) {
       setHasPaidOrderAccess(false);
       setLatestPdfOrder(null);
+      setLatestBookOrder(null);
       return {
         paidAccess: false,
-        latestPdfOrder: null
+        latestPdfOrder: null,
+        latestBookOrder: null
       };
     }
   };
@@ -1661,6 +1673,26 @@ const BookPageLuxe = () => {
     : WRITING_GUIDE_STEPS;
   const bookLifecycleStatus = getAutomaticLifecycleStatus();
   const bookLifecycleConfig = getBookLifecycleConfig(bookLifecycleStatus);
+  const journeyStatus = resolveBookJourneyStatus({
+    book,
+    latestOrder: latestBookOrder
+  });
+  const journeyStatusConfig = getJourneyStatusConfig(journeyStatus);
+  const isOrderDrivenJourney = [
+    'awaiting_payment',
+    'paid',
+    'pdf_generating',
+    'pdf_ready',
+    'print_queued',
+    'sent_to_printer',
+    'printed',
+    'shipped',
+    'delivered',
+    'cancelled',
+    'failed'
+  ].includes(journeyStatus);
+  const displayedLifecycleLabel = isOrderDrivenJourney ? journeyStatusConfig.label : bookLifecycleConfig.label;
+  const displayedLifecycleTone = isOrderDrivenJourney ? journeyStatusConfig.tone : bookLifecycleConfig.tone;
   const hasPreviewBeenGenerated = isBookLifecycleAtLeast(bookLifecycleStatus, 'preview_available');
   const canGenerateBookPreview = isBookReadyForPreview;
   const canFinalizeBook = (
@@ -1748,10 +1780,84 @@ const BookPageLuxe = () => {
   const openCheckout = () => {
     navigate(`/book/${bookId}/checkout`);
   };
+  const openOrdersPage = () => {
+    navigate('/orders');
+  };
   const currentLifecycleAction = (() => {
+    const normalizedOrderType = String(latestBookOrder?.type || '').toLowerCase();
+    if (journeyStatus === 'awaiting_payment') {
+      return {
+        key: 'pay_pending_order',
+        label: 'Payer',
+        note: 'Finaliser la commande en attente',
+        onClick: openCheckout,
+        disabled: false
+      };
+    }
+
+    if (journeyStatus === 'paid') {
+      if (normalizedOrderType === 'print') {
+        return {
+          key: 'follow_order',
+          label: 'Suivre la commande',
+          note: 'Paiement valide. Production a suivre.',
+          onClick: openOrdersPage,
+          disabled: false
+        };
+      }
+      return {
+        key: 'follow_pdf_generation',
+        label: 'Suivre la generation',
+        note: 'Paiement valide. Le PDF final se prepare.',
+        onClick: openCheckout,
+        disabled: false
+      };
+    }
+
+    if (journeyStatus === 'pdf_generating') {
+      return {
+        key: 'follow_pdf_generation',
+        label: 'Suivre la generation',
+        note: 'Le PDF final se prepare.',
+        onClick: openCheckout,
+        disabled: false
+      };
+    }
+
+    if (journeyStatus === 'pdf_ready') {
+      return {
+        key: 'download_pdf',
+        label: 'Telecharger le PDF',
+        note: 'Interieur et couverture disponibles',
+        onClick: openCheckout,
+        disabled: false
+      };
+    }
+
+    if (['print_queued', 'sent_to_printer', 'printed', 'shipped', 'delivered'].includes(journeyStatus)) {
+      return {
+        key: 'follow_order',
+        label: 'Suivre la commande',
+        note: 'Production et livraison',
+        onClick: openOrdersPage,
+        disabled: false
+      };
+    }
+
+    if (journeyStatus === 'cancelled' || journeyStatus === 'failed') {
+      return {
+        key: 'relaunch_order',
+        label: 'Relancer la commande',
+        note: 'Revenir au checkout',
+        onClick: openCheckout,
+        disabled: false
+      };
+    }
+
     if (bookLifecycleStatus === 'editing') {
       if (canGenerateBookPreview) {
         return {
+          key: 'generate_preview',
           label: generatingDraft ? 'Generation...' : 'Generer un apercu',
           note: 'Apercu protege du livre. Modifications toujours possibles.',
           onClick: handleGenerateDraft,
@@ -1760,6 +1866,7 @@ const BookPageLuxe = () => {
       }
 
       return {
+        key: 'continue_editing',
         label: 'Continuer l edition',
         note: 'Aller aux chapitres et finaliser les contenus',
         onClick: openEditionGallery,
@@ -1769,6 +1876,7 @@ const BookPageLuxe = () => {
 
     if (bookLifecycleStatus === 'preview_available') {
       return {
+        key: 'validate_book',
         label: updatingLifecycleStatus === 'finalized'
           ? 'Validation...'
           : 'Valider definitivement',
@@ -1780,6 +1888,7 @@ const BookPageLuxe = () => {
 
     if (bookLifecycleStatus === 'finalized') {
       return {
+        key: 'open_checkout',
         label: 'Commander',
         note: 'Choisir PDF, impression ou pack',
         onClick: openCheckout,
@@ -1789,6 +1898,7 @@ const BookPageLuxe = () => {
 
     if (bookLifecycleStatus === 'sent_to_printer') {
       return {
+        key: 'mark_printed',
         label: updatingLifecycleStatus === 'printed' ? 'Mise a jour...' : 'Marquer imprime',
         note: 'Suivi de production',
         onClick: () => setBookLifecycleStatus('printed'),
@@ -1798,6 +1908,7 @@ const BookPageLuxe = () => {
 
     if (bookLifecycleStatus === 'printed') {
       return {
+        key: 'mark_shipped',
         label: updatingLifecycleStatus === 'shipped' ? 'Mise a jour...' : 'Marquer envoye',
         note: 'Suivi de livraison',
         onClick: () => setBookLifecycleStatus('shipped'),
@@ -1806,12 +1917,17 @@ const BookPageLuxe = () => {
     }
 
     return {
+      key: 'workflow_done',
       label: 'Livre envoye',
       note: 'Workflow termine',
       onClick: () => {},
       disabled: true
     };
   })();
+  const showSecondaryPreviewAction = (
+    canGenerateBookPreview
+    && currentLifecycleAction.key !== 'generate_preview'
+  );
 
   return (
     <div className="book-container">
@@ -1819,7 +1935,7 @@ const BookPageLuxe = () => {
         <div className="book-header-content">
           <div className="book-title">
             <div className="book-header-identity">
-            <div className="book-eyebrow">{bookLifecycleConfig.label}</div>
+            <div className="book-eyebrow">{displayedLifecycleLabel}</div>
             <h1>{book.title}</h1>
             <div className="book-meta">
               <div className="book-meta-grid">
@@ -1838,8 +1954,8 @@ const BookPageLuxe = () => {
             <div className="book-progress-shell">
             <div className="book-lifecycle-panel">
               <div className="book-lifecycle-top">
-                <span className={`book-lifecycle-chip ${bookLifecycleConfig.tone}`}>
-                  {bookLifecycleConfig.label}
+                <span className={`book-lifecycle-chip ${displayedLifecycleTone}`}>
+                  {displayedLifecycleLabel}
                 </span>
                 {lifecycleUpdatedLabel && (
                   <span className="book-lifecycle-updated">
@@ -1888,28 +2004,30 @@ const BookPageLuxe = () => {
                 <span className="book-lifecycle-current-note">{currentLifecycleAction.note}</span>
               </button>
             </div>
-          <div className="book-header-actions">
-            <div className="book-header-actions-row is-primary">
-              <button
-                type="button"
-                className="book-header-btn book-header-btn-primary book-generate-btn"
-                onClick={handleGenerateDraft}
-                disabled={generatingDraft || !canGenerateBookPreview}
-                title={canGenerateBookPreview
-                  ? 'Afficher l apercu assemble du livre'
-                  : 'Validez chapitres + couverture + 4e avant l apercu'}
-              >
-                <span className="book-action-label">
-                  {generatingDraft
-                    ? 'Generation...'
-                    : hasPreviewBeenGenerated ? 'Regenerer un apercu' : 'Generer un apercu'}
-                </span>
-                <span className="book-action-note">
-                  Rendu livre assemble
-                </span>
-              </button>
+          {showSecondaryPreviewAction && (
+            <div className="book-header-actions">
+              <div className="book-header-actions-row is-primary">
+                <button
+                  type="button"
+                  className="book-header-btn book-header-btn-primary book-generate-btn"
+                  onClick={handleGenerateDraft}
+                  disabled={generatingDraft || !canGenerateBookPreview}
+                  title={canGenerateBookPreview
+                    ? 'Afficher l apercu assemble du livre'
+                    : 'Validez chapitres + couverture + 4e avant l apercu'}
+                >
+                  <span className="book-action-label">
+                    {generatingDraft
+                      ? 'Generation...'
+                      : hasPreviewBeenGenerated ? 'Regenerer un apercu' : 'Generer un apercu'}
+                  </span>
+                  <span className="book-action-note">
+                    Rendu livre assemble
+                  </span>
+                </button>
+              </div>
             </div>
-        </div>
+          )}
           </div>
         </div>
       </div>
@@ -2023,6 +2141,7 @@ const BookPageLuxe = () => {
               <div className="book-pdf-title">Export PDF final</div>
               <div className="book-pdf-status">{pdfExportStatusLabel}</div>
             </div>
+            <div className="book-pdf-meta">Bloc visible apres paiement valide.</div>
             <div className="book-pdf-meta">
               Job: {pdfExportJob.jobId}
               {pdfExportJob.renderer && (

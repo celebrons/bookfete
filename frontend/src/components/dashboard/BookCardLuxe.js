@@ -4,15 +4,17 @@ import Tooltip from '../ui/Tooltip';
 import {
   IconArchive,
   IconRestore,
-  IconDelete,
-  IconChapter,
-  IconContribution,
-  IconBook
+  IconDelete
 } from './DashboardIcons';
 import {
   getBookLifecycleConfig,
   getBookLifecycleStatusFromBook
 } from '../../utils/bookLifecycle';
+import {
+  getJourneyPrimaryAction,
+  getJourneyStatusConfig,
+  resolveBookJourneyStatus
+} from '../../utils/clientJourney';
 import './DashboardLuxe.css';
 
 const BookCardLuxe = ({
@@ -24,8 +26,12 @@ const BookCardLuxe = ({
   showRestore = false,
   autoDeleteDate
 }) => {
-  const lifecycleStatus = getBookLifecycleStatusFromBook(book);
-  const lifecycleConfig = getBookLifecycleConfig(lifecycleStatus);
+  const lifecycleConfig = getBookLifecycleConfig(getBookLifecycleStatusFromBook(book));
+  const latestOrder = book?.latestOrder || null;
+  const journeyStatus = resolveBookJourneyStatus({ book, latestOrder });
+  const journeyConfig = getJourneyStatusConfig(journeyStatus);
+  const primaryAction = getJourneyPrimaryAction(journeyStatus, latestOrder);
+  const chaptersCount = book.chapters?.[0]?.count || 0;
   const contributionsCount = book.contributions?.reduce(
     (acc, chapter) => acc + (chapter.contributions?.[0]?.count || 0),
     0
@@ -36,11 +42,31 @@ const BookCardLuxe = ({
     const date = new Date(dateString);
     return date.toLocaleDateString('fr-FR');
   };
+  const resolvePrimaryActionPath = () => {
+    if (primaryAction.key === 'follow_order' || primaryAction.key === 'open_orders') {
+      return '/orders';
+    }
+    if (
+      primaryAction.key === 'open_checkout'
+      || primaryAction.key === 'pay_pending_order'
+      || primaryAction.key === 'follow_pdf_generation'
+      || primaryAction.key === 'download_pdf'
+      || primaryAction.key === 'relaunch_order'
+    ) {
+      return `/book/${book.id}/checkout`;
+    }
+    return `/book/${book.id}`;
+  };
 
   return (
     <article className="card dashboard-book-card">
       <div className="dashboard-book-top">
-        <span className={`dashboard-book-status ${lifecycleConfig.tone}`}>{lifecycleConfig.label}</span>
+        <span
+          className={`dashboard-book-status ${journeyConfig.tone || lifecycleConfig.tone}`}
+          title={lifecycleConfig.label}
+        >
+          {journeyConfig.label || lifecycleConfig.label}
+        </span>
 
         <div className="dashboard-book-tools">
           {autoDeleteDate && (
@@ -57,11 +83,11 @@ const BookCardLuxe = ({
                   event.stopPropagation();
                   onArchive();
                 }}
-                className="dashboard-mini-action"
+                className="dashboard-mini-action is-icon"
                 type="button"
+                aria-label="Archiver ce livre"
               >
                 <IconArchive />
-                <span>Archiver</span>
               </button>
             </Tooltip>
           )}
@@ -74,11 +100,11 @@ const BookCardLuxe = ({
                   event.stopPropagation();
                   onRestore();
                 }}
-                className="dashboard-mini-action"
+                className="dashboard-mini-action is-icon"
                 type="button"
+                aria-label="Restaurer ce livre"
               >
                 <IconRestore />
-                <span>Restaurer</span>
               </button>
             </Tooltip>
           )}
@@ -90,51 +116,43 @@ const BookCardLuxe = ({
                 event.stopPropagation();
                 onDelete();
               }}
-              className="dashboard-mini-action is-danger"
+              className="dashboard-mini-action is-icon is-danger"
               type="button"
+              aria-label="Supprimer ce livre"
             >
               <IconDelete />
-              <span>Supprimer</span>
             </button>
           </Tooltip>
         </div>
       </div>
 
       <Link to={`/book/${book.id}`} className="dashboard-book-link">
-        <div className="dashboard-book-hero">
-          <div className="dashboard-book-icon-wrap">
-            <IconBook className="dashboard-book-icon" />
-          </div>
+        <div className="dashboard-book-hero-minimal">
           <div>
             <h3 className="dashboard-book-title">{book.title}</h3>
             <p className="dashboard-book-date">Cree le {formatDate(book.created_at)}</p>
           </div>
         </div>
 
-        <div className="dashboard-book-stats">
-          <div className="dashboard-book-stat-item">
-            <div className="dashboard-book-stat-label">Chapitres</div>
-            <div className="dashboard-book-stat-value">
-              <IconChapter />
-              <span>{book.chapters?.[0]?.count || 0}</span>
-            </div>
-          </div>
+        <p className="dashboard-book-summary">
+          {chaptersCount} chapitres · {contributionsCount} contributions
+        </p>
 
-          <div className="dashboard-book-stat-item">
-            <div className="dashboard-book-stat-label">Contributions</div>
-            <div className="dashboard-book-stat-value">
-              <IconContribution />
-              <span>{contributionsCount}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="dashboard-book-meta">
-          <span className="dashboard-book-meta-pill">{book.finition || 'Classique'}</span>
-          <span className="dashboard-book-meta-pill">{book.papier || 'Mat'}</span>
-          <span className="dashboard-book-meta-pill">{book.event_type || 'Generique'}</span>
+        <div className="dashboard-book-meta-inline">
+          <span>{book.finition || 'Classique'}</span>
+          <span>{book.papier || 'Mat'}</span>
+          <span>{book.event_type || 'Generique'}</span>
         </div>
       </Link>
+
+      {!showRestore && (
+        <div className="dashboard-book-primary">
+          <Link to={resolvePrimaryActionPath()} className="dashboard-book-primary-btn">
+            <span className="dashboard-book-primary-label">{primaryAction.label}</span>
+            <span className="dashboard-book-primary-note">{primaryAction.note}</span>
+          </Link>
+        </div>
+      )}
 
       {autoDeleteDate && (
         <div className="dashboard-book-delete-note">

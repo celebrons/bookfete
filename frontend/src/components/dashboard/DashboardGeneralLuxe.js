@@ -90,38 +90,60 @@ const DashboardGeneralLuxe = () => {
     try {
       setLoading(true);
 
-      const { data: booksData, error: booksError } = await supabase
-        .from('books')
-        .select(`
-          *,
-          chapters:chapters(count),
-          contributions:chapters(
-            contributions(count)
-          )
-        `)
-        .eq('owner_id', userId)
-        .eq('status', 'actif')
-        .order('created_at', { ascending: false });
+      const [activeBooksResult, archivedBooksResult, ordersResult] = await Promise.all([
+        supabase
+          .from('books')
+          .select(`
+            *,
+            chapters:chapters(count),
+            contributions:chapters(
+              contributions(count)
+            )
+          `)
+          .eq('owner_id', userId)
+          .eq('status', 'actif')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('books')
+          .select(`
+            *,
+            chapters:chapters(count),
+            contributions:chapters(
+              contributions(count)
+            )
+          `)
+          .eq('owner_id', userId)
+          .eq('status', 'archive')
+          .order('archived_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('id, book_id, status, type, created_at, metadata')
+          .eq('owner_id', userId)
+          .order('created_at', { ascending: false })
+      ]);
 
-      if (booksError) throw booksError;
+      if (activeBooksResult.error) throw activeBooksResult.error;
+      if (archivedBooksResult.error) throw archivedBooksResult.error;
+      if (ordersResult.error) throw ordersResult.error;
 
-      const { data: archivedData, error: archivedError } = await supabase
-        .from('books')
-        .select(`
-          *,
-          chapters:chapters(count),
-          contributions:chapters(
-            contributions(count)
-          )
-        `)
-        .eq('owner_id', userId)
-        .eq('status', 'archive')
-        .order('archived_at', { ascending: false });
+      const latestOrderByBook = new Map();
+      (ordersResult.data || []).forEach((order) => {
+        const bookKey = String(order?.book_id || '').trim();
+        if (!bookKey || latestOrderByBook.has(bookKey)) {
+          return;
+        }
+        latestOrderByBook.set(bookKey, order);
+      });
 
-      if (archivedError) throw archivedError;
+      const attachLatestOrder = (bookList) => (
+        (bookList || []).map((book) => ({
+          ...book,
+          latestOrder: latestOrderByBook.get(book.id) || null
+        }))
+      );
 
-      const activeBooks = booksData || [];
-      const archivedBooksList = archivedData || [];
+      const activeBooks = attachLatestOrder(activeBooksResult.data);
+      const archivedBooksList = attachLatestOrder(archivedBooksResult.data);
       setBooks(activeBooks);
       setArchivedBooks(archivedBooksList);
 

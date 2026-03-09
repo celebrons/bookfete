@@ -186,6 +186,32 @@
   border-color: rgba(111, 75, 140, 0.24);
 }
 
+.book-lifecycle-chip.is-awaiting,
+.book-lifecycle-chip.is-progress {
+  color: #8b5e11;
+  background: rgba(184, 146, 74, 0.2);
+  border-color: rgba(184, 146, 74, 0.34);
+}
+
+.book-lifecycle-chip.is-paid,
+.book-lifecycle-chip.is-ready {
+  color: #1f7a3d;
+  background: rgba(31, 122, 61, 0.12);
+  border-color: rgba(31, 122, 61, 0.24);
+}
+
+.book-lifecycle-chip.is-error {
+  color: #b42318;
+  background: rgba(180, 35, 24, 0.12);
+  border-color: rgba(180, 35, 24, 0.34);
+}
+
+.book-lifecycle-chip.is-muted {
+  color: #5f6770;
+  background: rgba(95, 103, 112, 0.12);
+  border-color: rgba(95, 103, 112, 0.28);
+}
+
 .book-lifecycle-updated {
   font-size: 11px;
   color: var(--text-light);
