@@ -101,6 +101,15 @@ export const createOrder = (payload) => request('/orders', {
   body: JSON.stringify(payload)
 });
 
+export const createStripeCheckoutSession = (orderId) => request(`/orders/${orderId}/checkout-session`, {
+  method: 'POST'
+});
+
+export const confirmStripePayment = (orderId, sessionId) => request(`/orders/${orderId}/stripe/confirm`, {
+  method: 'POST',
+  body: JSON.stringify({ sessionId })
+});
+
 export const payOrder = (orderId, payload = {}) => request(`/orders/${orderId}/pay`, {
   method: 'POST',
   body: JSON.stringify(payload)

@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { pathToFileURL } = require('url');
 const PDFDocument = require('pdfkit');
+const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const aiService = require('../services/aiService');
 const authenticate = require('../middleware/auth');
@@ -27,6 +28,24 @@ const ORDER_STATUSES_WITH_PDF_ACCESS = new Set([
   'shipped',
   'delivered'
 ]);
+const ORDER_STATUS_FLOW = [
+  'draft',
+  'awaiting_payment',
+  'paid',
+  'pdf_generating',
+  'pdf_ready',
+  'print_queued',
+  'sent_to_printer',
+  'printed',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'failed'
+];
+const ORDER_STATUS_RANK = ORDER_STATUS_FLOW.reduce((accumulator, status, index) => {
+  accumulator[status] = index;
+  return accumulator;
+}, {});
 const DEFAULT_PREVIEW_FORMAT = 'prestige';
 const PREVIEW_FORMATS = {
   prestige: {
@@ -391,21 +410,199 @@ function getPreviewFormatSpec(previewFormat = '') {
   return PREVIEW_FORMATS[formatId] || PREVIEW_FORMATS[DEFAULT_PREVIEW_FORMAT];
 }
 
-async function hasPaidPdfAccessForBook({ ownerId, bookId }) {
-  const allowedStatuses = Array.from(ORDER_STATUSES_WITH_PDF_ACCESS);
-  const { data, error } = await supabase
+function extractBearerToken(req) {
+  const authHeader = req.headers?.authorization || '';
+  const [scheme, token] = authHeader.split(' ');
+  if (scheme !== 'Bearer' || !token) {
+    return '';
+  }
+  return token;
+}
+
+function createUserScopedClient(req) {
+  const token = extractBearerToken(req);
+  if (!token) {
+    return null;
+  }
+
+  return createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    }
+  );
+}
+
+function normalizeIdentifier(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeOrderStatus(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isOrderLinkedToBook(order, bookId) {
+  const expectedBookId = normalizeIdentifier(bookId);
+  if (!expectedBookId) {
+    return false;
+  }
+
+  const directBookId = normalizeIdentifier(order?.book_id);
+  if (directBookId && directBookId === expectedBookId) {
+    return true;
+  }
+
+  const snapshotBookId = normalizeIdentifier(order?.snapshot?.bookId);
+  if (snapshotBookId && snapshotBookId === expectedBookId) {
+    return true;
+  }
+
+  const metadataBookId = normalizeIdentifier(order?.metadata?.bookId);
+  if (metadataBookId && metadataBookId === expectedBookId) {
+    return true;
+  }
+
+  return false;
+}
+
+function hasOrderPdfAccess(order) {
+  const normalizedStatus = normalizeOrderStatus(order?.status);
+  if (ORDER_STATUSES_WITH_PDF_ACCESS.has(normalizedStatus)) {
+    return true;
+  }
+
+  const stripePaymentStatus = normalizeOrderStatus(order?.metadata?.stripePaymentStatus);
+  if (stripePaymentStatus === 'paid') {
+    return true;
+  }
+
+  if (order?.paid_at || order?.metadata?.stripeConfirmedAt || order?.metadata?.paymentValidatedAt) {
+    return true;
+  }
+
+  return false;
+}
+
+async function hasPaidPdfAccessForBook({ db = supabase, ownerId, bookId }) {
+  const { data, error } = await db
     .from('orders')
-    .select('id, status')
-    .eq('owner_id', ownerId)
-    .eq('book_id', bookId)
-    .in('status', allowedStatuses)
-    .limit(1);
+    .select('id, status, paid_at, metadata, book_id, snapshot')
+    .eq('owner_id', ownerId || '')
+    .order('created_at', { ascending: false })
+    .limit(500);
 
   if (error) {
     throw error;
   }
 
-  return Array.isArray(data) && data.length > 0;
+  const ownerScopedPaid = Array.isArray(data) && data.some(
+    (order) => isOrderLinkedToBook(order, bookId) && hasOrderPdfAccess(order)
+  );
+  if (ownerScopedPaid) {
+    return true;
+  }
+
+  // Fallback for legacy/misaligned rows where owner_id can be missing or inconsistent.
+  const { data: rawBookOrders, error: rawBookOrdersError } = await db
+    .from('orders')
+    .select('id, status, paid_at, metadata, book_id, snapshot')
+    .eq('book_id', bookId)
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (rawBookOrdersError) {
+    throw rawBookOrdersError;
+  }
+
+  return Array.isArray(rawBookOrders) && rawBookOrders.some(hasOrderPdfAccess);
+}
+
+function getOrderStatusRank(status) {
+  const normalized = String(status || '').toLowerCase();
+  const rank = ORDER_STATUS_RANK[normalized];
+  return Number.isFinite(rank) ? rank : -1;
+}
+
+function mergeOrderMetadata(existingMetadata, patchMetadata) {
+  return {
+    ...(existingMetadata && typeof existingMetadata === 'object' ? existingMetadata : {}),
+    ...(patchMetadata && typeof patchMetadata === 'object' ? patchMetadata : {})
+  };
+}
+
+function getPdfCompletionTargetStatus(orderType) {
+  const normalizedType = String(orderType || '').toLowerCase();
+  if (normalizedType === 'print' || normalizedType === 'pack') {
+    return 'print_queued';
+  }
+  return 'pdf_ready';
+}
+
+async function syncOrderWithPdfJobResult({ job, outcome, errorMessage = '' }) {
+  const orderId = cleanText(job?.orderId, 120);
+  if (!orderId) {
+    return;
+  }
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .eq('owner_id', job.ownerId)
+    .single();
+
+  if (orderError || !order) {
+    return;
+  }
+
+  const nowIso = new Date().toISOString();
+  const nextMetadata = mergeOrderMetadata(order.metadata, {
+    pdfJobId: job.jobId,
+    pdfRequestedAt: order?.metadata?.pdfRequestedAt || job.createdAt || nowIso,
+    pdfPreviewFormat: job.previewFormat || order?.metadata?.pdfPreviewFormat || DEFAULT_PREVIEW_FORMAT
+  });
+  const updatePayload = {
+    metadata: nextMetadata,
+    updated_at: nowIso
+  };
+
+  if (outcome === 'ready') {
+    const targetStatus = getPdfCompletionTargetStatus(order.type);
+    const currentRank = getOrderStatusRank(order.status);
+    const targetRank = getOrderStatusRank(targetStatus);
+    const completedAt = job.completedAt || nowIso;
+
+    nextMetadata.pdfReady = true;
+    nextMetadata.pdfCompletedAt = completedAt;
+    nextMetadata.pdfError = null;
+    nextMetadata.pdfRenderer = job?.files?.renderer || null;
+
+    if (targetRank > currentRank) {
+      updatePayload.status = targetStatus;
+    }
+
+    updatePayload.pdf_ready_at = completedAt;
+  }
+
+  if (outcome === 'failed') {
+    nextMetadata.pdfReady = false;
+    nextMetadata.pdfError = cleanText(errorMessage || 'Generation PDF impossible', 260);
+
+    if (String(order.status || '').toLowerCase() === 'pdf_generating') {
+      updatePayload.status = 'paid';
+    }
+  }
+
+  await supabase
+    .from('orders')
+    .update(updatePayload)
+    .eq('id', order.id)
+    .eq('owner_id', job.ownerId);
 }
 
 router.post('/:id/generate-draft', authenticate, async (req, res) => {
@@ -456,6 +653,7 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
 
 router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
   try {
+    const db = createUserScopedClient(req) || supabase;
     const bookId = req.params.id;
     const { book, chapters } = await loadOwnedBookChapterContext({
       bookId,
@@ -490,10 +688,60 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       });
     }
 
-    const hasPaidAccess = await hasPaidPdfAccessForBook({
-      ownerId: req.user.id,
-      bookId
-    });
+    const requestedOrderId = cleanText(req.body?.orderId, 120);
+    let targetOrder = null;
+    let hasPaidAccess = false;
+
+    if (requestedOrderId) {
+      const { data: matchedOrder, error: matchedOrderError } = await db
+        .from('orders')
+        .select('*')
+        .eq('id', requestedOrderId)
+        .eq('owner_id', req.user.id)
+        .eq('book_id', bookId)
+        .single();
+
+      if (!matchedOrderError && matchedOrder) {
+        targetOrder = matchedOrder;
+      } else {
+        const { data: fallbackOrder, error: fallbackOrderError } = await db
+          .from('orders')
+          .select('*')
+          .eq('id', requestedOrderId)
+          .eq('owner_id', req.user.id)
+          .single();
+
+        if (!fallbackOrderError && fallbackOrder && isOrderLinkedToBook(fallbackOrder, bookId)) {
+          targetOrder = fallbackOrder;
+        } else {
+          const { data: rawOrder, error: rawOrderError } = await db
+            .from('orders')
+            .select('*')
+            .eq('id', requestedOrderId)
+            .single();
+
+          if (!rawOrderError && rawOrder && isOrderLinkedToBook(rawOrder, bookId)) {
+            targetOrder = rawOrder;
+          }
+        }
+      }
+
+      if (targetOrder) {
+        hasPaidAccess = hasOrderPdfAccess(targetOrder);
+      } else {
+        hasPaidAccess = await hasPaidPdfAccessForBook({
+          db,
+          ownerId: req.user.id,
+          bookId
+        });
+      }
+    } else {
+      hasPaidAccess = await hasPaidPdfAccessForBook({
+        db,
+        ownerId: req.user.id,
+        bookId
+      });
+    }
 
     if (!hasPaidAccess) {
       return res.status(403).json({
@@ -508,6 +756,7 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       jobId,
       bookId,
       ownerId: req.user.id,
+      orderId: targetOrder?.id || null,
       status: 'queued',
       createdAt,
       startedAt: null,
@@ -516,6 +765,29 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       files: null,
       previewFormat
     });
+
+    if (targetOrder) {
+      const nextOrderMetadata = mergeOrderMetadata(targetOrder.metadata, {
+        pdfJobId: jobId,
+        pdfRequestedAt: createdAt,
+        pdfPreviewFormat: previewFormat,
+        pdfReady: false,
+        pdfError: null
+      });
+      const orderUpdatePayload = {
+        metadata: nextOrderMetadata,
+        updated_at: createdAt
+      };
+      if (String(targetOrder.status || '').toLowerCase() === 'paid') {
+        orderUpdatePayload.status = 'pdf_generating';
+      }
+
+      await db
+        .from('orders')
+        .update(orderUpdatePayload)
+        .eq('id', targetOrder.id)
+        .eq('owner_id', req.user.id);
+    }
 
     processPdfExportJob({
       jobId,
@@ -542,19 +814,9 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
 
 router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res) => {
   try {
+    const db = createUserScopedClient(req) || supabase;
     const bookId = req.params.id;
     const jobId = req.params.jobId;
-    const hasPaidAccess = await hasPaidPdfAccessForBook({
-      ownerId: req.user.id,
-      bookId
-    });
-
-    if (!hasPaidAccess) {
-      return res.status(403).json({
-        error: 'Le PDF final est disponible uniquement apres paiement.'
-      });
-    }
-
     const job = getOwnedPdfExportJob({
       jobId,
       bookId,
@@ -563,6 +825,18 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
 
     if (!job) {
       return res.status(404).json({ error: 'Job export introuvable' });
+    }
+
+    const hasPaidAccess = await hasPaidPdfAccessForBook({
+      db,
+      ownerId: req.user.id,
+      bookId
+    });
+
+    if (!hasPaidAccess && !job.orderId) {
+      return res.status(403).json({
+        error: 'Le PDF final est disponible uniquement apres paiement.'
+      });
     }
 
     return res.json({
@@ -597,20 +871,10 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
 
 router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (req, res) => {
   try {
+    const db = createUserScopedClient(req) || supabase;
     const bookId = req.params.id;
     const jobId = req.params.jobId;
     const kind = req.params.kind;
-    const hasPaidAccess = await hasPaidPdfAccessForBook({
-      ownerId: req.user.id,
-      bookId
-    });
-
-    if (!hasPaidAccess) {
-      return res.status(403).json({
-        error: 'Le telechargement PDF est disponible uniquement apres paiement.'
-      });
-    }
-
     const job = getOwnedPdfExportJob({
       jobId,
       bookId,
@@ -619,6 +883,18 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
 
     if (!job) {
       return res.status(404).json({ error: 'Job export introuvable' });
+    }
+
+    const hasPaidAccess = await hasPaidPdfAccessForBook({
+      db,
+      ownerId: req.user.id,
+      bookId
+    });
+
+    if (!hasPaidAccess && !job.orderId) {
+      return res.status(403).json({
+        error: 'Le telechargement PDF est disponible uniquement apres paiement.'
+      });
     }
 
     if (job.status !== 'ready') {
@@ -1373,6 +1649,14 @@ async function processPdfExportJob({ jobId, book, chaptersWithDrafts, previewFor
     readyJob.error = null;
     readyJob.files = files;
     pdfExportJobs.set(jobId, readyJob);
+    try {
+      await syncOrderWithPdfJobResult({
+        job: readyJob,
+        outcome: 'ready'
+      });
+    } catch (syncError) {
+      console.error('Erreur sync commande PDF ready:', syncError);
+    }
   } catch (error) {
     const failedJob = pdfExportJobs.get(jobId);
     if (!failedJob) {
@@ -1383,6 +1667,15 @@ async function processPdfExportJob({ jobId, book, chaptersWithDrafts, previewFor
     failedJob.completedAt = new Date().toISOString();
     failedJob.error = cleanText(error?.message || 'Generation PDF impossible', 260);
     pdfExportJobs.set(jobId, failedJob);
+    try {
+      await syncOrderWithPdfJobResult({
+        job: failedJob,
+        outcome: 'failed',
+        errorMessage: failedJob.error
+      });
+    } catch (syncError) {
+      console.error('Erreur sync commande PDF failed:', syncError);
+    }
   }
 }
 

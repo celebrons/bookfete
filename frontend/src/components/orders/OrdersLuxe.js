@@ -6,7 +6,7 @@ import {
   includesPdf,
   formatPriceCents
 } from '../../utils/orderWorkflow';
-import { listOrders, updateOrderStatus } from '../../services/ordersApi';
+import { createStripeCheckoutSession, listOrders, updateOrderStatus } from '../../services/ordersApi';
 import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
 
@@ -32,6 +32,7 @@ const OrdersLuxe = () => {
   const [orders, setOrders] = useState([]);
   const [notice, setNotice] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState('');
+  const [startingPaymentOrderId, setStartingPaymentOrderId] = useState('');
 
   const loadOrders = async () => {
     try {
@@ -61,6 +62,22 @@ const OrdersLuxe = () => {
       setNotice({ type: 'error', message: error.message });
     } finally {
       setUpdatingOrderId('');
+    }
+  };
+
+  const startStripePayment = async (order) => {
+    if (!order?.id) return;
+    try {
+      setStartingPaymentOrderId(order.id);
+      setNotice(null);
+      const checkoutSession = await createStripeCheckoutSession(order.id);
+      if (!checkoutSession?.checkoutUrl) {
+        throw new Error('Impossible d ouvrir Stripe Checkout');
+      }
+      window.location.assign(checkoutSession.checkoutUrl);
+    } catch (error) {
+      setNotice({ type: 'error', message: error.message });
+      setStartingPaymentOrderId('');
     }
   };
 
@@ -133,8 +150,19 @@ const OrdersLuxe = () => {
                       className="btn btn-outline"
                       onClick={() => navigate(`/book/${bookId}`)}
                     >
-                      Ouvrir le livre
+                      Retour au livre
                     </button>
+
+                    {order.status === 'awaiting_payment' && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={startingPaymentOrderId === order.id}
+                        onClick={() => startStripePayment(order)}
+                      >
+                        {startingPaymentOrderId === order.id ? 'Redirection...' : 'Payer'}
+                      </button>
+                    )}
 
                     {order.status === 'paid' && includesPdf(order.type) && (
                       <button
@@ -143,6 +171,16 @@ const OrdersLuxe = () => {
                         onClick={() => navigate(`/book/${bookId}/checkout`)}
                       >
                         Finaliser PDF
+                      </button>
+                    )}
+
+                    {order.status === 'pdf_generating' && includesPdf(order.type) && (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => navigate(`/book/${bookId}/checkout`)}
+                      >
+                        Suivre generation PDF
                       </button>
                     )}
 

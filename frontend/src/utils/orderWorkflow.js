@@ -14,7 +14,7 @@ const ORDER_STATUS_CONFIG = {
   draft: { label: 'Brouillon', tone: 'is-draft' },
   awaiting_payment: { label: 'En attente paiement', tone: 'is-awaiting' },
   paid: { label: 'Payee', tone: 'is-paid' },
-  pdf_generating: { label: 'Generation PDF', tone: 'is-progress' },
+  pdf_generating: { label: 'Paiement valide - generation PDF', tone: 'is-progress' },
   pdf_ready: { label: 'PDF pret', tone: 'is-ready' },
   print_queued: { label: 'Mise en production', tone: 'is-progress' },
   sent_to_printer: { label: 'Envoye imprimeur', tone: 'is-progress' },
@@ -40,4 +40,3 @@ export const formatPriceCents = (value, currency = 'EUR') => {
     currency
   }).format(safeValue / 100);
 };
-

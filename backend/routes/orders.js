@@ -3,6 +3,13 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+let Stripe = null;
+
+try {
+  Stripe = require('stripe');
+} catch (_error) {
+  Stripe = null;
+}
 
 const ORDER_TYPES = new Set(['pdf', 'print', 'pack']);
 const ORDER_STATUSES = new Set([
@@ -18,6 +25,25 @@ const ORDER_STATUSES = new Set([
   'delivered',
   'cancelled',
   'failed'
+]);
+const ORDER_STATUS_REQUIRES_PAID = new Set([
+  'pdf_generating',
+  'pdf_ready',
+  'print_queued',
+  'sent_to_printer',
+  'printed',
+  'shipped',
+  'delivered'
+]);
+const ORDER_STATUS_PAID_OR_AFTER = new Set([
+  'paid',
+  'pdf_generating',
+  'pdf_ready',
+  'print_queued',
+  'sent_to_printer',
+  'printed',
+  'shipped',
+  'delivered'
 ]);
 
 const STATUS_TO_BOOK_LIFECYCLE = {
@@ -38,6 +64,14 @@ const BOOK_LIFECYCLE_ORDER = [
 ];
 
 const getNowIso = () => new Date().toISOString();
+const FRONTEND_BASE_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
+const STRIPE_ENABLED = process.env.STRIPE_ENABLED === '1';
+const STRIPE_CHECKOUT_SUCCESS_URL = process.env.STRIPE_CHECKOUT_SUCCESS_URL || '';
+const STRIPE_CHECKOUT_CANCEL_URL = process.env.STRIPE_CHECKOUT_CANCEL_URL || '';
+const stripeClient = (STRIPE_ENABLED && Stripe && STRIPE_SECRET_KEY)
+  ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
+  : null;
 
 const extractBearerToken = (req) => {
   const authHeader = req.headers?.authorization || '';
@@ -67,6 +101,33 @@ const createUserScopedClient = (req) => {
       }
     }
   );
+};
+
+const ensureStripeClient = () => {
+  if (!STRIPE_ENABLED) {
+    const error = new Error('Stripe est desactive');
+    error.status = 400;
+    throw error;
+  }
+  if (!Stripe) {
+    const error = new Error('Module Stripe non installe sur le serveur');
+    error.status = 500;
+    throw error;
+  }
+  if (!stripeClient) {
+    const error = new Error('Configuration Stripe incomplete');
+    error.status = 500;
+    throw error;
+  }
+  return stripeClient;
+};
+
+const fillCheckoutUrlTemplate = (template, context) => {
+  if (!template) return '';
+  return String(template)
+    .replace(/\{BOOK_ID\}/g, context.bookId)
+    .replace(/\{ORDER_ID\}/g, context.orderId)
+    .replace(/\{CHECKOUT_SESSION_ID\}/g, '{CHECKOUT_SESSION_ID}');
 };
 
 const cleanString = (value, maxLength = 240) => {
@@ -375,7 +436,14 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 router.post('/:orderId/pay', authenticate, async (req, res) => {
+  return res.status(410).json({
+    error: 'Paiement direct desactive. Utilisez Stripe Checkout.'
+  });
+});
+
+router.post('/:orderId/checkout-session', authenticate, async (req, res) => {
   try {
+    const stripe = ensureStripeClient();
     const db = createUserScopedClient(req);
     const { data: order, error: orderError } = await db
       .from('orders')
@@ -389,29 +457,144 @@ router.post('/:orderId/pay', authenticate, async (req, res) => {
     }
 
     if (!['draft', 'awaiting_payment'].includes(order.status)) {
-      return res.status(409).json({ error: 'Commande deja payee ou terminee' });
+      return res.status(409).json({ error: 'Commande deja en paiement ou traitee' });
+    }
+
+    const context = {
+      bookId: String(order.book_id || ''),
+      orderId: String(order.id || '')
+    };
+    const successUrl = fillCheckoutUrlTemplate(
+      STRIPE_CHECKOUT_SUCCESS_URL,
+      context
+    ) || `${FRONTEND_BASE_URL}/book/${context.bookId}/checkout?payment=success&orderId=${context.orderId}&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = fillCheckoutUrlTemplate(
+      STRIPE_CHECKOUT_CANCEL_URL,
+      context
+    ) || `${FRONTEND_BASE_URL}/book/${context.bookId}/checkout?payment=cancel&orderId=${context.orderId}`;
+
+    const checkoutSession = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      customer_email: req.user.email || undefined,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        orderId: String(order.id),
+        ownerId: String(req.user.id),
+        bookId: String(order.book_id || ''),
+        orderNumber: String(order.order_number || '')
+      },
+      line_items: [
+        {
+          quantity: Number(order.quantity || 1),
+          price_data: {
+            currency: String(order.currency || 'EUR').toLowerCase(),
+            unit_amount: Number(order.unit_cents || order.total_cents || 0),
+            product_data: {
+              name: `Livre souvenir - ${order.book_title || 'Sans titre'}`,
+              description: `Commande ${order.order_number || ''} (${order.type || 'pdf'})`
+            }
+          }
+        }
+      ]
+    });
+
+    const nowIso = getNowIso();
+    const mergedMetadata = mergeMetadata(order.metadata, {
+      stripeCheckoutSessionId: checkoutSession.id,
+      stripeCheckoutCreatedAt: nowIso
+    });
+
+    await db
+      .from('orders')
+      .update({
+        metadata: mergedMetadata,
+        updated_at: nowIso
+      })
+      .eq('id', order.id)
+      .eq('owner_id', req.user.id);
+
+    return res.json({
+      checkoutUrl: checkoutSession.url,
+      sessionId: checkoutSession.id
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    return res.status(status).json({ error: error.message });
+  }
+});
+
+router.post('/:orderId/stripe/confirm', authenticate, async (req, res) => {
+  try {
+    const stripe = ensureStripeClient();
+    const db = createUserScopedClient(req);
+    const sessionId = cleanString(req.body?.sessionId || '', 240);
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId requis' });
+    }
+
+    const { data: order, error: orderError } = await db
+      .from('orders')
+      .select('*')
+      .eq('id', req.params.orderId)
+      .eq('owner_id', req.user.id)
+      .single();
+
+    if (orderError || !order) {
+      return res.status(404).json({ error: 'Commande introuvable' });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session Stripe introuvable' });
+    }
+
+    const sessionOrderId = String(session.metadata?.orderId || '');
+    if (sessionOrderId && sessionOrderId !== String(order.id)) {
+      return res.status(400).json({ error: 'Session Stripe non associee a cette commande' });
+    }
+
+    if (String(session.payment_status || '').toLowerCase() !== 'paid') {
+      return res.status(409).json({ error: 'Paiement Stripe non confirme' });
     }
 
     const nowIso = getNowIso();
-    const paymentReference = cleanString(req.body?.paymentReference || '', 120) || `SIM-${Date.now()}`;
+    const nextMetadata = mergeMetadata(order.metadata, {
+      stripeCheckoutSessionId: session.id,
+      stripePaymentIntentId: session.payment_intent || null,
+      stripePaymentStatus: session.payment_status,
+      stripeConfirmedAt: nowIso
+    });
 
-    const { data, error } = await db
+    const updatePayload = {
+      metadata: nextMetadata,
+      updated_at: nowIso
+    };
+
+    if (['draft', 'awaiting_payment'].includes(order.status)) {
+      updatePayload.status = 'paid';
+      updatePayload.payment_reference = cleanString(String(session.payment_intent || session.id), 120);
+      updatePayload.paid_at = nowIso;
+    }
+
+    const { data: updatedOrder, error: updateError } = await db
       .from('orders')
-      .update({
-        status: 'paid',
-        payment_reference: paymentReference,
-        paid_at: nowIso,
-        updated_at: nowIso
-      })
+      .update(updatePayload)
       .eq('id', order.id)
       .eq('owner_id', req.user.id)
       .select('*')
       .single();
 
-    if (error) throw error;
-    return res.json(getApiSafeOrder(data));
+    if (updateError || !updatedOrder) {
+      throw updateError || new Error('Impossible de mettre a jour la commande');
+    }
+
+    return res.json(getApiSafeOrder(updatedOrder));
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    const status = error.status || 500;
+    return res.status(status).json({ error: error.message });
   }
 });
 
@@ -438,6 +621,16 @@ router.post('/:orderId/status', authenticate, async (req, res) => {
 
     if (!canUseStatusForOrderType(nextStatus, order.type)) {
       return res.status(400).json({ error: 'Statut incompatible avec ce type de commande' });
+    }
+    if (nextStatus === 'paid') {
+      return res.status(403).json({
+        error: 'Statut paid reserve a la confirmation Stripe'
+      });
+    }
+    if (ORDER_STATUS_REQUIRES_PAID.has(nextStatus) && !ORDER_STATUS_PAID_OR_AFTER.has(order.status)) {
+      return res.status(409).json({
+        error: 'Paiement requis avant de lancer la production'
+      });
     }
 
     const nowIso = getNowIso();

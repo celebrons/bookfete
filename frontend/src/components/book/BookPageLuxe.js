@@ -65,6 +65,12 @@ const ORDER_STATUSES_WITH_PDF_ACCESS = new Set([
   'shipped',
   'delivered'
 ]);
+const wait = (durationMs) => new Promise((resolve) => {
+  setTimeout(resolve, durationMs);
+});
+const isMissingPdfJobError = (error) => (
+  /job export introuvable|introuvable/i.test(String(error?.message || ''))
+);
 const BOOK_PREVIEW_FORMATS = [
   {
     id: 'prestige',
@@ -189,6 +195,7 @@ const BookPageLuxe = () => {
   });
   const [updatingLifecycleStatus, setUpdatingLifecycleStatus] = useState('');
   const [hasPaidOrderAccess, setHasPaidOrderAccess] = useState(false);
+  const [latestPdfOrder, setLatestPdfOrder] = useState(null);
   const [user, setUser] = useState(null);
   const [pageNotice, setPageNotice] = useState(null);
   const [editionGalleryRequest, setEditionGalleryRequest] = useState(0);
@@ -348,12 +355,49 @@ const BookPageLuxe = () => {
   const loadBookOrderAccess = async () => {
     try {
       const orders = await listOrdersByBook(bookId);
+      const latestOrder = Array.isArray(orders)
+        ? orders.find((order) => ['pdf', 'pack'].includes(String(order?.type || '').toLowerCase()))
+        : null;
       const paidAccess = Array.isArray(orders) && orders.some((order) => (
         ORDER_STATUSES_WITH_PDF_ACCESS.has(String(order?.status || '').toLowerCase())
       ));
       setHasPaidOrderAccess(paidAccess);
+      setLatestPdfOrder(latestOrder || null);
+
+      const jobId = String(latestOrder?.metadata?.pdfJobId || '').trim();
+      if (jobId) {
+        setPdfExportJob((previous) => {
+          const orderStatus = String(latestOrder?.status || '').toLowerCase();
+          const inferredStatus = (
+            latestOrder?.metadata?.pdfReady || orderStatus === 'pdf_ready'
+          )
+            ? 'ready'
+            : orderStatus === 'pdf_generating'
+              ? 'rendering'
+              : previous?.status || 'queued';
+
+          return {
+            jobId,
+            status: inferredStatus,
+            createdAt: previous?.createdAt || latestOrder?.metadata?.pdfRequestedAt || null,
+            completedAt: latestOrder?.metadata?.pdfCompletedAt || previous?.completedAt || null,
+            renderer: latestOrder?.metadata?.pdfRenderer || previous?.renderer || null,
+            error: latestOrder?.metadata?.pdfError || null
+          };
+        });
+      }
+
+      return {
+        paidAccess,
+        latestPdfOrder: latestOrder || null
+      };
     } catch (error) {
       setHasPaidOrderAccess(false);
+      setLatestPdfOrder(null);
+      return {
+        paidAccess: false,
+        latestPdfOrder: null
+      };
     }
   };
 
@@ -438,13 +482,19 @@ const BookPageLuxe = () => {
     setLoadingPdfPreview(false);
   };
 
-  const fetchPdfFileBlob = async ({ kind, jobId }) => {
+  const getAuthAccessToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
 
     if (!token) {
       throw new Error('Session introuvable');
     }
+
+    return token;
+  };
+
+  const fetchPdfFileBlob = async ({ kind, jobId }) => {
+    const token = await getAuthAccessToken();
 
     const response = await fetch(
       `${getApiBaseUrl()}/books/${bookId}/export-final-pdf/${jobId}/download/${kind}`,
@@ -474,22 +524,143 @@ const BookPageLuxe = () => {
     };
   };
 
+  const startFinalPdfExportJob = async (orderId = '') => {
+    const token = await getAuthAccessToken();
+    const normalizedOrderId = String(orderId || '').trim();
+    const payloadBody = normalizedOrderId ? { orderId: normalizedOrderId } : {};
+    const response = await fetch(
+      `${getApiBaseUrl()}/books/${bookId}/export-final-pdf`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payloadBody)
+      }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Impossible de relancer la generation PDF');
+    }
+    return payload;
+  };
+
+  const pollFinalPdfExportJobUntilReady = async (jobId) => {
+    const token = await getAuthAccessToken();
+    const maxAttempts = 90;
+    const delayMs = 2200;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await fetch(
+        `${getApiBaseUrl()}/books/${bookId}/export-final-pdf/${jobId}/status`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      // eslint-disable-next-line no-await-in-loop
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Erreur pendant la generation du PDF');
+      }
+
+      setPdfExportJob((previous) => ({
+        ...previous,
+        ...payload
+      }));
+
+      if (payload.status === 'ready') {
+        return payload;
+      }
+      if (payload.status === 'failed') {
+        throw new Error(payload.error || 'La generation du PDF a echoue');
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      await wait(delayMs);
+    }
+
+    throw new Error('Le PDF met trop de temps a etre genere. Reessayez dans quelques instants.');
+  };
+
+  const recoverMissingPdfJob = async (orderOverride = null) => {
+    const accessSnapshot = await loadBookOrderAccess();
+    const paidAccess = accessSnapshot?.paidAccess ?? hasPaidOrderAccess;
+    const linkedOrder = orderOverride || accessSnapshot?.latestPdfOrder || latestPdfOrder;
+
+    if (!paidAccess || !linkedOrder?.id) {
+      throw new Error('Commande associee au PDF introuvable');
+    }
+
+    showPageNotice('Le job PDF a expire. Regeneration en cours...', 'info');
+    let restartedJob;
+    try {
+      restartedJob = await startFinalPdfExportJob(linkedOrder.id);
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (!message.includes('commande associee au pdf introuvable')) {
+        throw error;
+      }
+      restartedJob = await startFinalPdfExportJob('');
+    }
+
+    setPdfExportJob((previous) => ({
+      ...previous,
+      ...restartedJob,
+      status: restartedJob?.status || previous?.status || 'queued'
+    }));
+
+    const readyJob = await pollFinalPdfExportJobUntilReady(restartedJob.jobId);
+    await loadBookOrderAccess();
+
+    showPageNotice('PDF regenere. Le telechargement demarre.', 'success');
+    return readyJob.jobId;
+  };
+
   const openPdfPreviewModal = async (kind = 'interior', jobOverride = null) => {
-    if (!hasPaidOrderAccess) {
+    const accessSnapshot = await loadBookOrderAccess();
+    const canAccessPdf = accessSnapshot?.paidAccess ?? hasPaidOrderAccess;
+    const currentPdfOrder = accessSnapshot?.latestPdfOrder || latestPdfOrder;
+    const currentPdfOrderStatus = String(currentPdfOrder?.status || '').toLowerCase();
+
+    if (!canAccessPdf) {
       showPageNotice('Le PDF fidele est disponible apres paiement. Utilisez l apercu protege en attendant.', 'info');
       return;
     }
 
     const targetJob = jobOverride || pdfExportJob;
-    if (!targetJob?.jobId) {
-      showPageNotice('Aucun PDF disponible pour l apercu.', 'info');
+    if (
+      currentPdfOrderStatus === 'pdf_generating'
+      && targetJob?.status !== 'ready'
+    ) {
+      showPageNotice('Paiement valide. Le PDF final est en cours de generation et sera disponible sous peu.', 'info');
       return;
     }
 
     setLoadingPdfPreview(true);
 
     try {
-      const { blob } = await fetchPdfFileBlob({ kind, jobId: targetJob.jobId });
+      let jobIdToUse = String(targetJob?.jobId || '').trim();
+      if (!jobIdToUse) {
+        jobIdToUse = await recoverMissingPdfJob(currentPdfOrder);
+      }
+
+      let blobResult;
+      try {
+        blobResult = await fetchPdfFileBlob({ kind, jobId: jobIdToUse });
+      } catch (error) {
+        if (!isMissingPdfJobError(error)) {
+          throw error;
+        }
+        const recoveredJobId = await recoverMissingPdfJob(currentPdfOrder);
+        blobResult = await fetchPdfFileBlob({ kind, jobId: recoveredJobId });
+      }
+
+      const { blob } = blobResult;
       const objectUrl = window.URL.createObjectURL(blob);
 
       setPdfPreviewModal((previous) => {
@@ -1187,21 +1358,46 @@ const BookPageLuxe = () => {
   };
 
   const handleDownloadPdfFile = async (kind) => {
-    if (!pdfExportJob?.jobId) {
+    const accessSnapshot = await loadBookOrderAccess();
+    const canAccessPdf = accessSnapshot?.paidAccess ?? hasPaidOrderAccess;
+    const currentPdfOrder = accessSnapshot?.latestPdfOrder || latestPdfOrder;
+    const currentPdfOrderStatus = String(currentPdfOrder?.status || '').toLowerCase();
+    let jobIdToUse = String(pdfExportJob?.jobId || '').trim();
+
+    if (!canAccessPdf) {
+      showPageNotice('Telechargement bloque avant paiement.', 'error');
       return;
     }
 
-    if (!hasPaidOrderAccess) {
-      showPageNotice('Telechargement bloque avant paiement.', 'error');
+    if (currentPdfOrderStatus === 'pdf_generating' && pdfExportJob?.status !== 'ready' && !jobIdToUse) {
+      showPageNotice('Paiement valide. Le PDF final est en cours de generation.', 'info');
       return;
     }
 
     try {
       setDownloadingPdfKind(kind);
-      const { blob, fileName } = await fetchPdfFileBlob({
-        kind,
-        jobId: pdfExportJob.jobId
-      });
+      if (!jobIdToUse) {
+        jobIdToUse = await recoverMissingPdfJob(currentPdfOrder);
+      }
+
+      let downloadResult;
+      try {
+        downloadResult = await fetchPdfFileBlob({
+          kind,
+          jobId: jobIdToUse
+        });
+      } catch (error) {
+        if (!isMissingPdfJobError(error)) {
+          throw error;
+        }
+        const recoveredJobId = await recoverMissingPdfJob(currentPdfOrder);
+        downloadResult = await fetchPdfFileBlob({
+          kind,
+          jobId: recoveredJobId
+        });
+      }
+
+      const { blob, fileName } = downloadResult;
 
       const objectUrl = window.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -1217,6 +1413,69 @@ const BookPageLuxe = () => {
       setDownloadingPdfKind('');
     }
   };
+
+  useEffect(() => {
+    if (!bookId || !user || !pdfExportJob?.jobId) {
+      return undefined;
+    }
+    if (pdfExportJob.status === 'ready' || pdfExportJob.status === 'failed') {
+      return undefined;
+    }
+
+    let active = true;
+    let timer = null;
+
+    const refreshPdfJobStatus = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token || !active) {
+          return;
+        }
+
+        const response = await fetch(
+          `${getApiBaseUrl()}/books/${bookId}/export-final-pdf/${pdfExportJob.jobId}/status`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+        const payload = await response.json().catch(() => ({}));
+
+        if (!active) {
+          return;
+        }
+
+        if (response.ok && payload?.jobId) {
+          setPdfExportJob((previous) => ({
+            ...previous,
+            ...payload
+          }));
+          if (payload.status === 'ready' || payload.status === 'failed') {
+            await loadBookOrderAccess();
+            return;
+          }
+        }
+      } catch (_error) {
+        // silent background refresh
+      }
+
+      if (active) {
+        timer = setTimeout(refreshPdfJobStatus, 3500);
+      }
+    };
+
+    timer = setTimeout(refreshPdfJobStatus, 1800);
+
+    return () => {
+      active = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [bookId, user, pdfExportJob?.jobId, pdfExportJob?.status]);
 
   const handleUpdateChaptersFromPages = async (newPages) => {
     try {
