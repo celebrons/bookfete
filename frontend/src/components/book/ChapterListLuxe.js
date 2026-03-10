@@ -41,6 +41,58 @@ const normalizeText = (value) => {
   return String(value).trim();
 };
 
+const CoverFaceIcon = ({ side = 'front' }) => (
+  <svg
+    viewBox="0 0 48 48"
+    focusable="false"
+    aria-hidden="true"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="10" y="6" width="28" height="36" rx="5" />
+    <path d="M16 6v36" />
+    {side === 'back' ? (
+      <>
+        <path d="M21 14h12" />
+        <path d="M21 19h12" />
+        <path d="M21 24h8" />
+        <rect x="21" y="30" width="12" height="6" rx="1.2" />
+        <path d="M23 31v4M25 31v4M27 31v4M29 31v4M31 31v4" />
+      </>
+    ) : (
+      <>
+        <path d="M21 14h12" />
+        <path d="M21 20h9" />
+        <path d="M21 28h12" />
+        <path d="M21 34h6" />
+      </>
+    )}
+  </svg>
+);
+
+const ChapterCardIcon = () => (
+  <svg
+    viewBox="0 0 56 56"
+    focusable="false"
+    aria-hidden="true"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="10" y="8" width="36" height="40" rx="8.5" />
+    <path d="M18 8v40" />
+    <path d="M23 19h15" />
+    <path d="M23 25h12" />
+    <path d="M23 31h15" />
+    <path d="M23 37h10" />
+  </svg>
+);
+
 const ChapterListLuxe = ({
   chapters,
   onUpdateChapter,
@@ -295,10 +347,8 @@ const ChapterListLuxe = ({
                       onClick={() => openEditionItem(item.id)}
                       className={`chapter-item chapter-special-card is-interactive ${selectedChapterId === item.id ? 'selected' : ''} ${isFront ? 'chapter-cover-card' : 'chapter-back-cover-card'}`}
                     >
-                      <div className="chapter-special-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" focusable="false">
-                          <path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22.5V4.5zm3 0H18v13H8a2.5 2.5 0 0 0-1 .21V5a.5.5 0 0 1 .5-.5z" />
-                        </svg>
+                      <div className={`chapter-special-icon ${isFront ? 'is-front' : 'is-back'}`} aria-hidden="true">
+                        <CoverFaceIcon side={isFront ? 'front' : 'back'} />
                       </div>
                       <div className="chapter-special-title">{isFront ? 'Couverture' : '4e de couverture'}</div>
                       <div className="chapter-special-subtitle">Configurer</div>
@@ -318,7 +368,6 @@ const ChapterListLuxe = ({
                 const { chapter, index } = item;
                 const chapterProgress = getChapterProgressState(chapter);
                 const displayTitle = index === 0 ? 'Introduction' : chapter.title;
-                const chapterShapeClass = `chapter-shape-${(index % 5) + 1}`;
                 const chapterAccent = chapterProgress.key === 'done'
                   ? '#2f8f58'
                   : chapterProgress.key === 'inProgress'
@@ -329,7 +378,7 @@ const ChapterListLuxe = ({
                   <div
                     key={chapter.id}
                     onClick={() => openEditionItem(chapter.id)}
-                    className={`chapter-item chapter-card-sketch ${chapterShapeClass} ${selectedChapterId === chapter.id ? 'selected' : ''}`}
+                    className={`chapter-item chapter-card-sketch ${selectedChapterId === chapter.id ? 'selected' : ''}`}
                     style={{
                       opacity: deleteConfirm?.id === chapter.id ? 0.5 : 1
                     }}
@@ -373,13 +422,8 @@ const ChapterListLuxe = ({
                       className="chapter-book-visual"
                       style={{ '--chapter-accent': chapterAccent }}
                     >
-                      <div className="chapter-book-stack" aria-hidden="true">
-                        <span className="chapter-sheet chapter-sheet-back" />
-                        <span className="chapter-sheet chapter-sheet-front">
-                          <svg viewBox="0 0 24 24" focusable="false">
-                            <path d="M6 6h12v2H6V6zm0 4h12v2H6v-2zm0 4h8v2H6v-2z" />
-                          </svg>
-                        </span>
+                      <div className="chapter-book-glyph" aria-hidden="true">
+                        <ChapterCardIcon />
                       </div>
                     </div>
 

@@ -1962,6 +1962,18 @@ const BookPageLuxe = () => {
                     Mis a jour: {lifecycleUpdatedLabel}
                   </span>
                 )}
+                {!showSecondaryPreviewAction && (
+                  <button
+                    type="button"
+                    className="book-dashboard-mini book-dashboard-mini-inline"
+                    onClick={() => navigate('/dashboard')}
+                    aria-label="Retour au tableau de bord"
+                    title="Retour au tableau de bord"
+                  >
+                    <span className="book-dashboard-mini-icon" aria-hidden="true" />
+                    <span className="book-dashboard-mini-label">Tableau de bord</span>
+                  </button>
+                )}
               </div>
               <div className="book-lifecycle-line">
                 {BOOK_LIFECYCLE_ORDER.map((statusKey, index) => {
@@ -1977,16 +1989,24 @@ const BookPageLuxe = () => {
                   const lifecycleStepClick = isCurrent ? currentLifecycleAction.onClick : undefined;
                   return (
                     <React.Fragment key={statusKey}>
-                      <button
-                        type="button"
+                      <div
                       className={`book-lifecycle-step ${isCurrent ? 'is-current' : ''} ${isDone ? 'is-done' : ''} ${isUpcoming ? 'is-upcoming' : ''}`}
-                      onClick={lifecycleStepClick}
-                      disabled={!isCurrent || currentLifecycleAction.disabled}
                       title={isCurrent ? `${config.label} - ${currentLifecycleAction.note}` : config.label}
                     >
                       <span className="book-lifecycle-marker">{isDone ? '✓' : index + 1}</span>
                       <span className="book-lifecycle-label">{config.shortLabel}</span>
-                    </button>
+                      {isCurrent && currentLifecycleAction.key !== 'workflow_done' && (
+                        <button
+                          type="button"
+                          className="book-lifecycle-inline-action"
+                          onClick={lifecycleStepClick}
+                          disabled={currentLifecycleAction.disabled}
+                        >
+                          <span className="book-lifecycle-inline-action-label">{currentLifecycleAction.label}</span>
+                          <span className="book-lifecycle-inline-action-note">{currentLifecycleAction.note}</span>
+                        </button>
+                      )}
+                    </div>
                     {nextStatusKey && (
                       <span className={`book-lifecycle-connector ${isConnectorDone ? 'is-done' : ''} ${isConnectorCurrent ? 'is-current' : ''}`} />
                     )}
@@ -1994,18 +2014,21 @@ const BookPageLuxe = () => {
                   );
                 })}
               </div>
-              <button
-                type="button"
-                className="book-lifecycle-current-action"
-                onClick={currentLifecycleAction.onClick}
-                disabled={currentLifecycleAction.disabled}
-              >
-                <span className="book-lifecycle-current-label">{currentLifecycleAction.label}</span>
-                <span className="book-lifecycle-current-note">{currentLifecycleAction.note}</span>
-              </button>
             </div>
           {showSecondaryPreviewAction && (
             <div className="book-header-actions">
+              <div className="book-header-actions-top">
+                <button
+                  type="button"
+                  className="book-dashboard-mini"
+                  onClick={() => navigate('/dashboard')}
+                  aria-label="Retour au tableau de bord"
+                  title="Retour au tableau de bord"
+                >
+                  <span className="book-dashboard-mini-icon" aria-hidden="true" />
+                  <span className="book-dashboard-mini-label">Tableau de bord</span>
+                </button>
+              </div>
               <div className="book-header-actions-row is-primary">
                 <button
                   type="button"
@@ -2019,7 +2042,7 @@ const BookPageLuxe = () => {
                   <span className="book-action-label">
                     {generatingDraft
                       ? 'Generation...'
-                      : hasPreviewBeenGenerated ? 'Regenerer un apercu' : 'Generer un apercu'}
+                      : 'Apercu au format livre'}
                   </span>
                   <span className="book-action-note">
                     Rendu livre assemble
