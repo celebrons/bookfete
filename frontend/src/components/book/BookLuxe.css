@@ -1646,6 +1646,28 @@
   box-shadow: 0 12px 24px -20px rgba(0, 0, 0, 0.12);
 }
 
+.draft-book-section-cover {
+  min-height: var(--preview-page-min-height, 500px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.draft-book-section-cover .draft-book-mini-title {
+  margin-bottom: var(--space-xs);
+}
+
+.draft-book-section-cover .cover-preview-spread {
+  display: block;
+  flex: 1;
+  min-height: 0;
+}
+
+.draft-book-section-cover .cover-preview-card {
+  min-height: calc(var(--preview-page-min-height, 500px) - 72px);
+  max-height: calc(var(--preview-page-min-height, 500px) - 72px);
+}
+
 .draft-book-section h2,
 .draft-book-chapter h3 {
   margin: 0 0 var(--space-sm);
@@ -1694,6 +1716,27 @@
 .draft-book-closing {
   margin: var(--space-md) 0 0;
   font-weight: 500;
+}
+
+.draft-book-folio {
+  margin-top: auto;
+  padding-top: var(--space-sm);
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  gap: 8px;
+  color: #8b6a2f;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.draft-book-folio-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(184, 146, 74, 0.78);
 }
 
 .draft-book-source {
@@ -1759,6 +1802,51 @@
 .draft-book-empty {
   color: var(--text-light);
   font-style: italic;
+}
+
+.draft-book-question-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: luxe-question;
+  display: grid;
+  gap: 8px;
+}
+
+.draft-book-question-list li {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(184, 146, 74, 0.24);
+  background: rgba(255, 255, 255, 0.74);
+  line-height: 1.58;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  counter-increment: luxe-question;
+}
+
+.draft-book-question-list li::before {
+  content: counter(luxe-question, decimal-leading-zero);
+  color: #8b6a2f;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  margin-top: 2px;
+}
+
+.draft-book-question-list li > span {
+  display: block;
+  min-width: 0;
+}
+
+.draft-book-text-block,
+.draft-book-body p,
+.draft-book-contributor-item,
+.draft-book-question-list li {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .book-pdf-preview-modal {

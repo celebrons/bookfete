@@ -5,6 +5,19 @@ const aiService = require('../services/aiService');
 const promptTemplateService = require('../services/promptTemplateService');
 const authenticate = require('../middleware/auth');
 
+const PROMPT_DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(
+  String(process.env.DEBUG_PROMPT_TRACE || '').trim().toLowerCase()
+);
+
+function logPromptDebug(tag, payload) {
+  if (!PROMPT_DEBUG_ENABLED) return;
+  try {
+    console.log(`[PROMPT_TRACE][${tag}] ${JSON.stringify(payload, null, 2)}`);
+  } catch (_error) {
+    console.log(`[PROMPT_TRACE][${tag}]`, payload);
+  }
+}
+
 function ensurePromptAdmin(req, res, next) {
   const allowListRaw = process.env.AI_PROMPT_ADMIN_EMAILS || '';
   const allowList = allowListRaw
@@ -551,6 +564,7 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
       eventType = '*',
       locale = 'fr',
       variables = {},
+      useDefaultVariables = true,
       runModel = false,
       model = 'mistral-small-latest',
       systemPrompt,
@@ -564,11 +578,13 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
       promptKey,
       eventType: normalizedEventType
     });
-
-    const mergedVariables = {
-      ...defaultVariables,
-      ...(variables || {})
-    };
+    const useFallbackDefaults = useDefaultVariables !== false;
+    const mergedVariables = useFallbackDefaults
+      ? {
+          ...defaultVariables,
+          ...(variables || {})
+        }
+      : { ...(variables || {}) };
 
     const promptConfig = await promptTemplateService.getActivePromptConfig({
       promptKey,
@@ -586,10 +602,15 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
     const resolvedUserPromptTemplate = hasUserTemplateOverride
       ? userPromptTemplate.trim()
       : promptConfig.userPromptTemplate;
-    const resolvedUserPrompt = promptTemplateService.compileTemplate(
+    const compiledUserPrompt = promptTemplateService.compileTemplate(
       resolvedUserPromptTemplate,
       mergedVariables
     );
+    const resolvedUserPrompt = promptTemplateService.applyPromptGuardrails({
+      promptKey,
+      userPrompt: compiledUserPrompt,
+      variables: mergedVariables
+    });
 
     const payload = {
       promptKey,
@@ -600,6 +621,8 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
       systemPrompt: resolvedSystemPrompt,
       userPromptTemplate: resolvedUserPromptTemplate,
       userPrompt: resolvedUserPrompt,
+      variables: mergedVariables,
+      useDefaultVariables: useFallbackDefaults,
       compiledPrompt: [
         '[SYSTEM PROMPT]',
         resolvedSystemPrompt || '',
@@ -617,6 +640,21 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
         modelOutput: ''
       })
     };
+
+    logPromptDebug('admin_prompt_test_request', {
+      promptKey,
+      eventType: normalizedEventType,
+      locale,
+      runModel: Boolean(runModel),
+      model,
+      source: payload.source,
+      version: payload.version,
+      useDefaultVariables: useFallbackDefaults,
+      variables: mergedVariables,
+      systemPrompt: resolvedSystemPrompt,
+      userPromptTemplate: resolvedUserPromptTemplate,
+      userPromptCompiled: resolvedUserPrompt
+    });
 
     if (runModel) {
       const response = await aiService.mistral.chat.complete({
@@ -645,6 +683,12 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
         userPrompt: resolvedUserPrompt,
         variables: mergedVariables,
         modelOutput
+      });
+
+      logPromptDebug('admin_prompt_test_model_output', {
+        promptKey,
+        model,
+        output: modelOutput
       });
     }
 
@@ -717,6 +761,32 @@ router.patch('/prompt-templates/:promptKey/versions/:version', authenticate, ens
     });
   } catch (error) {
     console.error('❌ Erreur mise à jour note version prompt:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/prompt-templates/:promptKey/activate', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const { promptKey } = req.params;
+    const {
+      eventType = '*',
+      locale = 'fr',
+      version
+    } = req.body || {};
+
+    const result = await promptTemplateService.activatePromptVersion({
+      promptKey,
+      eventType,
+      locale,
+      version
+    });
+
+    res.json({
+      ok: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('❌ Erreur activation version prompt:', error);
     res.status(400).json({ error: error.message });
   }
 });

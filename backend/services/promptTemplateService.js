@@ -163,13 +163,89 @@ function clearPromptCache() {
 
 function compileTemplate(template, variables = {}) {
   const source = normalizeText(template);
-  return source.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, variableName) => {
+  const resolveVariableValue = (variableName) => {
     const rawValue = variables[variableName];
     if (rawValue === null || rawValue === undefined) return '';
     if (Array.isArray(rawValue)) return rawValue.join(', ');
     if (typeof rawValue === 'object') return JSON.stringify(rawValue);
     return String(rawValue);
+  };
+
+  const withMustache = source.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, variableName) => (
+    resolveVariableValue(variableName)
+  ));
+
+  return withMustache.replace(/\[([a-zA-Z_][a-zA-Z0-9_]*)\]/g, (fullMatch, variableName) => {
+    // Keep non-variable bracketed text untouched to avoid accidental removals.
+    if (!Object.prototype.hasOwnProperty.call(variables || {}, variableName)) {
+      return fullMatch;
+    }
+    return resolveVariableValue(variableName);
   });
+}
+
+function applyPromptGuardrails({ promptKey, userPrompt = '', variables = {} }) {
+  const source = normalizeText(userPrompt);
+  if (!source) return source;
+
+  if (promptKey !== PROMPT_KEYS.QUESTION_GENERATION) {
+    return source;
+  }
+
+  const recipientName = normalizeText(variables?.recipientName, 'la personne celebree');
+  const chapterTitle = normalizeText(variables?.chapterTitle, 'le chapitre en cours');
+  const recipientGender = normalizeText(variables?.recipientGender, 'non specifie').toLowerCase();
+  const subjectPronoun = normalizeText(variables?.subjectPronoun, recipientGender === 'homme' ? 'il' : 'elle');
+  const possessive = normalizeText(variables?.possessive, recipientGender === 'homme' ? 'son' : 'sa');
+  const grammaticalGuardrail = recipientGender === 'homme'
+    ? [
+        '- Accord grammatical obligatoire au masculin.',
+        '- Interdiction des formes feminines pour la personne celebree: "elle", "connue", "genereuse", "presente", etc.',
+        '- Utilise des formulations masculines coherentes: "il", "connu", "genereux", "present".'
+      ]
+    : recipientGender === 'femme'
+      ? [
+          '- Accord grammatical obligatoire au feminin.',
+          '- Interdiction des formes masculines pour la personne celebree: "il", "connu", "genereux", "present", etc.',
+          '- Utilise des formulations feminines coherentes: "elle", "connue", "genereuse", "presente".'
+        ]
+      : [
+          '- Accord grammatical coherent avec les pronoms fournis.'
+        ];
+  const constrainedValues = [
+    ['eventType', normalizeText(variables?.eventType, 'generique')],
+    ['style', normalizeText(variables?.style, 'intime')],
+    ['bookTitle', normalizeText(variables?.bookTitle, 'Livre souvenir')],
+    ['recipientName', recipientName],
+    ['recipientAge', normalizeText(variables?.recipientAge, 'non specifie')],
+    ['recipientGender', normalizeText(variables?.recipientGender, 'non specifie')],
+    ['recipientNickname', normalizeText(variables?.recipientNickname, '')],
+    ['recipientTrait', normalizeText(variables?.recipientTrait, '')],
+    ['recipientAnecdote', normalizeText(variables?.recipientAnecdote, '')],
+    ['additionalContext', normalizeText(variables?.additionalContext, '')],
+    ['chapterTitle', chapterTitle],
+    ['subjectPronoun', subjectPronoun],
+    ['possessive', possessive]
+  ];
+  const valueLines = constrainedValues
+    .filter(([, value]) => value !== '')
+    .map(([key, value]) => `- ${key}: "${value}"`);
+  const guardrailLines = [
+    '',
+    'Contrainte critique de coherence:',
+    `- Le prenom de la personne celebree a utiliser est uniquement "${recipientName}".`,
+    '- Si un autre prenom apparait dans les instructions, ignore-le completement.',
+    '- Adresse toujours les questions au contributeur (tu), jamais a la personne celebree.',
+    `- Reste strictement centre sur le chapitre "${chapterTitle}".`,
+    '- Interdiction absolue de sortir des placeholders: pas de [recipientName], [chapterTitle], {{...}}.',
+    '- Utilise uniquement les valeurs concretes ci-dessous.',
+    ...grammaticalGuardrail,
+    '',
+    'Valeurs concretes a utiliser:',
+    ...valueLines
+  ];
+
+  return `${source}\n${guardrailLines.join('\n')}`;
 }
 
 async function getTemplateRecord({ promptKey, eventType, locale }) {
@@ -279,9 +355,14 @@ async function getActivePromptConfig({ promptKey, eventType = 'generique', local
 
 async function buildPrompt({ promptKey, eventType = 'generique', locale = 'fr', variables = {} }) {
   const config = await getActivePromptConfig({ promptKey, eventType, locale });
+  const compiledUserPrompt = compileTemplate(config.userPromptTemplate, variables);
   return {
     ...config,
-    userPrompt: compileTemplate(config.userPromptTemplate, variables)
+    userPrompt: applyPromptGuardrails({
+      promptKey,
+      userPrompt: compiledUserPrompt,
+      variables
+    })
   };
 }
 
@@ -493,6 +574,68 @@ async function updatePromptVersionNote({
   };
 }
 
+async function activatePromptVersion({
+  promptKey,
+  eventType = '*',
+  locale = 'fr',
+  version
+}) {
+  const normalizedVersion = Number(version);
+  if (!Number.isInteger(normalizedVersion) || normalizedVersion <= 0) {
+    throw new Error('Version invalide.');
+  }
+
+  const { template } = await getScopedTemplateRecord({
+    promptKey,
+    eventType,
+    locale
+  });
+
+  if (!template) {
+    throw new Error('Template introuvable pour ce scope.');
+  }
+
+  const { data: existingVersion, error: existingVersionError } = await supabase
+    .from('ai_prompt_versions')
+    .select('id, version, status')
+    .eq('template_id', template.id)
+    .eq('version', normalizedVersion)
+    .maybeSingle();
+
+  if (existingVersionError) throw existingVersionError;
+  if (!existingVersion) {
+    throw new Error(`Version ${normalizedVersion} introuvable.`);
+  }
+
+  const { error: templateUpdateError } = await supabase
+    .from('ai_prompt_templates')
+    .update({
+      active_version: normalizedVersion,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', template.id);
+
+  if (templateUpdateError) throw templateUpdateError;
+
+  if (existingVersion.status !== 'published') {
+    const { error: versionUpdateError } = await supabase
+      .from('ai_prompt_versions')
+      .update({
+        status: 'published'
+      })
+      .eq('template_id', template.id)
+      .eq('version', normalizedVersion);
+    if (versionUpdateError) throw versionUpdateError;
+  }
+
+  clearPromptCache();
+
+  return {
+    templateId: template.id,
+    activeVersion: normalizedVersion
+  };
+}
+
 async function deletePromptVersion({
   promptKey,
   eventType = '*',
@@ -569,11 +712,13 @@ module.exports = {
   PROMPT_KEYS,
   DEFAULT_PROMPTS,
   compileTemplate,
+  applyPromptGuardrails,
   buildPrompt,
   getActivePromptConfig,
   listPromptVersions,
   upsertPromptVersion,
   updatePromptVersionNote,
+  activatePromptVersion,
   deletePromptVersion,
   clearPromptCache
 };

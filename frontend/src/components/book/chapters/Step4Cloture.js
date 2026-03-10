@@ -94,6 +94,18 @@ const mergePlainTextIntoHtml = (templateHtml = '', text = '') => {
   return doc.body.innerHTML.trim();
 };
 
+const sanitizeLegacyChapterPreviewHtml = (html = '') => {
+  const source = String(html || '').trim();
+  if (!source) {
+    return '';
+  }
+
+  return source
+    .replace(/<div[^>]*class="[^"]*\bdraft-book-page-label\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<div[^>]*class="[^"]*\bdraft-book-chapter-index\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<p[^>]*class="[^"]*\bdraft-book-intro\b[^"]*"[^>]*>\s*Chapitre\s*\d+\s*[-:–][\s\S]*?<\/p>/gi, '');
+};
+
 const Step4Cloture = ({
   chapter,
   user,
@@ -160,7 +172,9 @@ const Step4Cloture = ({
       ).length;
   const normalizedText = (editorText || '').trim();
   const normalizedHtml = plainTextToHtml(normalizedText);
-  const previewHtml = (draftHtmlForPreview || chapterDraft?.html || normalizedHtml || '').trim();
+  const previewHtml = sanitizeLegacyChapterPreviewHtml(
+    (draftHtmlForPreview || chapterDraft?.html || normalizedHtml || '').trim()
+  );
   const hasDraftContent = Boolean(previewHtml || normalizedText);
   const canGenerateWithAI = !isDraftValidated && generationUnlocked && remainingGenerations > 0;
   const canSaveRevision = !isDraftValidated && !chapterLocked && Boolean(normalizedText);

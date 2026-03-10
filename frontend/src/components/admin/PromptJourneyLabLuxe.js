@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import '../../styles/luxe-theme.css';
@@ -17,166 +17,137 @@ const EVENT_PRESETS = [
   'vacances'
 ];
 
-const JOURNEY_STAGES = [
+const PROMPT_SCENARIOS = [
   {
     id: 'book_title',
-    label: '1. Titre du livre',
+    label: 'Titre du livre',
     promptKey: 'chapter_generation',
-    hint: 'But: verifier ce que l IA comprend pour proposer un titre premium.'
+    hint: 'Produit un titre premium a partir des infos projet.',
+    sharedHint: 'Partage la meme configuration que "Titres de chapitres".',
+    variableKeys: [
+      'eventType',
+      'style',
+      'bookTitle',
+      'recipientName',
+      'recipientAge',
+      'recipientGender',
+      'recipientNickname',
+      'recipientTrait',
+      'recipientAnecdote',
+      'additionalContext',
+      'count'
+    ]
   },
   {
     id: 'chapter_titles',
-    label: '2. Titres des chapitres',
+    label: 'Titres de chapitres',
     promptKey: 'chapter_generation',
-    hint: 'But: verifier la structure et la personnalisation des chapitres.'
+    hint: 'Produit la structure chapitre par chapitre.',
+    sharedHint: 'Partage la meme configuration que "Titre du livre".',
+    variableKeys: [
+      'eventType',
+      'style',
+      'bookTitle',
+      'recipientName',
+      'recipientAge',
+      'recipientGender',
+      'recipientNickname',
+      'recipientTrait',
+      'recipientAnecdote',
+      'additionalContext',
+      'count'
+    ]
   },
   {
     id: 'questions',
-    label: '3. Questions',
+    label: 'Questions contributeurs',
     promptKey: 'question_generation',
-    hint: 'But: verifier des questions narratives et exploitables.'
+    hint: 'Genere les questions de collecte des souvenirs.',
+    sharedHint: '',
+    variableKeys: [
+      'bookTitle',
+      'eventType',
+      'chapterTitle',
+      'style',
+      'recipientName',
+      'recipientAge',
+      'recipientGender',
+      'pronoun',
+      'subjectPronoun',
+      'possessive',
+      'ageContext',
+      'styleInstruction'
+    ]
   },
   {
     id: 'chapter_content',
-    label: '4. Contenu des chapitres',
+    label: 'Contenu chapitres',
     promptKey: 'content_generation',
-    hint: 'But: verifier la qualite redactionnelle du chapitre genere.'
+    hint: 'Redaction des contenus (chapitre, intro, conclusion via outputType).',
+    sharedHint: '',
+    variableKeys: [
+      'outputType',
+      'eventType',
+      'style',
+      'bookTitle',
+      'chapterTitle',
+      'recipientName',
+      'recipientAge',
+      'recipientGender',
+      'chapterSummary',
+      'narrativeContext',
+      'targetLength'
+    ]
   }
 ];
 
-const CHAPTER_GENERATION_RECOMMENDED = {
-  systemPrompt: [
-    'Tu es un architecte de livres de prestige.',
-    'Tu produis des propositions courtes, elegantes, emotionnelles et personnalisees.',
-    'Tu respectes strictement le format de sortie demande, sans blabla.'
-  ].join('\n'),
-  userPromptTemplate: [
-    'Tu dois produire une proposition de livre complete a partir des donnees fournies.',
-    '',
-    'Donnees utilisateur:',
-    '- eventType: {{eventType}}',
-    '- style: {{style}}',
-    '- bookTitle (si deja saisi): {{bookTitle}}',
-    '- recipientName: {{recipientName}}',
-    '- recipientAge: {{recipientAge}}',
-    '- recipientGender: {{recipientGender}}',
-    '- recipientNickname: {{recipientNickname}}',
-    '- recipientTrait: {{recipientTrait}}',
-    '- recipientAnecdote: {{recipientAnecdote}}',
-    '- additionalContext: {{additionalContext}}',
-    '- count (nombre de chapitres): {{count}}',
-    '',
-    'Regles:',
-    '- N interroge jamais l utilisateur.',
-    '- Utilise uniquement les donnees ci-dessus.',
-    '- Le titre du livre doit etre court, premium, emotionnel et personnalise.',
-    '- Produis exactement {{count}} titres de chapitres.',
-    '- Titres de chapitres courts, memorables, non generiques.',
-    '- Aucune description, aucun commentaire hors JSON.',
-    '- Pas de markdown.',
-    '',
-    'Format de sortie JSON strict:',
-    '{',
-    '  "bookTitle": "Titre du livre",',
-    '  "chapters": ["Titre chapitre 1", "Titre chapitre 2", "Titre chapitre 3"]',
-    '}'
-  ].join('\n'),
-  temperature: '0.72',
-  maxTokens: '1000'
+const VARIABLE_CATALOG = {
+  eventType: 'Type d evenement du livre',
+  style: 'Style narratif choisi',
+  bookTitle: 'Titre du livre',
+  recipientName: 'Nom du destinataire',
+  recipientAge: 'Age du destinataire',
+  recipientGender: 'Genre du destinataire',
+  recipientNickname: 'Surnom du destinataire',
+  recipientTrait: 'Trait marquant',
+  recipientAnecdote: 'Anecdote principale',
+  additionalContext: 'Contexte libre / contraintes',
+  count: 'Nombre de chapitres a produire',
+  chapterTitle: 'Titre du chapitre cible',
+  pronoun: 'Pronom contexte long',
+  subjectPronoun: 'Pronom sujet',
+  possessive: 'Adjectif possessif',
+  ageContext: 'Contexte age redactionnel',
+  styleInstruction: 'Consigne de ton derivee du style',
+  outputType: 'Type de sortie: introduction | chapter_content | conclusion',
+  chapterSummary: 'Resume du chapitre precedent',
+  narrativeContext: 'Contexte narratif de continuite',
+  targetLength: 'Longueur cible en caracteres'
 };
 
-const QUESTION_GENERATION_RECOMMENDED = {
-  systemPrompt: [
-    'Tu es un biographe narratif premium specialise en collecte de souvenirs.',
-    'Tu rediges des questions ouvertes concretes et exploitables.',
-    'Tu respectes strictement le format JSON demande.'
-  ].join('\n'),
-  userPromptTemplate: [
-    'Tu dois generer 4 questions ouvertes pour collecter des souvenirs narratifs premium.',
-    '',
-    'Contexte:',
-    '- bookTitle: {{bookTitle}}',
-    '- eventType: {{eventType}}',
-    '- chapterTitle: {{chapterTitle}}',
-    '- style: {{style}}',
-    '- recipientName: {{recipientName}}',
-    '- recipientAge: {{recipientAge}}',
-    '- recipientGender: {{recipientGender}}',
-    '- pronoun: {{pronoun}}',
-    '- subjectPronoun: {{subjectPronoun}}',
-    '- possessive: {{possessive}}',
-    '- ageContext: {{ageContext}}',
-    '- styleInstruction: {{styleInstruction}}',
-    '',
-    'Regles:',
-    '- Les questions sont adressees a l organisateur et aux contributeurs.',
-    '- Ne jamais adresser la question directement a {{recipientName}}.',
-    '- Ne jamais commencer une question par "{{recipientName}},".',
-    '- Utiliser la 3e personne pour parler de {{recipientName}}.',
-    '- Interdire les questions oui/non.',
-    '- Forcer des reponses concretes (decor, sons, odeurs, dialogues, emotions).',
-    '- Ton adapte au style {{style}}.',
-    '- Aucune phrase hors JSON, pas de markdown.',
-    '',
-    'Format de sortie JSON strict:',
-    '[',
-    '  "Question 1",',
-    '  "Question 2",',
-    '  "Question 3",',
-    '  "Question 4"',
-    ']'
-  ].join('\n'),
-  temperature: '0.68',
-  maxTokens: '700'
+const initialProjectForm = {
+  eventType: 'anniversaire',
+  locale: 'fr',
+  style: 'intime',
+  bookTitle: 'Pour tes 40 ans',
+  recipientName: 'la personne celebree',
+  recipientAge: '40',
+  recipientGender: 'femme',
+  recipientNickname: 'Ju',
+  recipientTrait: 'Genereuse, solaire et toujours presente',
+  recipientAnecdote: 'Le fameux gateau anniversaire sucre-sale',
+  additionalContext: 'Ton premium, elegant et complice',
+  chapterTitle: 'Les moments qui marquent',
+  chaptersCount: '8',
+  chapterSummary: 'Chapitre precedent: energie collective et souvenirs joyeux.',
+  narrativeContext: 'Conserver un fil narratif coherent et une voix chaleureuse.',
+  targetLength: '3200',
+  outputType: 'chapter_content'
 };
 
-const CONTENT_GENERATION_RECOMMENDED = {
-  systemPrompt: [
-    'Tu es un biographe haut de gamme.',
-    'Tu rediges un texte elegant, coherent, sensoriel et humain.',
-    'Tu respectes strictement les contraintes de sortie.'
-  ].join('\n'),
-  userPromptTemplate: [
-    'Tu dois rediger un texte final pour un livre souvenir.',
-    '',
-    'Contexte:',
-    '- outputType: {{outputType}} (valeurs: introduction | chapter_content | conclusion)',
-    '- eventType: {{eventType}}',
-    '- style: {{style}}',
-    '- bookTitle: {{bookTitle}}',
-    '- chapterTitle: {{chapterTitle}}',
-    '- recipientName: {{recipientName}}',
-    '- recipientAge: {{recipientAge}}',
-    '- recipientGender: {{recipientGender}}',
-    '- chapterSummary: {{chapterSummary}}',
-    '- narrativeContext: {{narrativeContext}}',
-    '- targetLength: {{targetLength}}',
-    '',
-    'Regles communes:',
-    '- N interroge jamais l utilisateur.',
-    '- Utilise uniquement les donnees fournies.',
-    '- Texte en francais uniquement.',
-    '- Pas de markdown, pas de JSON, pas de balises HTML.',
-    '- Respecte une longueur proche de {{targetLength}} caracteres (+/- 15%).',
-    '',
-    'Regles selon outputType:',
-    '- introduction: ouvrir le livre avec elegance, chaleur et promesse narrative.',
-    '- chapter_content: produire une narration riche, concrete, sensorielle et coherente.',
-    '- conclusion: cloturer avec emotion, gratitude et unite.',
-    '',
-    'Sortie attendue:',
-    '- Retourne uniquement le texte final.'
-  ].join('\n'),
-  temperature: '0.74',
-  maxTokens: '1800'
-};
-
-const RECOMMENDED_STAGE_TEMPLATES = {
-  book_title: CHAPTER_GENERATION_RECOMMENDED,
-  chapter_titles: CHAPTER_GENERATION_RECOMMENDED,
-  questions: QUESTION_GENERATION_RECOMMENDED,
-  chapter_content: CONTENT_GENERATION_RECOMMENDED
-};
+const PROJECT_FORM_STORAGE_KEY = 'prompt_journey_project_form_v1';
+const MODEL_STORAGE_KEY = 'prompt_journey_model_v1';
+const INTERNAL_SYSTEM_PROMPT = 'Tu suis strictement les instructions du prompt utilisateur.';
 
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -187,13 +158,24 @@ const buildApiBaseUrl = () => {
 const buildEndpoint = (path) => `${buildApiBaseUrl()}/ai${path}`;
 
 const compileTemplate = (template, variables = {}) => (
-  String(template || '').replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, variableName) => {
-    const rawValue = variables[variableName];
-    if (rawValue === null || rawValue === undefined) return '';
-    if (Array.isArray(rawValue)) return rawValue.join(', ');
-    if (typeof rawValue === 'object') return JSON.stringify(rawValue);
-    return String(rawValue);
-  })
+  String(template || '')
+    .replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, variableName) => {
+      const rawValue = variables[variableName];
+      if (rawValue === null || rawValue === undefined) return '';
+      if (Array.isArray(rawValue)) return rawValue.join(', ');
+      if (typeof rawValue === 'object') return JSON.stringify(rawValue);
+      return String(rawValue);
+    })
+    .replace(/\[([a-zA-Z_][a-zA-Z0-9_]*)\]/g, (fullMatch, variableName) => {
+      if (!Object.prototype.hasOwnProperty.call(variables || {}, variableName)) {
+        return fullMatch;
+      }
+      const rawValue = variables[variableName];
+      if (rawValue === null || rawValue === undefined) return '';
+      if (Array.isArray(rawValue)) return rawValue.join(', ');
+      if (typeof rawValue === 'object') return JSON.stringify(rawValue);
+      return String(rawValue);
+    })
 );
 
 const parseOptionalNumber = (rawValue, label) => {
@@ -242,55 +224,117 @@ const getAgeContext = (age, gender) => {
   if (!Number.isFinite(ageNumber)) return '';
   if (ageNumber < 18) return gender === 'homme' ? 'jeune garcon' : 'jeune fille';
   if (ageNumber < 30) return gender === 'homme' ? 'jeune homme' : 'jeune femme';
-  if (ageNumber < 50) return gender === 'homme' ? 'adulte' : 'adulte';
-  if (ageNumber < 70) return gender === 'homme' ? 'senior' : 'senior';
+  if (ageNumber < 50) return 'adulte';
+  if (ageNumber < 70) return 'senior';
   return gender === 'homme' ? 'veteran' : 'veterane';
 };
 
-const getInitialStageState = () => ({
+const buildScenarioVariables = (scenarioId, projectForm) => {
+  const common = {
+    eventType: projectForm.eventType || 'generique',
+    style: projectForm.style || 'intime',
+    bookTitle: projectForm.bookTitle || 'Livre souvenir',
+    recipientName: projectForm.recipientName || 'la personne',
+    recipientAge: projectForm.recipientAge || 'non specifie',
+    recipientGender: projectForm.recipientGender || 'non specifie',
+    recipientNickname: projectForm.recipientNickname || '',
+    recipientTrait: projectForm.recipientTrait || '',
+    recipientAnecdote: projectForm.recipientAnecdote || '',
+    additionalContext: projectForm.additionalContext || ''
+  };
+
+  if (scenarioId === 'book_title') {
+    return {
+      ...common,
+      count: 1,
+      additionalContext: [common.additionalContext, 'Objectif strict: proposer uniquement le titre du livre.']
+        .filter(Boolean)
+        .join(' ')
+    };
+  }
+
+  if (scenarioId === 'chapter_titles') {
+    return {
+      ...common,
+      count: Number(projectForm.chaptersCount) || 8,
+      additionalContext: [common.additionalContext, 'Objectif strict: produire uniquement les titres de chapitres.']
+        .filter(Boolean)
+        .join(' ')
+    };
+  }
+
+  if (scenarioId === 'questions') {
+    const pronouns = getPronouns(common.recipientGender);
+    const ageContextLabel = getAgeContext(common.recipientAge, common.recipientGender);
+    return {
+      ...common,
+      chapterTitle: projectForm.chapterTitle || 'Chapitre',
+      ...pronouns,
+      ageContext: ageContextLabel
+        ? `${pronouns.pronoun} est ${ageContextLabel} de ${common.recipientAge} ans`
+        : '',
+      styleInstruction: getStyleInstruction(common.style)
+    };
+  }
+
+  return {
+    ...common,
+    chapterTitle: projectForm.chapterTitle || 'Chapitre',
+    outputType: projectForm.outputType || 'chapter_content',
+    chapterSummary: projectForm.chapterSummary || '',
+    narrativeContext: projectForm.narrativeContext || common.additionalContext || '',
+    targetLength: Number(projectForm.targetLength) || 3200
+  };
+};
+
+const getInitialScenarioState = () => ({
   source: '-',
   version: '-',
   systemPrompt: '',
   userPromptTemplate: '',
   temperature: '',
   maxTokens: '',
-  lastCompiledPrompt: '',
-  lastModelOutput: '',
+  runModel: false,
   isTesting: false,
   isPublishing: false,
+  isActivating: false,
+  lastCompiledPrompt: '',
+  lastModelOutput: '',
   lastRunAt: ''
 });
 
-const initialProjectForm = {
-  eventType: 'anniversaire',
-  locale: 'fr',
-  style: 'intime',
-  bookTitle: 'Pour tes 40 ans',
-  recipientName: 'Juliette',
-  recipientAge: '40',
-  recipientGender: 'femme',
-  recipientNickname: 'Ju',
-  recipientTrait: 'Genereuse, solaire et toujours presente',
-  recipientAnecdote: 'Le fameux gateau anniversaire sucre-sale',
-  additionalContext: 'Ton premium, elegant et complice',
-  chapterTitle: 'Les moments qui marquent',
-  chaptersCount: '8',
-  chapterSummary: 'Chapitre precedent: energie collective et souvenirs joyeux.',
-  narrativeContext: 'Conserver un fil narratif coherent et une voix chaleureuse.',
-  targetLength: '3200'
+const loadPersistedProjectForm = () => {
+  if (typeof window === 'undefined') return initialProjectForm;
+  try {
+    const raw = window.localStorage.getItem(PROJECT_FORM_STORAGE_KEY);
+    if (!raw) return initialProjectForm;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return initialProjectForm;
+    return {
+      ...initialProjectForm,
+      ...parsed
+    };
+  } catch (_error) {
+    return initialProjectForm;
+  }
+};
+
+const loadPersistedModelName = () => {
+  if (typeof window === 'undefined') return DEFAULT_MODEL;
+  const stored = window.localStorage.getItem(MODEL_STORAGE_KEY);
+  return (stored || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
 };
 
 const PromptJourneyLabLuxe = () => {
-  const [projectForm, setProjectForm] = useState(initialProjectForm);
-  const [runModel, setRunModel] = useState(false);
-  const [modelName, setModelName] = useState(DEFAULT_MODEL);
+  const [projectForm, setProjectForm] = useState(() => loadPersistedProjectForm());
+  const [modelName, setModelName] = useState(() => loadPersistedModelName());
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [stageState, setStageState] = useState(() => (
-    JOURNEY_STAGES.reduce((acc, stage) => {
-      acc[stage.id] = getInitialStageState();
-      return acc;
+  const [scenarioState, setScenarioState] = useState(() => (
+    PROMPT_SCENARIOS.reduce((accumulator, scenario) => {
+      accumulator[scenario.id] = getInitialScenarioState();
+      return accumulator;
     }, {})
   ));
 
@@ -317,126 +361,46 @@ const PromptJourneyLabLuxe = () => {
     return payload;
   };
 
-  const updateStageState = (stageId, patch) => {
-    setStageState((previous) => ({
+  const updateScenarioState = (scenarioId, patch) => {
+    setScenarioState((previous) => ({
       ...previous,
-      [stageId]: {
-        ...(previous[stageId] || getInitialStageState()),
+      [scenarioId]: {
+        ...(previous[scenarioId] || getInitialScenarioState()),
         ...patch
       }
     }));
   };
 
-  const applyRecommendedTemplateToStage = (stage) => {
-    const recommended = RECOMMENDED_STAGE_TEMPLATES[stage.id];
-    if (!recommended) {
-      setErrorMessage(`Aucun template recommande pour ${stage.label}.`);
-      return;
-    }
-    updateStageState(stage.id, {
-      systemPrompt: recommended.systemPrompt,
-      userPromptTemplate: recommended.userPromptTemplate,
-      temperature: recommended.temperature,
-      maxTokens: recommended.maxTokens
-    });
-    setErrorMessage('');
-    setSuccessMessage(`Template recommande pre-rempli pour "${stage.label}". Vous pouvez le modifier.`);
-  };
-
-  const applyRecommendedTemplatesToAllStages = () => {
-    setStageState((previous) => {
+  const updateSharedPromptState = (promptKey, patch) => {
+    setScenarioState((previous) => {
       const next = { ...previous };
-      JOURNEY_STAGES.forEach((stage) => {
-        const recommended = RECOMMENDED_STAGE_TEMPLATES[stage.id];
-        if (!recommended) return;
-        next[stage.id] = {
-          ...(previous[stage.id] || getInitialStageState()),
-          systemPrompt: recommended.systemPrompt,
-          userPromptTemplate: recommended.userPromptTemplate,
-          temperature: recommended.temperature,
-          maxTokens: recommended.maxTokens
+      PROMPT_SCENARIOS.forEach((scenario) => {
+        if (scenario.promptKey !== promptKey) return;
+        next[scenario.id] = {
+          ...(previous[scenario.id] || getInitialScenarioState()),
+          ...patch
         };
       });
       return next;
     });
-    setErrorMessage('');
-    setSuccessMessage('Templates recommandes pre-remplis pour tout le parcours. Vous pouvez les modifier.');
   };
 
-  const buildStageVariables = (stageId) => {
-    const common = {
-      eventType: projectForm.eventType || 'generique',
-      style: projectForm.style || 'intime',
-      bookTitle: projectForm.bookTitle || 'Livre souvenir',
-      recipientName: projectForm.recipientName || 'la personne',
-      recipientAge: projectForm.recipientAge || 'non specifie',
-      recipientGender: projectForm.recipientGender || 'non specifie',
-      recipientNickname: projectForm.recipientNickname || '',
-      recipientTrait: projectForm.recipientTrait || '',
-      recipientAnecdote: projectForm.recipientAnecdote || '',
-      additionalContext: projectForm.additionalContext || ''
-    };
-
-    if (stageId === 'book_title') {
-      return {
-        ...common,
-        count: 1,
-        additionalContext: [common.additionalContext, 'Objectif: produire uniquement un titre du livre.']
-          .filter(Boolean)
-          .join(' ')
-      };
-    }
-
-    if (stageId === 'chapter_titles') {
-      return {
-        ...common,
-        count: Number(projectForm.chaptersCount) || 8
-      };
-    }
-
-    if (stageId === 'questions') {
-      const pronouns = getPronouns(common.recipientGender);
-      const ageContextLabel = getAgeContext(common.recipientAge, common.recipientGender);
-      return {
-        ...common,
-        chapterTitle: projectForm.chapterTitle || 'Chapitre',
-        ...pronouns,
-        ageContext: ageContextLabel
-          ? `${pronouns.pronoun} est ${ageContextLabel} de ${common.recipientAge} ans`
-          : '',
-        styleInstruction: getStyleInstruction(common.style)
-      };
-    }
-
-    return {
-      ...common,
-      chapterTitle: projectForm.chapterTitle || 'Chapitre',
-      outputType: 'chapter_content',
-      chapterSummary: projectForm.chapterSummary || '',
-      narrativeContext: projectForm.narrativeContext || common.additionalContext || '',
-      targetLength: Number(projectForm.targetLength) || 3200
-    };
-  };
-
-  const buildCompiledPromptPreview = (stageId) => {
-    const currentStage = stageState[stageId] || getInitialStageState();
-    const variables = buildStageVariables(stageId);
+const buildCompiledPromptPreview = (scenarioId) => {
+    const current = scenarioState[scenarioId] || getInitialScenarioState();
+    const variables = buildScenarioVariables(scenarioId, projectForm);
     return [
-      '[SYSTEM PROMPT]',
-      currentStage.systemPrompt || '',
-      '',
-      '[USER TEMPLATE COMPILE]',
-      compileTemplate(currentStage.userPromptTemplate || '', variables)
+      '[PROMPT UTILISATEUR COMPILE]',
+      compileTemplate(current.userPromptTemplate || '', variables)
     ].join('\n');
   };
 
-  const loadJourneyPrompts = async () => {
+  const loadPromptTemplates = async () => {
     setLoadingTemplates(true);
     setErrorMessage('');
     setSuccessMessage('');
 
     try {
-      const uniquePromptKeys = [...new Set(JOURNEY_STAGES.map((stage) => stage.promptKey))];
+      const uniquePromptKeys = [...new Set(PROMPT_SCENARIOS.map((scenario) => scenario.promptKey))];
       const responses = await Promise.all(
         uniquePromptKeys.map(async (promptKey) => {
           const payload = await apiRequest(
@@ -449,149 +413,222 @@ const PromptJourneyLabLuxe = () => {
         })
       );
 
-      const promptByKey = responses.reduce((acc, row) => {
-        acc[row.promptKey] = row.activePrompt;
-        return acc;
+      const activePromptByKey = responses.reduce((accumulator, row) => {
+        accumulator[row.promptKey] = row.activePrompt;
+        return accumulator;
       }, {});
 
-      setStageState((previous) => {
+      setScenarioState((previous) => {
         const next = { ...previous };
-        JOURNEY_STAGES.forEach((stage) => {
-          const activePrompt = promptByKey[stage.promptKey] || null;
-          const recommended = RECOMMENDED_STAGE_TEMPLATES[stage.id] || null;
-          next[stage.id] = {
-            ...(previous[stage.id] || getInitialStageState()),
+        PROMPT_SCENARIOS.forEach((scenario) => {
+          const activePrompt = activePromptByKey[scenario.promptKey] || null;
+          const current = previous[scenario.id] || getInitialScenarioState();
+          next[scenario.id] = {
+            ...current,
             source: activePrompt?.source || '-',
             version: activePrompt?.version || '-',
-            systemPrompt: activePrompt?.systemPrompt || recommended?.systemPrompt || '',
-            userPromptTemplate: activePrompt?.userPromptTemplate || recommended?.userPromptTemplate || '',
+            systemPrompt: activePrompt?.systemPrompt || current.systemPrompt || '',
+            userPromptTemplate: activePrompt?.userPromptTemplate || current.userPromptTemplate || '',
             temperature: Number.isFinite(Number(activePrompt?.temperature))
               ? String(activePrompt.temperature)
-              : (recommended?.temperature || ''),
+              : (current.temperature || ''),
             maxTokens: Number.isFinite(Number(activePrompt?.maxTokens))
               ? String(activePrompt.maxTokens)
-              : (recommended?.maxTokens || '')
+              : (current.maxTokens || ''),
+            isTesting: false,
+            isPublishing: false
           };
         });
         return next;
       });
 
-      setSuccessMessage('Prompts du parcours charges.');
+      setSuccessMessage('Prompts actifs charges.');
     } catch (error) {
-      setErrorMessage(error.message || 'Impossible de charger les prompts du parcours.');
+      setErrorMessage(error.message || 'Impossible de charger les prompts.');
     } finally {
       setLoadingTemplates(false);
     }
   };
 
   useEffect(() => {
-    loadJourneyPrompts();
+    loadPromptTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleStageFieldChange = (stageId, field, value) => {
-    updateStageState(stageId, { [field]: value });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(PROJECT_FORM_STORAGE_KEY, JSON.stringify(projectForm));
+  }, [projectForm]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(MODEL_STORAGE_KEY, modelName || DEFAULT_MODEL);
+  }, [modelName]);
+
+  const handlePromptFieldChange = (scenario, field, value) => {
+    if (scenario.promptKey === 'chapter_generation' || scenario.promptKey === 'content_generation') {
+      updateSharedPromptState(scenario.promptKey, { [field]: value });
+      return;
+    }
+    updateScenarioState(scenario.id, { [field]: value });
   };
 
-  const handleTestStage = async (stage) => {
-    const current = stageState[stage.id] || getInitialStageState();
-    if (!current.systemPrompt.trim() || !current.userPromptTemplate.trim()) {
-      setErrorMessage(`Le prompt ${stage.label} doit contenir un system prompt et un user template.`);
+  const handleTestScenario = async (scenario) => {
+    const current = scenarioState[scenario.id] || getInitialScenarioState();
+    if (!current.userPromptTemplate.trim()) {
+      setErrorMessage(`Le prompt "${scenario.label}" est vide.`);
       return;
     }
 
     setErrorMessage('');
     setSuccessMessage('');
-    updateStageState(stage.id, { isTesting: true });
+    updateScenarioState(scenario.id, { isTesting: true });
 
     try {
       const payload = {
         eventType: (projectForm.eventType || '*').trim() || '*',
         locale: (projectForm.locale || 'fr').trim() || 'fr',
-        variables: buildStageVariables(stage.id),
-        runModel,
+        variables: buildScenarioVariables(scenario.id, projectForm),
+        useDefaultVariables: false,
+        runModel: Boolean(current.runModel),
         model: (modelName || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
-        systemPrompt: current.systemPrompt,
+        systemPrompt: INTERNAL_SYSTEM_PROMPT,
         userPromptTemplate: current.userPromptTemplate,
-        temperature: parseOptionalNumber(current.temperature, `Temperature (${stage.label})`),
-        maxTokens: parseOptionalNumber(current.maxTokens, `Max tokens (${stage.label})`)
+        temperature: parseOptionalNumber(current.temperature, `Temperature (${scenario.label})`),
+        maxTokens: parseOptionalNumber(current.maxTokens, `Max tokens (${scenario.label})`)
       };
 
       const response = await apiRequest(
-        `/prompt-templates/${encodeURIComponent(stage.promptKey)}/test`,
+        `/prompt-templates/${encodeURIComponent(scenario.promptKey)}/test`,
         {
           method: 'POST',
           body: JSON.stringify(payload)
         }
       );
 
-      updateStageState(stage.id, {
-        lastCompiledPrompt: response.compiledPrompt || buildCompiledPromptPreview(stage.id),
+      updateScenarioState(scenario.id, {
+        lastCompiledPrompt: response.compiledPrompt || buildCompiledPromptPreview(scenario.id),
         lastModelOutput: response?.modelCall?.output || '',
         lastRunAt: new Date().toISOString()
       });
-      setSuccessMessage(`Test execute pour "${stage.label}".`);
+      setSuccessMessage(`Test execute pour "${scenario.label}".`);
     } catch (error) {
-      setErrorMessage(error.message || `Impossible de tester "${stage.label}".`);
+      setErrorMessage(error.message || `Impossible de tester "${scenario.label}".`);
     } finally {
-      updateStageState(stage.id, { isTesting: false });
+      updateScenarioState(scenario.id, { isTesting: false });
     }
   };
 
-  const handlePublishStage = async (stage) => {
-    const current = stageState[stage.id] || getInitialStageState();
-    if (!current.systemPrompt.trim() || !current.userPromptTemplate.trim()) {
-      setErrorMessage(`Le prompt ${stage.label} est incomplet.`);
+  const handleValidateScenario = async (scenario) => {
+    const current = scenarioState[scenario.id] || getInitialScenarioState();
+    if (!current.userPromptTemplate.trim()) {
+      setErrorMessage(`Le prompt "${scenario.label}" est vide.`);
       return;
     }
 
     setErrorMessage('');
     setSuccessMessage('');
-    updateStageState(stage.id, { isPublishing: true });
+    updateScenarioState(scenario.id, { isPublishing: true });
 
     try {
       const payload = {
         eventType: (projectForm.eventType || '*').trim() || '*',
         locale: (projectForm.locale || 'fr').trim() || 'fr',
-        systemPrompt: current.systemPrompt.trim(),
+        systemPrompt: INTERNAL_SYSTEM_PROMPT,
         userPromptTemplate: current.userPromptTemplate.trim(),
-        temperature: parseOptionalNumber(current.temperature, `Temperature (${stage.label})`),
-        maxTokens: parseOptionalNumber(current.maxTokens, `Max tokens (${stage.label})`),
-        note: `Validation parcours: ${stage.label}`,
+        temperature: parseOptionalNumber(current.temperature, `Temperature (${scenario.label})`),
+        maxTokens: parseOptionalNumber(current.maxTokens, `Max tokens (${scenario.label})`),
+        note: `Validation: ${scenario.label}`,
         status: 'published',
         publish: true
       };
 
-      await apiRequest(
-        `/prompt-templates/${encodeURIComponent(stage.promptKey)}/versions`,
+      const versionResult = await apiRequest(
+        `/prompt-templates/${encodeURIComponent(scenario.promptKey)}/versions`,
         {
           method: 'POST',
           body: JSON.stringify(payload)
         }
       );
 
-      setSuccessMessage(`Prompt publie pour "${stage.label}".`);
-      await loadJourneyPrompts();
+      const versionLabel = Number.isFinite(Number(versionResult?.activeVersion))
+        ? ` (v${versionResult.activeVersion})`
+        : '';
+      setSuccessMessage(`Prompt valide et versionne pour "${scenario.label}"${versionLabel}.`);
+      await loadPromptTemplates();
     } catch (error) {
-      setErrorMessage(error.message || `Impossible de publier "${stage.label}".`);
+      setErrorMessage(error.message || `Impossible de valider "${scenario.label}".`);
     } finally {
-      updateStageState(stage.id, { isPublishing: false });
+      updateScenarioState(scenario.id, { isPublishing: false });
     }
   };
+
+  const handleUseForCreation = async (scenario) => {
+    const current = scenarioState[scenario.id] || getInitialScenarioState();
+    const versionToActivate = Number(current.version);
+    if (!Number.isInteger(versionToActivate) || versionToActivate <= 0) {
+      setErrorMessage(`Aucune version valide a activer pour "${scenario.label}".`);
+      return;
+    }
+
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    if (scenario.promptKey === 'chapter_generation' || scenario.promptKey === 'content_generation') {
+      updateSharedPromptState(scenario.promptKey, { isActivating: true });
+    } else {
+      updateScenarioState(scenario.id, { isActivating: true });
+    }
+
+    try {
+      const result = await apiRequest(
+        `/prompt-templates/${encodeURIComponent(scenario.promptKey)}/activate`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            eventType: (projectForm.eventType || '*').trim() || '*',
+            locale: (projectForm.locale || 'fr').trim() || 'fr',
+            version: versionToActivate
+          })
+        }
+      );
+
+      setSuccessMessage(`Version v${result?.activeVersion || versionToActivate} active pour la creation.`);
+      await loadPromptTemplates();
+    } catch (error) {
+      setErrorMessage(error.message || `Impossible d activer la version pour "${scenario.label}".`);
+    } finally {
+      if (scenario.promptKey === 'chapter_generation' || scenario.promptKey === 'content_generation') {
+        updateSharedPromptState(scenario.promptKey, { isActivating: false });
+      } else {
+        updateScenarioState(scenario.id, { isActivating: false });
+      }
+    }
+  };
+
+  const scenarioVariableGuides = useMemo(() => (
+    PROMPT_SCENARIOS.reduce((accumulator, scenario) => {
+      accumulator[scenario.id] = scenario.variableKeys.map((name) => ({
+        name,
+        description: VARIABLE_CATALOG[name] || 'Variable de contexte'
+      }));
+      return accumulator;
+    }, {})
+  ), []);
 
   return (
     <div className="prompt-journey-page">
       <div className="prompt-journey-shell">
         <header className="prompt-journey-head">
           <div>
-            <span className="label-gold">Prompt journey lab</span>
-            <h1>Simulation complete des prompts IA</h1>
+            <span className="label-gold">Parametrage prompts</span>
+            <h1>Configuration et tests des prompts IA</h1>
             <p>
-              Une seule page pour simuler le parcours: formulaire projet, prompt envoye a l IA, test, puis validation.
+              Une seule page pour regler les prompts, tester chaque scenario, puis valider les versions.
+              Les modifications restent en brouillon tant que vous ne cliquez pas sur "Valider et versionner".
             </p>
           </div>
           <div className="prompt-journey-head-actions">
-            <Link to="/admin/prompts" className="btn btn-outline">Prompt admin</Link>
             <Link to="/dashboard" className="btn btn-outline">Dashboard</Link>
           </div>
         </header>
@@ -637,34 +674,19 @@ const PromptJourneyLabLuxe = () => {
           </div>
 
           <div className="prompt-journey-toolbar-actions">
-            <label className="prompt-journey-check">
-              <input
-                type="checkbox"
-                checked={runModel}
-                onChange={(event) => setRunModel(event.target.checked)}
-              />
-              <span>Executer aussi le modele</span>
-            </label>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={applyRecommendedTemplatesToAllStages}
-            >
-              Pre-remplir recommandes
-            </button>
             <button
               type="button"
               className="btn btn-primary"
-              onClick={loadJourneyPrompts}
+              onClick={loadPromptTemplates}
               disabled={loadingTemplates}
             >
-              {loadingTemplates ? 'Chargement...' : 'Charger les prompts'}
+              {loadingTemplates ? 'Chargement...' : 'Recharger les prompts actifs'}
             </button>
           </div>
         </section>
 
         <section className="prompt-journey-form">
-          <h2>Donnees du projet (simulees)</h2>
+          <h2>Donnees de test (variables)</h2>
           <div className="prompt-journey-form-grid">
             <div className="prompt-journey-field">
               <label>Titre du livre</label>
@@ -675,7 +697,7 @@ const PromptJourneyLabLuxe = () => {
               />
             </div>
             <div className="prompt-journey-field">
-              <label>Nom</label>
+              <label>Nom destinataire</label>
               <input
                 className="input-luxe"
                 value={projectForm.recipientName}
@@ -715,7 +737,7 @@ const PromptJourneyLabLuxe = () => {
               />
             </div>
             <div className="prompt-journey-field">
-              <label>Nb chapitres</label>
+              <label>Nombre de chapitres</label>
               <input
                 className="input-luxe"
                 value={projectForm.chaptersCount}
@@ -728,6 +750,14 @@ const PromptJourneyLabLuxe = () => {
                 className="input-luxe"
                 value={projectForm.chapterTitle}
                 onChange={(event) => setProjectForm((prev) => ({ ...prev, chapterTitle: event.target.value }))}
+              />
+            </div>
+            <div className="prompt-journey-field">
+              <label>outputType (contenu)</label>
+              <input
+                className="input-luxe"
+                value={projectForm.outputType}
+                onChange={(event) => setProjectForm((prev) => ({ ...prev, outputType: event.target.value }))}
               />
             </div>
           </div>
@@ -766,7 +796,7 @@ const PromptJourneyLabLuxe = () => {
               />
             </div>
             <div className="prompt-journey-field">
-              <label>Contexte narratif (chapitre)</label>
+              <label>Contexte narratif</label>
               <textarea
                 className="input-luxe"
                 value={projectForm.narrativeContext}
@@ -774,7 +804,7 @@ const PromptJourneyLabLuxe = () => {
               />
             </div>
             <div className="prompt-journey-field">
-              <label>Longueur cible (chapitre)</label>
+              <label>Longueur cible (caracteres)</label>
               <input
                 className="input-luxe"
                 value={projectForm.targetLength}
@@ -785,124 +815,149 @@ const PromptJourneyLabLuxe = () => {
         </section>
 
         <section className="prompt-journey-stages">
-          {JOURNEY_STAGES.map((stage) => {
-            const current = stageState[stage.id] || getInitialStageState();
-            const stageVariables = buildStageVariables(stage.id);
-            const compiledPreview = buildCompiledPromptPreview(stage.id);
+          {PROMPT_SCENARIOS.map((scenario) => {
+            const current = scenarioState[scenario.id] || getInitialScenarioState();
+            const stageVariables = buildScenarioVariables(scenario.id, projectForm);
+            const compiledPreview = buildCompiledPromptPreview(scenario.id);
+            const variableGuide = scenarioVariableGuides[scenario.id] || [];
 
             return (
-              <article key={stage.id} className="prompt-journey-card">
-                <div className="prompt-journey-card-head">
-                  <div>
-                    <h3>{stage.label}</h3>
-                    <p>{stage.hint}</p>
+              <details key={scenario.id} className="prompt-journey-card prompt-journey-card-collapsible">
+                <summary className="prompt-journey-card-summary">
+                  <div className="prompt-journey-card-summary-inner">
+                    <div>
+                      <h3>{scenario.label}</h3>
+                      <p>{scenario.hint}</p>
+                      {scenario.sharedHint ? <p className="prompt-journey-shared-hint">{scenario.sharedHint}</p> : null}
+                    </div>
+                    <div className="prompt-journey-card-summary-right">
+                      <div className="prompt-journey-badges">
+                        <span className="prompt-journey-badge">{scenario.promptKey}</span>
+                        <span className="prompt-journey-badge">source: {current.source}</span>
+                        <span className="prompt-journey-badge">v{current.version}</span>
+                      </div>
+                      <span className="prompt-journey-toggle-indicator" aria-hidden="true" />
+                    </div>
                   </div>
-                  <div className="prompt-journey-badges">
-                    <span className="prompt-journey-badge">{stage.promptKey}</span>
-                    <span className="prompt-journey-badge">source: {current.source}</span>
-                    <span className="prompt-journey-badge">v{current.version}</span>
-                  </div>
-                </div>
+                </summary>
 
-                <div className="prompt-journey-card-grid">
+                <div className="prompt-journey-card-body">
                   <div className="prompt-journey-field">
-                    <label>System prompt (modifiable)</label>
+                    <label>Prompt a tester (user template)</label>
                     <textarea
-                      className="input-luxe prompt-journey-textarea-system"
-                      value={current.systemPrompt}
-                      onChange={(event) => handleStageFieldChange(stage.id, 'systemPrompt', event.target.value)}
-                    />
-                  </div>
-
-                  <div className="prompt-journey-field">
-                    <label>User template prompt (modifiable)</label>
-                    <textarea
-                      className="input-luxe prompt-journey-textarea-user"
+                      className="input-luxe prompt-journey-textarea-prompt"
                       value={current.userPromptTemplate}
-                      onChange={(event) => handleStageFieldChange(stage.id, 'userPromptTemplate', event.target.value)}
+                      onChange={(event) => handlePromptFieldChange(scenario, 'userPromptTemplate', event.target.value)}
                     />
+                    <p className="prompt-journey-helper">
+                      Utilisez des variables au format <code>{'{{variable}}'}</code> ou <code>[variable]</code>.
+                      Le texte fixe (ex: un prenom ecrit en dur) n est jamais remplace automatiquement. Le system prompt est interne et fixe.
+                    </p>
                   </div>
-                </div>
 
-                <div className="prompt-journey-inline-fields">
-                  <div className="prompt-journey-field">
-                    <label>Temperature</label>
-                    <input
-                      className="input-luxe"
-                      value={current.temperature}
-                      onChange={(event) => handleStageFieldChange(stage.id, 'temperature', event.target.value)}
-                    />
+                  <div className="prompt-journey-inline-fields">
+                    <div className="prompt-journey-field">
+                      <label>Temperature</label>
+                      <input
+                        className="input-luxe"
+                        value={current.temperature}
+                        onChange={(event) => handlePromptFieldChange(scenario, 'temperature', event.target.value)}
+                      />
+                    </div>
+                    <div className="prompt-journey-field">
+                      <label>Max tokens</label>
+                      <input
+                        className="input-luxe"
+                        value={current.maxTokens}
+                        onChange={(event) => handlePromptFieldChange(scenario, 'maxTokens', event.target.value)}
+                      />
+                    </div>
+                    <label className="prompt-journey-check prompt-journey-run-toggle">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(current.runModel)}
+                        onChange={(event) => updateScenarioState(scenario.id, { runModel: event.target.checked })}
+                      />
+                      <span>Executer aussi le modele</span>
+                    </label>
                   </div>
-                  <div className="prompt-journey-field">
-                    <label>Max tokens</label>
-                    <input
-                      className="input-luxe"
-                      value={current.maxTokens}
-                      onChange={(event) => handleStageFieldChange(stage.id, 'maxTokens', event.target.value)}
-                    />
-                  </div>
-                </div>
 
-                <div className="prompt-journey-preview-grid">
+                  <details className="prompt-journey-variable-details">
+                    <summary>
+                      Afficher les variables possibles ({variableGuide.length})
+                    </summary>
+                    <div className="prompt-journey-variable-list">
+                      {variableGuide.map((item) => (
+                        <div key={`${scenario.id}-${item.name}`} className="prompt-journey-variable-chip">
+                          <code>{`{{${item.name}}}`}</code>
+                          <span>{item.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+
+                  <div className="prompt-journey-preview-grid">
+                    <div className="prompt-journey-field">
+                      <label>Variables envoyees</label>
+                      <textarea
+                        className="input-luxe prompt-journey-textarea-preview"
+                        value={JSON.stringify(stageVariables, null, 2)}
+                        readOnly
+                      />
+                    </div>
+                    <div className="prompt-journey-field">
+                      <label>Prompt compile envoye a l IA</label>
+                      <textarea
+                        className="input-luxe prompt-journey-textarea-preview"
+                        value={compiledPreview}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+
+                  <div className="prompt-journey-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleTestScenario(scenario)}
+                      disabled={current.isTesting}
+                    >
+                      {current.isTesting ? 'Test...' : 'Tester le prompt'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => handleValidateScenario(scenario)}
+                      disabled={current.isPublishing}
+                    >
+                      {current.isPublishing ? 'Validation...' : 'Valider et versionner'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => handleUseForCreation(scenario)}
+                      disabled={current.isActivating || Number(current.version) <= 0 || Number.isNaN(Number(current.version))}
+                    >
+                      {current.isActivating ? 'Activation...' : 'Utiliser pour la creation'}
+                    </button>
+                  </div>
+
                   <div className="prompt-journey-field">
-                    <label>Variables envoyees</label>
+                    <label>Sortie IA</label>
                     <textarea
-                      className="input-luxe prompt-journey-textarea-preview"
-                      value={JSON.stringify(stageVariables, null, 2)}
+                      className="input-luxe prompt-journey-textarea-result"
+                      value={current.lastModelOutput || ''}
                       readOnly
+                      placeholder="Cochez 'Executer aussi le modele' puis testez le prompt."
                     />
-                  </div>
-                  <div className="prompt-journey-field">
-                    <label>Prompt compile envoye a l IA</label>
-                    <textarea
-                      className="input-luxe prompt-journey-textarea-preview"
-                      value={compiledPreview}
-                      readOnly
-                    />
+                    {current.lastRunAt ? (
+                      <span className="prompt-journey-last-run">
+                        Dernier test: {new Date(current.lastRunAt).toLocaleString('fr-FR')}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
-
-                <div className="prompt-journey-actions">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => applyRecommendedTemplateToStage(stage)}
-                  >
-                    Pre-remplir recommande
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => handleTestStage(stage)}
-                    disabled={current.isTesting}
-                  >
-                    {current.isTesting ? 'Test...' : 'Tester ce prompt'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => handlePublishStage(stage)}
-                    disabled={current.isPublishing}
-                  >
-                    {current.isPublishing ? 'Validation...' : 'Valider ce prompt'}
-                  </button>
-                </div>
-
-                <div className="prompt-journey-field">
-                  <label>Sortie IA</label>
-                  <textarea
-                    className="input-luxe prompt-journey-textarea-result"
-                    value={current.lastModelOutput || ''}
-                    readOnly
-                    placeholder="Activez 'Executer aussi le modele' puis testez ce prompt."
-                  />
-                  {current.lastRunAt ? (
-                    <span className="prompt-journey-last-run">
-                      Dernier test: {new Date(current.lastRunAt).toLocaleString('fr-FR')}
-                    </span>
-                  ) : null}
-                </div>
-              </article>
+              </details>
             );
           })}
         </section>

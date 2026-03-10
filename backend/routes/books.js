@@ -70,24 +70,21 @@ const PREVIEW_FORMATS = {
 const PREVIEW_TEXT_DENSITY_PROFILES = {
   airy: {
     id: 'airy',
-    firstPageChars: 900,
-    firstPageFlexChars: 260,
-    maxChars: 4600,
-    chunkSize: 260
+    firstPageChars: 760,
+    firstPageFlexChars: 180,
+    maxChars: 4200
   },
   balanced: {
     id: 'balanced',
-    firstPageChars: 1250,
-    firstPageFlexChars: 320,
-    maxChars: 6200,
-    chunkSize: 360
+    firstPageChars: 980,
+    firstPageFlexChars: 240,
+    maxChars: 5600
   },
   compact: {
     id: 'compact',
-    firstPageChars: 1600,
-    firstPageFlexChars: 380,
-    maxChars: 7600,
-    chunkSize: 460
+    firstPageChars: 1260,
+    firstPageFlexChars: 280,
+    maxChars: 6900
   }
 };
 const PREVIEW_IMAGE_DENSITY_PROFILES = {
@@ -1412,7 +1409,7 @@ function ensureFourDraftPages(pages, fallbackPages) {
   for (let index = 0; index < 4; index += 1) {
     const currentPage = safePages[index] || fallback[index] || {};
     normalizedPages.push({
-      title: cleanText(currentPage.title, 180) || `Page ${index + 1}`,
+      title: cleanText(currentPage.title, 180) || `Volet ${index + 1}`,
       body: cleanText(currentPage.body, 3200) || cleanText(fallback[index]?.body, 3200) || 'Contenu a enrichir.'
     });
   }
@@ -1420,8 +1417,77 @@ function ensureFourDraftPages(pages, fallbackPages) {
   return normalizedPages;
 }
 
+function sanitizeDraftHeading(value, fallback = '') {
+  const raw = cleanText(value, 180);
+  if (!raw) {
+    return cleanText(fallback, 180) || '';
+  }
+
+  const trimmed = raw
+    .replace(/^chapitre\s*\d+\s*[-:–]\s*/i, '')
+    .replace(/^page\s*\d+\s*[-:–]\s*/i, '')
+    .trim();
+
+  return trimmed || cleanText(fallback, 180) || raw;
+}
+
+function normalizeComparableText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function sanitizeOpeningLead(value, chapterTitle) {
+  const raw = cleanText(value, 700);
+  if (!raw) {
+    return '';
+  }
+  const comparableRaw = normalizeComparableText(raw);
+  const comparableTitle = normalizeComparableText(chapterTitle);
+
+  if (!comparableRaw) {
+    return '';
+  }
+  if (comparableRaw.startsWith('chapitre ')) {
+    return '';
+  }
+  if (comparableTitle && comparableRaw === comparableTitle) {
+    return '';
+  }
+  if (comparableTitle && comparableRaw.startsWith(`${comparableTitle} `)) {
+    return '';
+  }
+
+  return raw;
+}
+
+function formatFolioNumber(value) {
+  const safeNumber = Number.isFinite(Number(value)) ? Math.max(1, Number(value)) : 1;
+  return String(Math.floor(safeNumber)).padStart(2, '0');
+}
+
+function renderDraftPageFolio({ pageNumber, totalPages }) {
+  const safePage = formatFolioNumber(pageNumber);
+  const safeTotal = formatFolioNumber(totalPages || 4);
+  return `
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">${safePage}</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">${safeTotal}</span>
+    </div>
+  `;
+}
+
 function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) {
   const chapterNumber = Number(chapter?.order_index || 0) + 1;
+  const chapterHeading = sanitizeDraftHeading(
+    draft.title || chapter?.title || `Volet ${chapterNumber}`,
+    chapter?.title || `Volet ${chapterNumber}`
+  );
+  const openingLead = sanitizeOpeningLead(sourcePayload?.chapter?.description, chapterHeading);
   const visiblePhotos = Array.isArray(sourcePayload?.chapter?.photoUrls)
     ? sourcePayload.chapter.photoUrls.slice(0, 6)
     : [];
@@ -1438,11 +1504,9 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
       <div class="draft-book-chapter-shell">
         ${draft.pages.map((page, index) => `
           <section class="draft-book-page${index === 0 ? ' draft-book-page-opening' : ''}${index === 3 ? ' draft-book-page-gallery' : ''}">
-            <div class="draft-book-page-label">Page ${index + 1}</div>
-            ${index === 0 ? `<div class="draft-book-chapter-index">Chapitre ${chapterNumber}</div>` : ''}
-            <h3>${escapeHtml(page.title || draft.title || chapter?.title || `Chapitre ${chapterNumber}`)}</h3>
-            ${index === 0 && sourcePayload?.chapter?.description
-              ? `<p class="draft-book-intro">${escapeHtml(sourcePayload.chapter.description)}</p>`
+            <h3>${escapeHtml(sanitizeDraftHeading(page.title || chapterHeading, chapterHeading))}</h3>
+            ${index === 0 && openingLead
+              ? `<p class="draft-book-intro">${escapeHtml(openingLead)}</p>`
               : ''}
             <div class="draft-book-body">
               ${formatParagraphs(page.body || '')}
@@ -1450,6 +1514,7 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
             ${index === 0 ? renderQuestionList(sourcePayload?.chapter?.questions) : ''}
             ${index === 2 ? renderContributionSpotlight(sourcePayload?.chapter?.organizerContribution, guestHighlights) : ''}
             ${index === 3 ? renderPhotoGallery(visiblePhotos, remainingPhotoCount) : ''}
+            ${renderDraftPageFolio({ pageNumber: index + 1, totalPages: 4 })}
           </section>
         `).join('')}
       </div>
@@ -1715,7 +1780,7 @@ function renderAssembledFrontCover(book) {
   const monogram = buildCoverMonogram(recipientLine || title);
 
   return `
-    <section class="draft-book-section">
+    <section class="draft-book-section draft-book-section-cover draft-book-section-cover-front">
       <div class="draft-book-mini-title">Couverture</div>
       <div class="cover-preview-spread" style="grid-template-columns: minmax(0, 1fr);">
         <article
@@ -1767,7 +1832,7 @@ function renderAssembledBackCover(book) {
   }
 
   return `
-    <section class="draft-book-section">
+    <section class="draft-book-section draft-book-section-cover draft-book-section-cover-back">
       <div class="draft-book-mini-title">4e de couverture</div>
       <div class="cover-preview-spread" style="grid-template-columns: minmax(0, 1fr);">
         <article
@@ -2278,11 +2343,6 @@ function renderValidatedBookCoverHtml({ book, previewFormat }) {
 
   return `
     <article class="draft-book draft-book-cover-print ${previewFormatClass}" data-preview-format="${resolvedPreviewFormat}">
-      <header class="draft-book-header">
-        <div class="draft-book-eyebrow">Couverture finale</div>
-        <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
-        <div class="draft-book-meta">Couverture et 4e de couverture</div>
-      </header>
       <section class="cover-print-spread">
         ${backCard}
         ${frontCard}
@@ -2331,6 +2391,7 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
   const pageMarginMm = isCoverMode ? coverPageMarginMm : interiorPageMarginMm;
   const interiorPageMinHeightMm = Math.max(110, trimHeightMm - pageMarginMm * 2 - 6);
   const coverCardMinHeightMm = Math.max(120, trimHeightMm - pageMarginMm * 2 - 2);
+  const coverContentHeightMm = Math.max(120, coverHeightMm - pageMarginMm * 2);
 
   return `
     @page {
@@ -2403,6 +2464,32 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       break-after: page;
     }
 
+    .draft-book-section-cover {
+      min-height: ${interiorPageMinHeightMm}mm;
+      display: flex;
+      flex-direction: column;
+      gap: 3mm;
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+    }
+
+    .draft-book-section-cover .draft-book-mini-title {
+      margin-bottom: 1.8mm;
+    }
+
+    .draft-book-section-cover .cover-preview-spread {
+      flex: 1;
+      min-height: 0;
+      display: block;
+    }
+
+    .draft-book-section-cover .cover-preview-card {
+      min-height: calc(${interiorPageMinHeightMm}mm - 16mm);
+      max-height: calc(${interiorPageMinHeightMm}mm - 16mm);
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+    }
+
     .draft-book-section h2,
     .draft-book-chapter h3 {
       margin: 0 0 4mm;
@@ -2425,6 +2512,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       box-shadow: none;
       display: flex;
       flex-direction: column;
+      page-break-inside: avoid;
+      break-inside: avoid-page;
       page-break-after: always;
       break-after: page;
     }
@@ -2435,29 +2524,6 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
 
     .draft-book-page-gallery {
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(249, 245, 236, 0.96) 100%);
-    }
-
-    .draft-book-page-label {
-      display: inline-flex;
-      align-self: flex-start;
-      margin-bottom: 4mm;
-      padding: 3px 10px;
-      border-radius: 999px;
-      background: rgba(184, 146, 74, 0.16);
-      color: #8b6a2f;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .draft-book-chapter-index {
-      font-size: 10px;
-      font-weight: 700;
-      color: #8b6a2f;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 3mm;
     }
 
     .draft-book-intro {
@@ -2482,6 +2548,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       break-inside: avoid-page;
       orphans: 3;
       widows: 3;
+      overflow-wrap: break-word;
+      word-break: normal;
     }
 
     .draft-book-text-block {
@@ -2518,6 +2586,27 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       font-weight: 500;
     }
 
+    .draft-book-folio {
+      margin-top: auto;
+      padding-top: 4mm;
+      display: inline-flex;
+      align-items: center;
+      align-self: center;
+      gap: 6px;
+      color: #8b6a2f;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .draft-book-folio-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(184, 146, 74, 0.78);
+    }
+
     .draft-book-source {
       margin: 0 0 4mm;
       padding-bottom: 3.5mm;
@@ -2546,17 +2635,42 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
 
     .draft-book-question-list {
       margin: 0;
-      padding-left: 18px;
+      padding: 0;
+      list-style: none;
+      counter-reset: luxe-question;
+      display: grid;
+      gap: 2.4mm;
       font-size: 12px;
     }
 
     .draft-book-question-list li {
-      margin-bottom: 7px;
-      line-height: 1.55;
+      margin: 0;
+      padding: 2.5mm 3.2mm;
+      border-radius: 6px;
+      border: 1px solid rgba(184, 146, 74, 0.24);
+      background: rgba(255, 255, 255, 0.72);
+      line-height: 1.58;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: start;
+      gap: 2.2mm;
+      counter-increment: luxe-question;
+      page-break-inside: avoid;
+      break-inside: avoid-page;
     }
 
-    .draft-book-question-list li:last-child {
-      margin-bottom: 0;
+    .draft-book-question-list li::before {
+      content: counter(luxe-question, decimal-leading-zero);
+      color: #8b6a2f;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      margin-top: 0.2mm;
+    }
+
+    .draft-book-question-list li > span {
+      display: block;
+      min-width: 0;
     }
 
     .draft-book-callout,
@@ -2658,13 +2772,18 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
-      page-break-after: always;
-      break-after: page;
+      height: ${coverContentHeightMm}mm;
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     .cover-preview-card {
       position: relative;
       min-height: ${coverCardMinHeightMm}mm;
+      height: ${coverCardMinHeightMm}mm;
+      max-height: ${coverCardMinHeightMm}mm;
       border-radius: 14px;
       border: 1px solid rgba(200, 184, 148, 0.62);
       background: var(--cover-bg, #f6f1e7);
@@ -2867,7 +2986,12 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       font-size: 17px;
     }
 
-    body.mode-cover .draft-book-header {
+    body.mode-cover .draft-book {
+      page-break-inside: avoid;
+      break-inside: avoid-page;
+    }
+
+    body.mode-cover .cover-print-spread {
       page-break-after: avoid;
       break-after: avoid;
     }
@@ -2919,10 +3043,13 @@ async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts, pre
 
       chaptersWithDrafts.forEach(({ chapter, draft }, chapterIndex) => {
         addPage();
-        doc.fillColor('#8b6a2f').font('Helvetica-Bold').fontSize(10).text(`Chapitre ${chapterIndex + 1}`);
+        doc.fillColor('#8b6a2f').font('Helvetica-Bold').fontSize(10).text(`Volet ${chapterIndex + 1}`);
         doc.moveDown(0.3);
         doc.fillColor('#1f2228').font('Helvetica-Bold').fontSize(18).text(
-          cleanText(draft?.title, 180) || cleanText(chapter?.title, 180) || `Chapitre ${chapterIndex + 1}`
+          sanitizeDraftHeading(
+            cleanText(draft?.title, 180) || cleanText(chapter?.title, 180) || `Volet ${chapterIndex + 1}`,
+            cleanText(chapter?.title, 180) || `Volet ${chapterIndex + 1}`
+          )
         );
         doc.moveDown(0.45);
         doc.fillColor('#1f2228').font('Helvetica').fontSize(11);
@@ -3623,8 +3750,11 @@ function renderDraftChapterPages({
   index,
   layoutSettings = null
 }) {
-  const chapterTitle = chapter.title || sourceChapter?.title || `Chapitre ${index + 1}`;
-  const sourceMeta = [];
+  const chapterTitle = sanitizeDraftHeading(
+    chapter.title || sourceChapter?.title || `Volet ${index + 1}`,
+    sourceChapter?.title || `Volet ${index + 1}`
+  );
+  const openingLead = sanitizeOpeningLead(sourceChapter?.description, chapterTitle);
   const normalizedLayoutSettings = normalizePreviewLayoutSettings(layoutSettings);
   const imageProfile = PREVIEW_IMAGE_DENSITY_PROFILES[normalizedLayoutSettings.imageDensity];
   const bodyParts = splitDraftBody(
@@ -3640,49 +3770,37 @@ function renderDraftChapterPages({
   const galleryPhotos = heroPhotoUrl ? visiblePhotos.slice(1) : visiblePhotos;
   const remainingPhotoCount = Math.max(0, allPhotos.length - visiblePhotos.length);
 
-  if (sourceChapter?.stats?.invitedCount) {
-    sourceMeta.push(`${sourceChapter.stats.invitedCount} invitation(s)`);
-  }
-  if (sourceChapter?.stats?.respondedCount) {
-    sourceMeta.push(`${sourceChapter.stats.respondedCount} reponse(s)`);
-  }
-  if (sourceChapter?.guestContributions?.length) {
-    sourceMeta.push(`${sourceChapter.guestContributions.length} contribution(s) retenue(s)`);
-  }
-
   return `
     <section class="draft-book-chapter">
       <div class="draft-book-chapter-shell">
         <section class="draft-book-page draft-book-page-opening">
-          <div class="draft-book-page-label">Page 1</div>
-          <div class="draft-book-chapter-index">Chapitre ${index + 1}</div>
           <h3>${escapeHtml(chapterTitle)}</h3>
-          ${sourceChapter?.description ? `<p class="draft-book-intro">${escapeHtml(sourceChapter.description)}</p>` : ''}
-          ${sourceMeta.length > 0 ? `<div class="draft-book-source">${escapeHtml(sourceMeta.join(' | '))}</div>` : ''}
+          ${openingLead ? `<p class="draft-book-intro">${escapeHtml(openingLead)}</p>` : ''}
           ${renderQuestionList(sourceChapter?.questions)}
+          ${renderDraftPageFolio({ pageNumber: 1, totalPages: 4 })}
         </section>
 
         <section class="draft-book-page">
-          <div class="draft-book-page-label">Page 2</div>
           ${chapter.intro ? `<p class="draft-book-intro">${escapeHtml(chapter.intro)}</p>` : ''}
           <div class="draft-book-body draft-book-body-blocks">
             ${formatParagraphs(bodyParts[0] || '', { paragraphClass: 'draft-book-text-block' })}
           </div>
           ${heroPhotoUrl ? renderInlineHeroPhoto(heroPhotoUrl, chapterTitle) : ''}
+          ${renderDraftPageFolio({ pageNumber: 2, totalPages: 4 })}
         </section>
 
         <section class="draft-book-page">
-          <div class="draft-book-page-label">Page 3</div>
           ${renderContributionSpotlight(sourceChapter?.organizerContribution, guestHighlights)}
+          ${renderDraftPageFolio({ pageNumber: 3, totalPages: 4 })}
         </section>
 
         <section class="draft-book-page draft-book-page-gallery">
-          <div class="draft-book-page-label">Page 4</div>
           <div class="draft-book-body draft-book-body-blocks">
             ${formatParagraphs(bodyParts[1] || bodyParts[0] || '', { paragraphClass: 'draft-book-text-block' })}
           </div>
           ${chapter.closing ? `<p class="draft-book-closing">${escapeHtml(chapter.closing)}</p>` : ''}
           ${renderPhotoGallery(galleryPhotos, remainingPhotoCount, { columns: imageProfile.galleryColumns })}
+          ${renderDraftPageFolio({ pageNumber: 4, totalPages: 4 })}
         </section>
       </div>
     </section>
@@ -3713,9 +3831,9 @@ function renderQuestionList(questions) {
   return `
     <div class="draft-book-question-block">
       <div class="draft-book-mini-title">Fils directeurs</div>
-      <ul class="draft-book-question-list">
-        ${items.slice(0, 5).map((question) => `<li>${escapeHtml(question)}</li>`).join('')}
-      </ul>
+      <ol class="draft-book-question-list">
+        ${items.slice(0, 5).map((question) => `<li><span>${escapeHtml(question)}</span></li>`).join('')}
+      </ol>
     </div>
   `;
 }
@@ -3762,7 +3880,7 @@ function renderPhotoGallery(photos, remainingPhotoCount, options = {}) {
     : 'draft-book-gallery';
 
   if (!Array.isArray(photos) || photos.length === 0) {
-    return '<p class="draft-book-empty">Aucune photo retenue pour ce chapitre pour le moment.</p>';
+    return '';
   }
 
   return `
@@ -3786,7 +3904,7 @@ function splitDraftBody(text, options = {}) {
   const paragraphs = splitTextToParagraphs(
     text,
     profile.maxChars,
-    profile.chunkSize
+    { preserveParagraphs: true }
   );
 
   if (paragraphs.length === 0) {
@@ -3852,10 +3970,22 @@ function splitTextToParagraphs(value, maxLength = 6000, chunkSize = 420) {
     ? `${normalized.slice(0, maxLength).trim()}...`
     : normalized;
 
-  return trimmed
+  const options = (chunkSize && typeof chunkSize === 'object') ? chunkSize : {};
+  const shouldPreserveParagraphs = options.preserveParagraphs !== false;
+  const resolvedChunkSize = Number.isFinite(Number(options.chunkSize))
+    ? Math.max(180, Number(options.chunkSize))
+    : Math.max(180, Number(chunkSize) || 420);
+  const paragraphs = trimmed
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.replace(/[ \t]+/g, ' ').replace(/\n/g, ' ').trim())
-    .flatMap((paragraph) => splitLongParagraphIntoChunks(paragraph, chunkSize))
+    .filter(Boolean);
+
+  if (shouldPreserveParagraphs) {
+    return paragraphs;
+  }
+
+  return paragraphs
+    .flatMap((paragraph) => splitLongParagraphIntoChunks(paragraph, resolvedChunkSize))
     .filter(Boolean);
 }
 

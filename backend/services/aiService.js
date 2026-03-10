@@ -3,6 +3,18 @@ const { Mistral } = require('@mistralai/mistralai');
 const promptTemplateService = require('./promptTemplateService');
 
 const apiKey = process.env.MISTRAL_API_KEY;
+const PROMPT_DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(
+  String(process.env.DEBUG_PROMPT_TRACE || '').trim().toLowerCase()
+);
+
+function logPromptDebug(tag, payload) {
+  if (!PROMPT_DEBUG_ENABLED) return;
+  try {
+    console.log(`[PROMPT_TRACE][${tag}] ${JSON.stringify(payload, null, 2)}`);
+  } catch (_error) {
+    console.log(`[PROMPT_TRACE][${tag}]`, payload);
+  }
+}
 
 if (!apiKey) {
   console.error('❌ MISTRAL_API_KEY manquante dans .env');
@@ -165,6 +177,27 @@ async function generateQuestions(params) {
     });
 
     const prompt = promptConfig.userPrompt;
+    logPromptDebug('generate_questions_request', {
+      source: promptConfig.source,
+      version: promptConfig.version,
+      model: 'mistral-small-latest',
+      variables: {
+        chapterTitle: chapterTitle || 'Chapitre',
+        eventType: eventType || 'evenement',
+        style: style || 'factuel',
+        bookTitle: bookTitle || 'Notre livre de souvenirs',
+        recipientName: name,
+        recipientAge: age,
+        recipientGender: gender,
+        pronoun,
+        possessive,
+        subjectPronoun,
+        ageContext,
+        styleInstruction
+      },
+      systemPrompt: promptConfig.systemPrompt,
+      userPromptCompiled: prompt
+    });
 
     console.log('📝 Prompt envoyé à Mistral (extrait):', prompt.substring(0, 300) + '...');
     console.log('🧩 Source prompt questions:', promptConfig.source, 'version:', promptConfig.version);
@@ -186,6 +219,10 @@ async function generateQuestions(params) {
     });
 
     const content = response.choices[0].message.content;
+    logPromptDebug('generate_questions_model_output', {
+      model: 'mistral-small-latest',
+      output: content
+    });
     console.log('📝 Réponse Mistral reçue');
 
     const questions = parseQuestions(content);
