@@ -390,6 +390,8 @@
 .prompt-admin-editor-actions {
   margin-top: var(--space-md);
   display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
   justify-content: flex-end;
 }
 
@@ -553,6 +555,73 @@
   text-transform: uppercase;
 }
 
+.prompt-admin-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.prompt-admin-analysis-card {
+  border: 1px solid rgba(220, 215, 204, 0.92);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prompt-admin-analysis-card label {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #8d6d35;
+}
+
+.prompt-admin-analysis-card p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.prompt-admin-analysis-card.is-warning {
+  border-color: #efddbd;
+  background: #fff8ea;
+}
+
+.prompt-admin-analysis-card.is-ok {
+  border-color: #d4e8db;
+  background: #eef8f1;
+}
+
+.prompt-admin-analysis-warnings {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prompt-admin-analysis-warning-item {
+  border: 1px solid #efddbd;
+  border-radius: 10px;
+  background: #fff8ea;
+  color: #8b5e11;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 7px 10px;
+}
+
+.prompt-admin-model-output-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .prompt-admin-textarea-result {
   min-height: 180px;
 }
@@ -615,6 +684,11 @@
   }
 
   .prompt-admin-inline-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .prompt-admin-analysis-grid,
+  .prompt-admin-model-output-grid {
     grid-template-columns: 1fr;
   }
 

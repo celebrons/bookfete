@@ -114,6 +114,7 @@ const Step4Cloture = ({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+  const hasOpenModal = showPreviewModal || showEditorModal || showFinalizeConfirm;
 
   const isOrganizer = user && book && user.id === book.owner_id;
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
@@ -207,6 +208,22 @@ const Step4Cloture = ({
       tone: isDraftValidated ? 'ok' : (chapterDraft ? 'active' : 'pending')
     }
   ].filter(Boolean);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return undefined;
+    }
+    if (!hasOpenModal) {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [hasOpenModal]);
 
   const buildLocalSummary = useCallback(() => {
     if (!chapter?.id) {
@@ -630,7 +647,7 @@ const Step4Cloture = ({
       {showPreviewModal && (
         <div className="modal-overlay" onClick={() => setShowPreviewModal(false)}>
           <div
-            className="modal-content book-draft-modal"
+            className="modal-content book-draft-modal chapter-draft-preview-modal"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="book-draft-modal-header">
@@ -674,7 +691,7 @@ const Step4Cloture = ({
               </button>
             </div>
 
-            <div className="book-draft-preview">
+            <div className="book-draft-preview chapter-draft-preview-scroll">
               {previewHtml ? (
                 <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
               ) : (

@@ -63,6 +63,9 @@ const isPdfOrderLinkError = (error) => (
   /commande associee au pdf introuvable/i.test(String(error?.message || ''))
 );
 const NETWORK_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 20000);
+const PREVIEW_FORMAT_IDS = new Set(['prestige', 'livret', 'carre']);
+const PREVIEW_TEXT_DENSITY_IDS = new Set(['airy', 'balanced', 'compact']);
+const PREVIEW_IMAGE_DENSITY_IDS = new Set(['discrete', 'balanced', 'immersive']);
 
 const fetchJsonWithTimeout = async (url, options = {}, timeoutMs = NETWORK_TIMEOUT_MS) => {
   const controller = new AbortController();
@@ -229,7 +232,28 @@ const BookCheckoutLuxe = () => {
   const startPdfExport = async (orderId = '') => {
     const headers = await getAuthHeaders();
     const normalizedOrderId = String(orderId || '').trim();
-    const payloadBody = normalizedOrderId ? { orderId: normalizedOrderId } : {};
+    const configuredFormat = String(book?.cover_config?.previewFormat || '').toLowerCase();
+    const previewFormat = PREVIEW_FORMAT_IDS.has(configuredFormat) ? configuredFormat : 'prestige';
+    const rawLayoutSettings = (
+      book?.cover_config?.previewLayoutSettings
+      && typeof book.cover_config.previewLayoutSettings === 'object'
+    )
+      ? book.cover_config.previewLayoutSettings
+      : {};
+    const payloadBody = {
+      previewFormat,
+      previewLayoutSettings: {
+        textDensity: PREVIEW_TEXT_DENSITY_IDS.has(rawLayoutSettings.textDensity)
+          ? rawLayoutSettings.textDensity
+          : 'balanced',
+        imageDensity: PREVIEW_IMAGE_DENSITY_IDS.has(rawLayoutSettings.imageDensity)
+          ? rawLayoutSettings.imageDensity
+          : 'balanced'
+      }
+    };
+    if (normalizedOrderId) {
+      payloadBody.orderId = normalizedOrderId;
+    }
     const { response, payload } = await fetchJsonWithTimeout(
       `${getApiBaseUrl()}/books/${bookId}/export-final-pdf`,
       {

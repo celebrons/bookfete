@@ -44,6 +44,140 @@ const JOURNEY_STAGES = [
   }
 ];
 
+const CHAPTER_GENERATION_RECOMMENDED = {
+  systemPrompt: [
+    'Tu es un architecte de livres de prestige.',
+    'Tu produis des propositions courtes, elegantes, emotionnelles et personnalisees.',
+    'Tu respectes strictement le format de sortie demande, sans blabla.'
+  ].join('\n'),
+  userPromptTemplate: [
+    'Tu dois produire une proposition de livre complete a partir des donnees fournies.',
+    '',
+    'Donnees utilisateur:',
+    '- eventType: {{eventType}}',
+    '- style: {{style}}',
+    '- bookTitle (si deja saisi): {{bookTitle}}',
+    '- recipientName: {{recipientName}}',
+    '- recipientAge: {{recipientAge}}',
+    '- recipientGender: {{recipientGender}}',
+    '- recipientNickname: {{recipientNickname}}',
+    '- recipientTrait: {{recipientTrait}}',
+    '- recipientAnecdote: {{recipientAnecdote}}',
+    '- additionalContext: {{additionalContext}}',
+    '- count (nombre de chapitres): {{count}}',
+    '',
+    'Regles:',
+    '- N interroge jamais l utilisateur.',
+    '- Utilise uniquement les donnees ci-dessus.',
+    '- Le titre du livre doit etre court, premium, emotionnel et personnalise.',
+    '- Produis exactement {{count}} titres de chapitres.',
+    '- Titres de chapitres courts, memorables, non generiques.',
+    '- Aucune description, aucun commentaire hors JSON.',
+    '- Pas de markdown.',
+    '',
+    'Format de sortie JSON strict:',
+    '{',
+    '  "bookTitle": "Titre du livre",',
+    '  "chapters": ["Titre chapitre 1", "Titre chapitre 2", "Titre chapitre 3"]',
+    '}'
+  ].join('\n'),
+  temperature: '0.72',
+  maxTokens: '1000'
+};
+
+const QUESTION_GENERATION_RECOMMENDED = {
+  systemPrompt: [
+    'Tu es un biographe narratif premium specialise en collecte de souvenirs.',
+    'Tu rediges des questions ouvertes concretes et exploitables.',
+    'Tu respectes strictement le format JSON demande.'
+  ].join('\n'),
+  userPromptTemplate: [
+    'Tu dois generer 4 questions ouvertes pour collecter des souvenirs narratifs premium.',
+    '',
+    'Contexte:',
+    '- bookTitle: {{bookTitle}}',
+    '- eventType: {{eventType}}',
+    '- chapterTitle: {{chapterTitle}}',
+    '- style: {{style}}',
+    '- recipientName: {{recipientName}}',
+    '- recipientAge: {{recipientAge}}',
+    '- recipientGender: {{recipientGender}}',
+    '- pronoun: {{pronoun}}',
+    '- subjectPronoun: {{subjectPronoun}}',
+    '- possessive: {{possessive}}',
+    '- ageContext: {{ageContext}}',
+    '- styleInstruction: {{styleInstruction}}',
+    '',
+    'Regles:',
+    '- Les questions sont adressees a l organisateur et aux contributeurs.',
+    '- Ne jamais adresser la question directement a {{recipientName}}.',
+    '- Ne jamais commencer une question par "{{recipientName}},".',
+    '- Utiliser la 3e personne pour parler de {{recipientName}}.',
+    '- Interdire les questions oui/non.',
+    '- Forcer des reponses concretes (decor, sons, odeurs, dialogues, emotions).',
+    '- Ton adapte au style {{style}}.',
+    '- Aucune phrase hors JSON, pas de markdown.',
+    '',
+    'Format de sortie JSON strict:',
+    '[',
+    '  "Question 1",',
+    '  "Question 2",',
+    '  "Question 3",',
+    '  "Question 4"',
+    ']'
+  ].join('\n'),
+  temperature: '0.68',
+  maxTokens: '700'
+};
+
+const CONTENT_GENERATION_RECOMMENDED = {
+  systemPrompt: [
+    'Tu es un biographe haut de gamme.',
+    'Tu rediges un texte elegant, coherent, sensoriel et humain.',
+    'Tu respectes strictement les contraintes de sortie.'
+  ].join('\n'),
+  userPromptTemplate: [
+    'Tu dois rediger un texte final pour un livre souvenir.',
+    '',
+    'Contexte:',
+    '- outputType: {{outputType}} (valeurs: introduction | chapter_content | conclusion)',
+    '- eventType: {{eventType}}',
+    '- style: {{style}}',
+    '- bookTitle: {{bookTitle}}',
+    '- chapterTitle: {{chapterTitle}}',
+    '- recipientName: {{recipientName}}',
+    '- recipientAge: {{recipientAge}}',
+    '- recipientGender: {{recipientGender}}',
+    '- chapterSummary: {{chapterSummary}}',
+    '- narrativeContext: {{narrativeContext}}',
+    '- targetLength: {{targetLength}}',
+    '',
+    'Regles communes:',
+    '- N interroge jamais l utilisateur.',
+    '- Utilise uniquement les donnees fournies.',
+    '- Texte en francais uniquement.',
+    '- Pas de markdown, pas de JSON, pas de balises HTML.',
+    '- Respecte une longueur proche de {{targetLength}} caracteres (+/- 15%).',
+    '',
+    'Regles selon outputType:',
+    '- introduction: ouvrir le livre avec elegance, chaleur et promesse narrative.',
+    '- chapter_content: produire une narration riche, concrete, sensorielle et coherente.',
+    '- conclusion: cloturer avec emotion, gratitude et unite.',
+    '',
+    'Sortie attendue:',
+    '- Retourne uniquement le texte final.'
+  ].join('\n'),
+  temperature: '0.74',
+  maxTokens: '1800'
+};
+
+const RECOMMENDED_STAGE_TEMPLATES = {
+  book_title: CHAPTER_GENERATION_RECOMMENDED,
+  chapter_titles: CHAPTER_GENERATION_RECOMMENDED,
+  questions: QUESTION_GENERATION_RECOMMENDED,
+  chapter_content: CONTENT_GENERATION_RECOMMENDED
+};
+
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const trimmed = configured.replace(/\/$/, '');
@@ -193,6 +327,42 @@ const PromptJourneyLabLuxe = () => {
     }));
   };
 
+  const applyRecommendedTemplateToStage = (stage) => {
+    const recommended = RECOMMENDED_STAGE_TEMPLATES[stage.id];
+    if (!recommended) {
+      setErrorMessage(`Aucun template recommande pour ${stage.label}.`);
+      return;
+    }
+    updateStageState(stage.id, {
+      systemPrompt: recommended.systemPrompt,
+      userPromptTemplate: recommended.userPromptTemplate,
+      temperature: recommended.temperature,
+      maxTokens: recommended.maxTokens
+    });
+    setErrorMessage('');
+    setSuccessMessage(`Template recommande pre-rempli pour "${stage.label}". Vous pouvez le modifier.`);
+  };
+
+  const applyRecommendedTemplatesToAllStages = () => {
+    setStageState((previous) => {
+      const next = { ...previous };
+      JOURNEY_STAGES.forEach((stage) => {
+        const recommended = RECOMMENDED_STAGE_TEMPLATES[stage.id];
+        if (!recommended) return;
+        next[stage.id] = {
+          ...(previous[stage.id] || getInitialStageState()),
+          systemPrompt: recommended.systemPrompt,
+          userPromptTemplate: recommended.userPromptTemplate,
+          temperature: recommended.temperature,
+          maxTokens: recommended.maxTokens
+        };
+      });
+      return next;
+    });
+    setErrorMessage('');
+    setSuccessMessage('Templates recommandes pre-remplis pour tout le parcours. Vous pouvez les modifier.');
+  };
+
   const buildStageVariables = (stageId) => {
     const common = {
       eventType: projectForm.eventType || 'generique',
@@ -288,18 +458,19 @@ const PromptJourneyLabLuxe = () => {
         const next = { ...previous };
         JOURNEY_STAGES.forEach((stage) => {
           const activePrompt = promptByKey[stage.promptKey] || null;
+          const recommended = RECOMMENDED_STAGE_TEMPLATES[stage.id] || null;
           next[stage.id] = {
             ...(previous[stage.id] || getInitialStageState()),
             source: activePrompt?.source || '-',
             version: activePrompt?.version || '-',
-            systemPrompt: activePrompt?.systemPrompt || '',
-            userPromptTemplate: activePrompt?.userPromptTemplate || '',
+            systemPrompt: activePrompt?.systemPrompt || recommended?.systemPrompt || '',
+            userPromptTemplate: activePrompt?.userPromptTemplate || recommended?.userPromptTemplate || '',
             temperature: Number.isFinite(Number(activePrompt?.temperature))
               ? String(activePrompt.temperature)
-              : '',
+              : (recommended?.temperature || ''),
             maxTokens: Number.isFinite(Number(activePrompt?.maxTokens))
               ? String(activePrompt.maxTokens)
-              : ''
+              : (recommended?.maxTokens || '')
           };
         });
         return next;
@@ -474,6 +645,13 @@ const PromptJourneyLabLuxe = () => {
               />
               <span>Executer aussi le modele</span>
             </label>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={applyRecommendedTemplatesToAllStages}
+            >
+              Pre-remplir recommandes
+            </button>
             <button
               type="button"
               className="btn btn-primary"
@@ -685,6 +863,13 @@ const PromptJourneyLabLuxe = () => {
                 </div>
 
                 <div className="prompt-journey-actions">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => applyRecommendedTemplateToStage(stage)}
+                  >
+                    Pre-remplir recommande
+                  </button>
                   <button
                     type="button"
                     className="btn btn-secondary"

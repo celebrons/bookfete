@@ -92,6 +92,61 @@ const BOOK_PREVIEW_FORMATS = [
     note: 'Photo-book'
   }
 ];
+const PREVIEW_TEXT_DENSITY_OPTIONS = [
+  { id: 'airy', label: 'Aere' },
+  { id: 'balanced', label: 'Standard' },
+  { id: 'compact', label: 'Dense' }
+];
+const PREVIEW_IMAGE_DENSITY_OPTIONS = [
+  { id: 'discrete', label: 'Discret' },
+  { id: 'balanced', label: 'Equilibre' },
+  { id: 'immersive', label: 'Immersif' }
+];
+const PREVIEW_LINE_SPACING_OPTIONS = [
+  { id: 'compact', label: 'Serre', factor: 0.94 },
+  { id: 'balanced', label: 'Normal', factor: 1 },
+  { id: 'airy', label: 'Aere', factor: 1.08 }
+];
+const DEFAULT_DRAFT_LAYOUT_SETTINGS = {
+  textDensity: 'balanced',
+  imageDensity: 'balanced',
+  lineSpacing: 'balanced',
+  fontScale: 1
+};
+
+const normalizeDraftLayoutSettings = (rawValue) => {
+  const source = rawValue && typeof rawValue === 'object' ? rawValue : {};
+  const textDensity = PREVIEW_TEXT_DENSITY_OPTIONS.some((option) => option.id === source.textDensity)
+    ? source.textDensity
+    : DEFAULT_DRAFT_LAYOUT_SETTINGS.textDensity;
+  const imageDensity = PREVIEW_IMAGE_DENSITY_OPTIONS.some((option) => option.id === source.imageDensity)
+    ? source.imageDensity
+    : DEFAULT_DRAFT_LAYOUT_SETTINGS.imageDensity;
+  const lineSpacing = PREVIEW_LINE_SPACING_OPTIONS.some((option) => option.id === source.lineSpacing)
+    ? source.lineSpacing
+    : DEFAULT_DRAFT_LAYOUT_SETTINGS.lineSpacing;
+  const rawFontScale = Number(source.fontScale);
+  const fontScale = Number.isFinite(rawFontScale)
+    ? Math.min(1.08, Math.max(0.9, rawFontScale))
+    : DEFAULT_DRAFT_LAYOUT_SETTINGS.fontScale;
+
+  return {
+    textDensity,
+    imageDensity,
+    lineSpacing,
+    fontScale
+  };
+};
+const areDraftLayoutSettingsEqual = (leftValue, rightValue) => {
+  const left = normalizeDraftLayoutSettings(leftValue);
+  const right = normalizeDraftLayoutSettings(rightValue);
+  return (
+    left.textDensity === right.textDensity
+    && left.imageDensity === right.imageDensity
+    && left.lineSpacing === right.lineSpacing
+    && left.fontScale === right.fontScale
+  );
+};
 
 const buildDraftPreviewPages = (html) => {
   if (!html || typeof window === 'undefined') {
@@ -184,6 +239,7 @@ const BookPageLuxe = () => {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [selectedPreviewFormat, setSelectedPreviewFormat] = useState(BOOK_PREVIEW_FORMATS[0].id);
   const [draftReadingMode, setDraftReadingMode] = useState('horizontal');
+  const [draftLayoutSettings, setDraftLayoutSettings] = useState(DEFAULT_DRAFT_LAYOUT_SETTINGS);
   const [draftSpreadIndex, setDraftSpreadIndex] = useState(0);
   const [isDraftToolbarVisible, setIsDraftToolbarVisible] = useState(false);
   const [isDraftToolbarPinned, setIsDraftToolbarPinned] = useState(false);
@@ -206,6 +262,7 @@ const BookPageLuxe = () => {
   const [editionGalleryRequest, setEditionGalleryRequest] = useState(0);
   const chapterIdsRef = useRef(new Set());
   const pdfExportPollRef = useRef(null);
+  const draftLayoutSaveTimeoutRef = useRef(null);
   const draftToolbarHideTimeoutRef = useRef(null);
   const pdfPanelRef = useRef(null);
   const mainContentRef = useRef(null);
@@ -282,6 +339,21 @@ const BookPageLuxe = () => {
   }, [book?.id, book?.cover_config?.previewFormat, selectedPreviewFormat]);
 
   useEffect(() => {
+    const nextSettings = normalizeDraftLayoutSettings(book?.cover_config?.previewLayoutSettings);
+    setDraftLayoutSettings((previous) => {
+      if (
+        previous.textDensity === nextSettings.textDensity
+        && previous.imageDensity === nextSettings.imageDensity
+        && previous.lineSpacing === nextSettings.lineSpacing
+        && previous.fontScale === nextSettings.fontScale
+      ) {
+        return previous;
+      }
+      return nextSettings;
+    });
+  }, [book?.id, book?.cover_config?.previewLayoutSettings]);
+
+  useEffect(() => {
     chapterIdsRef.current = new Set(
       chapters
         .map((chapter) => chapter?.id)
@@ -291,6 +363,10 @@ const BookPageLuxe = () => {
 
   useEffect(() => (
     () => {
+      if (draftLayoutSaveTimeoutRef.current) {
+        clearTimeout(draftLayoutSaveTimeoutRef.current);
+        draftLayoutSaveTimeoutRef.current = null;
+      }
       if (pdfExportPollRef.current) {
         clearInterval(pdfExportPollRef.current);
         pdfExportPollRef.current = null;
@@ -446,6 +522,51 @@ const BookPageLuxe = () => {
     }
   };
 
+  const queueDraftLayoutSettingsSave = (nextSettings) => {
+    if (!book?.id) {
+      return;
+    }
+    if (draftLayoutSaveTimeoutRef.current) {
+      clearTimeout(draftLayoutSaveTimeoutRef.current);
+      draftLayoutSaveTimeoutRef.current = null;
+    }
+    draftLayoutSaveTimeoutRef.current = setTimeout(async () => {
+      draftLayoutSaveTimeoutRef.current = null;
+      const currentCoverConfig = (book?.cover_config && typeof book.cover_config === 'object')
+        ? book.cover_config
+        : {};
+      const persistedLayout = normalizeDraftLayoutSettings(currentCoverConfig.previewLayoutSettings);
+      if (areDraftLayoutSettingsEqual(persistedLayout, nextSettings)) {
+        return;
+      }
+      try {
+        await handleUpdateBook({
+          cover_config: {
+            ...currentCoverConfig,
+            previewFormat: selectedPreviewFormat,
+            previewLayoutSettings: nextSettings
+          }
+        });
+      } catch (_error) {
+        showPageNotice('Reglage applique localement. Reessayez pour l enregistrer.', 'info');
+      }
+    }, 420);
+  };
+
+  const applyDraftLayoutSettings = (recipe) => {
+    setDraftLayoutSettings((previous) => {
+      const candidate = typeof recipe === 'function'
+        ? recipe(previous)
+        : { ...previous, ...recipe };
+      const next = normalizeDraftLayoutSettings(candidate);
+      if (areDraftLayoutSettingsEqual(previous, next)) {
+        return previous;
+      }
+      queueDraftLayoutSettingsSave(next);
+      return next;
+    });
+  };
+
   const getApiBaseUrl = () => process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const showPageNotice = (message, type = 'info') => {
     setPageNotice({ message, type });
@@ -539,7 +660,16 @@ const BookPageLuxe = () => {
   const startFinalPdfExportJob = async (orderId = '') => {
     const token = await getAuthAccessToken();
     const normalizedOrderId = String(orderId || '').trim();
-    const payloadBody = normalizedOrderId ? { orderId: normalizedOrderId } : {};
+    const payloadBody = {
+      previewFormat: selectedPreviewFormat,
+      previewLayoutSettings: {
+        textDensity: draftLayoutSettings.textDensity,
+        imageDensity: draftLayoutSettings.imageDensity
+      }
+    };
+    if (normalizedOrderId) {
+      payloadBody.orderId = normalizedOrderId;
+    }
     const response = await fetch(
       `${getApiBaseUrl()}/books/${bookId}/export-final-pdf`,
       {
@@ -1322,7 +1452,11 @@ const BookPageLuxe = () => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          previewFormat: selectedPreviewFormat
+          previewFormat: selectedPreviewFormat,
+          previewLayoutSettings: {
+            textDensity: draftLayoutSettings.textDensity,
+            imageDensity: draftLayoutSettings.imageDensity
+          }
         })
       });
 
@@ -1334,7 +1468,11 @@ const BookPageLuxe = () => {
 
       setDraftPreview({
         ...data,
-        previewFormat: selectedPreviewFormat
+        previewFormat: selectedPreviewFormat,
+        previewLayoutSettings: data?.previewLayoutSettings || {
+          textDensity: draftLayoutSettings.textDensity,
+          imageDensity: draftLayoutSettings.imageDensity
+        }
       });
       setDraftSpreadIndex(0);
       dismissPageNotice();
@@ -1584,6 +1722,17 @@ const BookPageLuxe = () => {
   const canGoToPreviousSpread = currentDraftSpreadIndex > 0;
   const canGoToNextSpread = currentDraftSpreadIndex < draftSpreadCount - 1;
   const isHorizontalDraftMode = draftReadingMode === 'horizontal';
+  const lineSpacingFactor = (
+    PREVIEW_LINE_SPACING_OPTIONS.find((option) => option.id === draftLayoutSettings.lineSpacing)?.factor
+    || 1
+  );
+  const draftPreviewInlineStyle = useMemo(
+    () => ({
+      '--draft-font-scale': String(draftLayoutSettings.fontScale || 1),
+      '--draft-line-height-factor': String(lineSpacingFactor)
+    }),
+    [draftLayoutSettings.fontScale, lineSpacingFactor]
+  );
 
   const shiftDraftSpread = (direction) => {
     setDraftSpreadIndex((previous) => {
@@ -2340,6 +2489,90 @@ const BookPageLuxe = () => {
                 </div>
               </div>
 
+              <div className="book-draft-layout-controls">
+                <div className="book-draft-layout-group">
+                  <span className="book-preview-format-label">Texte</span>
+                  <div className="book-draft-layout-switch" role="group" aria-label="Densite de texte">
+                    {PREVIEW_TEXT_DENSITY_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`book-draft-layout-btn ${draftLayoutSettings.textDensity === option.id ? 'is-active' : ''}`}
+                        onClick={() => {
+                          applyDraftLayoutSettings({
+                            textDensity: option.id
+                          });
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="book-draft-layout-group">
+                  <span className="book-preview-format-label">Images</span>
+                  <div className="book-draft-layout-switch" role="group" aria-label="Densite d images">
+                    {PREVIEW_IMAGE_DENSITY_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`book-draft-layout-btn ${draftLayoutSettings.imageDensity === option.id ? 'is-active' : ''}`}
+                        onClick={() => {
+                          applyDraftLayoutSettings({
+                            imageDensity: option.id
+                          });
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="book-draft-layout-group">
+                  <span className="book-preview-format-label">Interligne</span>
+                  <div className="book-draft-layout-switch" role="group" aria-label="Interligne">
+                    {PREVIEW_LINE_SPACING_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`book-draft-layout-btn ${draftLayoutSettings.lineSpacing === option.id ? 'is-active' : ''}`}
+                        onClick={() => {
+                          applyDraftLayoutSettings({
+                            lineSpacing: option.id
+                          });
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="book-draft-layout-group">
+                  <span className="book-preview-format-label">Taille texte</span>
+                  <div className="book-draft-slider">
+                    <input
+                      type="range"
+                      min="0.9"
+                      max="1.08"
+                      step="0.02"
+                      value={draftLayoutSettings.fontScale}
+                      onChange={(event) => {
+                        applyDraftLayoutSettings({
+                          fontScale: Number(event.target.value)
+                        });
+                      }}
+                      aria-label="Taille de texte"
+                    />
+                    <span className="book-draft-slider-value">
+                      {Math.round((draftLayoutSettings.fontScale || 1) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div className="book-draft-modal-actions">
                 <button
                   type="button"
@@ -2361,7 +2594,8 @@ const BookPageLuxe = () => {
             </div>
 
             <div
-              className={`book-draft-preview book-draft-preview-format-${selectedPreviewFormat} ${isHorizontalDraftMode ? 'is-horizontal' : 'is-vertical'}`}
+              className={`book-draft-preview book-draft-preview-format-${selectedPreviewFormat} book-draft-layout-text-${draftLayoutSettings.textDensity} book-draft-layout-image-${draftLayoutSettings.imageDensity} ${isHorizontalDraftMode ? 'is-horizontal' : 'is-vertical'}`}
+              style={draftPreviewInlineStyle}
               onMouseMove={(event) => {
                 const containerTop = event.currentTarget.getBoundingClientRect().top;
                 const offsetTop = event.clientY - containerTop;

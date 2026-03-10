@@ -335,6 +335,133 @@ const VARIABLE_PLACEHOLDERS = {
   targetLength: 'Ex: 3200'
 };
 
+const RECOMMENDED_PROMPT_TEMPLATES = {
+  chapter_generation: {
+    systemPrompt: [
+      'Tu es un architecte de livres de prestige.',
+      'Tu produis des propositions courtes, elegantes, emotionnelles et personnalisees.',
+      'Tu respectes strictement le format de sortie demande, sans blabla.'
+    ].join('\n'),
+    userPromptTemplate: [
+      'Tu dois produire une proposition de livre complete a partir des donnees fournies.',
+      '',
+      'Donnees utilisateur:',
+      '- eventType: {{eventType}}',
+      '- style: {{style}}',
+      '- bookTitle (si deja saisi): {{bookTitle}}',
+      '- recipientName: {{recipientName}}',
+      '- recipientAge: {{recipientAge}}',
+      '- recipientGender: {{recipientGender}}',
+      '- recipientNickname: {{recipientNickname}}',
+      '- recipientTrait: {{recipientTrait}}',
+      '- recipientAnecdote: {{recipientAnecdote}}',
+      '- additionalContext: {{additionalContext}}',
+      '- count (nombre de chapitres): {{count}}',
+      '',
+      'Regles:',
+      '- N interroge jamais l utilisateur.',
+      '- Utilise uniquement les donnees ci-dessus.',
+      '- Le titre du livre doit etre court, premium, emotionnel et personalise.',
+      '- Produis exactement {{count}} titres de chapitres.',
+      '- Titres de chapitres courts, memorables, non generiques.',
+      '- Aucune description, aucun commentaire hors JSON.',
+      '- Pas de markdown.',
+      '',
+      'Format de sortie JSON strict:',
+      '{',
+      '  "bookTitle": "Titre du livre",',
+      '  "chapters": ["Titre chapitre 1", "Titre chapitre 2", "Titre chapitre 3"]',
+      '}'
+    ].join('\n'),
+    temperature: '0.72',
+    maxTokens: '1000'
+  },
+  question_generation: {
+    systemPrompt: [
+      'Tu es un biographe narratif premium specialise en collecte de souvenirs.',
+      'Tu rediges des questions ouvertes concretes et exploitables.',
+      'Tu respectes strictement le format JSON demande.'
+    ].join('\n'),
+    userPromptTemplate: [
+      'Tu dois generer 4 questions ouvertes pour collecter des souvenirs narratifs premium.',
+      '',
+      'Contexte:',
+      '- bookTitle: {{bookTitle}}',
+      '- eventType: {{eventType}}',
+      '- chapterTitle: {{chapterTitle}}',
+      '- style: {{style}}',
+      '- recipientName: {{recipientName}}',
+      '- recipientAge: {{recipientAge}}',
+      '- recipientGender: {{recipientGender}}',
+      '- pronoun: {{pronoun}}',
+      '- subjectPronoun: {{subjectPronoun}}',
+      '- possessive: {{possessive}}',
+      '- ageContext: {{ageContext}}',
+      '- styleInstruction: {{styleInstruction}}',
+      '',
+      'Regles:',
+      '- Les questions sont adressees a l organisateur et aux contributeurs.',
+      '- Ne jamais adresser la question directement a {{recipientName}}.',
+      '- Ne jamais commencer une question par "{{recipientName}},".',
+      '- Utiliser la 3e personne pour parler de {{recipientName}}.',
+      '- Interdire les questions oui/non.',
+      '- Forcer des reponses concretes (decor, sons, odeurs, dialogues, emotions).',
+      '- Ton adapte au style {{style}}.',
+      '- Aucune phrase hors JSON, pas de markdown.',
+      '',
+      'Format de sortie JSON strict:',
+      '[',
+      '  "Question 1",',
+      '  "Question 2",',
+      '  "Question 3",',
+      '  "Question 4"',
+      ']'
+    ].join('\n'),
+    temperature: '0.68',
+    maxTokens: '700'
+  },
+  content_generation: {
+    systemPrompt: [
+      'Tu es un biographe haut de gamme.',
+      'Tu rediges un texte elegant, coherent, sensoriel et humain.',
+      'Tu respectes strictement les contraintes de sortie.'
+    ].join('\n'),
+    userPromptTemplate: [
+      'Tu dois rediger un texte final pour un livre souvenir.',
+      '',
+      'Contexte:',
+      '- outputType: {{outputType}} (valeurs: introduction | chapter_content | conclusion)',
+      '- eventType: {{eventType}}',
+      '- style: {{style}}',
+      '- bookTitle: {{bookTitle}}',
+      '- chapterTitle: {{chapterTitle}}',
+      '- recipientName: {{recipientName}}',
+      '- recipientAge: {{recipientAge}}',
+      '- recipientGender: {{recipientGender}}',
+      '- chapterSummary: {{chapterSummary}}',
+      '- narrativeContext: {{narrativeContext}}',
+      '- targetLength: {{targetLength}}',
+      '',
+      'Regles communes:',
+      '- N interroge jamais l utilisateur.',
+      '- Utilise uniquement les donnees fournies.',
+      '- Texte en francais uniquement.',
+      '- Pas de markdown, pas de JSON, pas de balises HTML.',
+      '- Respecte une longueur proche de {{targetLength}} caracteres (+/- 15%).',
+      '',
+      'Regles selon outputType:',
+      '- introduction: ouvrir le livre avec elegance, chaleur et promesse narrative.',
+      '- chapter_content: produire une narration riche, concrete, sensorielle et coherente.',
+      '- conclusion: cloturer avec emotion, gratitude et unite.',
+      '',
+      'Sortie attendue:',
+      '- Retourne uniquement le texte final.'
+    ].join('\n'),
+    temperature: '0.74',
+    maxTokens: '1800'
+  }
+};
+
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const trimmed = configured.replace(/\/$/, '');
@@ -535,19 +662,28 @@ const PromptAdminLuxe = () => {
   };
 
   const updateFormFromPrompt = (prompt) => {
-    if (!prompt) return;
+    const recommended = RECOMMENDED_PROMPT_TEMPLATES[promptKey] || null;
+    const hasPrompt = Boolean(prompt);
 
-    setSystemPrompt(prompt.systemPrompt || '');
-    setUserPromptTemplate(prompt.userPromptTemplate || '');
+    setSystemPrompt(
+      hasPrompt
+        ? (prompt.systemPrompt || recommended?.systemPrompt || '')
+        : (recommended?.systemPrompt || '')
+    );
+    setUserPromptTemplate(
+      hasPrompt
+        ? (prompt.userPromptTemplate || recommended?.userPromptTemplate || '')
+        : (recommended?.userPromptTemplate || '')
+    );
     setTemperature(
-      Number.isFinite(Number(prompt.temperature))
+      Number.isFinite(Number(prompt?.temperature))
         ? String(prompt.temperature)
-        : ''
+        : (recommended?.temperature || '')
     );
     setMaxTokens(
-      Number.isFinite(Number(prompt.maxTokens))
+      Number.isFinite(Number(prompt?.maxTokens))
         ? String(prompt.maxTokens)
-        : ''
+        : (recommended?.maxTokens || '')
     );
   };
 
@@ -730,6 +866,21 @@ const PromptAdminLuxe = () => {
     }
   };
 
+  const handleApplyRecommendedTemplate = () => {
+    const recommended = RECOMMENDED_PROMPT_TEMPLATES[promptKey];
+    if (!recommended) {
+      setErrorMessage(`Aucun template recommande pour ${promptKey}.`);
+      setSuccessMessage('');
+      return;
+    }
+    setSystemPrompt(recommended.systemPrompt);
+    setUserPromptTemplate(recommended.userPromptTemplate);
+    setTemperature(recommended.temperature);
+    setMaxTokens(recommended.maxTokens);
+    setErrorMessage('');
+    setSuccessMessage('Template recommande pre-rempli. Vous pouvez le modifier avant test/publication.');
+  };
+
   const handleClearCache = async () => {
     setErrorMessage('');
     setSuccessMessage('');
@@ -864,6 +1015,16 @@ const PromptAdminLuxe = () => {
     ...extractTemplateVariables(userPromptTemplate)
   ]));
   const parsedTestVariables = parseVariablesObject(testVariablesText) || {};
+  const testAnalysis = testResult?.analysis || null;
+  const analysisMissingVariables = Array.isArray(testAnalysis?.missingVariables)
+    ? testAnalysis.missingVariables
+    : [];
+  const analysisWarnings = Array.isArray(testAnalysis?.warnings)
+    ? testAnalysis.warnings
+    : [];
+  const parsedOutputPreview = testAnalysis?.parsedOutput
+    ? JSON.stringify(testAnalysis.parsedOutput, null, 2)
+    : '';
   const compiledPromptPreview = testResult
     ? (
         testResult.compiledPrompt
@@ -1197,6 +1358,13 @@ const PromptAdminLuxe = () => {
             <div className="prompt-admin-editor-actions">
               <button
                 type="button"
+                className="btn btn-outline"
+                onClick={handleApplyRecommendedTemplate}
+              >
+                Pre-remplir recommande
+              </button>
+              <button
+                type="button"
                 className="btn btn-primary"
                 onClick={handlePublish}
                 disabled={publishing}
@@ -1332,6 +1500,29 @@ const PromptAdminLuxe = () => {
                   <span>Version: {testResult.version || '-'}</span>
                 </div>
 
+                {testAnalysis ? (
+                  <div className="prompt-admin-analysis-grid">
+                    <div className={`prompt-admin-analysis-card ${analysisMissingVariables.length > 0 ? 'is-warning' : 'is-ok'}`}>
+                      <label>Variables attendues</label>
+                      <p>{(testAnalysis.expectedVariables || expectedVariableNames).join(', ') || '-'}</p>
+                    </div>
+                    <div className={`prompt-admin-analysis-card ${analysisMissingVariables.length > 0 ? 'is-warning' : 'is-ok'}`}>
+                      <label>Variables manquantes</label>
+                      <p>{analysisMissingVariables.join(', ') || 'Aucune'}</p>
+                    </div>
+                  </div>
+                ) : null}
+
+                {analysisWarnings.length > 0 ? (
+                  <div className="prompt-admin-analysis-warnings">
+                    {analysisWarnings.map((warningText) => (
+                      <div key={warningText} className="prompt-admin-analysis-warning-item">
+                        {warningText}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
                 <div className="prompt-admin-field">
                   <label>Prompt compile (system + user)</label>
                   <textarea
@@ -1342,13 +1533,25 @@ const PromptAdminLuxe = () => {
                 </div>
 
                 {testResult?.modelCall?.output ? (
-                  <div className="prompt-admin-field">
-                    <label>Sortie modele</label>
-                    <textarea
-                      className="input-luxe prompt-admin-textarea prompt-admin-textarea-result"
-                      value={testResult.modelCall.output}
-                      readOnly
-                    />
+                  <div className="prompt-admin-model-output-grid">
+                    <div className="prompt-admin-field">
+                      <label>Sortie modele</label>
+                      <textarea
+                        className="input-luxe prompt-admin-textarea prompt-admin-textarea-result"
+                        value={testResult.modelCall.output}
+                        readOnly
+                      />
+                    </div>
+                    {parsedOutputPreview ? (
+                      <div className="prompt-admin-field">
+                        <label>Sortie interpretee</label>
+                        <textarea
+                          className="input-luxe prompt-admin-textarea prompt-admin-textarea-result"
+                          value={parsedOutputPreview}
+                          readOnly
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

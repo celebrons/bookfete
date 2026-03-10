@@ -146,6 +146,172 @@ function parseSuggestedBookTitle(content) {
   return '';
 }
 
+function extractTemplateVariables(templateText = '') {
+  const variableNames = new Set();
+  const variablePattern = /{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}/g;
+  let match = variablePattern.exec(String(templateText || ''));
+  while (match) {
+    variableNames.add(match[1]);
+    match = variablePattern.exec(String(templateText || ''));
+  }
+  return [...variableNames];
+}
+
+function normalizeQuestionText(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\s+/g, ' ').trim();
+}
+
+function normalizeQuestionList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') return normalizeQuestionText(item);
+      if (item && typeof item === 'object') {
+        return normalizeQuestionText(item.question || item.title || item.label);
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function parseQuestionsForAdmin(content) {
+  if (!content) return [];
+
+  const cleanContent = String(content).replace(/```json|```/g, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleanContent);
+    if (Array.isArray(parsed)) {
+      return normalizeQuestionList(parsed);
+    }
+    if (parsed && typeof parsed === 'object') {
+      if (Array.isArray(parsed.questions)) {
+        return normalizeQuestionList(parsed.questions);
+      }
+      if (Array.isArray(parsed.items)) {
+        return normalizeQuestionList(parsed.items);
+      }
+    }
+  } catch (_error) {
+    // no-op
+  }
+
+  const jsonMatch = cleanContent.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    try {
+      const parsedArray = JSON.parse(jsonMatch[0]);
+      return normalizeQuestionList(parsedArray);
+    } catch (_error) {
+      // no-op
+    }
+  }
+
+  const fromLines = [];
+  const numberedLineRegex = /(?:^|\n)\s*(?:[-*•]?\s*)?(?:\d+[\)\.\-]|Question\s*\d+\s*[:\-])\s*(.+)/gi;
+  let match = numberedLineRegex.exec(cleanContent);
+  while (match) {
+    const text = normalizeQuestionText(match[1]);
+    if (text) {
+      fromLines.push(text);
+    }
+    match = numberedLineRegex.exec(cleanContent);
+  }
+
+  return fromLines;
+}
+
+function parsePromptTestModelOutput(promptKey, modelOutput = '') {
+  const raw = String(modelOutput || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  if (promptKey === promptTemplateService.PROMPT_KEYS.CHAPTER_GENERATION) {
+    const chapterTitles = parseChapterTitles(raw);
+    const suggestedBookTitle = parseSuggestedBookTitle(raw);
+    return {
+      kind: 'chapter_generation',
+      suggestedBookTitle,
+      chapterTitles,
+      chapterCount: chapterTitles.length
+    };
+  }
+
+  if (promptKey === promptTemplateService.PROMPT_KEYS.QUESTION_GENERATION) {
+    const questions = parseQuestionsForAdmin(raw);
+    return {
+      kind: 'question_generation',
+      questions,
+      questionCount: questions.length
+    };
+  }
+
+  if (promptKey === promptTemplateService.PROMPT_KEYS.CONTENT_GENERATION) {
+    return {
+      kind: 'content_generation',
+      characterCount: raw.length,
+      preview: raw.slice(0, 320)
+    };
+  }
+
+  return {
+    kind: 'unknown',
+    preview: raw.slice(0, 320)
+  };
+}
+
+function analyzePromptTest({
+  promptKey,
+  systemPrompt,
+  userPromptTemplate,
+  userPrompt,
+  variables = {},
+  modelOutput = ''
+}) {
+  const expectedVariables = Array.from(new Set([
+    ...extractTemplateVariables(systemPrompt),
+    ...extractTemplateVariables(userPromptTemplate)
+  ]));
+  const missingVariables = expectedVariables.filter((name) => {
+    const value = variables?.[name];
+    return value === null || value === undefined || String(value).trim() === '';
+  });
+  const unresolvedPlaceholders = extractTemplateVariables(userPrompt);
+
+  const warnings = [];
+  if (missingVariables.length > 0) {
+    warnings.push(`Variables manquantes: ${missingVariables.join(', ')}`);
+  }
+  if (unresolvedPlaceholders.length > 0) {
+    warnings.push(`Placeholders non resolus: ${unresolvedPlaceholders.join(', ')}`);
+  }
+
+  const parsedOutput = parsePromptTestModelOutput(promptKey, modelOutput);
+  if (modelOutput && parsedOutput) {
+    if (
+      promptKey === promptTemplateService.PROMPT_KEYS.QUESTION_GENERATION
+      && parsedOutput.questionCount < 3
+    ) {
+      warnings.push('Le modele n a pas retourne assez de questions exploitables.');
+    }
+    if (
+      promptKey === promptTemplateService.PROMPT_KEYS.CHAPTER_GENERATION
+      && parsedOutput.chapterCount === 0
+    ) {
+      warnings.push('Aucun titre de chapitre interpretable dans la sortie modele.');
+    }
+  }
+
+  return {
+    expectedVariables,
+    missingVariables,
+    unresolvedPlaceholders,
+    parsedOutput,
+    warnings
+  };
+}
+
 function shapeChaptersFromTitles(titles, count) {
   const safeTitles = Array.isArray(titles) ? [...titles] : [];
 
@@ -441,7 +607,15 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
         '[USER TEMPLATE COMPILE]',
         resolvedUserPrompt || ''
       ].join('\n'),
-      modelCall: null
+      modelCall: null,
+      analysis: analyzePromptTest({
+        promptKey,
+        systemPrompt: resolvedSystemPrompt,
+        userPromptTemplate: resolvedUserPromptTemplate,
+        userPrompt: resolvedUserPrompt,
+        variables: mergedVariables,
+        modelOutput: ''
+      })
     };
 
     if (runModel) {
@@ -459,10 +633,19 @@ router.post('/prompt-templates/:promptKey/test', authenticate, ensurePromptAdmin
           : promptConfig.maxTokens
       });
 
+      const modelOutput = response?.choices?.[0]?.message?.content || '';
       payload.modelCall = {
         model,
-        output: response?.choices?.[0]?.message?.content || ''
+        output: modelOutput
       };
+      payload.analysis = analyzePromptTest({
+        promptKey,
+        systemPrompt: resolvedSystemPrompt,
+        userPromptTemplate: resolvedUserPromptTemplate,
+        userPrompt: resolvedUserPrompt,
+        variables: mergedVariables,
+        modelOutput
+      });
     }
 
     res.json(payload);

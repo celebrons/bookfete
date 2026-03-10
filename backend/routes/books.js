@@ -67,6 +67,49 @@ const PREVIEW_FORMATS = {
     trimHeightMm: 210
   }
 };
+const PREVIEW_TEXT_DENSITY_PROFILES = {
+  airy: {
+    id: 'airy',
+    firstPageChars: 900,
+    firstPageFlexChars: 260,
+    maxChars: 4600,
+    chunkSize: 260
+  },
+  balanced: {
+    id: 'balanced',
+    firstPageChars: 1250,
+    firstPageFlexChars: 320,
+    maxChars: 6200,
+    chunkSize: 360
+  },
+  compact: {
+    id: 'compact',
+    firstPageChars: 1600,
+    firstPageFlexChars: 380,
+    maxChars: 7600,
+    chunkSize: 460
+  }
+};
+const PREVIEW_IMAGE_DENSITY_PROFILES = {
+  discrete: {
+    id: 'discrete',
+    maxPhotos: 3,
+    showHero: false,
+    galleryColumns: 2
+  },
+  balanced: {
+    id: 'balanced',
+    maxPhotos: 5,
+    showHero: true,
+    galleryColumns: 2
+  },
+  immersive: {
+    id: 'immersive',
+    maxPhotos: 8,
+    showHero: true,
+    galleryColumns: 3
+  }
+};
 const pdfExportJobs = new Map();
 
 const pdfExportCleanupTimer = setInterval(() => {
@@ -410,6 +453,30 @@ function getPreviewFormatSpec(previewFormat = '') {
   return PREVIEW_FORMATS[formatId] || PREVIEW_FORMATS[DEFAULT_PREVIEW_FORMAT];
 }
 
+function normalizePreviewTextDensity(value) {
+  const normalized = cleanText(value, 40).toLowerCase();
+  return PREVIEW_TEXT_DENSITY_PROFILES[normalized]?.id || PREVIEW_TEXT_DENSITY_PROFILES.balanced.id;
+}
+
+function normalizePreviewImageDensity(value) {
+  const normalized = cleanText(value, 40).toLowerCase();
+  return PREVIEW_IMAGE_DENSITY_PROFILES[normalized]?.id || PREVIEW_IMAGE_DENSITY_PROFILES.balanced.id;
+}
+
+function normalizePreviewLayoutSettings(value) {
+  const candidate = value && typeof value === 'object' ? value : {};
+
+  return {
+    textDensity: normalizePreviewTextDensity(candidate.textDensity),
+    imageDensity: normalizePreviewImageDensity(candidate.imageDensity)
+  };
+}
+
+function buildPreviewLayoutClassName(layoutSettings) {
+  const normalized = normalizePreviewLayoutSettings(layoutSettings);
+  return `draft-book-layout-text-${normalized.textDensity} draft-book-layout-image-${normalized.imageDensity}`;
+}
+
 function extractBearerToken(req) {
   const authHeader = req.headers?.authorization || '';
   const [scheme, token] = authHeader.split(' ');
@@ -613,6 +680,9 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
       ownerId: req.user.id
     });
     const previewFormat = resolveBookPreviewFormat(book, req.body?.previewFormat);
+    const previewLayoutSettings = normalizePreviewLayoutSettings(
+      req.body?.previewLayoutSettings || book?.cover_config?.previewLayoutSettings
+    );
     const chaptersWithDrafts = (chapters || []).map((chapter) => ({
       chapter,
       draft: extractChapterDraftState(chapter)
@@ -637,13 +707,15 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
     const html = renderValidatedBookPreviewHtml({
       book,
       chaptersWithDrafts,
-      previewFormat
+      previewFormat,
+      previewLayoutSettings
     });
 
     res.json({
       generatedAt: new Date().toISOString(),
       html,
-      previewFormat
+      previewFormat,
+      previewLayoutSettings
     });
   } catch (error) {
     console.error('Erreur apercu livre:', error);
@@ -660,6 +732,9 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       ownerId: req.user.id
     });
     const previewFormat = resolveBookPreviewFormat(book, req.body?.previewFormat);
+    const previewLayoutSettings = normalizePreviewLayoutSettings(
+      req.body?.previewLayoutSettings || book?.cover_config?.previewLayoutSettings
+    );
 
     const chaptersWithDrafts = (chapters || []).map((chapter) => ({
       chapter,
@@ -763,7 +838,8 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       completedAt: null,
       error: null,
       files: null,
-      previewFormat
+      previewFormat,
+      previewLayoutSettings
     });
 
     if (targetOrder) {
@@ -771,6 +847,7 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
         pdfJobId: jobId,
         pdfRequestedAt: createdAt,
         pdfPreviewFormat: previewFormat,
+        pdfPreviewLayoutSettings: previewLayoutSettings,
         pdfReady: false,
         pdfError: null
       });
@@ -793,7 +870,8 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       jobId,
       book,
       chaptersWithDrafts,
-      previewFormat
+      previewFormat,
+      previewLayoutSettings
     }).catch((error) => {
       console.error('Erreur pipeline export PDF:', error);
     });
@@ -802,7 +880,8 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       jobId,
       status: 'queued',
       createdAt,
-      previewFormat
+      previewFormat,
+      previewLayoutSettings
     });
   } catch (error) {
     console.error('Erreur lancement export PDF:', error);
@@ -1382,12 +1461,210 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
   `;
 }
 
-function renderValidatedBookPreviewHtml({ book, chaptersWithDrafts, previewFormat }) {
+function extractClassHtmlBlocks(html, tagName, className) {
+  if (!html || !tagName || !className) {
+    return [];
+  }
+
+  const safeTag = String(tagName).replace(/[^a-z0-9]/gi, '');
+  const safeClass = String(className).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+  const matcher = new RegExp(
+    `<${safeTag}[^>]*class="[^"]*\\b${safeClass}\\b[^"]*"[^>]*>([\\s\\S]*?)<\\/${safeTag}>`,
+    'gi'
+  );
+  const blocks = [];
+  let match = matcher.exec(String(html));
+  while (match) {
+    blocks.push(match[1] || '');
+    match = matcher.exec(String(html));
+  }
+  return blocks;
+}
+
+function extractTagHtmlBlocks(html, tagName) {
+  if (!html || !tagName) {
+    return [];
+  }
+
+  const safeTag = String(tagName).replace(/[^a-z0-9]/gi, '');
+  const matcher = new RegExp(`<${safeTag}[^>]*>([\\s\\S]*?)<\\/${safeTag}>`, 'gi');
+  const blocks = [];
+  let match = matcher.exec(String(html));
+  while (match) {
+    blocks.push(match[1] || '');
+    match = matcher.exec(String(html));
+  }
+  return blocks;
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+function stripHtmlToPlainText(html, maxLength = 4800) {
+  if (!html) {
+    return '';
+  }
+
+  const normalized = decodeHtmlEntities(
+    String(html)
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<\/div>/gi, '\n\n')
+      .replace(/<[^>]+>/g, ' ')
+  )
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!normalized) {
+    return '';
+  }
+
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength).trim()}...`
+    : normalized;
+}
+
+function extractDraftNarrativeFromHtml(html) {
+  const safeHtml = normalizeDraftHtml(html);
+  if (!safeHtml) {
+    return {
+      intro: '',
+      body: '',
+      closing: ''
+    };
+  }
+
+  const intro = stripHtmlToPlainText(
+    extractClassHtmlBlocks(safeHtml, 'p', 'draft-book-intro')[0] || '',
+    1200
+  );
+  const closing = stripHtmlToPlainText(
+    extractClassHtmlBlocks(safeHtml, 'p', 'draft-book-closing')[0] || '',
+    1200
+  );
+  const bodyBlocks = extractClassHtmlBlocks(safeHtml, 'div', 'draft-book-body');
+  const bodyText = bodyBlocks
+    .flatMap((blockHtml) => {
+      const paragraphBlocks = extractTagHtmlBlocks(blockHtml, 'p');
+      if (paragraphBlocks.length > 0) {
+        return paragraphBlocks.map((paragraphHtml) => stripHtmlToPlainText(paragraphHtml, 1800));
+      }
+      return [stripHtmlToPlainText(blockHtml, 2400)];
+    })
+    .filter(Boolean)
+    .join('\n\n');
+
+  if (!bodyText) {
+    return {
+      intro,
+      body: stripHtmlToPlainText(safeHtml, 7600),
+      closing
+    };
+  }
+
+  return {
+    intro,
+    body: bodyText,
+    closing
+  };
+}
+
+function buildPreviewSourceChapter(chapter) {
+  const chapterContributions = Array.isArray(chapter?.contributions) ? chapter.contributions : [];
+  const chapterInvites = Array.isArray(chapter?.chapter_invites) ? chapter.chapter_invites : [];
+  const retainedContributions = chapterContributions
+    .filter((contribution) => {
+      const normalizedEmail = normalizeEmail(contribution?.contributor_email);
+      return (
+        normalizedEmail &&
+        normalizedEmail !== CHAPTER_STATE_EMAIL &&
+        normalizedEmail !== CHAPTER_DRAFT_EMAIL &&
+        contribution.approved === true &&
+        contribution.is_finalized !== false &&
+        !contribution.needs_revision
+      );
+    })
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  const organizerRow = retainedContributions[0] || null;
+  const guestRows = retainedContributions.slice(1);
+
+  return {
+    title: cleanText(chapter?.title, 180) || 'Chapitre',
+    description: cleanText(chapter?.description, 700),
+    questions: Array.isArray(chapter?.questions_ia)
+      ? chapter.questions_ia.map((question) => cleanText(question, 260)).filter(Boolean)
+      : [],
+    organizerContribution: organizerRow
+      ? {
+          message: cleanText(organizerRow.message, 3200),
+          photoUrls: normalizePhotoUrls(organizerRow.photo_urls)
+        }
+      : null,
+    guestContributions: guestRows.map((contribution) => ({
+      contributorName: cleanText(contribution.contributor_name, 180)
+        || cleanText(normalizeEmail(contribution.contributor_email).split('@')[0], 180)
+        || 'Contributeur',
+      message: cleanText(contribution.message, 2400),
+      photoUrls: normalizePhotoUrls(contribution.photo_urls)
+    })),
+    stats: {
+      invitedCount: chapterInvites.length,
+      respondedCount: chapterInvites.filter((invite) => invite.accepted || invite.contributed).length
+    }
+  };
+}
+
+function buildChapterNarrativeForPreview({ chapter, draft, sourceChapter }) {
+  const extracted = extractDraftNarrativeFromHtml(draft?.html || '');
+  const fallbackBody = buildChapterBodyFallback(sourceChapter);
+  const resolvedBody = extracted.body || fallbackBody;
+
+  return {
+    title: cleanText(draft?.title, 180) || cleanText(chapter?.title, 180) || sourceChapter.title || 'Chapitre',
+    intro: extracted.intro || sourceChapter.description || '',
+    body: cleanText(resolvedBody, 10000),
+    closing: extracted.closing || ''
+  };
+}
+
+function renderValidatedBookPreviewHtml({
+  book,
+  chaptersWithDrafts,
+  previewFormat,
+  previewLayoutSettings
+}) {
   const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
   const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
-  const chapterBlocks = chaptersWithDrafts
-    .map(({ draft }) => draft?.html || '')
-    .filter(Boolean)
+  const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings);
+  const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings);
+  const chapterBlocks = (chaptersWithDrafts || [])
+    .map(({ chapter, draft }, index) => {
+      const sourceChapter = buildPreviewSourceChapter(chapter);
+      const chapterNarrative = buildChapterNarrativeForPreview({
+        chapter,
+        draft,
+        sourceChapter
+      });
+
+      return renderDraftChapterPages({
+        chapter: chapterNarrative,
+        sourceChapter,
+        index,
+        layoutSettings: normalizedLayoutSettings
+      });
+    })
     .join('');
   const frontCoverBlock = renderAssembledFrontCover(book);
   const backCoverBlock = renderAssembledBackCover(book);
@@ -1395,7 +1672,7 @@ function renderValidatedBookPreviewHtml({ book, chaptersWithDrafts, previewForma
     || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
 
   return `
-    <article class="draft-book ${previewFormatClass}" data-preview-format="${resolvedPreviewFormat}">
+    <article class="draft-book ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}">
       <header class="draft-book-header">
         <div class="draft-book-eyebrow">Apercu assemble</div>
         <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
@@ -1621,7 +1898,13 @@ function getOwnedPdfExportJob({ jobId, bookId, ownerId }) {
   return job;
 }
 
-async function processPdfExportJob({ jobId, book, chaptersWithDrafts, previewFormat }) {
+async function processPdfExportJob({
+  jobId,
+  book,
+  chaptersWithDrafts,
+  previewFormat,
+  previewLayoutSettings
+}) {
   const queuedJob = pdfExportJobs.get(jobId);
   if (!queuedJob) {
     return;
@@ -1637,7 +1920,8 @@ async function processPdfExportJob({ jobId, book, chaptersWithDrafts, previewFor
       book,
       chaptersWithDrafts,
       jobId,
-      previewFormat
+      previewFormat,
+      previewLayoutSettings
     });
     const readyJob = pdfExportJobs.get(jobId);
     if (!readyJob) {
@@ -1712,7 +1996,13 @@ function deletePdfExportFiles(job) {
   });
 }
 
-async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId, previewFormat }) {
+async function generateFinalBookPdfFiles({
+  book,
+  chaptersWithDrafts,
+  jobId,
+  previewFormat,
+  previewLayoutSettings
+}) {
   await fsp.mkdir(PDF_EXPORT_DIR, { recursive: true });
   const safeBookName = normalizePdfFileName(cleanText(book?.title, 120), 'livre');
   const interiorPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-interieur.pdf`);
@@ -1730,7 +2020,8 @@ async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId, prev
         book,
         chaptersWithDrafts,
         jobId,
-        previewFormat: resolvedPreviewFormat
+        previewFormat: resolvedPreviewFormat,
+        previewLayoutSettings
       });
     } catch (browserError) {
       const strictBrowserMode = rendererMode === 'browser-strict';
@@ -1744,14 +2035,16 @@ async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId, prev
         filePath: interiorPath,
         book,
         chaptersWithDrafts,
-        previewFormat: resolvedPreviewFormat
+        previewFormat: resolvedPreviewFormat,
+        previewLayoutSettings
       });
 
       await generateCoverPdfFile({
         filePath: coverPath,
         book,
         chaptersWithDrafts,
-        previewFormat: resolvedPreviewFormat
+        previewFormat: resolvedPreviewFormat,
+        previewLayoutSettings
       });
     }
   } else {
@@ -1759,14 +2052,16 @@ async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId, prev
       filePath: interiorPath,
       book,
       chaptersWithDrafts,
-      previewFormat: resolvedPreviewFormat
+      previewFormat: resolvedPreviewFormat,
+      previewLayoutSettings
     });
 
     await generateCoverPdfFile({
       filePath: coverPath,
       book,
       chaptersWithDrafts,
-      previewFormat: resolvedPreviewFormat
+      previewFormat: resolvedPreviewFormat,
+      previewLayoutSettings
     });
     rendererUsed = 'legacy';
   }
@@ -1790,7 +2085,8 @@ async function generateBookPdfFilesFromHtml({
   book,
   chaptersWithDrafts,
   jobId,
-  previewFormat
+  previewFormat,
+  previewLayoutSettings
 }) {
   const browserPath = resolvePdfBrowserPath();
   if (!browserPath) {
@@ -1802,7 +2098,8 @@ async function generateBookPdfFilesFromHtml({
   const interiorHtml = renderValidatedBookInteriorHtml({
     book,
     chaptersWithDrafts,
-    previewFormat
+    previewFormat,
+    previewLayoutSettings
   });
   const coverHtml = renderValidatedBookCoverHtml({
     book,
@@ -1925,18 +2222,38 @@ function execFilePromise(command, args, options = {}) {
   });
 }
 
-function renderValidatedBookInteriorHtml({ book, chaptersWithDrafts, previewFormat }) {
+function renderValidatedBookInteriorHtml({
+  book,
+  chaptersWithDrafts,
+  previewFormat,
+  previewLayoutSettings
+}) {
   const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
   const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
-  const chapterBlocks = chaptersWithDrafts
-    .map(({ draft }) => draft?.html || '')
-    .filter(Boolean)
+  const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings);
+  const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings);
+  const chapterBlocks = (chaptersWithDrafts || [])
+    .map(({ chapter, draft }, index) => {
+      const sourceChapter = buildPreviewSourceChapter(chapter);
+      const chapterNarrative = buildChapterNarrativeForPreview({
+        chapter,
+        draft,
+        sourceChapter
+      });
+
+      return renderDraftChapterPages({
+        chapter: chapterNarrative,
+        sourceChapter,
+        index,
+        layoutSettings: normalizedLayoutSettings
+      });
+    })
     .join('');
   const chaptersContent = chapterBlocks
     || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
 
   return `
-    <article class="draft-book ${previewFormatClass}" data-preview-format="${resolvedPreviewFormat}">
+    <article class="draft-book ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}">
       <header class="draft-book-header">
         <div class="draft-book-eyebrow">Version finale</div>
         <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
@@ -2167,6 +2484,28 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       widows: 3;
     }
 
+    .draft-book-text-block {
+      margin: 0 0 3.5mm;
+      line-height: 1.72;
+      font-size: 12px;
+    }
+
+    .draft-book-layout-text-airy .draft-book-text-block,
+    .draft-book-layout-text-airy .draft-book-body p,
+    .draft-book-layout-text-airy .draft-book-section p {
+      font-size: 11.5px;
+      line-height: 1.86;
+      margin-bottom: 4.2mm;
+    }
+
+    .draft-book-layout-text-compact .draft-book-text-block,
+    .draft-book-layout-text-compact .draft-book-body p,
+    .draft-book-layout-text-compact .draft-book-section p {
+      font-size: 12.6px;
+      line-height: 1.58;
+      margin-bottom: 2.8mm;
+    }
+
     .draft-book-body p:last-child,
     .draft-book-section p:last-child,
     .draft-book-callout p:last-child,
@@ -2250,6 +2589,10 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       gap: 3.5mm;
     }
 
+    .draft-book-gallery.is-cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .draft-book-photo {
       margin: 0;
       min-height: 42mm;
@@ -2264,6 +2607,31 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       height: 100%;
       min-height: 42mm;
       object-fit: cover;
+    }
+
+    .draft-book-media-block {
+      margin: 4mm 0 0;
+      border-radius: 8px;
+      border: 1px solid rgba(184, 146, 74, 0.18);
+      overflow: hidden;
+      min-height: 42mm;
+      background: rgba(240, 232, 214, 0.35);
+    }
+
+    .draft-book-media-block img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 42mm;
+      object-fit: cover;
+    }
+
+    .draft-book-layout-image-discrete .draft-book-gallery {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .draft-book-layout-image-immersive .draft-book-gallery {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .draft-book-question-block,
@@ -3249,15 +3617,27 @@ function renderBookDraftHtml({ book, draft, sourcePayload }) {
   `;
 }
 
-function renderDraftChapterPages({ chapter, sourceChapter, index }) {
+function renderDraftChapterPages({
+  chapter,
+  sourceChapter,
+  index,
+  layoutSettings = null
+}) {
   const chapterTitle = chapter.title || sourceChapter?.title || `Chapitre ${index + 1}`;
   const sourceMeta = [];
-  const bodyParts = splitDraftBody(chapter.body || buildChapterBodyFallback(sourceChapter || {}));
+  const normalizedLayoutSettings = normalizePreviewLayoutSettings(layoutSettings);
+  const imageProfile = PREVIEW_IMAGE_DENSITY_PROFILES[normalizedLayoutSettings.imageDensity];
+  const bodyParts = splitDraftBody(
+    chapter.body || buildChapterBodyFallback(sourceChapter || {}),
+    { textDensity: normalizedLayoutSettings.textDensity }
+  );
   const guestHighlights = Array.isArray(sourceChapter?.guestContributions)
     ? sourceChapter.guestContributions.slice(0, 3)
     : [];
   const allPhotos = collectChapterPhotos(sourceChapter);
-  const visiblePhotos = allPhotos.slice(0, 6);
+  const visiblePhotos = allPhotos.slice(0, imageProfile.maxPhotos);
+  const heroPhotoUrl = imageProfile.showHero ? (visiblePhotos[0] || '') : '';
+  const galleryPhotos = heroPhotoUrl ? visiblePhotos.slice(1) : visiblePhotos;
   const remainingPhotoCount = Math.max(0, allPhotos.length - visiblePhotos.length);
 
   if (sourceChapter?.stats?.invitedCount) {
@@ -3285,9 +3665,10 @@ function renderDraftChapterPages({ chapter, sourceChapter, index }) {
         <section class="draft-book-page">
           <div class="draft-book-page-label">Page 2</div>
           ${chapter.intro ? `<p class="draft-book-intro">${escapeHtml(chapter.intro)}</p>` : ''}
-          <div class="draft-book-body">
-            ${formatParagraphs(bodyParts[0] || '')}
+          <div class="draft-book-body draft-book-body-blocks">
+            ${formatParagraphs(bodyParts[0] || '', { paragraphClass: 'draft-book-text-block' })}
           </div>
+          ${heroPhotoUrl ? renderInlineHeroPhoto(heroPhotoUrl, chapterTitle) : ''}
         </section>
 
         <section class="draft-book-page">
@@ -3297,14 +3678,26 @@ function renderDraftChapterPages({ chapter, sourceChapter, index }) {
 
         <section class="draft-book-page draft-book-page-gallery">
           <div class="draft-book-page-label">Page 4</div>
-          <div class="draft-book-body">
-            ${formatParagraphs(bodyParts[1] || bodyParts[0] || '')}
+          <div class="draft-book-body draft-book-body-blocks">
+            ${formatParagraphs(bodyParts[1] || bodyParts[0] || '', { paragraphClass: 'draft-book-text-block' })}
           </div>
           ${chapter.closing ? `<p class="draft-book-closing">${escapeHtml(chapter.closing)}</p>` : ''}
-          ${renderPhotoGallery(visiblePhotos, remainingPhotoCount)}
+          ${renderPhotoGallery(galleryPhotos, remainingPhotoCount, { columns: imageProfile.galleryColumns })}
         </section>
       </div>
     </section>
+  `;
+}
+
+function renderInlineHeroPhoto(photoUrl, chapterTitle) {
+  if (!photoUrl) {
+    return '';
+  }
+
+  return `
+    <figure class="draft-book-media-block">
+      <img src="${escapeHtml(photoUrl)}" alt="Illustration ${escapeHtml(chapterTitle || 'chapitre')}" loading="lazy" />
+    </figure>
   `;
 }
 
@@ -3360,7 +3753,14 @@ function renderContributionSpotlight(organizerContribution, guestHighlights) {
   return blocks.join('');
 }
 
-function renderPhotoGallery(photos, remainingPhotoCount) {
+function renderPhotoGallery(photos, remainingPhotoCount, options = {}) {
+  const galleryColumns = Number.isFinite(Number(options.columns))
+    ? Math.max(2, Math.min(3, Number(options.columns)))
+    : 2;
+  const galleryClass = galleryColumns === 3
+    ? 'draft-book-gallery is-cols-3'
+    : 'draft-book-gallery';
+
   if (!Array.isArray(photos) || photos.length === 0) {
     return '<p class="draft-book-empty">Aucune photo retenue pour ce chapitre pour le moment.</p>';
   }
@@ -3368,7 +3768,7 @@ function renderPhotoGallery(photos, remainingPhotoCount) {
   return `
     <div class="draft-book-gallery-wrap">
       <div class="draft-book-mini-title">Photos du chapitre</div>
-      <div class="draft-book-gallery">
+      <div class="${galleryClass}">
         ${photos.map((photoUrl, photoIndex) => `
           <figure class="draft-book-photo">
             <img src="${escapeHtml(photoUrl)}" alt="Photo du chapitre ${photoIndex + 1}" loading="lazy" />
@@ -3380,34 +3780,61 @@ function renderPhotoGallery(photos, remainingPhotoCount) {
   `;
 }
 
-function splitDraftBody(text) {
-  const paragraphs = splitTextToParagraphs(text, 8000);
+function splitDraftBody(text, options = {}) {
+  const textDensity = normalizePreviewTextDensity(options?.textDensity);
+  const profile = PREVIEW_TEXT_DENSITY_PROFILES[textDensity];
+  const paragraphs = splitTextToParagraphs(
+    text,
+    profile.maxChars,
+    profile.chunkSize
+  );
 
   if (paragraphs.length === 0) {
     return ['', ''];
   }
 
-  if (paragraphs.length === 1) {
-    const sentenceParts = paragraphs[0]
-      .split(/(?<=[.!?])\s+/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    const middle = Math.max(1, Math.ceil(sentenceParts.length / 2));
+  const pageOneParagraphs = [];
+  const pageTwoParagraphs = [];
+  let pageOneChars = 0;
 
+  paragraphs.forEach((paragraph) => {
+    const candidateLength = pageOneChars + paragraph.length;
+    const shouldStayOnPageOne = (
+      candidateLength <= profile.firstPageChars
+      || (pageOneParagraphs.length <= 1 && candidateLength <= profile.firstPageChars + profile.firstPageFlexChars)
+    );
+
+    if (shouldStayOnPageOne) {
+      pageOneParagraphs.push(paragraph);
+      pageOneChars = candidateLength;
+      return;
+    }
+
+    pageTwoParagraphs.push(paragraph);
+  });
+
+  if (pageTwoParagraphs.length === 0 && pageOneParagraphs.length > 1) {
+    const middle = Math.ceil(pageOneParagraphs.length / 2);
     return [
-      sentenceParts.slice(0, middle).join(' '),
-      sentenceParts.slice(middle).join(' ')
+      pageOneParagraphs.slice(0, middle).join('\n\n'),
+      pageOneParagraphs.slice(middle).join('\n\n')
     ];
   }
 
-  const middle = Math.ceil(paragraphs.length / 2);
+  const fallbackPageOne = pageOneParagraphs.join('\n\n');
+  const fallbackPageTwo = pageTwoParagraphs.join('\n\n');
+
+  if (!fallbackPageTwo) {
+    return [fallbackPageOne, fallbackPageOne];
+  }
+
   return [
-    paragraphs.slice(0, middle).join('\n\n'),
-    paragraphs.slice(middle).join('\n\n')
+    fallbackPageOne,
+    fallbackPageTwo
   ];
 }
 
-function splitTextToParagraphs(value, maxLength = 6000) {
+function splitTextToParagraphs(value, maxLength = 6000, chunkSize = 420) {
   if (typeof value !== 'string') {
     return [];
   }
@@ -3428,7 +3855,7 @@ function splitTextToParagraphs(value, maxLength = 6000) {
   return trimmed
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.replace(/[ \t]+/g, ' ').replace(/\n/g, ' ').trim())
-    .flatMap((paragraph) => splitLongParagraphIntoChunks(paragraph, 420))
+    .flatMap((paragraph) => splitLongParagraphIntoChunks(paragraph, chunkSize))
     .filter(Boolean);
 }
 
@@ -3488,14 +3915,21 @@ function splitLongParagraphIntoChunks(paragraph, chunkSize = 420) {
   return chunks;
 }
 
-function formatParagraphs(text) {
+function formatParagraphs(text, options = {}) {
+  const paragraphClass = cleanText(options?.paragraphClass, 120);
   const paragraphs = splitTextToParagraphs(text, 6000);
 
   if (paragraphs.length === 0) {
     return '<p class="draft-book-empty">Contenu en cours de generation.</p>';
   }
 
-  return paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('');
+  return paragraphs
+    .map((paragraph) => (
+      paragraphClass
+        ? `<p class="${escapeHtml(paragraphClass)}">${escapeHtml(paragraph)}</p>`
+        : `<p>${escapeHtml(paragraph)}</p>`
+    ))
+    .join('');
 }
 
 function collectChapterPhotos(sourceChapter) {
