@@ -46,25 +46,35 @@ const ORDER_STATUS_RANK = ORDER_STATUS_FLOW.reduce((accumulator, status, index) 
   accumulator[status] = index;
   return accumulator;
 }, {});
-const DEFAULT_PREVIEW_FORMAT = 'prestige';
+const DEFAULT_PREVIEW_FORMAT = 'standard';
+const PREVIEW_FORMAT_ALIASES = {
+  prestige: 'standard',
+  carre: 'luxe'
+};
 const PREVIEW_FORMATS = {
-  prestige: {
-    id: 'prestige',
-    label: 'Prestige',
-    trimWidthMm: 148,
-    trimHeightMm: 210
-  },
   livret: {
     id: 'livret',
     label: 'Livret',
-    trimWidthMm: 130,
-    trimHeightMm: 190
+    trimWidthMm: 148,
+    trimHeightMm: 210,
+    defaultTextDensity: 'compact',
+    defaultImageDensity: 'discrete'
   },
-  carre: {
-    id: 'carre',
-    label: 'Carre',
+  standard: {
+    id: 'standard',
+    label: 'Standard',
     trimWidthMm: 210,
-    trimHeightMm: 210
+    trimHeightMm: 297,
+    defaultTextDensity: 'balanced',
+    defaultImageDensity: 'balanced'
+  },
+  luxe: {
+    id: 'luxe',
+    label: 'Luxe',
+    trimWidthMm: 240,
+    trimHeightMm: 320,
+    defaultTextDensity: 'airy',
+    defaultImageDensity: 'immersive'
   }
 };
 const PREVIEW_TEXT_DENSITY_PROFILES = {
@@ -428,7 +438,8 @@ function getBookCoverValidationState(book) {
 
 function normalizePreviewFormat(value) {
   const normalized = cleanText(value, 40).toLowerCase();
-  return PREVIEW_FORMATS[normalized] ? normalized : '';
+  const canonical = PREVIEW_FORMAT_ALIASES[normalized] || normalized;
+  return PREVIEW_FORMATS[canonical] ? canonical : '';
 }
 
 function resolveBookPreviewFormat(book, requestedFormat = '') {
@@ -460,17 +471,20 @@ function normalizePreviewImageDensity(value) {
   return PREVIEW_IMAGE_DENSITY_PROFILES[normalized]?.id || PREVIEW_IMAGE_DENSITY_PROFILES.balanced.id;
 }
 
-function normalizePreviewLayoutSettings(value) {
+function normalizePreviewLayoutSettings(value, previewFormat = '') {
   const candidate = value && typeof value === 'object' ? value : {};
+  const formatSpec = getPreviewFormatSpec(previewFormat);
+  const defaultTextDensity = normalizePreviewTextDensity(formatSpec?.defaultTextDensity);
+  const defaultImageDensity = normalizePreviewImageDensity(formatSpec?.defaultImageDensity);
 
   return {
-    textDensity: normalizePreviewTextDensity(candidate.textDensity),
-    imageDensity: normalizePreviewImageDensity(candidate.imageDensity)
+    textDensity: normalizePreviewTextDensity(candidate.textDensity || defaultTextDensity),
+    imageDensity: normalizePreviewImageDensity(candidate.imageDensity || defaultImageDensity)
   };
 }
 
-function buildPreviewLayoutClassName(layoutSettings) {
-  const normalized = normalizePreviewLayoutSettings(layoutSettings);
+function buildPreviewLayoutClassName(layoutSettings, previewFormat = '') {
+  const normalized = normalizePreviewLayoutSettings(layoutSettings, previewFormat);
   return `draft-book-layout-text-${normalized.textDensity} draft-book-layout-image-${normalized.imageDensity}`;
 }
 
@@ -678,7 +692,8 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
     });
     const previewFormat = resolveBookPreviewFormat(book, req.body?.previewFormat);
     const previewLayoutSettings = normalizePreviewLayoutSettings(
-      req.body?.previewLayoutSettings || book?.cover_config?.previewLayoutSettings
+      req.body?.previewLayoutSettings || book?.cover_config?.previewLayoutSettings,
+      previewFormat
     );
     const chaptersWithDrafts = (chapters || []).map((chapter) => ({
       chapter,
@@ -730,7 +745,8 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
     });
     const previewFormat = resolveBookPreviewFormat(book, req.body?.previewFormat);
     const previewLayoutSettings = normalizePreviewLayoutSettings(
-      req.body?.previewLayoutSettings || book?.cover_config?.previewLayoutSettings
+      req.body?.previewLayoutSettings || book?.cover_config?.previewLayoutSettings,
+      previewFormat
     );
 
     const chaptersWithDrafts = (chapters || []).map((chapter) => ({
@@ -1431,6 +1447,61 @@ function sanitizeDraftHeading(value, fallback = '') {
   return trimmed || cleanText(fallback, 180) || raw;
 }
 
+function sanitizeDraftHeadingStrict(value, fallback = '') {
+  const base = sanitizeDraftHeading(value, fallback);
+  if (!base) {
+    return cleanText(fallback, 180) || '';
+  }
+
+  const cleaned = base
+    .replace(/^\s*page\s*\d+\s*[-:–—]*\s*/i, '')
+    .replace(/^\s*chapitre\s*\d+\s*[-:–—]*\s*/i, '')
+    .replace(/^\s*(?:page\s*\d+\s*)?(?:chapitre\s*\d+\s*)+/i, '')
+    .trim();
+
+  return cleaned || cleanText(fallback, 180) || base;
+}
+
+function sanitizeDraftBodyText(value, chapterTitle = '') {
+  const raw = String(value || '').replace(/\r\n/g, '\n').trim();
+  if (!raw) {
+    return '';
+  }
+
+  const comparableTitle = normalizeComparableText(chapterTitle);
+  const lines = raw.split('\n');
+  let removed = 0;
+  let cursor = 0;
+
+  while (cursor < lines.length && removed < 3) {
+    const current = String(lines[cursor] || '').trim();
+    if (!current) {
+      cursor += 1;
+      continue;
+    }
+
+    const comparableCurrent = normalizeComparableText(current);
+    const looksLikePageMarker = (
+      /^page\s*\d+$/i.test(current)
+      || /^chapitre\s*\d+$/i.test(current)
+      || /^page\s*\d+\s*[-:–—]/i.test(current)
+      || /^chapitre\s*\d+\s*[-:–—]/i.test(current)
+      || /^\s*(?:page\s*\d+\s*)?(?:chapitre\s*\d+\s*)+/i.test(current)
+    );
+    const duplicatesChapterTitle = Boolean(comparableTitle && comparableCurrent && comparableCurrent === comparableTitle);
+
+    if (looksLikePageMarker || duplicatesChapterTitle) {
+      lines.splice(cursor, 1);
+      removed += 1;
+      continue;
+    }
+
+    break;
+  }
+
+  return lines.join('\n').trim();
+}
+
 function normalizeComparableText(value) {
   return String(value || '')
     .toLowerCase()
@@ -1483,7 +1554,7 @@ function renderDraftPageFolio({ pageNumber, totalPages }) {
 
 function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) {
   const chapterNumber = Number(chapter?.order_index || 0) + 1;
-  const chapterHeading = sanitizeDraftHeading(
+  const chapterHeading = sanitizeDraftHeadingStrict(
     draft.title || chapter?.title || `Volet ${chapterNumber}`,
     chapter?.title || `Volet ${chapterNumber}`
   );
@@ -1504,12 +1575,22 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
       <div class="draft-book-chapter-shell">
         ${draft.pages.map((page, index) => `
           <section class="draft-book-page${index === 0 ? ' draft-book-page-opening' : ''}${index === 3 ? ' draft-book-page-gallery' : ''}">
-            <h3>${escapeHtml(sanitizeDraftHeading(page.title || chapterHeading, chapterHeading))}</h3>
+            ${(() => {
+              const pageHeading = sanitizeDraftHeadingStrict(page.title || chapterHeading, chapterHeading);
+              const showHeading = (
+                index === 0
+                || (
+                  normalizeComparableText(pageHeading)
+                  && normalizeComparableText(pageHeading) !== normalizeComparableText(chapterHeading)
+                )
+              );
+              return showHeading ? `<h3>${escapeHtml(pageHeading)}</h3>` : '';
+            })()}
             ${index === 0 && openingLead
               ? `<p class="draft-book-intro">${escapeHtml(openingLead)}</p>`
               : ''}
             <div class="draft-book-body">
-              ${formatParagraphs(page.body || '')}
+              ${formatParagraphs(sanitizeDraftBodyText(page.body || '', chapterHeading))}
             </div>
             ${index === 0 ? renderQuestionList(sourcePayload?.chapter?.questions) : ''}
             ${index === 2 ? renderContributionSpotlight(sourcePayload?.chapter?.organizerContribution, guestHighlights) : ''}
@@ -1517,10 +1598,6 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
             ${renderDraftPageFolio({ pageNumber: index + 1, totalPages: 4 })}
           </section>
         `).join('')}
-      </div>
-      <div class="draft-book-section" style="margin-top:16px;">
-        <div class="draft-book-mini-title">Resume de chapitre</div>
-        ${formatParagraphs(draft.summary || summarizeHtmlForChapter(draft.html || ''))}
       </div>
     </section>
   `;
@@ -1712,8 +1789,8 @@ function renderValidatedBookPreviewHtml({
 }) {
   const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
   const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
-  const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings);
-  const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings);
+  const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings, resolvedPreviewFormat);
+  const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings, resolvedPreviewFormat);
   const chapterBlocks = (chaptersWithDrafts || [])
     .map(({ chapter, draft }, index) => {
       const sourceChapter = buildPreviewSourceChapter(chapter);
@@ -1822,14 +1899,6 @@ function renderAssembledBackCover(book) {
     backCoverConfig.show_contributors ?? backCoverConfig.showContributors ?? true
   );
   const showQrHint = Boolean(backCoverConfig.showQrHint);
-  const chips = [];
-
-  if (showContributors) {
-    chips.push('Contributions collectives');
-  }
-  if (showQrHint) {
-    chips.push('Emplacement QR');
-  }
 
   return `
     <section class="draft-book-section draft-book-section-cover draft-book-section-cover-back">
@@ -1844,10 +1913,7 @@ function renderAssembledBackCover(book) {
             ${formatParagraphs(blurb || 'Texte de quatrieme de couverture a definir.')}
           </div>
           ${quote ? `<blockquote class="cover-preview-back-quote">"${escapeHtml(quote)}"</blockquote>` : ''}
-          <div class="cover-preview-back-footer">
-            ${chips.length > 0 ? `<div class="cover-preview-chip">${escapeHtml(chips.join(' | '))}</div>` : '<span></span>'}
-            ${showQrHint ? '<div class="cover-preview-qr">QR</div>' : ''}
-          </div>
+          ${(showContributors || showQrHint) ? '<div class="cover-preview-back-footer"><span></span></div>' : ''}
           <div class="cover-preview-back-signature">${escapeHtml(signature)}</div>
         </article>
       </div>
@@ -2295,8 +2361,8 @@ function renderValidatedBookInteriorHtml({
 }) {
   const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
   const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
-  const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings);
-  const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings);
+  const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings, resolvedPreviewFormat);
+  const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings, resolvedPreviewFormat);
   const chapterBlocks = (chaptersWithDrafts || [])
     .map(({ chapter, draft }, index) => {
       const sourceChapter = buildPreviewSourceChapter(chapter);
@@ -2991,6 +3057,36 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       break-inside: avoid-page;
     }
 
+    body.mode-cover .draft-book-section {
+      margin: 0;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    body.mode-cover .draft-book-section-cover {
+      min-height: auto;
+      gap: 0;
+    }
+
+    body.mode-cover .draft-book-mini-title {
+      display: none;
+    }
+
+    body.mode-cover .draft-book-section-cover .cover-preview-spread {
+      min-height: ${coverContentHeightMm}mm;
+      height: ${coverContentHeightMm}mm;
+    }
+
+    body.mode-cover .draft-book-section-cover .cover-preview-card {
+      min-height: ${coverContentHeightMm}mm;
+      height: ${coverContentHeightMm}mm;
+      max-height: ${coverContentHeightMm}mm;
+    }
+
     body.mode-cover .cover-print-spread {
       page-break-after: avoid;
       break-after: avoid;
@@ -3046,7 +3142,7 @@ async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts, pre
         doc.fillColor('#8b6a2f').font('Helvetica-Bold').fontSize(10).text(`Volet ${chapterIndex + 1}`);
         doc.moveDown(0.3);
         doc.fillColor('#1f2228').font('Helvetica-Bold').fontSize(18).text(
-          sanitizeDraftHeading(
+          sanitizeDraftHeadingStrict(
             cleanText(draft?.title, 180) || cleanText(chapter?.title, 180) || `Volet ${chapterIndex + 1}`,
             cleanText(chapter?.title, 180) || `Volet ${chapterIndex + 1}`
           )
@@ -3285,15 +3381,22 @@ async function writePdfFile({ filePath, title, draw }) {
 function buildInteriorChapterText({ chapter, draft }) {
   const sections = [];
   const summary = cleanText(draft?.summary, 1200);
-  const chapterText = htmlToPlainText(draft?.html || '', 42000);
-
-  if (summary) {
-    sections.push(`Resume du chapitre:\n${summary}`);
-  }
+  const chapterTitle = sanitizeDraftHeadingStrict(
+    cleanText(draft?.title, 180) || cleanText(chapter?.title, 180) || '',
+    cleanText(chapter?.title, 180) || ''
+  );
+  const chapterText = sanitizeDraftBodyText(
+    htmlToPlainText(draft?.html || '', 42000),
+    chapterTitle
+  );
 
   if (chapterText) {
     sections.push(chapterText);
-  } else {
+  } else if (summary) {
+    sections.push(summary);
+  }
+
+  if (!chapterText && !summary) {
     sections.push(
       cleanText(chapter?.description, 1800) || 'Ce chapitre est valide mais ne contient pas de texte exploitable pour l impression.'
     );
@@ -3750,7 +3853,7 @@ function renderDraftChapterPages({
   index,
   layoutSettings = null
 }) {
-  const chapterTitle = sanitizeDraftHeading(
+  const chapterTitle = sanitizeDraftHeadingStrict(
     chapter.title || sourceChapter?.title || `Volet ${index + 1}`,
     sourceChapter?.title || `Volet ${index + 1}`
   );
@@ -3758,8 +3861,11 @@ function renderDraftChapterPages({
   const normalizedLayoutSettings = normalizePreviewLayoutSettings(layoutSettings);
   const imageProfile = PREVIEW_IMAGE_DENSITY_PROFILES[normalizedLayoutSettings.imageDensity];
   const bodyParts = splitDraftBody(
-    chapter.body || buildChapterBodyFallback(sourceChapter || {}),
-    { textDensity: normalizedLayoutSettings.textDensity }
+    sanitizeDraftBodyText(chapter.body || buildChapterBodyFallback(sourceChapter || {}), chapterTitle),
+    {
+      textDensity: normalizedLayoutSettings.textDensity,
+      chapterTitle
+    }
   );
   const guestHighlights = Array.isArray(sourceChapter?.guestContributions)
     ? sourceChapter.guestContributions.slice(0, 3)
@@ -3825,12 +3931,11 @@ function renderQuestionList(questions) {
     : [];
 
   if (items.length === 0) {
-    return '<p class="draft-book-empty">Questions editoriales a enrichir si besoin avant la version finale.</p>';
+    return '';
   }
 
   return `
     <div class="draft-book-question-block">
-      <div class="draft-book-mini-title">Fils directeurs</div>
       <ol class="draft-book-question-list">
         ${items.slice(0, 5).map((question) => `<li><span>${escapeHtml(question)}</span></li>`).join('')}
       </ol>
@@ -3844,7 +3949,6 @@ function renderContributionSpotlight(organizerContribution, guestHighlights) {
   if (organizerContribution?.message) {
     blocks.push(`
       <div class="draft-book-callout">
-        <div class="draft-book-mini-title">Voix de l'organisateur</div>
         ${formatParagraphs(organizerContribution.message)}
       </div>
     `);
@@ -3853,7 +3957,6 @@ function renderContributionSpotlight(organizerContribution, guestHighlights) {
   if (Array.isArray(guestHighlights) && guestHighlights.length > 0) {
     blocks.push(`
       <div class="draft-book-contributor-list">
-        <div class="draft-book-mini-title">Extraits des proches</div>
         ${guestHighlights.map((contribution) => `
           <div class="draft-book-contributor-item">
             <strong>${escapeHtml(contribution.contributorName || 'Contributeur')}</strong>
@@ -3865,7 +3968,7 @@ function renderContributionSpotlight(organizerContribution, guestHighlights) {
   }
 
   if (blocks.length === 0) {
-    return '<p class="draft-book-empty">Les contributions de ce chapitre pourront encore etre enrichies avant la mise en page finale.</p>';
+    return '';
   }
 
   return blocks.join('');

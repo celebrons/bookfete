@@ -63,9 +63,23 @@ const isPdfOrderLinkError = (error) => (
   /commande associee au pdf introuvable/i.test(String(error?.message || ''))
 );
 const NETWORK_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 20000);
-const PREVIEW_FORMAT_IDS = new Set(['prestige', 'livret', 'carre']);
+const PREVIEW_FORMAT_IDS = new Set(['livret', 'standard', 'luxe']);
+const PREVIEW_FORMAT_ALIASES = {
+  prestige: 'standard',
+  carre: 'luxe'
+};
 const PREVIEW_TEXT_DENSITY_IDS = new Set(['airy', 'balanced', 'compact']);
 const PREVIEW_IMAGE_DENSITY_IDS = new Set(['discrete', 'balanced', 'immersive']);
+const PREVIEW_FORMAT_LAYOUT_DEFAULTS = {
+  livret: { textDensity: 'compact', imageDensity: 'discrete' },
+  standard: { textDensity: 'balanced', imageDensity: 'balanced' },
+  luxe: { textDensity: 'airy', imageDensity: 'immersive' }
+};
+const normalizePreviewFormat = (value) => {
+  const normalized = String(value || '').toLowerCase();
+  const canonical = PREVIEW_FORMAT_ALIASES[normalized] || normalized;
+  return PREVIEW_FORMAT_IDS.has(canonical) ? canonical : 'standard';
+};
 
 const fetchJsonWithTimeout = async (url, options = {}, timeoutMs = NETWORK_TIMEOUT_MS) => {
   const controller = new AbortController();
@@ -232,8 +246,9 @@ const BookCheckoutLuxe = () => {
   const startPdfExport = async (orderId = '') => {
     const headers = await getAuthHeaders();
     const normalizedOrderId = String(orderId || '').trim();
-    const configuredFormat = String(book?.cover_config?.previewFormat || '').toLowerCase();
-    const previewFormat = PREVIEW_FORMAT_IDS.has(configuredFormat) ? configuredFormat : 'prestige';
+    const previewFormat = normalizePreviewFormat(book?.cover_config?.previewFormat);
+    const previewLayoutDefaults = PREVIEW_FORMAT_LAYOUT_DEFAULTS[previewFormat]
+      || PREVIEW_FORMAT_LAYOUT_DEFAULTS.standard;
     const rawLayoutSettings = (
       book?.cover_config?.previewLayoutSettings
       && typeof book.cover_config.previewLayoutSettings === 'object'
@@ -245,10 +260,10 @@ const BookCheckoutLuxe = () => {
       previewLayoutSettings: {
         textDensity: PREVIEW_TEXT_DENSITY_IDS.has(rawLayoutSettings.textDensity)
           ? rawLayoutSettings.textDensity
-          : 'balanced',
+          : previewLayoutDefaults.textDensity,
         imageDensity: PREVIEW_IMAGE_DENSITY_IDS.has(rawLayoutSettings.imageDensity)
           ? rawLayoutSettings.imageDensity
-          : 'balanced'
+          : previewLayoutDefaults.imageDensity
       }
     };
     if (normalizedOrderId) {

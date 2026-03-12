@@ -38,9 +38,20 @@ const buildInitialFormData = (book, chaptersCount) => ({
   pages: clampPages(book?.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER || 64)
 });
 
-const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }) => {
+const BookConfigLuxe = ({
+  book,
+  onUpdateBook,
+  chaptersCount = 6,
+  onPagesChange,
+  onOpenBookPreview,
+  canOpenBookPreview = false,
+  previewUnavailableReason = '',
+  isGeneratingPreview = false,
+  onOpenCoverConfig
+}) => {
   const [formData, setFormData] = useState(() => buildInitialFormData(book, chaptersCount));
   const [isSaving, setIsSaving] = useState(false);
+  const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(null);
 
   useEffect(() => {
@@ -107,11 +118,10 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }
     updateField('pages', clampPages(newPages));
   };
 
-  const handleValidate = async () => {
-    if (isSaving || !hasPendingChanges) {
-      return;
+  const persistConfiguration = async ({ showSuccessBanner = true } = {}) => {
+    if (!hasPendingChanges) {
+      return false;
     }
-
     setIsSaving(true);
     setSaveFeedback(null);
 
@@ -130,21 +140,66 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }
         await onPagesChange(formData.pages);
       }
 
-      setSaveFeedback({
-        type: 'success',
-        message: 'Configuration enregistree. Les donnees du livre sont a jour.'
-      });
+      if (showSuccessBanner) {
+        setSaveFeedback({
+          type: 'success',
+          message: 'Configuration enregistree. Les donnees du livre sont a jour.'
+        });
+      }
+      return true;
     } catch (error) {
       setSaveFeedback({
         type: 'error',
         message: 'La validation a echoue. Merci de reessayer.'
       });
+      throw error;
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleValidate = async () => {
+    if (isSaving || isPreparingPreview || !hasPendingChanges) {
+      return;
+    }
+    try {
+      await persistConfiguration({ showSuccessBanner: true });
+    } catch (_error) {
+      // Feedback already handled.
+    }
+  };
+
+  const handleOpenLivePreview = async () => {
+    if (
+      isSaving
+      || isPreparingPreview
+      || typeof onOpenBookPreview !== 'function'
+      || !canOpenBookPreview
+    ) {
+      return;
+    }
+
+    setIsPreparingPreview(true);
+    setSaveFeedback(null);
+    try {
+      if (hasPendingChanges) {
+        await persistConfiguration({ showSuccessBanner: false });
+      }
+      await onOpenBookPreview();
+    } catch (_error) {
+      // Parent displays detailed notice when preview generation fails.
+    } finally {
+      setIsPreparingPreview(false);
+    }
+  };
+
   const pageProgress = ((formData.pages - MIN_PAGES) / (MAX_PAGES - MIN_PAGES)) * 100;
+  const previewActionDisabled = (
+    isSaving
+    || isPreparingPreview
+    || isGeneratingPreview
+    || !canOpenBookPreview
+  );
 
   return (
     <div className="book-config-live">
@@ -308,6 +363,35 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }
             <div className="book-config-preview-price-value">{livePrice} EUR</div>
             <div className="book-config-preview-price-note">Mise a jour en direct</div>
           </div>
+
+          <div className="book-config-preview-actions">
+            <button
+              type="button"
+              className="btn btn-primary book-config-preview-btn"
+              onClick={handleOpenLivePreview}
+              disabled={previewActionDisabled}
+              title={canOpenBookPreview ? 'Ouvrir un apercu feuillete du livre' : previewUnavailableReason}
+            >
+              {isSaving || isPreparingPreview || isGeneratingPreview
+                ? 'Preparation...'
+                : 'Apercu au format livre'}
+            </button>
+            <div className="book-config-preview-helper">
+              Feuilletage reel avec couverture + contenu assembles.
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-outline book-config-cover-btn"
+              onClick={onOpenCoverConfig}
+              disabled={typeof onOpenCoverConfig !== 'function'}
+            >
+              Configurer couverture et 4e
+            </button>
+            {!canOpenBookPreview && previewUnavailableReason && (
+              <div className="book-config-preview-warning">{previewUnavailableReason}</div>
+            )}
+          </div>
         </aside>
       </div>
 
@@ -321,7 +405,7 @@ const BookConfigLuxe = ({ book, onUpdateBook, chaptersCount = 6, onPagesChange }
           type="button"
           className="btn btn-primary book-config-validate-btn"
           onClick={handleValidate}
-          disabled={!hasPendingChanges || isSaving}
+          disabled={!hasPendingChanges || isSaving || isPreparingPreview}
         >
           {isSaving ? 'Validation...' : 'Valider la configuration'}
         </button>
