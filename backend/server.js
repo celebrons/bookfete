@@ -6,12 +6,21 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+const orderRoutes = require('./routes/orders');
+
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://bookfete-front.onrender.com', 'https://bookfete.onrender.com']
     : '*'
 }));
+if (typeof orderRoutes.handleStripeWebhook === 'function') {
+  app.post(
+    '/api/orders/webhook/stripe',
+    express.raw({ type: 'application/json' }),
+    orderRoutes.handleStripeWebhook
+  );
+}
 app.use(express.json());
 
 // ============================================
@@ -22,7 +31,6 @@ const bookRoutes = require('./routes/books'); // À créer si nécessaire
 const chapterRoutes = require('./routes/chapters');
 const inviteRoutes = require('./routes/invites');
 const aiRoutes = require('./routes/ai');
-const orderRoutes = require('./routes/orders');
 
 // ============================================
 // ANCIENNES ROUTES À SUPPRIMER (commentées)

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import '../BookLuxe.css';
 
@@ -138,16 +138,66 @@ const sanitizeChapterPreviewHtml = (html = '') => {
       return;
     }
 
+    const normalizedLowerText = text.toLowerCase();
+    const looksLikeSinglePageLabel = /^page\s*\d+(?:\s*\/\s*\d+)?$/i.test(text);
+    const looksLikeSingleChapterLabel = /^chapitre\s*\d+$/i.test(text);
+    const looksLikeRepeatedChapterHeader = duplicatedHeadingPattern.test(text);
+    const looksLikeLegacyChapterLead = /^chapitre\s*\d+\s*[-:–—]/i.test(text);
+    const looksLikeLegacySummaryLabel = normalizedLowerText === 'fils directeurs';
+
     if (
-      /^page\s*\d+$/i.test(text)
-      || /^chapitre\s*\d+$/i.test(text)
-      || duplicatedHeadingPattern.test(text)
+      looksLikeSinglePageLabel
+      || looksLikeSingleChapterLabel
+      || looksLikeRepeatedChapterHeader
+      || looksLikeLegacyChapterLead
+      || looksLikeLegacySummaryLabel
     ) {
       node.remove();
     }
   });
 
   return doc.body.innerHTML.trim();
+};
+
+const buildChapterPreviewPages = (html = '') => {
+  if (!html || typeof window === 'undefined' || typeof window.DOMParser === 'undefined') {
+    return [];
+  }
+
+  try {
+    const parser = new window.DOMParser();
+    const document = parser.parseFromString(html, 'text/html');
+    const chapterPages = Array.from(
+      document.querySelectorAll('.draft-book-chapter-shell > .draft-book-page')
+    );
+
+    if (chapterPages.length > 0) {
+      return chapterPages
+        .map((page) => (page instanceof window.HTMLElement ? page.outerHTML : ''))
+        .filter(Boolean);
+    }
+
+    const fallbackPages = Array.from(
+      document.querySelectorAll('.draft-book-page, .draft-book-section')
+    );
+
+    if (fallbackPages.length > 0) {
+      return fallbackPages
+        .map((page) => (page instanceof window.HTMLElement ? page.outerHTML : ''))
+        .filter(Boolean);
+    }
+
+    const root = document.querySelector('.draft-book') || document.body;
+    if (!root) {
+      return [];
+    }
+
+    return Array.from(root.children || [])
+      .map((child) => (child instanceof window.HTMLElement ? child.outerHTML : ''))
+      .filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
 };
 
 const Step4Cloture = ({
@@ -168,6 +218,7 @@ const Step4Cloture = ({
   const [draftHtmlForPreview, setDraftHtmlForPreview] = useState(chapter?.chapterDraft?.html || '');
   const [editorText, setEditorText] = useState(htmlToPlainText(chapter?.chapterDraft?.html || ''));
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewSpreadIndex, setPreviewSpreadIndex] = useState(0);
   const [showEditorModal, setShowEditorModal] = useState(false);
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
   const hasOpenModal = showPreviewModal || showEditorModal || showFinalizeConfirm;
@@ -219,6 +270,19 @@ const Step4Cloture = ({
   const previewHtml = sanitizeChapterPreviewHtml(
     (draftHtmlForPreview || chapterDraft?.html || normalizedHtml || '').trim()
   );
+  const chapterPreviewPages = useMemo(
+    () => buildChapterPreviewPages(previewHtml),
+    [previewHtml]
+  );
+  const previewSpreadCount = Math.max(1, Math.ceil(chapterPreviewPages.length / 2));
+  const currentPreviewSpreadIndex = Math.min(
+    previewSpreadIndex,
+    Math.max(0, previewSpreadCount - 1)
+  );
+  const leftPreviewPageHtml = chapterPreviewPages[currentPreviewSpreadIndex * 2] || '';
+  const rightPreviewPageHtml = chapterPreviewPages[currentPreviewSpreadIndex * 2 + 1] || '';
+  const canGoToPreviousPreviewSpread = currentPreviewSpreadIndex > 0;
+  const canGoToNextPreviewSpread = currentPreviewSpreadIndex < previewSpreadCount - 1;
   const hasDraftContent = Boolean(previewHtml || normalizedText);
   const canGenerateWithAI = !isDraftValidated && generationUnlocked && remainingGenerations > 0;
   const canSaveRevision = !isDraftValidated && !chapterLocked && Boolean(normalizedText);
@@ -282,6 +346,52 @@ const Step4Cloture = ({
       document.body.style.overflow = previousOverflow;
     };
   }, [hasOpenModal]);
+
+  useEffect(() => {
+    if (!showPreviewModal) {
+      return;
+    }
+    setPreviewSpreadIndex(0);
+  }, [showPreviewModal, chapter?.id]);
+
+  useEffect(() => {
+    setPreviewSpreadIndex((previous) => {
+      const max = Math.max(0, previewSpreadCount - 1);
+      return Math.min(previous, max);
+    });
+  }, [previewSpreadCount]);
+
+  useEffect(() => {
+    if (!showPreviewModal || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowPreviewModal(false);
+        return;
+      }
+      if (event.key === 'ArrowLeft' && canGoToPreviousPreviewSpread) {
+        event.preventDefault();
+        setPreviewSpreadIndex((previous) => Math.max(0, previous - 1));
+      }
+      if (event.key === 'ArrowRight' && canGoToNextPreviewSpread) {
+        event.preventDefault();
+        setPreviewSpreadIndex((previous) => Math.min(previewSpreadCount - 1, previous + 1));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    showPreviewModal,
+    canGoToPreviousPreviewSpread,
+    canGoToNextPreviewSpread,
+    previewSpreadCount
+  ]);
 
   const buildLocalSummary = useCallback(() => {
     if (!chapter?.id) {
@@ -578,6 +688,14 @@ const Step4Cloture = ({
     setShowEditorModal(false);
   };
 
+  const shiftPreviewSpread = (direction) => {
+    setPreviewSpreadIndex((previous) => {
+      const max = Math.max(0, previewSpreadCount - 1);
+      const next = previous + direction;
+      return Math.min(max, Math.max(0, next));
+    });
+  };
+
   if (!isOrganizer) {
     return (
       <div className="workflow-content" style={{ textAlign: 'center', color: '#999' }}>
@@ -749,11 +867,58 @@ const Step4Cloture = ({
               </button>
             </div>
 
-            <div className="book-draft-preview chapter-draft-preview-scroll">
-              {previewHtml ? (
-                <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            <div className="book-draft-preview chapter-draft-preview-scroll is-horizontal">
+              {chapterPreviewPages.length > 0 ? (
+                <div className="book-draft-preview-stage book-draft-preview-stage-spread chapter-draft-preview-stage">
+                  <button
+                    type="button"
+                    className="book-draft-nav-arrow is-left"
+                    onClick={() => shiftPreviewSpread(-1)}
+                    disabled={!canGoToPreviousPreviewSpread}
+                    aria-label="Pages precedentes"
+                  >
+                    {'<'}
+                  </button>
+                  <div className="book-draft-book-spread">
+                    <article className="draft-book-leaf is-left">
+                      <div
+                        className="draft-book-leaf-content"
+                        dangerouslySetInnerHTML={{ __html: leftPreviewPageHtml }}
+                      />
+                    </article>
+                    <article className="draft-book-leaf is-right">
+                      <div
+                        className="draft-book-leaf-content"
+                        dangerouslySetInnerHTML={{
+                          __html: rightPreviewPageHtml || '<div class="draft-book-leaf-empty"></div>'
+                        }}
+                      />
+                    </article>
+                  </div>
+                  <button
+                    type="button"
+                    className="book-draft-nav-arrow is-right"
+                    onClick={() => shiftPreviewSpread(1)}
+                    disabled={!canGoToNextPreviewSpread}
+                    aria-label="Pages suivantes"
+                  >
+                    {'>'}
+                  </button>
+                </div>
+              ) : previewHtml ? (
+                <div className="book-draft-preview-stage">
+                  <div
+                    className="book-draft-preview-paper"
+                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                  />
+                </div>
               ) : (
                 <p className="draft-book-empty">Aucun brouillon n a encore ete genere pour ce chapitre.</p>
+              )}
+              {chapterPreviewPages.length > 0 && (
+                <div className="book-draft-spread-meta chapter-draft-spread-meta">
+                  Pages {currentPreviewSpreadIndex * 2 + 1}-{Math.min((currentPreviewSpreadIndex + 1) * 2, chapterPreviewPages.length)} / {chapterPreviewPages.length}
+                </div>
               )}
             </div>
           </div>

@@ -4,75 +4,180 @@ import '../../styles/luxe-theme.css';
 
 const COVER_STYLES = [
   {
-    id: 'editorial_classic',
-    label: 'Editorial classique',
-    description: 'Serif raffinee, details dores et composition ceremonielle.',
-    tag: 'Edition prestige',
-    titleFont: "'Baskerville', 'Palatino Linotype', serif",
-    bodyFont: "'Inter', sans-serif"
+    id: 'elegance_intemporelle',
+    label: 'Elegance intemporelle',
+    description: 'Fond lin creme, dorure discrte, sobriete premium.',
+    tag: 'Elegance intemporelle',
+    titleFont: "'Cormorant Garamond', 'Baskerville', serif",
+    bodyFont: "'Inter', sans-serif",
+    palette: {
+      front: '#f7f1e8',
+      back: '#eee4d6',
+      text: '#1f2228',
+      accent: '#b8924a',
+      subtle: '#d8c7a4'
+    },
+    defaults: {
+      frontMotif: 'line',
+      frontShowMonogram: true,
+      frontShowPhotoFrame: false,
+      frontPhotoLabel: 'Motif signature',
+      backShowContributors: false,
+      backShowQrHint: true,
+      backContributorsLine: '',
+      backDateLocation: '',
+      backOrganizerLine: '',
+      backIsbn: 'ISBN 978-2-00000-000-0'
+    }
   },
   {
-    id: 'minimal_contemporary',
-    label: 'Minimal contemporain',
-    description: 'Lignes franches, respiration maximale et impact visuel net.',
+    id: 'modernite_minimaliste',
+    label: 'Modernite minimaliste',
+    description: 'Noir mat, contraste fort et cadre photo epure.',
     tag: 'Collection moderne',
     titleFont: "'Avenir Next', 'Inter', sans-serif",
-    bodyFont: "'Inter', sans-serif"
+    bodyFont: "'Inter', sans-serif",
+    palette: {
+      front: '#14161a',
+      back: '#111318',
+      text: '#f4f6fa',
+      accent: '#c8d0dc',
+      subtle: '#424a56'
+    },
+    defaults: {
+      frontMotif: 'none',
+      frontShowMonogram: false,
+      frontShowPhotoFrame: true,
+      frontPhotoLabel: 'Portrait noir et blanc',
+      backShowContributors: true,
+      backShowQrHint: true,
+      backContributorsLine: 'Contributeurs : famille et amis',
+      backDateLocation: '',
+      backOrganizerLine: '',
+      backIsbn: ''
+    }
   },
   {
-    id: 'heritage_emotion',
-    label: 'Heritage emotionnel',
-    description: 'Ton narratif, monogramme et presence humaine plus forte.',
-    tag: 'Memoire intime',
+    id: 'retro_chic',
+    label: 'Retro chic',
+    description: 'Papier vieilli, grain subtil et tonalite narrative.',
+    tag: 'Collection heritage',
     titleFont: "'Garamond', 'Times New Roman', serif",
-    bodyFont: "'Inter', sans-serif"
+    bodyFont: "'Inter', sans-serif",
+    palette: {
+      front: '#f2e6d8',
+      back: '#eadac8',
+      text: '#3a2e27',
+      accent: '#a26d55',
+      subtle: '#cda98d'
+    },
+    defaults: {
+      frontMotif: 'corner',
+      frontShowMonogram: false,
+      frontShowPhotoFrame: true,
+      frontPhotoLabel: 'Photo archive',
+      backShowContributors: false,
+      backShowQrHint: false,
+      backContributorsLine: 'Souvenirs choisis par ses proches',
+      backDateLocation: '',
+      backOrganizerLine: '',
+      backIsbn: ''
+    }
+  },
+  {
+    id: 'prestige_contemporain',
+    label: 'Prestige contemporain',
+    description: 'Effet cuir, medaillon central et finitions nobles.',
+    tag: 'Edition maison prestige',
+    titleFont: "'Cinzel', 'Baskerville', serif",
+    bodyFont: "'Inter', sans-serif",
+    palette: {
+      front: '#2f2432',
+      back: '#2a1f2d',
+      text: '#f2eadf',
+      accent: '#c8a25f',
+      subtle: '#6f5a73'
+    },
+    defaults: {
+      frontMotif: 'none',
+      frontShowMonogram: true,
+      frontShowPhotoFrame: false,
+      frontPhotoLabel: '',
+      backShowContributors: false,
+      backShowQrHint: true,
+      backContributorsLine: '',
+      backDateLocation: '',
+      backOrganizerLine: 'Un livre unique pour une personne unique',
+      backIsbn: ''
+    }
+  },
+  {
+    id: 'artistique_poetique',
+    label: 'Artistique poetique',
+    description: 'Aquarelle, composition sensible et ambiance lumineuse.',
+    tag: 'Edition atelier',
+    titleFont: "'Playfair Display', 'Baskerville', serif",
+    bodyFont: "'Inter', sans-serif",
+    palette: {
+      front: '#edf1f7',
+      back: '#e9eef7',
+      text: '#243246',
+      accent: '#7890b0',
+      subtle: '#c6d3e5'
+    },
+    defaults: {
+      frontMotif: 'none',
+      frontShowMonogram: false,
+      frontShowPhotoFrame: false,
+      frontPhotoLabel: '',
+      backShowContributors: true,
+      backShowQrHint: false,
+      backContributorsLine: '',
+      backDateLocation: '',
+      backOrganizerLine: 'Contributions reunies par l organisateur',
+      backIsbn: 'ISBN 978-2-99999-999-9'
+    }
   }
 ];
 
-const COLOR_PALETTES = [
-  {
-    id: 'ivoire_dore',
-    label: 'Ivoire dore',
-    front: '#f6f1e7',
-    back: '#efe7da',
-    text: '#1f2228',
-    accent: '#b8924a',
-    subtle: '#d7c39a'
-  },
-  {
-    id: 'sauge_precieuse',
-    label: 'Sauge precieuse',
-    front: '#eaf0ea',
-    back: '#e2ebe2',
-    text: '#1f2a28',
-    accent: '#8f9f8f',
-    subtle: '#b9c7ba'
-  },
-  {
-    id: 'bleu_poudre',
-    label: 'Bleu poudre',
-    front: '#e9edf4',
-    back: '#e1e7f0',
-    text: '#1f2530',
-    accent: '#7f90a8',
-    subtle: '#b9c3d2'
-  }
+const STYLE_ID_ALIASES = {
+  editorial_classic: 'elegance_intemporelle',
+  minimal_contemporary: 'modernite_minimaliste',
+  heritage_emotion: 'retro_chic'
+};
+
+const DEFAULT_STYLE_ID = 'elegance_intemporelle';
+
+const VISIBLE_COVER_STYLES = COVER_STYLES.filter(
+  (style) => !style.legacy
+);
+
+const MOTIF_OPTIONS = [
+  { id: 'line', label: 'Filet' },
+  { id: 'corner', label: 'Coin grave' },
+  { id: 'olive_leaf', label: "Feuille d'olivier" },
+  { id: 'none', label: 'Sans motif' }
 ];
 
 const SERIALIZABLE_KEYS = [
   'styleId',
-  'paletteId',
   'frontTitle',
   'frontSubtitle',
   'frontRecipient',
   'frontEventLine',
   'frontMotif',
   'frontShowMonogram',
+  'frontShowPhotoFrame',
+  'frontPhotoLabel',
   'backBlurb',
   'backQuote',
   'backSignature',
   'backShowContributors',
-  'backShowQrHint'
+  'backShowQrHint',
+  'backContributorsLine',
+  'backDateLocation',
+  'backOrganizerLine',
+  'backIsbn'
 ];
 
 const normalizeText = (value) => {
@@ -86,13 +191,12 @@ const toTitleCase = (value) => {
   return safeValue.charAt(0).toUpperCase() + safeValue.slice(1);
 };
 
-const getStyleById = (styleId) => (
-  COVER_STYLES.find((style) => style.id === styleId) || COVER_STYLES[0]
-);
-
-const getPaletteById = (paletteId) => (
-  COLOR_PALETTES.find((palette) => palette.id === paletteId) || COLOR_PALETTES[0]
-);
+const getStyleById = (styleId) => {
+  const canonicalId = STYLE_ID_ALIASES[normalizeText(styleId)] || normalizeText(styleId);
+  return COVER_STYLES.find((style) => style.id === canonicalId)
+    || COVER_STYLES.find((style) => style.id === DEFAULT_STYLE_ID)
+    || COVER_STYLES[0];
+};
 
 const getMonogram = (input) => {
   const words = normalizeText(input)
@@ -129,31 +233,53 @@ const buildInitialState = (book) => {
     ? book.back_cover_config
     : {};
 
-  const preferredStyle = normalizeText(coverConfig.template || backCoverConfig.template || '');
-  const preferredPalette = normalizeText(coverConfig.palette || backCoverConfig.palette || '');
+  const preferredStyle = normalizeText(coverConfig.template || backCoverConfig.template || DEFAULT_STYLE_ID);
   const style = getStyleById(preferredStyle);
-  const palette = getPaletteById(preferredPalette);
+  const styleDefaults = style.defaults || {};
 
   return {
     styleId: style.id,
-    paletteId: palette.id,
     frontTitle: normalizeText(coverConfig.title || book?.title || ''),
     frontSubtitle: normalizeText(coverConfig.subtitle || ''),
     frontRecipient: normalizeText(coverConfig.recipientLine || book?.recipient_name || ''),
     frontEventLine: normalizeText(coverConfig.eventLine || deriveDefaultEventLine(book)),
-    frontMotif: normalizeText(coverConfig.motif || 'line'),
-    frontShowMonogram: coverConfig.showMonogram !== false,
+    frontMotif: normalizeText(coverConfig.motif || styleDefaults.frontMotif || 'line'),
+    frontShowMonogram: Boolean(
+      coverConfig.showMonogram ?? styleDefaults.frontShowMonogram ?? true
+    ),
+    frontShowPhotoFrame: Boolean(
+      coverConfig.showPhotoFrame ?? styleDefaults.frontShowPhotoFrame
+    ),
+    frontPhotoLabel: normalizeText(
+      coverConfig.photoLabel || styleDefaults.frontPhotoLabel || 'Photo'
+    ),
     backBlurb: normalizeText(backCoverConfig.blurb || ''),
     backQuote: normalizeText(backCoverConfig.quote || ''),
     backSignature: normalizeText(
       backCoverConfig.signature
-        || (book?.recipient_name ? `Les proches de ${book.recipient_name}` : 'Les proches')
+      || (book?.recipient_name ? `Les proches de ${book.recipient_name}` : 'Les proches')
     ),
     backShowContributors: Boolean(
-      backCoverConfig.show_contributors ?? backCoverConfig.showContributors ?? true
+      backCoverConfig.show_contributors
+      ?? backCoverConfig.showContributors
+      ?? styleDefaults.backShowContributors
     ),
-    backShowQrHint: Boolean(backCoverConfig.showQrHint)
-  };
+    backShowQrHint: Boolean(
+      backCoverConfig.showQrHint ?? styleDefaults.backShowQrHint
+    ),
+    backContributorsLine: normalizeText(
+      backCoverConfig.contributorsLine || styleDefaults.backContributorsLine || ''
+    ),
+    backDateLocation: normalizeText(
+      backCoverConfig.dateLocation || styleDefaults.backDateLocation || ''
+    ),
+    backOrganizerLine: normalizeText(
+      backCoverConfig.organizerLine || styleDefaults.backOrganizerLine || ''
+    ),
+    backIsbn: normalizeText(
+      backCoverConfig.isbnCode || styleDefaults.backIsbn || ''
+    )
+  }
 };
 
 const getStateSignature = (state) => JSON.stringify(
@@ -204,26 +330,27 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
     [formState.styleId]
   );
 
-  const selectedPalette = useMemo(
-    () => getPaletteById(formState.paletteId),
-    [formState.paletteId]
-  );
-
   const stateSignature = useMemo(
     () => getStateSignature(formState),
     [formState]
   );
 
   const hasPendingChanges = stateSignature !== baselineSignature;
+  const selectedPalette = selectedStyle.palette;
 
   const frontTitlePreview = normalizeText(formState.frontTitle) || normalizeText(book?.title) || 'Titre du livre';
   const frontSubtitlePreview = normalizeText(formState.frontSubtitle) || 'Sous-titre optionnel';
   const frontRecipientPreview = normalizeText(formState.frontRecipient) || normalizeText(book?.recipient_name) || 'Destinataire';
   const frontEventLinePreview = normalizeText(formState.frontEventLine) || 'Edition personnalisable';
+  const frontPhotoLabelPreview = normalizeText(formState.frontPhotoLabel) || 'Photo';
   const backBlurbPreview = normalizeText(formState.backBlurb)
     || 'Texte de quatrieme de couverture a definir. Cette zone mettra en valeur la promesse editoriale du livre.';
   const backQuotePreview = normalizeText(formState.backQuote);
   const backSignaturePreview = normalizeText(formState.backSignature) || 'Signature';
+  const backContributorsLinePreview = normalizeText(formState.backContributorsLine);
+  const backDateLocationPreview = normalizeText(formState.backDateLocation);
+  const backOrganizerLinePreview = normalizeText(formState.backOrganizerLine);
+  const backIsbnPreview = normalizeText(formState.backIsbn);
   const monogramValue = getMonogram(frontRecipientPreview || frontTitlePreview);
 
   const updateField = (field, value) => {
@@ -237,17 +364,41 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
     }
   };
 
+  const applyStylePreset = (styleId) => {
+    const nextStyle = getStyleById(styleId);
+    const styleDefaults = nextStyle.defaults || {};
+    setFormState((previous) => ({
+      ...previous,
+      styleId: nextStyle.id,
+      frontMotif: styleDefaults.frontMotif || previous.frontMotif || 'line',
+      frontShowMonogram: Boolean(styleDefaults.frontShowMonogram),
+      frontShowPhotoFrame: Boolean(styleDefaults.frontShowPhotoFrame),
+      frontPhotoLabel: normalizeText(previous.frontPhotoLabel || styleDefaults.frontPhotoLabel || 'Photo'),
+      backShowContributors: Boolean(styleDefaults.backShowContributors),
+      backShowQrHint: Boolean(styleDefaults.backShowQrHint),
+      backContributorsLine: normalizeText(previous.backContributorsLine || styleDefaults.backContributorsLine || ''),
+      backDateLocation: normalizeText(previous.backDateLocation || styleDefaults.backDateLocation || ''),
+      backOrganizerLine: normalizeText(previous.backOrganizerLine || styleDefaults.backOrganizerLine || ''),
+      backIsbn: normalizeText(previous.backIsbn || styleDefaults.backIsbn || '')
+    }));
+
+    if (saveFeedback) {
+      setSaveFeedback(null);
+    }
+  };
+
   const buildPayload = () => {
     const nextCoverConfig = {
       ...(book?.cover_config || {}),
       template: formState.styleId,
-      palette: formState.paletteId,
       title: frontTitlePreview,
       subtitle: normalizeText(formState.frontSubtitle),
       recipientLine: normalizeText(formState.frontRecipient),
       eventLine: normalizeText(formState.frontEventLine),
       motif: normalizeText(formState.frontMotif || 'line'),
       showMonogram: Boolean(formState.frontShowMonogram),
+      showPhotoFrame: Boolean(formState.frontShowPhotoFrame),
+      photoLabel: normalizeText(formState.frontPhotoLabel),
       color: selectedPalette.front,
       accentColor: selectedPalette.accent,
       textColor: selectedPalette.text,
@@ -257,12 +408,15 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
     const nextBackCoverConfig = {
       ...(book?.back_cover_config || {}),
       template: formState.styleId,
-      palette: formState.paletteId,
       blurb: normalizeText(formState.backBlurb),
       quote: normalizeText(formState.backQuote),
       signature: normalizeText(formState.backSignature),
       show_contributors: Boolean(formState.backShowContributors),
       showQrHint: Boolean(formState.backShowQrHint),
+      contributorsLine: normalizeText(formState.backContributorsLine),
+      dateLocation: normalizeText(formState.backDateLocation),
+      organizerLine: normalizeText(formState.backOrganizerLine),
+      isbnCode: normalizeText(formState.backIsbn),
       color: selectedPalette.back,
       textColor: selectedPalette.text,
       accentColor: selectedPalette.accent,
@@ -318,6 +472,11 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
         {formState.frontShowMonogram && (
           <div className="cover-preview-monogram">{monogramValue}</div>
         )}
+        {formState.frontShowPhotoFrame && (
+          <div className="cover-preview-front-photo">
+            <div className="cover-preview-front-photo-inner">{frontPhotoLabelPreview}</div>
+          </div>
+        )}
         <div className="cover-preview-front-copy">
           <div className="cover-preview-front-event">{frontEventLinePreview}</div>
           <h3>{frontTitlePreview}</h3>
@@ -326,6 +485,16 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
         </div>
         {formState.frontMotif === 'line' && <div className="cover-preview-motif-line" aria-hidden="true" />}
         {formState.frontMotif === 'corner' && <div className="cover-preview-motif-corner" aria-hidden="true" />}
+        {formState.frontMotif === 'olive_leaf' && (
+          <div className="cover-preview-motif-olive" aria-hidden="true">
+            <svg viewBox="0 0 140 120" role="presentation" focusable="false">
+              <path d="M24 92 C40 48, 74 20, 122 16 C104 64, 72 96, 30 104 Z" />
+              <path d="M31 100 C55 80, 76 58, 95 30" className="olive-vein" />
+              <ellipse cx="60" cy="76" rx="8" ry="4" className="olive-fruit" />
+              <ellipse cx="74" cy="62" rx="7" ry="3.5" className="olive-fruit" />
+            </svg>
+          </div>
+        )}
       </article>
 
       <article
@@ -344,14 +513,28 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
         {backQuotePreview && (
           <blockquote className="cover-preview-back-quote">"{backQuotePreview}"</blockquote>
         )}
+        {backOrganizerLinePreview && (
+          <div className="cover-preview-back-organizer">{backOrganizerLinePreview}</div>
+        )}
         <div className="cover-preview-back-footer">
           {formState.backShowContributors && (
-            <div className="cover-preview-chip">Contributions collectives</div>
+            <div className="cover-preview-chip">
+              {backContributorsLinePreview || 'Contributions collectives'}
+            </div>
           )}
           {formState.backShowQrHint && (
             <div className="cover-preview-qr">QR</div>
           )}
         </div>
+        {backDateLocationPreview && (
+          <div className="cover-preview-back-date">{backDateLocationPreview}</div>
+        )}
+        {selectedStyle.id === 'artistique_poetique' && (
+          <div className="cover-preview-note-zone">Mot manuscrit personnel</div>
+        )}
+        {backIsbnPreview && (
+          <div className="cover-preview-back-isbn">{backIsbnPreview}</div>
+        )}
         <div className="cover-preview-back-signature">{backSignaturePreview}</div>
       </article>
     </div>
@@ -404,34 +587,17 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
           </div>
 
           <div className="cover-designer-group">
-            <span className="cover-designer-group-label">Direction artistique</span>
+            <span className="cover-designer-group-label">Exemples luxe (couverture + 4e)</span>
             <div className="cover-style-grid">
-              {COVER_STYLES.map((style) => (
+              {VISIBLE_COVER_STYLES.map((style) => (
                 <button
                   key={style.id}
                   type="button"
                   className={`cover-style-option ${formState.styleId === style.id ? 'is-selected' : ''}`}
-                  onClick={() => updateField('styleId', style.id)}
+                  onClick={() => applyStylePreset(style.id)}
                 >
                   <span className="cover-style-label">{style.label}</span>
                   <span className="cover-style-text">{style.description}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="cover-designer-group">
-            <span className="cover-designer-group-label">Palette</span>
-            <div className="cover-palette-grid">
-              {COLOR_PALETTES.map((palette) => (
-                <button
-                  key={palette.id}
-                  type="button"
-                  className={`cover-palette-option ${formState.paletteId === palette.id ? 'is-selected' : ''}`}
-                  onClick={() => updateField('paletteId', palette.id)}
-                >
-                  <span className="cover-palette-swatch" style={{ background: palette.front }} />
-                  <span className="cover-palette-label">{palette.label}</span>
                 </button>
               ))}
             </div>
@@ -481,9 +647,11 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
                     value={formState.frontMotif}
                     onChange={(event) => updateField('frontMotif', event.target.value)}
                   >
-                    <option value="line">Filet central</option>
-                    <option value="corner">Coin grave</option>
-                    <option value="none">Sans motif</option>
+                    {MOTIF_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                   <label className="cover-toggle-line">
                     <input
@@ -493,6 +661,23 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
                     />
                     <span>Afficher le monogramme</span>
                   </label>
+                  <label className="cover-toggle-line">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formState.frontShowPhotoFrame)}
+                      onChange={(event) => updateField('frontShowPhotoFrame', event.target.checked)}
+                    />
+                    <span>Afficher un cadre photo / illustration</span>
+                  </label>
+                  {formState.frontShowPhotoFrame && (
+                    <input
+                      type="text"
+                      className="input-luxe"
+                      value={formState.frontPhotoLabel}
+                      onChange={(event) => updateField('frontPhotoLabel', event.target.value)}
+                      placeholder="Legende du cadre (ex: Portrait noir et blanc)"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -520,6 +705,34 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
                     value={formState.backSignature}
                     onChange={(event) => updateField('backSignature', event.target.value)}
                     placeholder="Signature (ex: Les proches de ...)"
+                  />
+                  <input
+                    type="text"
+                    className="input-luxe"
+                    value={formState.backOrganizerLine}
+                    onChange={(event) => updateField('backOrganizerLine', event.target.value)}
+                    placeholder="Ligne organisateur ou promesse editoriale"
+                  />
+                  <input
+                    type="text"
+                    className="input-luxe"
+                    value={formState.backContributorsLine}
+                    onChange={(event) => updateField('backContributorsLine', event.target.value)}
+                    placeholder="Ligne contributeurs (micro-typographie)"
+                  />
+                  <input
+                    type="text"
+                    className="input-luxe"
+                    value={formState.backDateLocation}
+                    onChange={(event) => updateField('backDateLocation', event.target.value)}
+                    placeholder="Date et lieu (optionnel)"
+                  />
+                  <input
+                    type="text"
+                    className="input-luxe"
+                    value={formState.backIsbn}
+                    onChange={(event) => updateField('backIsbn', event.target.value)}
+                    placeholder="ISBN factice (optionnel)"
                   />
                 </div>
               </div>
@@ -565,7 +778,8 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
 
           <div className="cover-preview-guides">
             <div>Repere imprimeur: zone sure representee par le cadre interieur.</div>
-            <div>Les textes longs de 4e doivent rester lisibles en 8 a 11 lignes max.</div>
+            <div>Choisissez un des 5 exemples puis ajustez le texte sans casser la respiration visuelle.</div>
+            <div>Le rendu imprimeur reprend cette mise en page avec les memes blocs.</div>
           </div>
         </aside>
       </div>

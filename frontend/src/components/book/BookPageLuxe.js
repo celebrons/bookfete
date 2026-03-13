@@ -1833,6 +1833,44 @@ const BookPageLuxe = () => {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !draftPreview) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setDraftPreview(null);
+        return;
+      }
+
+      if (!isHorizontalDraftMode) {
+        return;
+      }
+
+      if (event.key === 'ArrowLeft' && canGoToPreviousSpread) {
+        event.preventDefault();
+        setDraftSpreadIndex((previous) => Math.max(0, previous - 1));
+      }
+      if (event.key === 'ArrowRight' && canGoToNextSpread) {
+        event.preventDefault();
+        setDraftSpreadIndex((previous) => Math.min(draftSpreadCount - 1, previous + 1));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    draftPreview,
+    isHorizontalDraftMode,
+    canGoToPreviousSpread,
+    canGoToNextSpread,
+    draftSpreadCount
+  ]);
+
   const showDraftToolbar = () => {
     if (draftToolbarHideTimeoutRef.current) {
       clearTimeout(draftToolbarHideTimeoutRef.current);

@@ -77,3 +77,14 @@ Ce script publie `question_generation` pour:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `AI_PROMPT_ADMIN_EMAILS` (liste d'emails separes par des virgules pour proteger la gestion des prompts)
+
+## Stripe (test)
+
+- `STRIPE_ENABLED=1`
+- `STRIPE_SECRET_KEY=sk_test_...`
+- `STRIPE_WEBHOOK_SECRET=whsec_...`
+- Endpoint webhook backend: `POST /api/orders/webhook/stripe`
+
+En local sans signature webhook (debug uniquement):
+
+- `STRIPE_WEBHOOK_ALLOW_UNSIGNED=1`

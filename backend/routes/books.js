@@ -80,21 +80,24 @@ const PREVIEW_FORMATS = {
 const PREVIEW_TEXT_DENSITY_PROFILES = {
   airy: {
     id: 'airy',
-    firstPageChars: 760,
-    firstPageFlexChars: 180,
-    maxChars: 4200
+    firstPageChars: 560,
+    firstPageFlexChars: 120,
+    maxChars: 3000,
+    chunkSize: 240
   },
   balanced: {
     id: 'balanced',
-    firstPageChars: 980,
-    firstPageFlexChars: 240,
-    maxChars: 5600
+    firstPageChars: 700,
+    firstPageFlexChars: 150,
+    maxChars: 3600,
+    chunkSize: 300
   },
   compact: {
     id: 'compact',
-    firstPageChars: 1260,
-    firstPageFlexChars: 280,
-    maxChars: 6900
+    firstPageChars: 820,
+    firstPageFlexChars: 180,
+    maxChars: 4300,
+    chunkSize: 340
   }
 };
 const PREVIEW_IMAGE_DENSITY_PROFILES = {
@@ -116,6 +119,11 @@ const PREVIEW_IMAGE_DENSITY_PROFILES = {
     showHero: true,
     galleryColumns: 3
   }
+};
+const PREVIEW_FORMAT_TEXT_BUDGET_FACTORS = {
+  livret: 0.84,
+  standard: 1,
+  luxe: 1.08
 };
 const pdfExportJobs = new Map();
 
@@ -737,7 +745,7 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
 
 router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
   try {
-    const db = createUserScopedClient(req) || supabase;
+    const db = supabase;
     const bookId = req.params.id;
     const { book, chapters } = await loadOwnedBookChapterContext({
       bookId,
@@ -837,6 +845,59 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       });
     }
 
+    if (!targetOrder) {
+      const { data: candidateOrders, error: candidateOrdersError } = await db
+        .from('orders')
+        .select('*')
+        .eq('owner_id', req.user.id)
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (!candidateOrdersError && Array.isArray(candidateOrders)) {
+        targetOrder = candidateOrders.find(
+          (order) => isOrderLinkedToBook(order, bookId) && hasOrderPdfAccess(order)
+        ) || null;
+      }
+    }
+
+    const linkedJobId = cleanText(targetOrder?.metadata?.pdfJobId, 120);
+    if (linkedJobId) {
+      const linkedJob = getOwnedPdfExportJob({
+        jobId: linkedJobId,
+        bookId,
+        ownerId: req.user.id
+      });
+
+      if (linkedJob && ['queued', 'rendering', 'ready'].includes(String(linkedJob.status || '').toLowerCase())) {
+        return res.status(202).json({
+          jobId: linkedJob.jobId,
+          status: linkedJob.status,
+          createdAt: linkedJob.createdAt,
+          previewFormat: linkedJob.previewFormat || previewFormat,
+          previewLayoutSettings: linkedJob.previewLayoutSettings || previewLayoutSettings
+        });
+      }
+    }
+
+    if (targetOrder && String(targetOrder.status || '').toLowerCase() === 'pdf_generating') {
+      const recoveredJob = await recoverMissingPdfExportJob({
+        db,
+        bookId,
+        ownerId: req.user.id,
+        requestedJobId: linkedJobId || ''
+      });
+
+      if (recoveredJob && ['queued', 'rendering', 'ready'].includes(String(recoveredJob.status || '').toLowerCase())) {
+        return res.status(202).json({
+          jobId: recoveredJob.jobId,
+          status: recoveredJob.status,
+          createdAt: recoveredJob.createdAt,
+          previewFormat: recoveredJob.previewFormat || previewFormat,
+          previewLayoutSettings: recoveredJob.previewLayoutSettings || previewLayoutSettings
+        });
+      }
+    }
+
     const jobId = createPdfExportJobId();
     const createdAt = new Date().toISOString();
 
@@ -906,14 +967,23 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
 
 router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res) => {
   try {
-    const db = createUserScopedClient(req) || supabase;
+    const db = supabase;
     const bookId = req.params.id;
     const jobId = req.params.jobId;
-    const job = getOwnedPdfExportJob({
+    let job = getOwnedPdfExportJob({
       jobId,
       bookId,
       ownerId: req.user.id
     });
+
+    if (!job) {
+      job = await recoverMissingPdfExportJob({
+        db,
+        bookId,
+        ownerId: req.user.id,
+        requestedJobId: jobId
+      });
+    }
 
     if (!job) {
       return res.status(404).json({ error: 'Job export introuvable' });
@@ -955,7 +1025,7 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
     });
   } catch (error) {
     console.error('Erreur statut export PDF:', error);
-    return res.status(500).json({
+    return res.status(error.status || 500).json({
       error: error.message || 'Erreur lors de la recuperation du statut export'
     });
   }
@@ -963,15 +1033,24 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
 
 router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (req, res) => {
   try {
-    const db = createUserScopedClient(req) || supabase;
+    const db = supabase;
     const bookId = req.params.id;
     const jobId = req.params.jobId;
     const kind = req.params.kind;
-    const job = getOwnedPdfExportJob({
+    let job = getOwnedPdfExportJob({
       jobId,
       bookId,
       ownerId: req.user.id
     });
+
+    if (!job) {
+      job = await recoverMissingPdfExportJob({
+        db,
+        bookId,
+        ownerId: req.user.id,
+        requestedJobId: jobId
+      });
+    }
 
     if (!job) {
       return res.status(404).json({ error: 'Job export introuvable' });
@@ -991,7 +1070,9 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
 
     if (job.status !== 'ready') {
       return res.status(409).json({
-        error: 'Le PDF final nest pas encore disponible'
+        error: 'Le PDF final est en cours de generation',
+        jobId: job.jobId,
+        status: job.status
       });
     }
 
@@ -1022,7 +1103,7 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
     fileStream.pipe(res);
   } catch (error) {
     console.error('Erreur telechargement PDF:', error);
-    return res.status(500).json({
+    return res.status(error.status || 500).json({
       error: error.message || 'Erreur lors du telechargement du PDF'
     });
   }
@@ -1559,21 +1640,33 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
     chapter?.title || `Volet ${chapterNumber}`
   );
   const openingLead = sanitizeOpeningLead(sourcePayload?.chapter?.description, chapterHeading);
-  const visiblePhotos = Array.isArray(sourcePayload?.chapter?.photoUrls)
-    ? sourcePayload.chapter.photoUrls.slice(0, 6)
-    : [];
-  const remainingPhotoCount = Math.max(
-    0,
-    (Array.isArray(sourcePayload?.chapter?.photoUrls) ? sourcePayload.chapter.photoUrls.length : 0) - visiblePhotos.length
+  const resolvedPreviewFormat = resolveBookPreviewFormat(book);
+  const normalizedLayoutSettings = normalizePreviewLayoutSettings(
+    book?.cover_config?.previewLayoutSettings,
+    resolvedPreviewFormat
   );
-  const guestHighlights = Array.isArray(sourcePayload?.chapter?.guestContributions)
-    ? sourcePayload.chapter.guestContributions.slice(0, 3)
+  const imageProfile = PREVIEW_IMAGE_DENSITY_PROFILES[normalizedLayoutSettings.imageDensity];
+  const pageBudget = getPreviewPageTextBudget(
+    normalizedLayoutSettings.textDensity,
+    resolvedPreviewFormat
+  );
+  const allPhotos = Array.isArray(sourcePayload?.chapter?.photoUrls)
+    ? sourcePayload.chapter.photoUrls
     : [];
+  const visiblePhotos = allPhotos.slice(0, imageProfile.maxPhotos);
+  const heroPhotoUrl = imageProfile.showHero ? (visiblePhotos[0] || '') : '';
+  const galleryPhotos = heroPhotoUrl ? visiblePhotos.slice(1) : visiblePhotos;
+  const guestHighlights = Array.isArray(sourcePayload?.chapter?.guestContributions)
+    ? sourcePayload.chapter.guestContributions.slice(0, Math.max(1, pageBudget.guestItems))
+    : [];
+  const draftPages = Array.isArray(draft?.pages) && draft.pages.length > 0
+    ? draft.pages
+    : [{ title: chapterHeading, body: cleanText(draft?.body || '', pageBudget.pageBodyChars) }];
 
   return `
     <section class="draft-book-chapter">
       <div class="draft-book-chapter-shell">
-        ${draft.pages.map((page, index) => `
+        ${draftPages.map((page, index) => `
           <section class="draft-book-page${index === 0 ? ' draft-book-page-opening' : ''}${index === 3 ? ' draft-book-page-gallery' : ''}">
             ${(() => {
               const pageHeading = sanitizeDraftHeadingStrict(page.title || chapterHeading, chapterHeading);
@@ -1590,11 +1683,22 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
               ? `<p class="draft-book-intro">${escapeHtml(openingLead)}</p>`
               : ''}
             <div class="draft-book-body">
-              ${formatParagraphs(sanitizeDraftBodyText(page.body || '', chapterHeading))}
+              ${formatParagraphs(cleanText(
+                sanitizeDraftBodyText(page.body || '', chapterHeading),
+                index === 3 ? pageBudget.pageTailChars : pageBudget.pageBodyChars
+              ))}
             </div>
-            ${index === 0 ? renderQuestionList(sourcePayload?.chapter?.questions) : ''}
-            ${index === 2 ? renderContributionSpotlight(sourcePayload?.chapter?.organizerContribution, guestHighlights) : ''}
-            ${index === 3 ? renderPhotoGallery(visiblePhotos, remainingPhotoCount) : ''}
+            ${index === 0 ? renderQuestionList(sourcePayload?.chapter?.questions, {
+              maxItems: pageBudget.questionItems,
+              maxCharsPerItem: pageBudget.questionChars
+            }) : ''}
+            ${index === 1 && heroPhotoUrl ? renderInlineHeroPhoto(heroPhotoUrl, chapterHeading) : ''}
+            ${index === 2 ? renderContributionSpotlight(sourcePayload?.chapter?.organizerContribution, guestHighlights, {
+              organizerMaxChars: pageBudget.organizerChars,
+              guestMaxChars: pageBudget.guestChars,
+              maxGuestHighlights: pageBudget.guestItems
+            }) : ''}
+            ${index === 3 ? renderPhotoGallery(galleryPhotos, { columns: imageProfile.galleryColumns }) : ''}
             ${renderDraftPageFolio({ pageNumber: index + 1, totalPages: 4 })}
           </section>
         `).join('')}
@@ -1804,7 +1908,8 @@ function renderValidatedBookPreviewHtml({
         chapter: chapterNarrative,
         sourceChapter,
         index,
-        layoutSettings: normalizedLayoutSettings
+        layoutSettings: normalizedLayoutSettings,
+        previewFormat: resolvedPreviewFormat
       });
     })
     .join('');
@@ -1837,6 +1942,7 @@ function renderAssembledFrontCover(book) {
   const {
     styleId,
     styleTag,
+    styleDefaults,
     frontBg,
     textColor,
     accentColor,
@@ -1852,9 +1958,27 @@ function renderAssembledFrontCover(book) {
       cleanText(book?.event_type, 120),
       book?.recipient_age ? `${book.recipient_age} ans` : ''
     ].filter(Boolean).join(' | ');
-  const motif = cleanText(coverConfig.motif, 30) || 'line';
-  const showMonogram = coverConfig.showMonogram !== false;
+  const motif = cleanText(coverConfig.motif, 30) || cleanText(styleDefaults.frontMotif, 30) || 'line';
+  const showMonogram = Boolean(
+    coverConfig.showMonogram ?? styleDefaults.frontShowMonogram ?? true
+  );
+  const showPhotoFrame = Boolean(
+    coverConfig.showPhotoFrame ?? styleDefaults.frontShowPhotoFrame
+  );
+  const photoLabel = cleanText(coverConfig.photoLabel, 120)
+    || cleanText(styleDefaults.frontPhotoLabel, 120)
+    || 'Photo';
   const monogram = buildCoverMonogram(recipientLine || title);
+  const oliveMotifHtml = `
+    <div class="cover-preview-motif-olive" aria-hidden="true">
+      <svg viewBox="0 0 140 120" role="presentation" focusable="false">
+        <path d="M24 92 C40 48, 74 20, 122 16 C104 64, 72 96, 30 104 Z"></path>
+        <path d="M31 100 C55 80, 76 58, 95 30" class="olive-vein"></path>
+        <ellipse cx="60" cy="76" rx="8" ry="4" class="olive-fruit"></ellipse>
+        <ellipse cx="74" cy="62" rx="7" ry="3.5" class="olive-fruit"></ellipse>
+      </svg>
+    </div>
+  `;
 
   return `
     <section class="draft-book-section draft-book-section-cover draft-book-section-cover-front">
@@ -1867,6 +1991,11 @@ function renderAssembledFrontCover(book) {
           <div class="cover-preview-safe-zone"></div>
           <div class="cover-preview-tag">${escapeHtml(styleTag)}</div>
           ${showMonogram ? `<div class="cover-preview-monogram">${escapeHtml(monogram)}</div>` : ''}
+          ${showPhotoFrame ? `
+            <div class="cover-preview-front-photo">
+              <div class="cover-preview-front-photo-inner">${escapeHtml(photoLabel)}</div>
+            </div>
+          ` : ''}
           <div class="cover-preview-front-copy">
             ${eventLine ? `<div class="cover-preview-front-event">${escapeHtml(eventLine)}</div>` : ''}
             <h3>${escapeHtml(title)}</h3>
@@ -1875,6 +2004,7 @@ function renderAssembledFrontCover(book) {
           </div>
           ${motif === 'line' ? '<div class="cover-preview-motif-line" aria-hidden="true"></div>' : ''}
           ${motif === 'corner' ? '<div class="cover-preview-motif-corner" aria-hidden="true"></div>' : ''}
+          ${motif === 'olive_leaf' ? oliveMotifHtml : ''}
         </article>
       </div>
     </section>
@@ -1884,6 +2014,7 @@ function renderAssembledFrontCover(book) {
 function renderAssembledBackCover(book) {
   const {
     styleId,
+    styleDefaults,
     backBg,
     textColor,
     accentColor,
@@ -1896,9 +2027,20 @@ function renderAssembledBackCover(book) {
   const signature = cleanText(backCoverConfig.signature, 180)
     || (book?.recipient_name ? `Les proches de ${book.recipient_name}` : 'Les proches');
   const showContributors = Boolean(
-    backCoverConfig.show_contributors ?? backCoverConfig.showContributors ?? true
+    backCoverConfig.show_contributors
+    ?? backCoverConfig.showContributors
+    ?? styleDefaults.backShowContributors
   );
-  const showQrHint = Boolean(backCoverConfig.showQrHint);
+  const showQrHint = Boolean(backCoverConfig.showQrHint ?? styleDefaults.backShowQrHint);
+  const contributorsLine = cleanText(backCoverConfig.contributorsLine, 220)
+    || cleanText(styleDefaults.backContributorsLine, 220)
+    || 'Contributions collectives';
+  const dateLocation = cleanText(backCoverConfig.dateLocation, 180)
+    || cleanText(styleDefaults.backDateLocation, 180);
+  const organizerLine = cleanText(backCoverConfig.organizerLine, 220)
+    || cleanText(styleDefaults.backOrganizerLine, 220);
+  const isbnCode = cleanText(backCoverConfig.isbnCode, 60)
+    || cleanText(styleDefaults.backIsbn, 60);
 
   return `
     <section class="draft-book-section draft-book-section-cover draft-book-section-cover-back">
@@ -1913,7 +2055,16 @@ function renderAssembledBackCover(book) {
             ${formatParagraphs(blurb || 'Texte de quatrieme de couverture a definir.')}
           </div>
           ${quote ? `<blockquote class="cover-preview-back-quote">"${escapeHtml(quote)}"</blockquote>` : ''}
-          ${(showContributors || showQrHint) ? '<div class="cover-preview-back-footer"><span></span></div>' : ''}
+          ${organizerLine ? `<div class="cover-preview-back-organizer">${escapeHtml(organizerLine)}</div>` : ''}
+          ${(showContributors || showQrHint) ? `
+            <div class="cover-preview-back-footer">
+              ${showContributors ? `<div class="cover-preview-chip">${escapeHtml(contributorsLine)}</div>` : '<span></span>'}
+              ${showQrHint ? '<div class="cover-preview-qr">QR</div>' : ''}
+            </div>
+          ` : ''}
+          ${dateLocation ? `<div class="cover-preview-back-date">${escapeHtml(dateLocation)}</div>` : ''}
+          ${styleId === 'artistique_poetique' ? '<div class="cover-preview-note-zone">Mot manuscrit personnel</div>' : ''}
+          ${isbnCode ? `<div class="cover-preview-back-isbn">${escapeHtml(isbnCode)}</div>` : ''}
           <div class="cover-preview-back-signature">${escapeHtml(signature)}</div>
         </article>
       </div>
@@ -1942,51 +2093,138 @@ function resolveCoverPreviewConfig(book) {
     ? book.back_cover_config
     : {};
 
+  const styleAliases = {
+    editorial_classic: 'elegance_intemporelle',
+    minimal_contemporary: 'modernite_minimaliste',
+    heritage_emotion: 'retro_chic'
+  };
   const stylePresets = {
-    editorial_classic: {
-      id: 'editorial_classic',
-      tag: 'Edition prestige',
-      titleFont: "'Baskerville', 'Palatino Linotype', serif",
-      bodyFont: "'Inter', sans-serif"
+    elegance_intemporelle: {
+      id: 'elegance_intemporelle',
+      tag: 'Elegance intemporelle',
+      titleFont: "'Cormorant Garamond', 'Baskerville', serif",
+      bodyFont: "'Inter', sans-serif",
+      palette: {
+        front: '#f7f1e8',
+        back: '#eee4d6',
+        text: '#1f2228',
+        accent: '#b8924a'
+      },
+      defaults: {
+        frontMotif: 'line',
+        frontShowMonogram: true,
+        frontShowPhotoFrame: false,
+        frontPhotoLabel: 'Motif signature',
+        backShowContributors: false,
+        backShowQrHint: true,
+        backContributorsLine: '',
+        backDateLocation: '',
+        backOrganizerLine: '',
+        backIsbn: 'ISBN 978-2-00000-000-0'
+      }
     },
-    minimal_contemporary: {
-      id: 'minimal_contemporary',
+    modernite_minimaliste: {
+      id: 'modernite_minimaliste',
       tag: 'Collection moderne',
       titleFont: "'Avenir Next', 'Inter', sans-serif",
-      bodyFont: "'Inter', sans-serif"
+      bodyFont: "'Inter', sans-serif",
+      palette: {
+        front: '#14161a',
+        back: '#111318',
+        text: '#f4f6fa',
+        accent: '#c8d0dc'
+      },
+      defaults: {
+        frontMotif: 'none',
+        frontShowMonogram: false,
+        frontShowPhotoFrame: true,
+        frontPhotoLabel: 'Portrait noir et blanc',
+        backShowContributors: true,
+        backShowQrHint: true,
+        backContributorsLine: 'Contributeurs : famille et amis',
+        backDateLocation: '',
+        backOrganizerLine: '',
+        backIsbn: ''
+      }
     },
-    heritage_emotion: {
-      id: 'heritage_emotion',
-      tag: 'Memoire intime',
+    retro_chic: {
+      id: 'retro_chic',
+      tag: 'Collection heritage',
       titleFont: "'Garamond', 'Times New Roman', serif",
-      bodyFont: "'Inter', sans-serif"
-    }
-  };
-  const palettePresets = {
-    ivoire_dore: {
-      front: '#f6f1e7',
-      back: '#efe7da',
-      text: '#1f2228',
-      accent: '#b8924a'
+      bodyFont: "'Inter', sans-serif",
+      palette: {
+        front: '#f2e6d8',
+        back: '#eadac8',
+        text: '#3a2e27',
+        accent: '#a26d55'
+      },
+      defaults: {
+        frontMotif: 'corner',
+        frontShowMonogram: false,
+        frontShowPhotoFrame: true,
+        frontPhotoLabel: 'Photo archive',
+        backShowContributors: false,
+        backShowQrHint: false,
+        backContributorsLine: 'Souvenirs choisis par ses proches',
+        backDateLocation: '',
+        backOrganizerLine: '',
+        backIsbn: ''
+      }
     },
-    sauge_precieuse: {
-      front: '#eaf0ea',
-      back: '#e2ebe2',
-      text: '#1f2a28',
-      accent: '#8f9f8f'
+    prestige_contemporain: {
+      id: 'prestige_contemporain',
+      tag: 'Edition maison prestige',
+      titleFont: "'Cinzel', 'Baskerville', serif",
+      bodyFont: "'Inter', sans-serif",
+      palette: {
+        front: '#2f2432',
+        back: '#2a1f2d',
+        text: '#f2eadf',
+        accent: '#c8a25f'
+      },
+      defaults: {
+        frontMotif: 'none',
+        frontShowMonogram: true,
+        frontShowPhotoFrame: false,
+        frontPhotoLabel: '',
+        backShowContributors: false,
+        backShowQrHint: true,
+        backContributorsLine: '',
+        backDateLocation: '',
+        backOrganizerLine: 'Un livre unique pour une personne unique',
+        backIsbn: ''
+      }
     },
-    bleu_poudre: {
-      front: '#e9edf4',
-      back: '#e1e7f0',
-      text: '#1f2530',
-      accent: '#7f90a8'
+    artistique_poetique: {
+      id: 'artistique_poetique',
+      tag: 'Edition atelier',
+      titleFont: "'Playfair Display', 'Baskerville', serif",
+      bodyFont: "'Inter', sans-serif",
+      palette: {
+        front: '#edf1f7',
+        back: '#e9eef7',
+        text: '#243246',
+        accent: '#7890b0'
+      },
+      defaults: {
+        frontMotif: 'none',
+        frontShowMonogram: false,
+        frontShowPhotoFrame: false,
+        frontPhotoLabel: '',
+        backShowContributors: true,
+        backShowQrHint: false,
+        backContributorsLine: '',
+        backDateLocation: '',
+        backOrganizerLine: 'Contributions reunies par l organisateur',
+        backIsbn: 'ISBN 978-2-99999-999-9'
+      }
     }
   };
 
   const requestedStyleId = cleanText(coverConfig.template || backCoverConfig.template, 80);
-  const style = stylePresets[requestedStyleId] || stylePresets.editorial_classic;
-  const requestedPaletteId = cleanText(coverConfig.palette || backCoverConfig.palette, 80);
-  const palette = palettePresets[requestedPaletteId] || palettePresets.ivoire_dore;
+  const canonicalStyleId = styleAliases[requestedStyleId] || requestedStyleId;
+  const style = stylePresets[canonicalStyleId] || stylePresets.elegance_intemporelle;
+  const palette = style.palette;
   const frontBg = sanitizeCssValue(coverConfig.color, palette.front);
   const backBg = sanitizeCssValue(backCoverConfig.color, palette.back);
   const textColor = sanitizeCssValue(coverConfig.textColor || backCoverConfig.textColor, palette.text);
@@ -1997,6 +2235,7 @@ function resolveCoverPreviewConfig(book) {
   return {
     styleId: style.id,
     styleTag: style.tag,
+    styleDefaults: style.defaults || {},
     frontBg,
     backBg,
     textColor,
@@ -2027,6 +2266,221 @@ function getOwnedPdfExportJob({ jobId, bookId, ownerId }) {
   }
 
   return job;
+}
+
+function findLatestOwnedPdfExportJob({ bookId, ownerId }) {
+  let latestJob = null;
+
+  for (const job of pdfExportJobs.values()) {
+    if (String(job?.bookId) !== String(bookId)) {
+      continue;
+    }
+    if (String(job?.ownerId) !== String(ownerId)) {
+      continue;
+    }
+
+    if (!latestJob) {
+      latestJob = job;
+      continue;
+    }
+
+    const latestTs = Date.parse(latestJob.createdAt || '');
+    const currentTs = Date.parse(job.createdAt || '');
+    const latestValue = Number.isFinite(latestTs) ? latestTs : 0;
+    const currentValue = Number.isFinite(currentTs) ? currentTs : 0;
+
+    if (currentValue > latestValue) {
+      latestJob = job;
+    }
+  }
+
+  return latestJob;
+}
+
+function buildPdfExportPrerequisiteError(message) {
+  const error = new Error(message);
+  error.status = 409;
+  return error;
+}
+
+async function recoverMissingPdfExportJob({
+  db = supabase,
+  bookId,
+  ownerId,
+  requestedJobId = ''
+}) {
+  const normalizedRequestedJobId = cleanText(requestedJobId, 120);
+  if (normalizedRequestedJobId) {
+    const requestedJob = getOwnedPdfExportJob({
+      jobId: normalizedRequestedJobId,
+      bookId,
+      ownerId
+    });
+    if (requestedJob) {
+      return requestedJob;
+    }
+  }
+
+  const latestOwnedJob = findLatestOwnedPdfExportJob({ bookId, ownerId });
+  if (latestOwnedJob) {
+    return latestOwnedJob;
+  }
+
+  const { data: ownedBook, error: ownedBookError } = await db
+    .from('books')
+    .select('id')
+    .eq('id', bookId)
+    .eq('owner_id', ownerId)
+    .maybeSingle();
+
+  if (ownedBookError) {
+    throw ownedBookError;
+  }
+  if (!ownedBook) {
+    return null;
+  }
+
+  const { data: candidateOrders, error: candidateOrdersError } = await db
+    .from('orders')
+    .select('*')
+    .eq('owner_id', ownerId)
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (candidateOrdersError) {
+    throw candidateOrdersError;
+  }
+
+  const linkedPaidOrders = (Array.isArray(candidateOrders) ? candidateOrders : []).filter(
+    (order) => isOrderLinkedToBook(order, bookId) && hasOrderPdfAccess(order)
+  );
+
+  if (!linkedPaidOrders.length) {
+    return null;
+  }
+
+  const preferredOrder = normalizedRequestedJobId
+    ? linkedPaidOrders.find(
+        (order) => normalizeIdentifier(order?.metadata?.pdfJobId) === normalizeIdentifier(normalizedRequestedJobId)
+      )
+    : null;
+  const targetOrder = preferredOrder || linkedPaidOrders[0];
+  if (!targetOrder?.id) {
+    return null;
+  }
+
+  const metadataJobId = cleanText(targetOrder?.metadata?.pdfJobId, 120);
+  if (metadataJobId) {
+    const metadataLinkedJob = getOwnedPdfExportJob({
+      jobId: metadataJobId,
+      bookId,
+      ownerId
+    });
+    if (metadataLinkedJob) {
+      return metadataLinkedJob;
+    }
+  }
+
+  const { book, chapters } = await loadOwnedBookChapterContext({
+    bookId,
+    ownerId
+  });
+  const chaptersWithDrafts = (chapters || []).map((chapter) => ({
+    chapter,
+    draft: extractChapterDraftState(chapter)
+  }));
+  const incompleteCount = chaptersWithDrafts.filter(
+    ({ draft }) => draft?.status !== 'validated'
+  ).length;
+
+  if (!chaptersWithDrafts.length) {
+    throw buildPdfExportPrerequisiteError('Aucun chapitre disponible pour generer le PDF final');
+  }
+
+  if (incompleteCount > 0) {
+    throw buildPdfExportPrerequisiteError(
+      `Tous les chapitres doivent etre valides avant l export PDF (${incompleteCount} restant(s))`
+    );
+  }
+
+  const coverValidation = getBookCoverValidationState(book);
+  if (!coverValidation.isBookCoverValidated) {
+    throw buildPdfExportPrerequisiteError(
+      'La couverture et la 4e de couverture doivent etre validees avant l export PDF final.'
+    );
+  }
+
+  const previewFormat = resolveBookPreviewFormat(
+    book,
+    targetOrder?.metadata?.pdfPreviewFormat || targetOrder?.metadata?.previewFormat
+  );
+  const previewLayoutSettings = normalizePreviewLayoutSettings(
+    targetOrder?.metadata?.pdfPreviewLayoutSettings || book?.cover_config?.previewLayoutSettings,
+    previewFormat
+  );
+
+  let recoveredJobId = metadataJobId || normalizedRequestedJobId || createPdfExportJobId();
+  const conflictingJob = pdfExportJobs.get(recoveredJobId);
+  if (
+    conflictingJob
+    && (String(conflictingJob.bookId) !== String(bookId) || String(conflictingJob.ownerId) !== String(ownerId))
+  ) {
+    recoveredJobId = createPdfExportJobId();
+  } else if (conflictingJob) {
+    return conflictingJob;
+  }
+
+  const createdAt = new Date().toISOString();
+  const recoveredJob = {
+    jobId: recoveredJobId,
+    bookId,
+    ownerId,
+    orderId: targetOrder.id,
+    status: 'queued',
+    createdAt,
+    startedAt: null,
+    completedAt: null,
+    error: null,
+    files: null,
+    previewFormat,
+    previewLayoutSettings
+  };
+  pdfExportJobs.set(recoveredJobId, recoveredJob);
+
+  const nextOrderMetadata = mergeOrderMetadata(targetOrder.metadata, {
+    pdfJobId: recoveredJobId,
+    pdfRequestedAt: createdAt,
+    pdfPreviewFormat: previewFormat,
+    pdfPreviewLayoutSettings: previewLayoutSettings,
+    pdfReady: false,
+    pdfError: null
+  });
+  const orderUpdatePayload = {
+    metadata: nextOrderMetadata,
+    updated_at: createdAt
+  };
+  const normalizedStatus = String(targetOrder.status || '').toLowerCase();
+  if (normalizedStatus === 'paid' || normalizedStatus === 'pdf_ready' || normalizedStatus === 'failed') {
+    orderUpdatePayload.status = 'pdf_generating';
+  }
+
+  await db
+    .from('orders')
+    .update(orderUpdatePayload)
+    .eq('id', targetOrder.id)
+    .eq('owner_id', ownerId);
+
+  processPdfExportJob({
+    jobId: recoveredJobId,
+    book,
+    chaptersWithDrafts,
+    previewFormat,
+    previewLayoutSettings
+  }).catch((error) => {
+    console.error('Erreur regeneration job export PDF:', error);
+  });
+
+  return recoveredJob;
 }
 
 async function processPdfExportJob({
@@ -2376,7 +2830,8 @@ function renderValidatedBookInteriorHtml({
         chapter: chapterNarrative,
         sourceChapter,
         index,
-        layoutSettings: normalizedLayoutSettings
+        layoutSettings: normalizedLayoutSettings,
+        previewFormat: resolvedPreviewFormat
       });
     })
     .join('');
@@ -2507,8 +2962,10 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
 
     .draft-book-header h1 {
       margin: 0 0 4mm;
-      font-size: 28px;
-      line-height: 1.2;
+      font-family: "Baskerville", "Palatino Linotype", serif;
+      font-size: 26px;
+      line-height: 1.14;
+      letter-spacing: 0.01em;
     }
 
     .draft-book-meta {
@@ -2559,6 +3016,19 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     .draft-book-section h2,
     .draft-book-chapter h3 {
       margin: 0 0 4mm;
+      font-family: "Baskerville", "Palatino Linotype", serif;
+      color: #1f2228;
+      letter-spacing: 0.01em;
+    }
+
+    .draft-book-section h2 {
+      font-size: 21px;
+      line-height: 1.18;
+    }
+
+    .draft-book-chapter h3 {
+      font-size: 23px;
+      line-height: 1.16;
     }
 
     .draft-book-chapter {
@@ -2596,7 +3066,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       margin: 0 0 4mm;
       font-style: italic;
       color: #5f6770;
-      line-height: 1.7;
+      line-height: 1.6;
+      font-size: 11.6px;
     }
 
     .draft-book-body {
@@ -2608,8 +3079,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     .draft-book-callout p,
     .draft-book-contributor-item p {
       margin: 0 0 3.5mm;
-      line-height: 1.72;
-      font-size: 12px;
+      line-height: 1.62;
+      font-size: 11.5px;
       page-break-inside: avoid;
       break-inside: avoid-page;
       orphans: 3;
@@ -2620,23 +3091,23 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
 
     .draft-book-text-block {
       margin: 0 0 3.5mm;
-      line-height: 1.72;
-      font-size: 12px;
+      line-height: 1.62;
+      font-size: 11.5px;
     }
 
     .draft-book-layout-text-airy .draft-book-text-block,
     .draft-book-layout-text-airy .draft-book-body p,
     .draft-book-layout-text-airy .draft-book-section p {
-      font-size: 11.5px;
-      line-height: 1.86;
+      font-size: 11.1px;
+      line-height: 1.74;
       margin-bottom: 4.2mm;
     }
 
     .draft-book-layout-text-compact .draft-book-text-block,
     .draft-book-layout-text-compact .draft-book-body p,
     .draft-book-layout-text-compact .draft-book-section p {
-      font-size: 12.6px;
-      line-height: 1.58;
+      font-size: 11.9px;
+      line-height: 1.52;
       margin-bottom: 2.8mm;
     }
 
@@ -2706,7 +3177,7 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       counter-reset: luxe-question;
       display: grid;
       gap: 2.4mm;
-      font-size: 12px;
+      font-size: 11.2px;
     }
 
     .draft-book-question-list li {
@@ -2715,7 +3186,7 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       border-radius: 6px;
       border: 1px solid rgba(184, 146, 74, 0.24);
       background: rgba(255, 255, 255, 0.72);
-      line-height: 1.58;
+      line-height: 1.5;
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
       align-items: start;
@@ -2910,6 +3381,36 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       z-index: 1;
     }
 
+    .cover-preview-front-photo {
+      margin: 4mm auto 3mm;
+      width: 68%;
+      height: 34mm;
+      border-radius: 4mm;
+      border: 0.35mm solid rgba(31, 34, 40, 0.22);
+      background: rgba(255, 255, 255, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2mm;
+      box-sizing: border-box;
+    }
+
+    .cover-preview-front-photo-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 3mm;
+      border: 0.35mm dashed rgba(31, 34, 40, 0.24);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: rgba(31, 34, 40, 0.65);
+      box-sizing: border-box;
+    }
+
     .cover-preview-front-event {
       font-size: 11px;
       text-transform: uppercase;
@@ -2961,6 +3462,40 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       border-radius: 0 10px 0 0;
     }
 
+    .cover-preview-motif-olive {
+      position: absolute;
+      top: 64px;
+      right: 18px;
+      width: 88px;
+      height: 74px;
+      color: var(--cover-accent, #b8924a);
+      opacity: 0.9;
+    }
+
+    .cover-preview-motif-olive svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .cover-preview-motif-olive path {
+      fill: currentColor;
+      opacity: 0.24;
+    }
+
+    .cover-preview-motif-olive .olive-vein {
+      fill: none;
+      stroke: rgba(31, 34, 40, 0.28);
+      stroke-width: 3;
+      stroke-linecap: round;
+      opacity: 0.7;
+    }
+
+    .cover-preview-motif-olive .olive-fruit {
+      fill: rgba(31, 34, 40, 0.18);
+      opacity: 0.9;
+    }
+
     .cover-preview-back-copy {
       margin-top: 6px;
       color: var(--cover-text, #1f2228);
@@ -2985,6 +3520,13 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       font-family: "Baskerville", "Palatino Linotype", serif;
       font-size: 16px;
       line-height: 1.45;
+    }
+
+    .cover-preview-back-organizer {
+      margin-top: 2.2mm;
+      font-size: 10px;
+      line-height: 1.5;
+      color: rgba(31, 34, 40, 0.75);
     }
 
     .cover-preview-back-footer {
@@ -3032,29 +3574,173 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       letter-spacing: 0.04em;
     }
 
+    .cover-preview-back-date {
+      margin-top: 2mm;
+      font-size: 8px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(31, 34, 40, 0.62);
+    }
+
+    .cover-preview-note-zone {
+      margin-top: 2.2mm;
+      min-height: 13mm;
+      border-radius: 2.5mm;
+      border: 0.35mm dashed rgba(31, 34, 40, 0.24);
+      background: rgba(255, 255, 255, 0.58);
+      color: rgba(31, 34, 40, 0.62);
+      font-size: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      box-sizing: border-box;
+    }
+
+    .cover-preview-back-isbn {
+      margin-top: 2mm;
+      font-size: 7px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(31, 34, 40, 0.58);
+    }
+
+    .cover-preview-card.cover-style-elegance_intemporelle::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.16) 0,
+          rgba(255, 255, 255, 0.16) 0.35mm,
+          transparent 0.35mm,
+          transparent 1.05mm
+        ),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0) 44%);
+      opacity: 0.68;
+      pointer-events: none;
+    }
+
+    .cover-preview-card.cover-style-modernite_minimaliste .cover-preview-front-copy h3,
     .cover-preview-card.cover-style-minimal_contemporary .cover-preview-front-copy h3 {
       text-transform: uppercase;
       letter-spacing: 0.08em;
       font-size: 24px;
     }
 
+    .cover-preview-card.cover-style-modernite_minimaliste .cover-preview-tag,
     .cover-preview-card.cover-style-minimal_contemporary .cover-preview-tag {
       border-style: solid;
       letter-spacing: 0.12em;
     }
 
+    .cover-preview-card.cover-style-modernite_minimaliste .cover-preview-front-photo,
+    .cover-preview-card.cover-style-minimal_contemporary .cover-preview-front-photo {
+      border-color: rgba(243, 246, 252, 0.45);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .cover-preview-card.cover-style-modernite_minimaliste .cover-preview-front-photo-inner,
+    .cover-preview-card.cover-style-minimal_contemporary .cover-preview-front-photo-inner {
+      border-color: rgba(238, 243, 252, 0.36);
+      color: rgba(238, 243, 252, 0.82);
+    }
+
+    .cover-preview-card.cover-style-modernite_minimaliste .cover-preview-motif-olive path,
+    .cover-preview-card.cover-style-minimal_contemporary .cover-preview-motif-olive path {
+      fill: rgba(219, 227, 240, 0.55);
+    }
+
+    .cover-preview-card.cover-style-modernite_minimaliste .cover-preview-motif-olive .olive-vein,
+    .cover-preview-card.cover-style-minimal_contemporary .cover-preview-motif-olive .olive-vein {
+      stroke: rgba(238, 243, 252, 0.56);
+    }
+
+    .cover-preview-card.cover-style-modernite_minimaliste .cover-preview-motif-olive .olive-fruit,
+    .cover-preview-card.cover-style-minimal_contemporary .cover-preview-motif-olive .olive-fruit {
+      fill: rgba(238, 243, 252, 0.52);
+    }
+
+    .cover-preview-card.cover-style-retro_chic .cover-preview-front-copy h3,
     .cover-preview-card.cover-style-heritage_emotion .cover-preview-front-copy h3 {
       font-style: italic;
       line-height: 1.18;
     }
 
+    .cover-preview-card.cover-style-retro_chic .cover-preview-back-quote,
     .cover-preview-card.cover-style-heritage_emotion .cover-preview-back-quote {
       font-size: 17px;
+    }
+
+    .cover-preview-card.cover-style-retro_chic .cover-preview-front-photo {
+      width: 62%;
+      border-radius: 50% / 45%;
+      border-color: rgba(137, 93, 67, 0.35);
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .cover-preview-card.cover-style-retro_chic .cover-preview-front-photo-inner {
+      border-radius: 50% / 45%;
+      border-color: rgba(137, 93, 67, 0.4);
+    }
+
+    .cover-preview-card.cover-style-prestige_contemporain .cover-preview-front-copy h3 {
+      display: inline-flex;
+      padding: 2.2mm 3.4mm;
+      border-radius: 999px;
+      border: 0.35mm solid rgba(201, 164, 96, 0.45);
+      background: rgba(255, 255, 255, 0.08);
+      margin-bottom: 2.4mm;
+      font-size: 22px;
+    }
+
+    .cover-preview-card.cover-style-prestige_contemporain .cover-preview-monogram {
+      position: absolute;
+      right: 6mm;
+      bottom: 7mm;
+      margin-top: 0;
+      border-color: rgba(201, 164, 96, 0.5);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .cover-preview-card.cover-style-prestige_contemporain .cover-preview-motif-olive path {
+      fill: rgba(246, 232, 205, 0.32);
+    }
+
+    .cover-preview-card.cover-style-prestige_contemporain .cover-preview-motif-olive .olive-vein {
+      stroke: rgba(246, 232, 205, 0.48);
+    }
+
+    .cover-preview-card.cover-style-prestige_contemporain .cover-preview-motif-olive .olive-fruit {
+      fill: rgba(246, 232, 205, 0.46);
+    }
+
+    .cover-preview-card.cover-style-artistique_poetique::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 22% 18%, rgba(141, 168, 206, 0.42), transparent 40%),
+        radial-gradient(circle at 80% 74%, rgba(181, 152, 204, 0.36), transparent 44%),
+        radial-gradient(circle at 44% 86%, rgba(245, 188, 173, 0.3), transparent 40%);
+      opacity: 0.84;
+      pointer-events: none;
+    }
+
+    .cover-preview-card.cover-style-artistique_poetique .cover-preview-note-zone {
+      background: rgba(255, 255, 255, 0.72);
+      border-color: rgba(123, 146, 183, 0.4);
+      color: rgba(69, 90, 130, 0.78);
     }
 
     body.mode-cover .draft-book {
       page-break-inside: avoid;
       break-inside: avoid-page;
+      min-height: ${coverContentHeightMm}mm;
+      max-height: ${coverContentHeightMm}mm;
+      overflow: hidden;
     }
 
     body.mode-cover .draft-book-section {
@@ -3079,6 +3765,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     body.mode-cover .draft-book-section-cover .cover-preview-spread {
       min-height: ${coverContentHeightMm}mm;
       height: ${coverContentHeightMm}mm;
+      max-height: ${coverContentHeightMm}mm;
+      overflow: hidden;
     }
 
     body.mode-cover .draft-book-section-cover .cover-preview-card {
@@ -3090,6 +3778,14 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     body.mode-cover .cover-print-spread {
       page-break-after: avoid;
       break-after: avoid;
+      page-break-before: avoid;
+      break-before: avoid-page;
+      overflow: hidden;
+    }
+
+    body.mode-cover .cover-preview-front-copy,
+    body.mode-cover .cover-preview-back-copy {
+      overflow: hidden;
     }
   `;
 }
@@ -3200,6 +3896,9 @@ async function generateCoverPdfFile({ filePath, book, chaptersWithDrafts, previe
       .join(' | ');
   const backBlurb = cleanText(backCoverConfig?.blurb, 1800) || 'Texte de quatrieme de couverture a finaliser.';
   const backQuote = cleanText(backCoverConfig?.quote, 360);
+  const backOrganizerLine = cleanText(backCoverConfig?.organizerLine, 220);
+  const backDateLocation = cleanText(backCoverConfig?.dateLocation, 180);
+  const backIsbn = cleanText(backCoverConfig?.isbnCode, 60);
   const backSignature = cleanText(backCoverConfig?.signature, 180)
     || (book?.recipient_name ? `Les proches de ${book.recipient_name}` : 'Les proches');
 
@@ -3293,6 +3992,30 @@ async function generateCoverPdfFile({ filePath, book, chaptersWithDrafts, previe
           `"${backQuote}"`,
           backX + safeMarginPt,
           trimY + trimHeightPt - mmToPt(48),
+          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+        );
+      }
+      if (backOrganizerLine) {
+        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(9).text(
+          backOrganizerLine,
+          backX + safeMarginPt,
+          trimY + trimHeightPt - mmToPt(34),
+          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+        );
+      }
+      if (backDateLocation) {
+        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(8).text(
+          backDateLocation,
+          backX + safeMarginPt,
+          trimY + trimHeightPt - mmToPt(26),
+          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
+        );
+      }
+      if (backIsbn) {
+        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(7).text(
+          backIsbn,
+          backX + safeMarginPt,
+          trimY + trimHeightPt - mmToPt(22),
           { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
         );
       }
@@ -3810,12 +4533,19 @@ function buildChapterBodyFallback(chapter) {
 
 function renderBookDraftHtml({ book, draft, sourcePayload }) {
   const subtitle = draft.subtitle || [book.event_type, book.style_narratif].filter(Boolean).join(' | ');
+  const resolvedPreviewFormat = resolveBookPreviewFormat(book);
+  const normalizedLayoutSettings = normalizePreviewLayoutSettings(
+    book?.cover_config?.previewLayoutSettings,
+    resolvedPreviewFormat
+  );
   const chapterBlocks = draft.chapters.map((chapter, index) => {
     const sourceChapter = sourcePayload.chapters[index];
     return renderDraftChapterPages({
       chapter,
       sourceChapter,
-      index
+      index,
+      layoutSettings: normalizedLayoutSettings,
+      previewFormat: resolvedPreviewFormat
     });
   }).join('');
 
@@ -3851,15 +4581,24 @@ function renderDraftChapterPages({
   chapter,
   sourceChapter,
   index,
-  layoutSettings = null
+  layoutSettings = null,
+  previewFormat = ''
 }) {
   const chapterTitle = sanitizeDraftHeadingStrict(
     chapter.title || sourceChapter?.title || `Volet ${index + 1}`,
     sourceChapter?.title || `Volet ${index + 1}`
   );
   const openingLead = sanitizeOpeningLead(sourceChapter?.description, chapterTitle);
-  const normalizedLayoutSettings = normalizePreviewLayoutSettings(layoutSettings);
+  const normalizedPreviewFormat = resolveBookPreviewFormat(null, previewFormat);
+  const normalizedLayoutSettings = normalizePreviewLayoutSettings(
+    layoutSettings,
+    normalizedPreviewFormat
+  );
   const imageProfile = PREVIEW_IMAGE_DENSITY_PROFILES[normalizedLayoutSettings.imageDensity];
+  const pageBudget = getPreviewPageTextBudget(
+    normalizedLayoutSettings.textDensity,
+    normalizedPreviewFormat
+  );
   const bodyParts = splitDraftBody(
     sanitizeDraftBodyText(chapter.body || buildChapterBodyFallback(sourceChapter || {}), chapterTitle),
     {
@@ -3868,13 +4607,12 @@ function renderDraftChapterPages({
     }
   );
   const guestHighlights = Array.isArray(sourceChapter?.guestContributions)
-    ? sourceChapter.guestContributions.slice(0, 3)
+    ? sourceChapter.guestContributions.slice(0, 2)
     : [];
   const allPhotos = collectChapterPhotos(sourceChapter);
   const visiblePhotos = allPhotos.slice(0, imageProfile.maxPhotos);
   const heroPhotoUrl = imageProfile.showHero ? (visiblePhotos[0] || '') : '';
   const galleryPhotos = heroPhotoUrl ? visiblePhotos.slice(1) : visiblePhotos;
-  const remainingPhotoCount = Math.max(0, allPhotos.length - visiblePhotos.length);
 
   return `
     <section class="draft-book-chapter">
@@ -3882,35 +4620,100 @@ function renderDraftChapterPages({
         <section class="draft-book-page draft-book-page-opening">
           <h3>${escapeHtml(chapterTitle)}</h3>
           ${openingLead ? `<p class="draft-book-intro">${escapeHtml(openingLead)}</p>` : ''}
-          ${renderQuestionList(sourceChapter?.questions)}
+          ${renderQuestionList(sourceChapter?.questions, {
+            maxItems: pageBudget.questionItems,
+            maxCharsPerItem: pageBudget.questionChars
+          })}
           ${renderDraftPageFolio({ pageNumber: 1, totalPages: 4 })}
         </section>
 
         <section class="draft-book-page">
           ${chapter.intro ? `<p class="draft-book-intro">${escapeHtml(chapter.intro)}</p>` : ''}
           <div class="draft-book-body draft-book-body-blocks">
-            ${formatParagraphs(bodyParts[0] || '', { paragraphClass: 'draft-book-text-block' })}
+            ${formatParagraphs(
+              cleanText(bodyParts[0] || '', pageBudget.pageBodyChars),
+              { paragraphClass: 'draft-book-text-block' }
+            )}
           </div>
           ${heroPhotoUrl ? renderInlineHeroPhoto(heroPhotoUrl, chapterTitle) : ''}
           ${renderDraftPageFolio({ pageNumber: 2, totalPages: 4 })}
         </section>
 
         <section class="draft-book-page">
-          ${renderContributionSpotlight(sourceChapter?.organizerContribution, guestHighlights)}
+          ${renderContributionSpotlight(sourceChapter?.organizerContribution, guestHighlights, {
+            organizerMaxChars: pageBudget.organizerChars,
+            guestMaxChars: pageBudget.guestChars,
+            maxGuestHighlights: pageBudget.guestItems
+          })}
           ${renderDraftPageFolio({ pageNumber: 3, totalPages: 4 })}
         </section>
 
         <section class="draft-book-page draft-book-page-gallery">
           <div class="draft-book-body draft-book-body-blocks">
-            ${formatParagraphs(bodyParts[1] || bodyParts[0] || '', { paragraphClass: 'draft-book-text-block' })}
+            ${formatParagraphs(
+              cleanText(bodyParts[1] || '', pageBudget.pageTailChars),
+              { paragraphClass: 'draft-book-text-block' }
+            )}
           </div>
           ${chapter.closing ? `<p class="draft-book-closing">${escapeHtml(chapter.closing)}</p>` : ''}
-          ${renderPhotoGallery(galleryPhotos, remainingPhotoCount, { columns: imageProfile.galleryColumns })}
+          ${renderPhotoGallery(galleryPhotos, { columns: imageProfile.galleryColumns })}
           ${renderDraftPageFolio({ pageNumber: 4, totalPages: 4 })}
         </section>
       </div>
     </section>
   `;
+}
+
+function getPreviewPageTextBudget(textDensity, previewFormat = '') {
+  const normalizedDensity = normalizePreviewTextDensity(textDensity);
+  const normalizedPreviewFormat = resolveBookPreviewFormat(null, previewFormat);
+  const formatFactor = PREVIEW_FORMAT_TEXT_BUDGET_FACTORS[normalizedPreviewFormat] || 1;
+  let baseBudget;
+
+  if (normalizedDensity === 'airy') {
+    baseBudget = {
+      questionItems: 2,
+      questionChars: 120,
+      organizerChars: 420,
+      guestChars: 140,
+      guestItems: 1,
+      pageBodyChars: 760,
+      pageTailChars: 620
+    };
+  }
+  else if (normalizedDensity === 'compact') {
+    baseBudget = {
+      questionItems: 3,
+      questionChars: 160,
+      organizerChars: 700,
+      guestChars: 210,
+      guestItems: 2,
+      pageBodyChars: 1120,
+      pageTailChars: 900
+    };
+  } else {
+    baseBudget = {
+      questionItems: 2,
+      questionChars: 140,
+      organizerChars: 560,
+      guestChars: 170,
+      guestItems: 1,
+      pageBodyChars: 940,
+      pageTailChars: 760
+    };
+  }
+
+  const isLuxeFormat = normalizedPreviewFormat === 'luxe';
+
+  return {
+    questionItems: Math.max(2, Math.min(4, baseBudget.questionItems + (isLuxeFormat ? 1 : 0))),
+    questionChars: Math.round(baseBudget.questionChars * formatFactor),
+    organizerChars: Math.round(baseBudget.organizerChars * formatFactor),
+    guestChars: Math.round(baseBudget.guestChars * formatFactor),
+    guestItems: Math.max(1, Math.min(3, baseBudget.guestItems + (isLuxeFormat ? 1 : 0))),
+    pageBodyChars: Math.round(baseBudget.pageBodyChars * formatFactor),
+    pageTailChars: Math.round(baseBudget.pageTailChars * formatFactor)
+  };
 }
 
 function renderInlineHeroPhoto(photoUrl, chapterTitle) {
@@ -3925,9 +4728,15 @@ function renderInlineHeroPhoto(photoUrl, chapterTitle) {
   `;
 }
 
-function renderQuestionList(questions) {
+function renderQuestionList(questions, options = {}) {
+  const maxItems = Number.isFinite(Number(options.maxItems))
+    ? Math.max(1, Math.min(4, Number(options.maxItems)))
+    : 3;
+  const maxCharsPerItem = Number.isFinite(Number(options.maxCharsPerItem))
+    ? Math.max(90, Math.min(220, Number(options.maxCharsPerItem)))
+    : 170;
   const items = Array.isArray(questions)
-    ? questions.map((question) => cleanText(question, 220)).filter(Boolean)
+    ? questions.map((question) => cleanText(question, maxCharsPerItem)).filter(Boolean)
     : [];
 
   if (items.length === 0) {
@@ -3937,19 +4746,29 @@ function renderQuestionList(questions) {
   return `
     <div class="draft-book-question-block">
       <ol class="draft-book-question-list">
-        ${items.slice(0, 5).map((question) => `<li><span>${escapeHtml(question)}</span></li>`).join('')}
+        ${items.slice(0, maxItems).map((question) => `<li><span>${escapeHtml(question)}</span></li>`).join('')}
       </ol>
     </div>
   `;
 }
 
-function renderContributionSpotlight(organizerContribution, guestHighlights) {
+function renderContributionSpotlight(organizerContribution, guestHighlights, options = {}) {
+  const organizerMaxChars = Number.isFinite(Number(options.organizerMaxChars))
+    ? Math.max(180, Math.min(1200, Number(options.organizerMaxChars)))
+    : 560;
+  const guestMaxChars = Number.isFinite(Number(options.guestMaxChars))
+    ? Math.max(90, Math.min(420, Number(options.guestMaxChars)))
+    : 170;
+  const maxGuestHighlights = Number.isFinite(Number(options.maxGuestHighlights))
+    ? Math.max(1, Math.min(3, Number(options.maxGuestHighlights)))
+    : 1;
   const blocks = [];
 
-  if (organizerContribution?.message) {
+  const organizerMessage = cleanText(organizerContribution?.message || '', organizerMaxChars);
+  if (organizerMessage) {
     blocks.push(`
       <div class="draft-book-callout">
-        ${formatParagraphs(organizerContribution.message)}
+        ${formatParagraphs(organizerMessage)}
       </div>
     `);
   }
@@ -3957,10 +4776,10 @@ function renderContributionSpotlight(organizerContribution, guestHighlights) {
   if (Array.isArray(guestHighlights) && guestHighlights.length > 0) {
     blocks.push(`
       <div class="draft-book-contributor-list">
-        ${guestHighlights.map((contribution) => `
+        ${guestHighlights.slice(0, maxGuestHighlights).map((contribution) => `
           <div class="draft-book-contributor-item">
             <strong>${escapeHtml(contribution.contributorName || 'Contributeur')}</strong>
-            <p>${escapeHtml(cleanText(contribution.message, 320) || 'Souvenir a integrer dans la version finale.')}</p>
+            <p>${escapeHtml(cleanText(contribution.message, guestMaxChars) || 'Souvenir a integrer dans la version finale.')}</p>
           </div>
         `).join('')}
       </div>
@@ -3974,7 +4793,7 @@ function renderContributionSpotlight(organizerContribution, guestHighlights) {
   return blocks.join('');
 }
 
-function renderPhotoGallery(photos, remainingPhotoCount, options = {}) {
+function renderPhotoGallery(photos, options = {}) {
   const galleryColumns = Number.isFinite(Number(options.columns))
     ? Math.max(2, Math.min(3, Number(options.columns)))
     : 2;
@@ -3996,7 +4815,6 @@ function renderPhotoGallery(photos, remainingPhotoCount, options = {}) {
           </figure>
         `).join('')}
       </div>
-      ${remainingPhotoCount > 0 ? `<div class="draft-book-gallery-note">+ ${remainingPhotoCount} photo(s) supplementaire(s) disponibles pour la maquette finale.</div>` : ''}
     </div>
   `;
 }
@@ -4004,11 +4822,14 @@ function renderPhotoGallery(photos, remainingPhotoCount, options = {}) {
 function splitDraftBody(text, options = {}) {
   const textDensity = normalizePreviewTextDensity(options?.textDensity);
   const profile = PREVIEW_TEXT_DENSITY_PROFILES[textDensity];
-  const paragraphs = splitTextToParagraphs(
+  const rawParagraphs = splitTextToParagraphs(
     text,
     profile.maxChars,
     { preserveParagraphs: true }
   );
+  const paragraphs = rawParagraphs
+    .flatMap((paragraph) => splitLongParagraphIntoChunks(paragraph, profile.chunkSize || 360))
+    .filter(Boolean);
 
   if (paragraphs.length === 0) {
     return ['', ''];
@@ -4035,7 +4856,7 @@ function splitDraftBody(text, options = {}) {
   });
 
   if (pageTwoParagraphs.length === 0 && pageOneParagraphs.length > 1) {
-    const middle = Math.ceil(pageOneParagraphs.length / 2);
+    const middle = Math.max(1, Math.floor(pageOneParagraphs.length / 2));
     return [
       pageOneParagraphs.slice(0, middle).join('\n\n'),
       pageOneParagraphs.slice(middle).join('\n\n')
@@ -4046,7 +4867,7 @@ function splitDraftBody(text, options = {}) {
   const fallbackPageTwo = pageTwoParagraphs.join('\n\n');
 
   if (!fallbackPageTwo) {
-    return [fallbackPageOne, fallbackPageOne];
+    return [fallbackPageOne, ''];
   }
 
   return [
