@@ -88,3 +88,31 @@ Ce script publie `question_generation` pour:
 En local sans signature webhook (debug uniquement):
 
 - `STRIPE_WEBHOOK_ALLOW_UNSIGNED=1`
+
+## Seed projet realiste (tests UX complets)
+
+Ce script cree un livre de demo proche d un parcours reel:
+- livre + configuration couverture/4e
+- 8 chapitres
+- contributeurs
+- invitations
+- contributions texte + images
+- etats workflow chapitre
+- brouillons IA simules (dont chapitres valides)
+
+Commande:
+
+```bash
+npm run seed:realistic-project -- --owner-id=<UUID_OWNER> --variant=editing --cleanup=true
+```
+
+Ou avec email profil:
+
+```bash
+npm run seed:realistic-project -- --owner-email=<email> --variant=finalized --cleanup=true
+```
+
+Options:
+- `--variant=editing|finalized` (defaut: `editing`)
+- `--chapters=8` (entre 4 et 12)
+- `--cleanup=true` supprime les anciens livres `[DEMO]` du meme owner

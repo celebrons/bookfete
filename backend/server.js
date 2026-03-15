@@ -1,19 +1,44 @@
-// C:\Users\USER\bookfete\backend\server.js
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+
+const quietStartup = process.env.QUIET_STARTUP !== '0';
+if (quietStartup) {
+  const originalLog = console.log;
+  const suppressedStartupPatterns = [
+    'debug routes auth',
+    'routes auth enregistr',
+    'chargement des routes invitations',
+    'fonctions disponibles',
+    'routes invitations charg',
+    'mode simulation - emails non configur'
+  ];
+
+  console.log = (...args) => {
+    const message = args.map((value) => String(value || '')).join(' ').toLowerCase();
+    if (suppressedStartupPatterns.some((pattern) => message.includes(pattern))) {
+      return;
+    }
+    originalLog(...args);
+  };
+}
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
 const orderRoutes = require('./routes/orders');
+const authRoutes = require('./routes/auth');
+const bookRoutes = require('./routes/books');
+const chapterRoutes = require('./routes/chapters');
+const inviteRoutes = require('./routes/invites');
+const aiRoutes = require('./routes/ai');
 
-// Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
+  origin: process.env.NODE_ENV === 'production'
     ? ['https://bookfete-front.onrender.com', 'https://bookfete.onrender.com']
     : '*'
 }));
+
 if (typeof orderRoutes.handleStripeWebhook === 'function') {
   app.post(
     '/api/orders/webhook/stripe',
@@ -21,26 +46,9 @@ if (typeof orderRoutes.handleStripeWebhook === 'function') {
     orderRoutes.handleStripeWebhook
   );
 }
+
 app.use(express.json());
 
-// ============================================
-// ROUTES - Version mise à jour (sans projects)
-// ============================================
-const authRoutes = require('./routes/auth');
-const bookRoutes = require('./routes/books'); // À créer si nécessaire
-const chapterRoutes = require('./routes/chapters');
-const inviteRoutes = require('./routes/invites');
-const aiRoutes = require('./routes/ai');
-
-// ============================================
-// ANCIENNES ROUTES À SUPPRIMER (commentées)
-// ============================================
-// const projectRoutes = require('./routes/projects'); // ← À SUPPRIMER
-// const orderRoutes = require('./routes/orders');     // ← À SUPPRIMER
-
-// ============================================
-// ROUTES ACTIVES
-// ============================================
 app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/chapters', chapterRoutes);
@@ -48,30 +56,19 @@ app.use('/api/invites', inviteRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/orders', orderRoutes);
 
-// Route de test
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// Gestion des erreurs 404
-app.use((req, res) => {
+app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Gestion des erreurs globales
-app.use((err, req, res, next) => {
-  console.error('❌ Erreur serveur:', err);
+app.use((err, _req, res, _next) => {
+  console.error('Server error:', err);
   res.status(500).json({ error: err.message });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
-  console.log(`📝 Routes disponibles:`);
-  console.log(`   - /api/auth`);
-  console.log(`   - /api/books`);
-  console.log(`   - /api/chapters`);
-  console.log(`   - /api/invites`);
-  console.log(`   - /api/ai`);
-  console.log(`   - /api/orders`);
-  console.log(`   - /api/health`);
+  console.log(`API started on http://localhost:${PORT}`);
 });

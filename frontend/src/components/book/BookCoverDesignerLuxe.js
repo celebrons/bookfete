@@ -454,91 +454,270 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
     }
   };
 
-  const renderPreviewSpread = (expanded = false) => (
-    <div className={`cover-preview-spread ${expanded ? 'is-expanded' : ''}`}>
-      <article
-        className={`cover-preview-card is-front cover-style-${formState.styleId} ${activeFace === 'front' ? 'is-active' : ''}`}
-        style={{
-          '--cover-bg': selectedPalette.front,
-          '--cover-text': selectedPalette.text,
-          '--cover-accent': selectedPalette.accent,
-          '--cover-subtle': selectedPalette.subtle,
-          '--cover-title-font': selectedStyle.titleFont,
-          '--cover-body-font': selectedStyle.bodyFont
-        }}
-      >
-        <div className="cover-preview-safe-zone" />
-        <div className="cover-preview-tag">{selectedStyle.tag}</div>
-        {formState.frontShowMonogram && (
-          <div className="cover-preview-monogram">{monogramValue}</div>
-        )}
-        {formState.frontShowPhotoFrame && (
-          <div className="cover-preview-front-photo">
-            <div className="cover-preview-front-photo-inner">{frontPhotoLabelPreview}</div>
-          </div>
-        )}
-        <div className="cover-preview-front-copy">
-          <div className="cover-preview-front-event">{frontEventLinePreview}</div>
-          <h3>{frontTitlePreview}</h3>
-          <p>{frontSubtitlePreview}</p>
-          <div className="cover-preview-front-recipient">{frontRecipientPreview}</div>
+  const renderFrontEditorFields = ({ compact = false } = {}) => (
+    <div className={`cover-designer-fields ${compact ? 'is-compact' : ''}`}>
+      <div className="cover-designer-group">
+        <span className="cover-designer-group-label">Titre et hierarchie</span>
+        <div className="cover-field-stack">
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.frontTitle}
+            onChange={(event) => updateField('frontTitle', event.target.value)}
+            placeholder="Titre principal de la couverture"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.frontSubtitle}
+            onChange={(event) => updateField('frontSubtitle', event.target.value)}
+            placeholder="Sous-titre optionnel"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.frontRecipient}
+            onChange={(event) => updateField('frontRecipient', event.target.value)}
+            placeholder="Nom ou surnom mis en avant"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.frontEventLine}
+            onChange={(event) => updateField('frontEventLine', event.target.value)}
+            placeholder="Contexte (ex: Anniversaire | 40 ans)"
+          />
         </div>
-        {formState.frontMotif === 'line' && <div className="cover-preview-motif-line" aria-hidden="true" />}
-        {formState.frontMotif === 'corner' && <div className="cover-preview-motif-corner" aria-hidden="true" />}
-        {formState.frontMotif === 'olive_leaf' && (
-          <div className="cover-preview-motif-olive" aria-hidden="true">
-            <svg viewBox="0 0 140 120" role="presentation" focusable="false">
-              <path d="M24 92 C40 48, 74 20, 122 16 C104 64, 72 96, 30 104 Z" />
-              <path d="M31 100 C55 80, 76 58, 95 30" className="olive-vein" />
-              <ellipse cx="60" cy="76" rx="8" ry="4" className="olive-fruit" />
-              <ellipse cx="74" cy="62" rx="7" ry="3.5" className="olive-fruit" />
-            </svg>
-          </div>
-        )}
-      </article>
+      </div>
 
-      <article
-        className={`cover-preview-card is-back cover-style-${formState.styleId} ${activeFace === 'back' ? 'is-active' : ''}`}
-        style={{
-          '--cover-bg': selectedPalette.back,
-          '--cover-text': selectedPalette.text,
-          '--cover-accent': selectedPalette.accent,
-          '--cover-subtle': selectedPalette.subtle,
-          '--cover-title-font': selectedStyle.titleFont,
-          '--cover-body-font': selectedStyle.bodyFont
-        }}
-      >
-        <div className="cover-preview-safe-zone" />
-        <div className="cover-preview-back-copy">{backBlurbPreview}</div>
-        {backQuotePreview && (
-          <blockquote className="cover-preview-back-quote">"{backQuotePreview}"</blockquote>
-        )}
-        {backOrganizerLinePreview && (
-          <div className="cover-preview-back-organizer">{backOrganizerLinePreview}</div>
-        )}
-        <div className="cover-preview-back-footer">
-          {formState.backShowContributors && (
-            <div className="cover-preview-chip">
-              {backContributorsLinePreview || 'Contributions collectives'}
-            </div>
-          )}
-          {formState.backShowQrHint && (
-            <div className="cover-preview-qr">QR</div>
+      <div className="cover-designer-group">
+        <span className="cover-designer-group-label">Motif</span>
+        <div className="cover-field-stack">
+          <select
+            className="input-luxe"
+            value={formState.frontMotif}
+            onChange={(event) => updateField('frontMotif', event.target.value)}
+          >
+            {MOTIF_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <label className="cover-toggle-line">
+            <input
+              type="checkbox"
+              checked={Boolean(formState.frontShowMonogram)}
+              onChange={(event) => updateField('frontShowMonogram', event.target.checked)}
+            />
+            <span>Afficher le monogramme</span>
+          </label>
+          <label className="cover-toggle-line">
+            <input
+              type="checkbox"
+              checked={Boolean(formState.frontShowPhotoFrame)}
+              onChange={(event) => updateField('frontShowPhotoFrame', event.target.checked)}
+            />
+            <span>Afficher un cadre photo / illustration</span>
+          </label>
+          {formState.frontShowPhotoFrame && (
+            <input
+              type="text"
+              className="input-luxe"
+              value={formState.frontPhotoLabel}
+              onChange={(event) => updateField('frontPhotoLabel', event.target.value)}
+              placeholder="Legende du cadre (ex: Portrait noir et blanc)"
+            />
           )}
         </div>
-        {backDateLocationPreview && (
-          <div className="cover-preview-back-date">{backDateLocationPreview}</div>
-        )}
-        {selectedStyle.id === 'artistique_poetique' && (
-          <div className="cover-preview-note-zone">Mot manuscrit personnel</div>
-        )}
-        {backIsbnPreview && (
-          <div className="cover-preview-back-isbn">{backIsbnPreview}</div>
-        )}
-        <div className="cover-preview-back-signature">{backSignaturePreview}</div>
-      </article>
+      </div>
     </div>
   );
+
+  const renderBackEditorFields = ({ compact = false } = {}) => (
+    <div className={`cover-designer-fields ${compact ? 'is-compact' : ''}`}>
+      <div className="cover-designer-group">
+        <span className="cover-designer-group-label">Texte editorial</span>
+        <div className="cover-field-stack">
+          <textarea
+            className="input-luxe cover-textarea"
+            value={formState.backBlurb}
+            onChange={(event) => updateField('backBlurb', event.target.value)}
+            placeholder="Resume premium (500-700 caracteres recommandes)"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.backQuote}
+            onChange={(event) => updateField('backQuote', event.target.value)}
+            placeholder="Citation courte optionnelle"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.backSignature}
+            onChange={(event) => updateField('backSignature', event.target.value)}
+            placeholder="Signature (ex: Les proches de ...)"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.backOrganizerLine}
+            onChange={(event) => updateField('backOrganizerLine', event.target.value)}
+            placeholder="Ligne organisateur ou promesse editoriale"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.backContributorsLine}
+            onChange={(event) => updateField('backContributorsLine', event.target.value)}
+            placeholder="Ligne contributeurs (micro-typographie)"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.backDateLocation}
+            onChange={(event) => updateField('backDateLocation', event.target.value)}
+            placeholder="Date et lieu (optionnel)"
+          />
+          <input
+            type="text"
+            className="input-luxe"
+            value={formState.backIsbn}
+            onChange={(event) => updateField('backIsbn', event.target.value)}
+            placeholder="ISBN factice (optionnel)"
+          />
+        </div>
+      </div>
+
+      <div className="cover-designer-group">
+        <span className="cover-designer-group-label">Elements optionnels</span>
+        <div className="cover-field-stack">
+          <label className="cover-toggle-line">
+            <input
+              type="checkbox"
+              checked={Boolean(formState.backShowContributors)}
+              onChange={(event) => updateField('backShowContributors', event.target.checked)}
+            />
+            <span>Mentionner la participation des contributeurs</span>
+          </label>
+          <label className="cover-toggle-line">
+            <input
+              type="checkbox"
+              checked={Boolean(formState.backShowQrHint)}
+              onChange={(event) => updateField('backShowQrHint', event.target.checked)}
+            />
+            <span>Afficher un emplacement QR discret</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderFrontPreviewCard = () => (
+    <article
+      key="front"
+      className={`cover-preview-card is-front cover-style-${formState.styleId} ${activeFace === 'front' ? 'is-active' : ''}`}
+      style={{
+        '--cover-bg': selectedPalette.front,
+        '--cover-text': selectedPalette.text,
+        '--cover-accent': selectedPalette.accent,
+        '--cover-subtle': selectedPalette.subtle,
+        '--cover-title-font': selectedStyle.titleFont,
+        '--cover-body-font': selectedStyle.bodyFont
+      }}
+    >
+      <div className="cover-preview-safe-zone" />
+      <div className="cover-preview-tag">{selectedStyle.tag}</div>
+      {formState.frontShowMonogram && (
+        <div className="cover-preview-monogram">{monogramValue}</div>
+      )}
+      {formState.frontShowPhotoFrame && (
+        <div className="cover-preview-front-photo">
+          <div className="cover-preview-front-photo-inner">{frontPhotoLabelPreview}</div>
+        </div>
+      )}
+      <div className="cover-preview-front-copy">
+        <div className="cover-preview-front-event">{frontEventLinePreview}</div>
+        <h3>{frontTitlePreview}</h3>
+        <p>{frontSubtitlePreview}</p>
+        <div className="cover-preview-front-recipient">{frontRecipientPreview}</div>
+      </div>
+      {formState.frontMotif === 'line' && <div className="cover-preview-motif-line" aria-hidden="true" />}
+      {formState.frontMotif === 'corner' && <div className="cover-preview-motif-corner" aria-hidden="true" />}
+      {formState.frontMotif === 'olive_leaf' && (
+        <div className="cover-preview-motif-olive" aria-hidden="true">
+          <svg viewBox="0 0 140 120" role="presentation" focusable="false">
+            <path d="M24 92 C40 48, 74 20, 122 16 C104 64, 72 96, 30 104 Z" />
+            <path d="M31 100 C55 80, 76 58, 95 30" className="olive-vein" />
+            <ellipse cx="60" cy="76" rx="8" ry="4" className="olive-fruit" />
+            <ellipse cx="74" cy="62" rx="7" ry="3.5" className="olive-fruit" />
+          </svg>
+        </div>
+      )}
+    </article>
+  );
+
+  const renderBackPreviewCard = () => (
+    <article
+      key="back"
+      className={`cover-preview-card is-back cover-style-${formState.styleId} ${activeFace === 'back' ? 'is-active' : ''}`}
+      style={{
+        '--cover-bg': selectedPalette.back,
+        '--cover-text': selectedPalette.text,
+        '--cover-accent': selectedPalette.accent,
+        '--cover-subtle': selectedPalette.subtle,
+        '--cover-title-font': selectedStyle.titleFont,
+        '--cover-body-font': selectedStyle.bodyFont
+      }}
+    >
+      <div className="cover-preview-safe-zone" />
+      <div className="cover-preview-back-copy">{backBlurbPreview}</div>
+      {backQuotePreview && (
+        <blockquote className="cover-preview-back-quote">"{backQuotePreview}"</blockquote>
+      )}
+      {backOrganizerLinePreview && (
+        <div className="cover-preview-back-organizer">{backOrganizerLinePreview}</div>
+      )}
+      <div className="cover-preview-back-footer">
+        {formState.backShowContributors && (
+          <div className="cover-preview-chip">
+            {backContributorsLinePreview || 'Contributions collectives'}
+          </div>
+        )}
+        {formState.backShowQrHint && (
+          <div className="cover-preview-qr">QR</div>
+        )}
+      </div>
+      {backDateLocationPreview && (
+        <div className="cover-preview-back-date">{backDateLocationPreview}</div>
+      )}
+      {selectedStyle.id === 'artistique_poetique' && (
+        <div className="cover-preview-note-zone">Mot manuscrit personnel</div>
+      )}
+      {backIsbnPreview && (
+        <div className="cover-preview-back-isbn">{backIsbnPreview}</div>
+      )}
+      <div className="cover-preview-back-signature">{backSignaturePreview}</div>
+    </article>
+  );
+
+  const renderPreviewSpread = ({ expanded = false, activeOnly = false } = {}) => {
+    const cards = [];
+
+    if (!activeOnly || activeFace === 'front') {
+      cards.push(renderFrontPreviewCard());
+    }
+    if (!activeOnly || activeFace === 'back') {
+      cards.push(renderBackPreviewCard());
+    }
+
+    return (
+      <div className={`cover-preview-spread ${expanded ? 'is-expanded' : ''} ${activeOnly ? 'is-single-face' : ''}`}>
+        {cards}
+      </div>
+    );
+  };
 
   return (
     <div className="cover-designer-live">
@@ -603,163 +782,9 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
             </div>
           </div>
 
-          {activeFace === 'front' ? (
-            <div className="cover-designer-fields">
-              <div className="cover-designer-group">
-                <span className="cover-designer-group-label">Titre et hierarchie</span>
-                <div className="cover-field-stack">
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.frontTitle}
-                    onChange={(event) => updateField('frontTitle', event.target.value)}
-                    placeholder="Titre principal de la couverture"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.frontSubtitle}
-                    onChange={(event) => updateField('frontSubtitle', event.target.value)}
-                    placeholder="Sous-titre optionnel"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.frontRecipient}
-                    onChange={(event) => updateField('frontRecipient', event.target.value)}
-                    placeholder="Nom ou surnom mis en avant"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.frontEventLine}
-                    onChange={(event) => updateField('frontEventLine', event.target.value)}
-                    placeholder="Contexte (ex: Anniversaire | 40 ans)"
-                  />
-                </div>
-              </div>
-
-              <div className="cover-designer-group">
-                <span className="cover-designer-group-label">Motif</span>
-                <div className="cover-field-stack">
-                  <select
-                    className="input-luxe"
-                    value={formState.frontMotif}
-                    onChange={(event) => updateField('frontMotif', event.target.value)}
-                  >
-                    {MOTIF_OPTIONS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="cover-toggle-line">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(formState.frontShowMonogram)}
-                      onChange={(event) => updateField('frontShowMonogram', event.target.checked)}
-                    />
-                    <span>Afficher le monogramme</span>
-                  </label>
-                  <label className="cover-toggle-line">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(formState.frontShowPhotoFrame)}
-                      onChange={(event) => updateField('frontShowPhotoFrame', event.target.checked)}
-                    />
-                    <span>Afficher un cadre photo / illustration</span>
-                  </label>
-                  {formState.frontShowPhotoFrame && (
-                    <input
-                      type="text"
-                      className="input-luxe"
-                      value={formState.frontPhotoLabel}
-                      onChange={(event) => updateField('frontPhotoLabel', event.target.value)}
-                      placeholder="Legende du cadre (ex: Portrait noir et blanc)"
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="cover-designer-fields">
-              <div className="cover-designer-group">
-                <span className="cover-designer-group-label">Texte editorial</span>
-                <div className="cover-field-stack">
-                  <textarea
-                    className="input-luxe cover-textarea"
-                    value={formState.backBlurb}
-                    onChange={(event) => updateField('backBlurb', event.target.value)}
-                    placeholder="Resume premium (500-700 caracteres recommandes)"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.backQuote}
-                    onChange={(event) => updateField('backQuote', event.target.value)}
-                    placeholder="Citation courte optionnelle"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.backSignature}
-                    onChange={(event) => updateField('backSignature', event.target.value)}
-                    placeholder="Signature (ex: Les proches de ...)"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.backOrganizerLine}
-                    onChange={(event) => updateField('backOrganizerLine', event.target.value)}
-                    placeholder="Ligne organisateur ou promesse editoriale"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.backContributorsLine}
-                    onChange={(event) => updateField('backContributorsLine', event.target.value)}
-                    placeholder="Ligne contributeurs (micro-typographie)"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.backDateLocation}
-                    onChange={(event) => updateField('backDateLocation', event.target.value)}
-                    placeholder="Date et lieu (optionnel)"
-                  />
-                  <input
-                    type="text"
-                    className="input-luxe"
-                    value={formState.backIsbn}
-                    onChange={(event) => updateField('backIsbn', event.target.value)}
-                    placeholder="ISBN factice (optionnel)"
-                  />
-                </div>
-              </div>
-
-              <div className="cover-designer-group">
-                <span className="cover-designer-group-label">Elements optionnels</span>
-                <div className="cover-field-stack">
-                  <label className="cover-toggle-line">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(formState.backShowContributors)}
-                      onChange={(event) => updateField('backShowContributors', event.target.checked)}
-                    />
-                    <span>Mentionner la participation des contributeurs</span>
-                  </label>
-                  <label className="cover-toggle-line">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(formState.backShowQrHint)}
-                      onChange={(event) => updateField('backShowQrHint', event.target.checked)}
-                    />
-                    <span>Afficher un emplacement QR discret</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
+          {activeFace === 'front'
+            ? renderFrontEditorFields()
+            : renderBackEditorFields()}
         </section>
 
         <aside className="cover-designer-preview">
@@ -774,7 +799,7 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
             </button>
           </div>
 
-          {renderPreviewSpread(false)}
+          {renderPreviewSpread({ expanded: false, activeOnly: true })}
 
           <div className="cover-preview-guides">
             <div>Repere imprimeur: zone sure representee par le cadre interieur.</div>
@@ -808,7 +833,11 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook, initialFace = 'front' }) =>
               </button>
             </div>
 
-            {renderPreviewSpread(true)}
+            <div className="cover-preview-modal-body">
+              <div className="cover-preview-modal-canvas">
+                {renderPreviewSpread({ expanded: true, activeOnly: false })}
+              </div>
+            </div>
           </div>
         </div>
       )}

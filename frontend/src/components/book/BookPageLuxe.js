@@ -248,6 +248,16 @@ const parseChapterDraftState = (rawValue) => {
       title: parsed.title || '',
       summary: parsed.summary || '',
       html: parsed.html || '',
+      aiQuality: parsed.aiQuality && typeof parsed.aiQuality === 'object'
+        ? {
+            score: Number(parsed.aiQuality.score || 0),
+            issues: Array.isArray(parsed.aiQuality.issues)
+              ? parsed.aiQuality.issues
+              : []
+          }
+        : null,
+      aiPlan: parsed.aiPlan && typeof parsed.aiPlan === 'object' ? parsed.aiPlan : null,
+      generationMode: parsed.generationMode || '',
       lastGeneratedAt: parsed.lastGeneratedAt || null,
       lastEditedAt: parsed.lastEditedAt || null,
       finalizedAt: parsed.finalizedAt || null
@@ -1224,7 +1234,7 @@ const BookPageLuxe = () => {
     }
   };
 
-  const handleGenerateChapterDraft = async (chapterId) => {
+  const handleGenerateChapterDraft = async (chapterId, options = {}) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -1238,7 +1248,8 @@ const BookPageLuxe = () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify(options || {})
       });
       const data = await response.json();
 
@@ -1246,7 +1257,9 @@ const BookPageLuxe = () => {
         throw new Error(data.error || 'Erreur lors de la generation du chapitre');
       }
 
-      mergeContributionIntoChapterState(chapterId, data.draftContribution);
+      if (data?.draftContribution) {
+        mergeContributionIntoChapterState(chapterId, data.draftContribution);
+      }
       return data;
     } catch (error) {
       console.error('Erreur generation chapitre:', error);

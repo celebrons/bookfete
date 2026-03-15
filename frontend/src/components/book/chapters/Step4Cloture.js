@@ -216,6 +216,7 @@ const Step4Cloture = ({
   const [summary, setSummary] = useState(null);
   const [busyAction, setBusyAction] = useState('');
   const [draftHtmlForPreview, setDraftHtmlForPreview] = useState(chapter?.chapterDraft?.html || '');
+  const [draftQualityForPreview, setDraftQualityForPreview] = useState(chapter?.chapterDraft?.aiQuality || null);
   const [editorText, setEditorText] = useState(htmlToPlainText(chapter?.chapterDraft?.html || ''));
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewSpreadIndex, setPreviewSpreadIndex] = useState(0);
@@ -284,7 +285,9 @@ const Step4Cloture = ({
   const canGoToPreviousPreviewSpread = currentPreviewSpreadIndex > 0;
   const canGoToNextPreviewSpread = currentPreviewSpreadIndex < previewSpreadCount - 1;
   const hasDraftContent = Boolean(previewHtml || normalizedText);
-  const canGenerateWithAI = !isDraftValidated && generationUnlocked && remainingGenerations > 0;
+  const canGenerateWithAI = isDraftValidated
+    ? true
+    : (generationUnlocked && remainingGenerations > 0);
   const canSaveRevision = !isDraftValidated && !chapterLocked && Boolean(normalizedText);
   const canFinalize = !isDraftValidated && generationUnlocked && Boolean(normalizedText);
   const showFinalizeAction = !isDraftValidated && hasDraftContent;
@@ -293,6 +296,11 @@ const Step4Cloture = ({
     chapterDraft?.lastEditedAt ||
     chapterDraft?.lastGeneratedAt ||
     null;
+  const aiQualityScore = Number(draftQualityForPreview?.score);
+  const hasAiQualityScore = Number.isFinite(aiQualityScore) && aiQualityScore > 0;
+  const aiQualityIssues = Array.isArray(draftQualityForPreview?.issues)
+    ? draftQualityForPreview.issues.filter(Boolean).slice(0, 3)
+    : [];
   const summaryCards = [
     {
       label: 'Questions',
@@ -444,6 +452,7 @@ const Step4Cloture = ({
   useEffect(() => {
     const nextDraftHtml = chapter?.chapterDraft?.html || '';
     setDraftHtmlForPreview(nextDraftHtml);
+    setDraftQualityForPreview(chapter?.chapterDraft?.aiQuality || null);
     setEditorText(htmlToPlainText(chapter?.chapterDraft?.html || ''));
     setError('');
     setNotice('');
@@ -545,12 +554,14 @@ const Step4Cloture = ({
   );
 
   const handleGenerate = async () => {
-    if (chapterLocked) {
+    const previewOnlyRegeneration = isDraftValidated;
+
+    if (chapterLocked && !previewOnlyRegeneration) {
       setError('Ce chapitre est deja valide et verrouille.');
       return;
     }
 
-    if (!generationUnlocked) {
+    if (!generationUnlocked && !previewOnlyRegeneration) {
       setError('Fermez d abord les contributions avant de generer le brouillon de ce chapitre.');
       return;
     }
@@ -565,13 +576,26 @@ const Step4Cloture = ({
     setNotice('');
 
     try {
-      const result = await onGenerateChapterDraft(chapter.id);
+      const result = await onGenerateChapterDraft(
+        chapter.id,
+        previewOnlyRegeneration
+          ? { allowValidatedRegeneration: true, previewOnly: true }
+          : {}
+      );
       if (result?.draft?.html) {
         setDraftHtmlForPreview(result.draft.html);
         setEditorText(htmlToPlainText(result.draft.html));
       }
-      setNotice('Chapitre genere. Vous pouvez relire et ajuster le texte avant validation.');
-      setShowEditorModal(true);
+      if (result?.draft?.aiQuality) {
+        setDraftQualityForPreview(result.draft.aiQuality);
+      }
+      if (previewOnlyRegeneration || result?.previewOnly) {
+        setNotice('Nouvelle version de comparaison generee. La version finale reste verrouillee.');
+        setShowPreviewModal(true);
+      } else {
+        setNotice('Chapitre genere. Vous pouvez relire et ajuster le texte avant validation.');
+        setShowEditorModal(true);
+      }
     } catch (generationError) {
       setError(generationError.message || 'Erreur lors de la generation du chapitre.');
     } finally {
@@ -601,6 +625,9 @@ const Step4Cloture = ({
       if (result?.draft?.html) {
         setDraftHtmlForPreview(result.draft.html);
         setEditorText(htmlToPlainText(result.draft.html));
+      }
+      if (result?.draft?.aiQuality) {
+        setDraftQualityForPreview(result.draft.aiQuality);
       }
       setNotice('Texte du chapitre enregistre.');
       if (closeAfterSave) {
@@ -658,6 +685,9 @@ const Step4Cloture = ({
       if (result?.draft?.html) {
         setDraftHtmlForPreview(result.draft.html);
         setEditorText(htmlToPlainText(result.draft.html));
+      }
+      if (result?.draft?.aiQuality) {
+        setDraftQualityForPreview(result.draft.aiQuality);
       }
       setNotice('Le chapitre a ete valide definitivement et ferme.');
     } catch (finalizeError) {
@@ -753,7 +783,7 @@ const Step4Cloture = ({
           <div>
             <h4 className="chapter-draft-workbench-title">Atelier du chapitre</h4>
             <p className="chapter-draft-workbench-subtitle">
-              4 pages HTML minimum. Regeneration IA limitee a 3 essais, puis revision manuelle et validation finale.
+              8 pages HTML. Regeneration IA limitee a 3 essais, puis revision manuelle et validation finale.
             </p>
           </div>
           <div className="chapter-draft-chip-row">
@@ -772,22 +802,24 @@ const Step4Cloture = ({
         </div>
 
         <div className="chapter-draft-action-row">
-          {!isDraftValidated && (
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={handleGenerate}
-              disabled={!canGenerateWithAI || busyAction !== ''}
-            >
-              {busyAction === 'generate'
-                ? 'Generation...'
-                : (
-                  generationCount > 0
-                    ? `Regenerer le chapitre (${remainingGenerations} restant${remainingGenerations > 1 ? 's' : ''})`
-                    : 'Generer le chapitre'
-                )}
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleGenerate}
+            disabled={!canGenerateWithAI || busyAction !== ''}
+          >
+            {busyAction === 'generate'
+              ? 'Generation...'
+              : (
+                isDraftValidated
+                  ? 'Regenerer pour comparer'
+                  : (
+                    generationCount > 0
+                      ? `Regenerer le chapitre (${remainingGenerations} restant${remainingGenerations > 1 ? 's' : ''})`
+                      : 'Generer le chapitre'
+                  )
+              )}
+          </button>
 
           {hasDraftContent && (
             <button
@@ -812,6 +844,20 @@ const Step4Cloture = ({
           )}
         </div>
 
+        {hasAiQualityScore && (
+          <div className="chapter-draft-quality-box">
+            <div className="chapter-draft-quality-header">
+              <span>aiQuality</span>
+              <strong>{Math.max(0, Math.min(100, Math.round(aiQualityScore)))}/100</strong>
+            </div>
+            {aiQualityIssues.length > 0 && (
+              <div className="chapter-draft-quality-issues">
+                {aiQualityIssues.join(' | ')}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="chapter-draft-summary-card is-active" style={{ marginTop: 'var(--space-sm)' }}>
           <div className="chapter-draft-summary-label">Utilisation</div>
           <div className="chapter-draft-summary-value" style={{ fontSize: '14px', fontWeight: '500' }}>
@@ -826,30 +872,19 @@ const Step4Cloture = ({
             className="modal-content book-draft-modal chapter-draft-preview-modal"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="book-draft-modal-header">
+            <div className="book-draft-modal-header chapter-draft-preview-header-compact">
               <div>
-                <div className="label-gold">Grand apercu du chapitre</div>
                 <h3 className="book-draft-modal-title">
                   {chapter?.order_index === 0 ? 'Introduction' : chapter?.title}
                 </h3>
                 <div className="book-draft-modal-meta">
-                  Version {isDraftValidated ? 'finale' : 'de travail'} | 4 pages minimum
+                  Version {isDraftValidated ? 'finale' : 'de travail'}
                 </div>
               </div>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => setShowPreviewModal(false)}
-              >
-                x
-              </button>
-            </div>
-
-            <div className="book-draft-modal-actions">
               {!isDraftValidated && (
                 <button
                   type="button"
-                  className="btn btn-outline"
+                  className="btn btn-outline chapter-draft-preview-edit-btn"
                   onClick={() => {
                     setShowPreviewModal(false);
                     setShowEditorModal(true);
@@ -860,10 +895,10 @@ const Step4Cloture = ({
               )}
               <button
                 type="button"
-                className="btn btn-primary"
+                className="modal-close"
                 onClick={() => setShowPreviewModal(false)}
               >
-                Fermer
+                x
               </button>
             </div>
 
@@ -914,11 +949,6 @@ const Step4Cloture = ({
                 </div>
               ) : (
                 <p className="draft-book-empty">Aucun brouillon n a encore ete genere pour ce chapitre.</p>
-              )}
-              {chapterPreviewPages.length > 0 && (
-                <div className="book-draft-spread-meta chapter-draft-spread-meta">
-                  Pages {currentPreviewSpreadIndex * 2 + 1}-{Math.min((currentPreviewSpreadIndex + 1) * 2, chapterPreviewPages.length)} / {chapterPreviewPages.length}
-                </div>
               )}
             </div>
           </div>

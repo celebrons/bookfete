@@ -15,6 +15,18 @@ const authenticate = require('../middleware/auth');
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
 const MAX_CHAPTER_AI_GENERATIONS = 3;
+const CHAPTER_DRAFT_PAGE_COUNT = 8;
+const CHAPTER_DRAFT_MIN_TOTAL_CHARS = 3800;
+const CHAPTER_DRAFT_MIN_PAGE_CHARS = 300;
+const CHAPTER_DRAFT_QUALITY_THRESHOLD = 72;
+const CHAPTER_DRAFT_FILLER_PATTERNS = [
+  /dans ce chapitre/gi,
+  /ce chapitre (?:montre|raconte|presente|met en lumiere|se referme|ouvre)/gi,
+  /il est important de/gi,
+  /nous allons/gi,
+  /ce texte/gi,
+  /volet\s*\d+/gi
+];
 const MM_TO_PT = 72 / 25.4;
 const PDF_EXPORT_JOB_TTL_MS = 6 * 60 * 60 * 1000;
 const PDF_EXPORT_DIR = path.join(__dirname, '..', 'tmp', 'pdf-exports');
@@ -241,12 +253,28 @@ router.post('/:id/chapters/:chapterId/generate-draft', authenticate, async (req,
     });
     const existingDraftState = extractChapterDraftState(currentChapter);
     const generationCount = Number(existingDraftState?.generationCount || 0);
+    const isValidatedDraft = existingDraftState?.status === 'validated';
+    const allowValidatedRegeneration = Boolean(req.body?.allowValidatedRegeneration);
+    const previewOnly = Boolean(req.body?.previewOnly);
+    const isValidatedPreviewOnly = isValidatedDraft && allowValidatedRegeneration && previewOnly;
 
-    if (existingDraftState?.status === 'validated') {
+    if (isValidatedDraft && !allowValidatedRegeneration) {
       return res.status(400).json({ error: 'Ce chapitre est deja valide definitivement' });
     }
 
-    if (generationCount >= MAX_CHAPTER_AI_GENERATIONS) {
+    if (isValidatedDraft && allowValidatedRegeneration && !previewOnly) {
+      return res.status(400).json({
+        error: 'Pour conserver le verrouillage final, utilisez la regeneration en mode apercu uniquement'
+      });
+    }
+
+    if (previewOnly && !isValidatedDraft) {
+      return res.status(400).json({
+        error: 'Le mode apercu de regeneration est reserve aux chapitres valides'
+      });
+    }
+
+    if (!isValidatedPreviewOnly && generationCount >= MAX_CHAPTER_AI_GENERATIONS) {
       return res.status(400).json({ error: 'La limite de 3 generations IA a ete atteinte pour ce chapitre' });
     }
 
@@ -265,18 +293,36 @@ router.post('/:id/chapters/:chapterId/generate-draft', authenticate, async (req,
       draft: generatedDraft,
       sourcePayload
     });
+    const generatedAt = new Date().toISOString();
     const nextState = {
       version: 1,
-      status: 'draft',
-      generationCount: generationCount + 1,
+      status: previewOnly ? (existingDraftState?.status || 'draft') : 'draft',
+      generationCount: previewOnly ? generationCount : (generationCount + 1),
       maxGenerations: MAX_CHAPTER_AI_GENERATIONS,
       title: cleanText(generatedDraft.title, 180) || cleanText(currentChapter.title, 180) || 'Chapitre',
       summary: cleanText(generatedDraft.summary, 600) || summarizeHtmlForChapter(html),
       html,
-      lastGeneratedAt: new Date().toISOString(),
+      aiQuality: generatedDraft?.quality || null,
+      aiPlan: generatedDraft?.plan || null,
+      generationMode: cleanText(generatedDraft?.generationMode, 40) || 'single_pass',
+      lastGeneratedAt: generatedAt,
       lastEditedAt: existingDraftState?.lastEditedAt || null,
-      finalizedAt: null
+      finalizedAt: previewOnly
+        ? (existingDraftState?.finalizedAt || null)
+        : null
     };
+
+    if (previewOnly) {
+      return res.json({
+        generatedAt,
+        previewOnly: true,
+        draft: {
+          ...nextState,
+          previewOnly: true
+        }
+      });
+    }
+
     const draftContribution = await upsertSystemContributionRecord({
       chapterId: currentChapter.id,
       existingRow: findSystemContribution(currentChapter, CHAPTER_DRAFT_EMAIL),
@@ -286,7 +332,7 @@ router.post('/:id/chapters/:chapterId/generate-draft', authenticate, async (req,
     });
 
     res.json({
-      generatedAt: nextState.lastGeneratedAt,
+      generatedAt,
       draft: nextState,
       draftContribution
     });
@@ -327,6 +373,9 @@ router.post('/:id/chapters/:chapterId/save-draft', authenticate, async (req, res
       title: cleanText(existingDraftState?.title, 180) || cleanText(currentChapter.title, 180) || 'Chapitre',
       summary: summarizeHtmlForChapter(nextHtml),
       html: nextHtml,
+      aiQuality: existingDraftState?.aiQuality || null,
+      aiPlan: existingDraftState?.aiPlan || null,
+      generationMode: cleanText(existingDraftState?.generationMode, 40) || 'single_pass',
       lastGeneratedAt: existingDraftState?.lastGeneratedAt || null,
       lastEditedAt: new Date().toISOString(),
       finalizedAt: null
@@ -382,6 +431,9 @@ router.post('/:id/chapters/:chapterId/finalize-draft', authenticate, async (req,
       title: cleanText(existingDraftState?.title, 180) || cleanText(currentChapter.title, 180) || 'Chapitre',
       summary: summarizeHtmlForChapter(nextHtml),
       html: nextHtml,
+      aiQuality: existingDraftState?.aiQuality || null,
+      aiPlan: existingDraftState?.aiPlan || null,
+      generationMode: cleanText(existingDraftState?.generationMode, 40) || 'single_pass',
       lastGeneratedAt: existingDraftState?.lastGeneratedAt || null,
       lastEditedAt: existingDraftState?.lastEditedAt || finalizedAt,
       finalizedAt
@@ -1204,6 +1256,18 @@ function extractChapterDraftState(chapter) {
       title: cleanText(parsed.title, 180),
       summary: cleanText(parsed.summary, 600),
       html: normalizeDraftHtml(parsed.html),
+      aiQuality: parsed.aiQuality && typeof parsed.aiQuality === 'object'
+        ? {
+            score: Number(parsed.aiQuality.score || 0),
+            issues: Array.isArray(parsed.aiQuality.issues)
+              ? parsed.aiQuality.issues.map((issue) => cleanText(issue, 180)).filter(Boolean).slice(0, 8)
+              : []
+          }
+        : null,
+      aiPlan: parsed.aiPlan && typeof parsed.aiPlan === 'object'
+        ? parsed.aiPlan
+        : null,
+      generationMode: cleanText(parsed.generationMode, 40),
       lastGeneratedAt: parsed.lastGeneratedAt || null,
       lastEditedAt: parsed.lastEditedAt || null,
       finalizedAt: parsed.finalizedAt || null
@@ -1358,53 +1422,313 @@ function buildChapterDraftSourcePayload({
   };
 }
 
-async function generateChapterDraftFromAI(sourcePayload) {
-  const fallbackDraft = buildFallbackChapterDraft(sourcePayload);
+function extractLeadSentenceForPlan(value, maxLength = 220) {
+  const text = cleanText(value, 1600);
+  if (!text) {
+    return '';
+  }
+  const firstSentence = text.split(/[\.\!\?]\s+/)[0] || text;
+  return cleanText(firstSentence, maxLength);
+}
 
-  if (!aiService?.mistral) {
-    return fallbackDraft;
+function extractDetailAnchorsFromSourcePayload(sourcePayload, maxItems = 8) {
+  const chapter = sourcePayload?.chapter || {};
+  const chunks = [
+    cleanText(chapter?.description, 700),
+    cleanText(chapter?.organizerContribution?.message, 2600),
+    ...(Array.isArray(chapter?.guestContributions)
+      ? chapter.guestContributions.map((contribution) => cleanText(contribution?.message, 1800))
+      : [])
+  ].filter(Boolean);
+  const results = [];
+  const seen = new Set();
+
+  for (const chunk of chunks) {
+    const sentences = String(chunk)
+      .split(/[\.\!\?]+\s+/)
+      .map((sentence) => cleanText(sentence, 180))
+      .filter(Boolean);
+
+    for (const sentence of sentences) {
+      const comparable = normalizeComparableText(sentence);
+      if (!comparable) {
+        continue;
+      }
+      if (seen.has(comparable)) {
+        continue;
+      }
+      if (sentence.length < 24) {
+        continue;
+      }
+      if (/^(ce chapitre|dans ce chapitre|il est important)/i.test(sentence)) {
+        continue;
+      }
+
+      seen.add(comparable);
+      results.push(sentence);
+      if (results.length >= maxItems) {
+        return results;
+      }
+    }
   }
 
-  const prompt = [
-    'Tu rediges le brouillon d un seul chapitre d un livre souvenir.',
-    'Tu dois produire exactement 4 pages de contenu coherentes entre elles.',
-    'Le ton doit respecter le style narratif demande et rester fluide en francais.',
-    'Prends en compte les resumes des chapitres precedents pour garder une vraie continuite narrative.',
-    'Si un brief libre est fourni, utilise-le comme intention editoriale prioritaire.',
-    'Ignore totalement les contributions non validees : seules les donnees fournies ci-dessous sont utilisables.',
-    'Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :',
-    '{',
-    '  "title": "string",',
-    '  "pages": [',
-    '    { "title": "string", "body": "string" },',
-    '    { "title": "string", "body": "string" },',
-    '    { "title": "string", "body": "string" },',
-    '    { "title": "string", "body": "string" }',
-    '  ],',
-    '  "summary": "string"',
-    '}',
-    'Ne mets aucun markdown, aucun commentaire, aucun texte hors du JSON.',
-    '',
-    'DONNEES SOURCE :',
-    JSON.stringify({
-      book: sourcePayload.book,
-      chapter: {
-        ...sourcePayload.chapter,
-        organizerContribution: sourcePayload.chapter.organizerContribution
-          ? {
-              message: sourcePayload.chapter.organizerContribution.message,
-              photoCount: sourcePayload.chapter.organizerContribution.photoUrls.length
-            }
-          : null,
-        guestContributions: sourcePayload.chapter.guestContributions.map((contribution) => ({
-          contributorName: contribution.contributorName,
-          message: contribution.message,
+  return results;
+}
+
+function buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors = [], maxGuest = 4) {
+  const chapter = sourcePayload?.chapter || {};
+  const guestContributions = Array.isArray(chapter?.guestContributions)
+    ? chapter.guestContributions
+    : [];
+
+  return {
+    book: sourcePayload?.book || {},
+    chapter: {
+      id: chapter.id,
+      orderIndex: chapter.orderIndex,
+      title: chapter.title,
+      description: chapter.description,
+      questions: Array.isArray(chapter.questions) ? chapter.questions : [],
+      organizerContribution: chapter.organizerContribution
+        ? {
+            message: cleanText(chapter.organizerContribution.message, 2200),
+            photoCount: Array.isArray(chapter.organizerContribution.photoUrls)
+              ? chapter.organizerContribution.photoUrls.length
+              : 0
+          }
+        : null,
+      guestContributions: guestContributions
+        .slice(0, Math.max(1, maxGuest))
+        .map((contribution) => ({
+          contributorName: cleanText(contribution.contributorName, 180) || 'Contributeur',
+          message: cleanText(contribution.message, 1700),
           photoCount: Array.isArray(contribution.photoUrls) ? contribution.photoUrls.length : 0
         })),
-        photoUrls: undefined
-      },
-      previousChapterSummaries: sourcePayload.previousChapterSummaries
-    })
+      stats: chapter.stats || {}
+    },
+    previousChapterSummaries: Array.isArray(sourcePayload?.previousChapterSummaries)
+      ? sourcePayload.previousChapterSummaries.slice(-4)
+      : [],
+    detailAnchors: Array.isArray(detailAnchors)
+      ? detailAnchors.slice(0, 8)
+      : []
+  };
+}
+
+function buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors = []) {
+  const chapterTitle = cleanText(sourcePayload?.chapter?.title, 180)
+    || cleanText(fallbackDraft?.title, 180)
+    || 'Chapitre';
+  const fallbackPages = Array.isArray(fallbackDraft?.pages) ? fallbackDraft.pages : [];
+  const anchorPool = Array.isArray(detailAnchors) ? detailAnchors : [];
+
+  return {
+    narrativePromise: cleanText(sourcePayload?.chapter?.description, 280)
+      || `Rendre le chapitre ${chapterTitle} vivant, concret et memorisable.`,
+    pagePlans: Array.from({ length: CHAPTER_DRAFT_PAGE_COUNT }, (_, index) => {
+      const fallbackPage = fallbackPages[index] || {};
+      return {
+        title: sanitizeDraftHeadingStrict(
+          fallbackPage.title || `Page ${index + 1}`,
+          index === 0 ? chapterTitle : `Volet ${index + 1}`
+        ),
+        focus: extractLeadSentenceForPlan(fallbackPage.body, 220)
+          || `Developper un moment fort lie a ${chapterTitle}.`,
+        anchors: anchorPool
+          .slice(index, index + 2)
+          .map((anchor) => cleanText(anchor, 160))
+          .filter(Boolean)
+      };
+    }),
+    forbidden: [
+      'Phrases meta de type "dans ce chapitre".',
+      'Generalites vagues sans details concrets.',
+      'Repetition du meme angle narratif sur toutes les pages.'
+    ]
+  };
+}
+
+function normalizeChapterPlan(candidatePlan, sourcePayload, fallbackDraft, detailAnchors = []) {
+  const fallbackPlan = buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors);
+  if (!candidatePlan || typeof candidatePlan !== 'object') {
+    return fallbackPlan;
+  }
+
+  const pagePlans = Array.from({ length: CHAPTER_DRAFT_PAGE_COUNT }, (_, index) => {
+    const page = Array.isArray(candidatePlan.pagePlans) ? candidatePlan.pagePlans[index] : null;
+    const fallbackPage = fallbackPlan.pagePlans[index];
+    return {
+      title: sanitizeDraftHeadingStrict(
+        cleanText(page?.title, 180) || fallbackPage.title,
+        fallbackPage.title
+      ),
+      focus: cleanText(page?.focus, 320) || fallbackPage.focus,
+      anchors: Array.isArray(page?.anchors)
+        ? page.anchors.map((anchor) => cleanText(anchor, 160)).filter(Boolean).slice(0, 3)
+        : fallbackPage.anchors
+    };
+  });
+
+  const forbidden = Array.isArray(candidatePlan.forbidden)
+    ? candidatePlan.forbidden.map((item) => cleanText(item, 140)).filter(Boolean).slice(0, 5)
+    : fallbackPlan.forbidden;
+
+  return {
+    narrativePromise: cleanText(candidatePlan.narrativePromise, 320) || fallbackPlan.narrativePromise,
+    pagePlans,
+    forbidden: forbidden.length > 0 ? forbidden : fallbackPlan.forbidden
+  };
+}
+
+function buildDraftSummaryFromPages(pages, chapterTitle = '') {
+  const pageBodies = Array.isArray(pages)
+    ? pages.map((page) => cleanText(page?.body, 1200)).filter(Boolean)
+    : [];
+  const source = pageBodies.join(' ');
+  const fallback = chapterTitle ? `Resume du chapitre ${chapterTitle}.` : 'Resume du chapitre.';
+  return summarizePlainText(source, 420) || fallback;
+}
+
+function normalizeGeneratedDraft(rawDraft, fallbackDraft, chapterTitle = '') {
+  const resolvedTitle = cleanText(rawDraft?.title, 180)
+    || cleanText(fallbackDraft?.title, 180)
+    || cleanText(chapterTitle, 180)
+    || 'Chapitre';
+  const pages = ensureDraftPages(rawDraft?.pages, fallbackDraft?.pages, resolvedTitle);
+  const summary = cleanText(rawDraft?.summary, 600)
+    || buildDraftSummaryFromPages(pages, resolvedTitle)
+    || cleanText(fallbackDraft?.summary, 600)
+    || `Resume du chapitre ${resolvedTitle}.`;
+
+  return {
+    title: resolvedTitle,
+    pages,
+    summary
+  };
+}
+
+function analyzeChapterDraftQuality(draft, sourcePayload, detailAnchors = []) {
+  const pages = Array.isArray(draft?.pages) ? draft.pages : [];
+  const bodies = pages.map((page) => cleanText(page?.body, 5000));
+  const pageLengths = bodies.map((body) => body.length);
+  const totalChars = pageLengths.reduce((sum, size) => sum + size, 0);
+  const combinedText = bodies.join('\n\n');
+  const comparableCombined = normalizeComparableText(combinedText);
+  const issues = [];
+  let score = 100;
+
+  if (totalChars < CHAPTER_DRAFT_MIN_TOTAL_CHARS) {
+    issues.push(`Texte global trop court (${totalChars} caracteres).`);
+    score -= 24;
+    if (totalChars < 2200) {
+      score -= 12;
+    }
+  }
+
+  const shortPages = pageLengths.filter((size) => size < CHAPTER_DRAFT_MIN_PAGE_CHARS).length;
+  if (shortPages > 0) {
+    issues.push(`${shortPages} page(s) restent trop peu developpees.`);
+    score -= shortPages * 10;
+  }
+
+  const veryShortPages = pageLengths.filter((size) => size < 320).length;
+  if (veryShortPages > 0) {
+    issues.push(`${veryShortPages} page(s) sont tres courtes (<320 caracteres).`);
+    score -= veryShortPages * 8;
+  }
+
+  const fillerMatches = CHAPTER_DRAFT_FILLER_PATTERNS.reduce(
+    (count, pattern) => count + ((combinedText.match(pattern) || []).length),
+    0
+  );
+  if (fillerMatches > 0) {
+    issues.push(`Expressions generiques detectees (${fillerMatches}).`);
+    score -= Math.min(24, fillerMatches * 4);
+  }
+
+  if (/(^|\n)\s*[-*]\s+/m.test(combinedText)) {
+    issues.push('Listes a puces detectees dans le recit.');
+    score -= 8;
+  }
+
+  const normalizedParagraphs = combinedText
+    .split(/\n{2,}/)
+    .map((paragraph) => normalizeComparableText(paragraph))
+    .filter((paragraph) => paragraph.length >= 28);
+  const duplicates = normalizedParagraphs.reduce((accumulator, paragraph) => {
+    accumulator[paragraph] = (accumulator[paragraph] || 0) + 1;
+    return accumulator;
+  }, {});
+  const duplicateCount = Object.values(duplicates).filter((count) => count > 1).length;
+  if (duplicateCount > 0) {
+    issues.push(`Repetitions detectees (${duplicateCount} paragraphe(s) redondant(s)).`);
+    score -= Math.min(16, duplicateCount * 6);
+  }
+
+  const anchorFragments = (Array.isArray(detailAnchors) ? detailAnchors : [])
+    .map((anchor) => normalizeComparableText(anchor)
+      .split(' ')
+      .filter((token) => token.length >= 4)
+      .slice(0, 4)
+      .join(' '))
+    .filter((fragment, index, list) => fragment && list.indexOf(fragment) === index);
+  const anchorHits = anchorFragments.filter((fragment) => comparableCombined.includes(fragment)).length;
+  const requiredAnchorHits = anchorFragments.length >= 4 ? 2 : anchorFragments.length > 0 ? 1 : 0;
+  if (requiredAnchorHits > 0 && anchorHits < requiredAnchorHits) {
+    issues.push('Le recit ne reutilise pas assez de details concrets issus des contributions.');
+    score -= (requiredAnchorHits - anchorHits) * 10;
+  }
+
+  const longWords = comparableCombined.split(' ').filter((token) => token.length >= 4);
+  const lexicalRatio = longWords.length > 0
+    ? (new Set(longWords)).size / longWords.length
+    : 1;
+  if (longWords.length >= 140 && lexicalRatio < 0.38) {
+    issues.push('Lexique trop repetitif, manque de variete narrative.');
+    score -= 10;
+  }
+
+  const normalizedScore = Math.max(0, Math.min(100, Math.round(score)));
+
+  return {
+    score: normalizedScore,
+    issues,
+    metrics: {
+      totalChars,
+      pageLengths,
+      fillerMatches,
+      duplicateCount,
+      anchorHits,
+      requiredAnchorHits,
+      lexicalRatio: Number(lexicalRatio.toFixed(3))
+    }
+  };
+}
+
+async function generateChapterPlanFromAI(sourcePayload, fallbackDraft, detailAnchors = []) {
+  const fallbackPlan = buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors);
+
+  if (!aiService?.mistral) {
+    return fallbackPlan;
+  }
+
+  const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 3);
+  const prompt = [
+    `Tu es directeur editorial premium. Tu construis un plan narratif en ${CHAPTER_DRAFT_PAGE_COUNT} pages.`,
+    'Objectif: produire un chapitre original, riche, sans blabla.',
+    'Interdits: phrases meta, generalites vides, morale abstraite.',
+    'Retourne UNIQUEMENT un JSON valide avec cette structure exacte:',
+    '{',
+    '  "narrativePromise": "string",',
+    '  "pagePlans": [',
+    '    { "title": "string", "focus": "string", "anchors": ["string", "string"] }',
+    '  ],',
+    '  "forbidden": ["string", "string", "string"]',
+    '}',
+    `"pagePlans" doit contenir exactement ${CHAPTER_DRAFT_PAGE_COUNT} objets.`,
+    '',
+    'DONNEES:',
+    JSON.stringify(sourceSnapshot)
   ].join('\n');
 
   try {
@@ -1413,32 +1737,227 @@ async function generateChapterDraftFromAI(sourcePayload) {
       messages: [
         {
           role: 'system',
-          content: 'Tu es un redacteur editorial de livres souvenirs. Tu produis uniquement du JSON valide.'
+          content: 'Tu renvoies uniquement du JSON valide et compact.'
         },
         {
           role: 'user',
           content: prompt
         }
       ],
-      temperature: 0.55,
-      maxTokens: 2200
+      temperature: 0.45,
+      maxTokens: 1800
+    });
+
+    const content = response?.choices?.[0]?.message?.content || '';
+    const parsed = parseDraftJson(content);
+    return normalizeChapterPlan(parsed, sourcePayload, fallbackDraft, detailAnchors);
+  } catch (error) {
+    console.error('Erreur IA plan chapitre:', error);
+    return fallbackPlan;
+  }
+}
+
+async function maybeRegenerateChapterDraftForQuality({
+  sourcePayload,
+  chapterPlan,
+  detailAnchors,
+  candidateDraft,
+  fallbackDraft,
+  qualityReport
+}) {
+  if (!aiService?.mistral || qualityReport.score >= CHAPTER_DRAFT_QUALITY_THRESHOLD) {
+    return {
+      draft: candidateDraft,
+      quality: qualityReport,
+      improved: false
+    };
+  }
+
+  const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 4);
+  const prompt = [
+    'Tu corriges un brouillon de chapitre pour atteindre un niveau editorial premium.',
+    'Tu dois garder le sens global, mais supprimer le blabla et densifier le concret.',
+    'Tu DOIS ameliorer selon ces points:',
+    ...(qualityReport.issues.length > 0
+      ? qualityReport.issues.map((issue, index) => `${index + 1}. ${issue}`)
+      : ['1. Rendre le texte plus concret et plus vivant.']),
+    '',
+    'Contraintes obligatoires:',
+    `- ${CHAPTER_DRAFT_PAGE_COUNT} pages exactement.`,
+    `- Chaque page entre ${CHAPTER_DRAFT_MIN_PAGE_CHARS} et 1100 caracteres environ.`,
+    '- Titres de pages editoriaux, sans "Page 1" ni "Chapitre 1".',
+    '- Utilise des details sensoriels, gestes, dialogues brefs quand pertinent.',
+    '- Aucun format liste a puces.',
+    '- Aucun meta-commentaire sur la redaction.',
+    '',
+    'Retourne UNIQUEMENT ce JSON:',
+    '{ "title":"string", "pages":[{"title":"string","body":"string"}], "summary":"string" }',
+    `"pages" doit contenir exactement ${CHAPTER_DRAFT_PAGE_COUNT} objets.`,
+    '',
+    'PLAN NARRATIF:',
+    JSON.stringify(chapterPlan),
+    '',
+    'BROUILLON ACTUEL:',
+    JSON.stringify(candidateDraft),
+    '',
+    'DONNEES SOURCE:',
+    JSON.stringify(sourceSnapshot)
+  ].join('\n');
+
+  try {
+    const response = await aiService.mistral.chat.complete({
+      model: 'mistral-small-latest',
+      messages: [
+        {
+          role: 'system',
+          content: 'Tu renvoies uniquement du JSON valide. Aucune phrase hors JSON.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.38,
+      maxTokens: 3800
+    });
+
+    const content = response?.choices?.[0]?.message?.content || '';
+    const parsed = parseDraftJson(content);
+    if (!parsed || !Array.isArray(parsed.pages)) {
+      return {
+        draft: candidateDraft,
+        quality: qualityReport,
+        improved: false
+      };
+    }
+
+    const revisedDraft = normalizeGeneratedDraft(
+      parsed,
+      fallbackDraft,
+      sourcePayload?.chapter?.title || candidateDraft?.title || 'Chapitre'
+    );
+    const revisedQuality = analyzeChapterDraftQuality(revisedDraft, sourcePayload, detailAnchors);
+
+    if (revisedQuality.score > qualityReport.score) {
+      return {
+        draft: revisedDraft,
+        quality: revisedQuality,
+        improved: true
+      };
+    }
+
+    return {
+      draft: candidateDraft,
+      quality: qualityReport,
+      improved: false
+    };
+  } catch (error) {
+    console.error('Erreur IA revision qualite chapitre:', error);
+    return {
+      draft: candidateDraft,
+      quality: qualityReport,
+      improved: false
+    };
+  }
+}
+
+async function generateChapterDraftFromAI(sourcePayload) {
+  const fallbackDraft = buildFallbackChapterDraft(sourcePayload);
+  const detailAnchors = extractDetailAnchorsFromSourcePayload(sourcePayload, 8);
+  const chapterPlan = await generateChapterPlanFromAI(sourcePayload, fallbackDraft, detailAnchors);
+  const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 6);
+
+  if (!aiService?.mistral) {
+    return {
+      ...fallbackDraft,
+      plan: chapterPlan,
+      quality: analyzeChapterDraftQuality(fallbackDraft, sourcePayload, detailAnchors),
+      generationMode: 'fallback'
+    };
+  }
+
+  const prompt = [
+    `Tu rediges un chapitre premium en ${CHAPTER_DRAFT_PAGE_COUNT} pages a partir d un plan narratif.`,
+    'Objectif: texte original, dense, lisible, elegant, sans phrase inutile.',
+    'Regles absolues:',
+    '- Respecter strictement le plan fourni.',
+    `- ${CHAPTER_DRAFT_PAGE_COUNT} pages exactement.`,
+    `- Chaque page doit contenir au moins ${CHAPTER_DRAFT_MIN_PAGE_CHARS} caracteres utiles.`,
+    '- Titres de pages editoriaux, jamais "Page X" ou "Chapitre X".',
+    '- Eviter les phrases meta (ex: "dans ce chapitre").',
+    '- Aucune liste a puces, aucun markdown, aucun HTML.',
+    '- Integrer des details concrets des contributions (lieux, gestes, objets, scenes).',
+    '- Conserver la coherence avec les resumes des chapitres precedents.',
+    '',
+    'Retourne UNIQUEMENT un JSON valide:',
+    '{ "title":"string", "pages":[{"title":"string","body":"string"}], "summary":"string" }',
+    `"pages" doit contenir exactement ${CHAPTER_DRAFT_PAGE_COUNT} objets.`,
+    '',
+    'PLAN NARRATIF:',
+    JSON.stringify(chapterPlan),
+    '',
+    'DONNEES SOURCE:',
+    JSON.stringify(sourceSnapshot)
+  ].join('\n');
+
+  try {
+    const response = await aiService.mistral.chat.complete({
+      model: 'mistral-small-latest',
+      messages: [
+        {
+          role: 'system',
+          content: 'Tu es un redacteur editorial haut de gamme. Tu renvoies uniquement un JSON strictement valide.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.52,
+      maxTokens: 4400
     });
 
     const content = response?.choices?.[0]?.message?.content || '';
     const parsed = parseDraftJson(content);
 
     if (!parsed || !Array.isArray(parsed.pages)) {
-      return fallbackDraft;
+      return {
+        ...fallbackDraft,
+        plan: chapterPlan,
+        quality: analyzeChapterDraftQuality(fallbackDraft, sourcePayload, detailAnchors),
+        generationMode: 'fallback'
+      };
     }
 
+    const candidateDraft = normalizeGeneratedDraft(
+      parsed,
+      fallbackDraft,
+      sourcePayload?.chapter?.title || fallbackDraft.title
+    );
+    const qualityReport = analyzeChapterDraftQuality(candidateDraft, sourcePayload, detailAnchors);
+    const reviewOutcome = await maybeRegenerateChapterDraftForQuality({
+      sourcePayload,
+      chapterPlan,
+      detailAnchors,
+      candidateDraft,
+      fallbackDraft,
+      qualityReport
+    });
+
     return {
-      title: cleanText(parsed.title, 180) || fallbackDraft.title,
-      pages: ensureFourDraftPages(parsed.pages, fallbackDraft.pages),
-      summary: cleanText(parsed.summary, 600) || fallbackDraft.summary
+      ...reviewOutcome.draft,
+      plan: chapterPlan,
+      quality: reviewOutcome.quality,
+      generationMode: reviewOutcome.improved ? 'plan_plus_revision' : 'plan_plus_redaction'
     };
   } catch (error) {
     console.error('Erreur IA brouillon chapitre:', error);
-    return fallbackDraft;
+    return {
+      ...fallbackDraft,
+      plan: chapterPlan,
+      quality: analyzeChapterDraftQuality(fallbackDraft, sourcePayload, detailAnchors),
+      generationMode: 'fallback'
+    };
   }
 }
 
@@ -1447,46 +1966,102 @@ function buildFallbackChapterDraft(sourcePayload) {
   const recipientName = sourcePayload.book?.recipientName || 'la personne celebree';
   const questions = Array.isArray(chapter.questions) ? chapter.questions : [];
   const guestContributions = Array.isArray(chapter.guestContributions) ? chapter.guestContributions : [];
+  const detailAnchors = extractDetailAnchorsFromSourcePayload(sourcePayload, 6);
   const organizerText = chapter.organizerContribution?.message || '';
+  const chapterTitle = cleanText(chapter.title, 180) || 'Chapitre';
+  const organizerParagraphs = splitTextToParagraphs(
+    sanitizeDraftBodyText(organizerText, chapterTitle),
+    5600,
+    { preserveParagraphs: true }
+  );
+  const organizerPrimary = cleanText(organizerParagraphs[0] || organizerText, 1500);
+  const organizerSecondary = cleanText(organizerParagraphs.slice(1).join(' '), 1800);
+  const guestVoices = guestContributions
+    .slice(0, 6)
+    .map((contribution) => {
+      const contributorName = cleanText(contribution.contributorName, 140) || 'Un proche';
+      const contributionBody = cleanText(contribution.message, 700);
+      if (!contributionBody) {
+        return '';
+      }
+      return `${contributorName} : ${contributionBody}`;
+    })
+    .filter(Boolean);
+  const guestVoicesPrimary = guestVoices.slice(0, 3).join('\n\n');
+  const guestVoicesSecondary = guestVoices.slice(3, 6).join('\n\n');
+  const hasFewGuestContributions = guestContributions.length < 2;
   const previousBridge = sourcePayload.previousChapterSummaries.length > 0
-    ? `Ce chapitre prolonge ${sourcePayload.previousChapterSummaries.slice(-1)[0].summary}`
-    : `Ce chapitre ouvre une nouvelle sequence du livre dedie a ${recipientName}.`;
+    ? `Fil narratif precedent : ${sourcePayload.previousChapterSummaries.slice(-1)[0].summary}`
+    : `Le recit se concentre sur un moment fondateur autour de ${recipientName}.`;
   const projectIntent = sourcePayload.book?.aiProjectBrief
     ? `Intention editoriale : ${sourcePayload.book.aiProjectBrief}`
     : '';
 
   return {
-    title: chapter.title || 'Chapitre',
+    title: chapterTitle,
     pages: [
       {
-        title: chapter.title || 'Ouverture',
+        title: chapterTitle,
         body: [
-          chapter.description || `${chapter.title || 'Ce chapitre'} pose le decor du souvenir a transmettre.`,
+          chapter.description || `Nous ouvrons sur ${chapterTitle} avec un angle concret et narratif.`,
           previousBridge,
           projectIntent,
-          questions.length > 0 ? `Pistes editoriales : ${questions.slice(0, 4).join(' ')}` : ''
+          questions.length > 0 ? `Pistes editoriales : ${questions.slice(0, 3).join(' ')}` : '',
+          detailAnchors.length > 0 ? `Details a faire vivre : ${detailAnchors.slice(0, 2).join(' | ')}` : ''
         ].filter(Boolean).join('\n\n')
       },
       {
-        title: 'Recit principal',
-        body: organizerText || `L organisateur peut encore enrichir ce chapitre pour raconter avec plus de nuances ce moment cle autour de ${recipientName}.`
+        title: 'Le moment qui lance tout',
+        body: organizerPrimary
+          || `La narration principale s appuie sur une scene precise autour de ${recipientName}: qui etait la, ce qui a ete dit, et ce qui a ete ressenti.`
       },
       {
-        title: 'Voix des proches',
-        body: guestContributions.length > 0
-          ? guestContributions
-              .slice(0, 4)
-              .map((contribution) => `${contribution.contributorName} partage : ${contribution.message}`)
-              .join('\n\n')
-          : 'Aucune contribution validee supplementaire n est encore integree a ce chapitre.'
+        title: hasFewGuestContributions ? 'Votre regard en lumiere' : 'La voix de l organisateur',
+        body: [
+          organizerPrimary,
+          organizerSecondary
+        ].filter(Boolean).join('\n\n') || `Le regard de l organisateur doit installer la tonalite et le rythme de ${chapterTitle}.`
+      },
+      {
+        title: 'Vos proches ont dit...',
+        body: [
+          guestVoicesPrimary,
+          guestVoicesPrimary
+            ? ''
+            : 'Vos proches ont dit... leurs regards seront integres ici au fur et a mesure des validations.'
+        ].filter(Boolean).join('\n\n')
+      },
+      {
+        title: 'Les details qui restent',
+        body: [
+          detailAnchors.length > 0 ? `Details saillants : ${detailAnchors.slice(0, 3).join(' | ')}` : '',
+          cleanText(chapter.description, 520),
+          `La narration doit rester concrete, situee et sensorielle, sans generalites.`
+        ].filter(Boolean).join('\n\n')
+      },
+      {
+        title: 'Galerie narrative',
+        body: [
+          organizerSecondary || organizerPrimary,
+          detailAnchors.length > 3 ? `A prolonger avec : ${detailAnchors.slice(3, 6).join(' | ')}` : ''
+        ].filter(Boolean).join('\n\n') || `Cette page accueille un tempo plus visuel et des respirations narratives.`
+      },
+      {
+        title: 'Vos proches ont dit... (suite)',
+        body: guestVoicesSecondary || (
+          hasFewGuestContributions
+            ? 'La suite des retours de proches prendra place ici quand de nouvelles contributions seront validees.'
+            : 'Les retours complementaires des proches sont integres ici pour enrichir le regard croise.'
+        )
       },
       {
         title: 'Clore la sequence',
         body: [
-          `Ce chapitre se referme sur une tonalite ${sourcePayload.book?.styleNarratif || 'sensible'} et prepare la transition vers la suite du livre.`,
+          `La cloture doit laisser une image nette et memorisable, dans une tonalite ${sourcePayload.book?.styleNarratif || 'sensible'}.`,
+          detailAnchors.length > 2 ? `Derniers rappels concrets : ${detailAnchors.slice(2, 4).join(' | ')}` : '',
           chapter.stats?.respondedCount
-            ? `${chapter.stats.respondedCount} contribution(s) validee(s) ont nourri ce brouillon.`
-            : 'Le chapitre peut encore etre enrichi avant la validation finale.'
+            ? `${chapter.stats.respondedCount} contribution(s) validee(s) nourrissent deja ce brouillon.`
+            : 'Le chapitre peut encore gagner en relief avec quelques scenes precises supplementaires.'
         ].filter(Boolean).join('\n\n')
       }
     ],
@@ -1498,16 +2073,35 @@ function buildFallbackChapterDraft(sourcePayload) {
   };
 }
 
-function ensureFourDraftPages(pages, fallbackPages) {
+function ensureDraftPages(pages, fallbackPages, chapterTitle = '') {
   const safePages = Array.isArray(pages) ? pages : [];
   const fallback = Array.isArray(fallbackPages) ? fallbackPages : [];
   const normalizedPages = [];
+  const baseTitle = cleanText(chapterTitle, 180) || 'Chapitre';
 
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < CHAPTER_DRAFT_PAGE_COUNT; index += 1) {
     const currentPage = safePages[index] || fallback[index] || {};
+    const fallbackPage = fallback[index] || {};
+    const pageTitle = sanitizeDraftHeadingStrict(
+      cleanText(currentPage.title, 180)
+      || cleanText(fallbackPage.title, 180)
+      || (index === 0 ? baseTitle : `Volet ${index + 1}`),
+      index === 0 ? baseTitle : `Volet ${index + 1}`
+    );
+    const pageBody = cleanText(
+      sanitizeDraftBodyText(
+        currentPage.body || fallbackPage.body || 'Contenu a enrichir.',
+        baseTitle
+      ),
+      4200
+    ) || cleanText(
+      sanitizeDraftBodyText(fallbackPage.body || 'Contenu a enrichir.', baseTitle),
+      4200
+    ) || 'Contenu a enrichir.';
+
     normalizedPages.push({
-      title: cleanText(currentPage.title, 180) || `Volet ${index + 1}`,
-      body: cleanText(currentPage.body, 3200) || cleanText(fallback[index]?.body, 3200) || 'Contenu a enrichir.'
+      title: pageTitle,
+      body: pageBody
     });
   }
 
@@ -1623,7 +2217,7 @@ function formatFolioNumber(value) {
 
 function renderDraftPageFolio({ pageNumber, totalPages }) {
   const safePage = formatFolioNumber(pageNumber);
-  const safeTotal = formatFolioNumber(totalPages || 4);
+  const safeTotal = formatFolioNumber(totalPages || CHAPTER_DRAFT_PAGE_COUNT);
   return `
     <div class="draft-book-folio" aria-hidden="true">
       <span class="draft-book-folio-value">${safePage}</span>
@@ -1659,15 +2253,22 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
   const guestHighlights = Array.isArray(sourcePayload?.chapter?.guestContributions)
     ? sourcePayload.chapter.guestContributions.slice(0, Math.max(1, pageBudget.guestItems))
     : [];
-  const draftPages = Array.isArray(draft?.pages) && draft.pages.length > 0
-    ? draft.pages
-    : [{ title: chapterHeading, body: cleanText(draft?.body || '', pageBudget.pageBodyChars) }];
+  const fallbackPages = [{
+    title: chapterHeading,
+    body: cleanText(draft?.body || '', pageBudget.pageBodyChars)
+  }];
+  const draftPages = ensureDraftPages(
+    Array.isArray(draft?.pages) ? draft.pages : [],
+    fallbackPages,
+    chapterHeading
+  );
+  const totalPages = draftPages.length;
 
   return `
-    <section class="draft-book-chapter">
+    <section class="draft-book-chapter" lang="fr">
       <div class="draft-book-chapter-shell">
         ${draftPages.map((page, index) => `
-          <section class="draft-book-page${index === 0 ? ' draft-book-page-opening' : ''}${index === 3 ? ' draft-book-page-gallery' : ''}">
+          <section class="draft-book-page${index === 0 ? ' draft-book-page-opening' : ''}${index === 5 ? ' draft-book-page-gallery' : ''}">
             ${(() => {
               const pageHeading = sanitizeDraftHeadingStrict(page.title || chapterHeading, chapterHeading);
               const showHeading = (
@@ -1685,21 +2286,30 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
             <div class="draft-book-body">
               ${formatParagraphs(cleanText(
                 sanitizeDraftBodyText(page.body || '', chapterHeading),
-                index === 3 ? pageBudget.pageTailChars : pageBudget.pageBodyChars
+                index === 5 ? pageBudget.pageTailChars : pageBudget.pageBodyChars
               ))}
             </div>
             ${index === 0 ? renderQuestionList(sourcePayload?.chapter?.questions, {
               maxItems: pageBudget.questionItems,
               maxCharsPerItem: pageBudget.questionChars
             }) : ''}
-            ${index === 1 && heroPhotoUrl ? renderInlineHeroPhoto(heroPhotoUrl, chapterHeading) : ''}
+            ${index === 3 && heroPhotoUrl ? renderInlineHeroPhoto(heroPhotoUrl, chapterHeading) : ''}
             ${index === 2 ? renderContributionSpotlight(sourcePayload?.chapter?.organizerContribution, guestHighlights, {
+              heading: 'Votre contribution en lumiere',
               organizerMaxChars: pageBudget.organizerChars,
               guestMaxChars: pageBudget.guestChars,
-              maxGuestHighlights: pageBudget.guestItems
+              maxGuestHighlights: Math.max(1, Math.ceil(pageBudget.guestItems / 2)),
+              preferOrganizer: true
             }) : ''}
-            ${index === 3 ? renderPhotoGallery(galleryPhotos, { columns: imageProfile.galleryColumns }) : ''}
-            ${renderDraftPageFolio({ pageNumber: index + 1, totalPages: 4 })}
+            ${index === 5 ? renderPhotoGallery(galleryPhotos, { columns: imageProfile.galleryColumns }) : ''}
+            ${index === 6 ? renderContributionSpotlight(sourcePayload?.chapter?.organizerContribution, guestHighlights, {
+              heading: 'Vos proches ont dit...',
+              organizerMaxChars: Math.round(pageBudget.organizerChars * 0.45),
+              guestMaxChars: pageBudget.guestChars,
+              maxGuestHighlights: Math.max(1, pageBudget.guestItems),
+              preferGuests: true
+            }) : ''}
+            ${renderDraftPageFolio({ pageNumber: index + 1, totalPages })}
           </section>
         `).join('')}
       </div>
@@ -1919,18 +2529,7 @@ function renderValidatedBookPreviewHtml({
     || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
 
   return `
-    <article class="draft-book ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}">
-      <header class="draft-book-header">
-        <div class="draft-book-eyebrow">Apercu assemble</div>
-        <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
-        <div class="draft-book-meta">
-          ${escapeHtml([
-            book.recipient_name ? `Destinataire : ${book.recipient_name}` : '',
-            book.style_narratif ? `Style : ${book.style_narratif}` : '',
-            book.event_type ? `Evenement : ${book.event_type}` : ''
-          ].filter(Boolean).join(' | '))}
-        </div>
-      </header>
+    <article class="draft-book draft-book-assembled ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}">
       ${frontCoverBlock}
       ${chaptersContent}
       ${backCoverBlock}
@@ -1981,11 +2580,10 @@ function renderAssembledFrontCover(book) {
   `;
 
   return `
-    <section class="draft-book-section draft-book-section-cover draft-book-section-cover-front">
-      <div class="draft-book-mini-title">Couverture</div>
-      <div class="cover-preview-spread" style="grid-template-columns: minmax(0, 1fr);">
+    <section class="draft-book-section draft-book-section-cover draft-book-section-cover-front is-full-bleed">
+      <div class="cover-preview-spread is-single-face is-book-page">
         <article
-          class="cover-preview-card is-front cover-style-${styleId} is-active"
+          class="cover-preview-card is-front cover-style-${styleId} is-active is-page-fill"
           style="--cover-bg:${escapeHtml(frontBg)};--cover-text:${escapeHtml(textColor)};--cover-accent:${escapeHtml(accentColor)};--cover-title-font:${escapeHtml(titleFont)};--cover-body-font:${escapeHtml(bodyFont)};"
         >
           <div class="cover-preview-safe-zone"></div>
@@ -2043,11 +2641,10 @@ function renderAssembledBackCover(book) {
     || cleanText(styleDefaults.backIsbn, 60);
 
   return `
-    <section class="draft-book-section draft-book-section-cover draft-book-section-cover-back">
-      <div class="draft-book-mini-title">4e de couverture</div>
-      <div class="cover-preview-spread" style="grid-template-columns: minmax(0, 1fr);">
+    <section class="draft-book-section draft-book-section-cover draft-book-section-cover-back is-full-bleed">
+      <div class="cover-preview-spread is-single-face is-book-page">
         <article
-          class="cover-preview-card is-back cover-style-${styleId} is-active"
+          class="cover-preview-card is-back cover-style-${styleId} is-active is-page-fill"
           style="--cover-bg:${escapeHtml(backBg)};--cover-text:${escapeHtml(textColor)};--cover-accent:${escapeHtml(accentColor)};--cover-title-font:${escapeHtml(titleFont)};--cover-body-font:${escapeHtml(bodyFont)};"
         >
           <div class="cover-preview-safe-zone"></div>
@@ -2991,7 +3588,7 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       min-height: ${interiorPageMinHeightMm}mm;
       display: flex;
       flex-direction: column;
-      gap: 3mm;
+      gap: 1.8mm;
       page-break-inside: avoid;
       break-inside: avoid-page;
     }
@@ -3007,15 +3604,36 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     }
 
     .draft-book-section-cover .cover-preview-card {
-      min-height: calc(${interiorPageMinHeightMm}mm - 16mm);
-      max-height: calc(${interiorPageMinHeightMm}mm - 16mm);
+      min-height: calc(${interiorPageMinHeightMm}mm - 12mm);
+      max-height: calc(${interiorPageMinHeightMm}mm - 12mm);
       page-break-inside: avoid;
       break-inside: avoid-page;
     }
 
+    .draft-book-section-cover.is-full-bleed {
+      padding: 2mm;
+      gap: 1.2mm;
+      border-color: rgba(223, 216, 201, 0.9);
+    }
+
+    .draft-book-section-cover.is-full-bleed .cover-preview-spread {
+      height: 100%;
+    }
+
+    .draft-book-section-cover.is-full-bleed .cover-preview-card {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      min-height: calc(${interiorPageMinHeightMm}mm - 4mm);
+      height: calc(${interiorPageMinHeightMm}mm - 4mm);
+      max-height: none;
+      border-radius: 10px;
+      padding: 14px;
+    }
+
     .draft-book-section h2,
     .draft-book-chapter h3 {
-      margin: 0 0 4mm;
+      margin: 0 0 4.8mm;
       font-family: "Baskerville", "Palatino Linotype", serif;
       color: #1f2228;
       letter-spacing: 0.01em;
@@ -3028,7 +3646,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
 
     .draft-book-chapter h3 {
       font-size: 23px;
-      line-height: 1.16;
+      line-height: 1.14;
+      letter-spacing: 0.012em;
     }
 
     .draft-book-chapter {
@@ -3063,10 +3682,11 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     }
 
     .draft-book-intro {
-      margin: 0 0 4mm;
+      margin: 0 0 5mm;
+      max-width: 90%;
       font-style: italic;
       color: #5f6770;
-      line-height: 1.6;
+      line-height: 1.66;
       font-size: 11.6px;
     }
 
@@ -3078,9 +3698,12 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     .draft-book-section p,
     .draft-book-callout p,
     .draft-book-contributor-item p {
-      margin: 0 0 3.5mm;
-      line-height: 1.62;
+      margin: 0 0 4.1mm;
+      line-height: 1.68;
       font-size: 11.5px;
+      text-align: justify;
+      text-align-last: left;
+      hyphens: auto;
       page-break-inside: avoid;
       break-inside: avoid-page;
       orphans: 3;
@@ -3090,8 +3713,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     }
 
     .draft-book-text-block {
-      margin: 0 0 3.5mm;
-      line-height: 1.62;
+      margin: 0 0 4.1mm;
+      line-height: 1.68;
       font-size: 11.5px;
     }
 
@@ -3155,7 +3778,7 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     }
 
     .draft-book-mini-title {
-      margin-bottom: 3.5mm;
+      margin-bottom: 4.2mm;
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.08em;
@@ -3224,6 +3847,20 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       margin-top: 4mm;
     }
 
+    .draft-book-contribution-spotlight {
+      display: grid;
+      gap: 3mm;
+    }
+
+    .draft-book-contributor-item strong {
+      display: inline-block;
+      margin-bottom: 1.4mm;
+      font-size: 10.4px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #7c5f2f;
+    }
+
     .draft-book-contributor-item + .draft-book-contributor-item {
       margin-top: 4mm;
       padding-top: 4mm;
@@ -3231,22 +3868,39 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     }
 
     .draft-book-gallery-wrap {
-      margin-top: 5mm;
+      margin-top: 6mm;
+      display: grid;
+      gap: 3mm;
     }
 
     .draft-book-gallery {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 3.5mm;
+      gap: 4mm;
+      align-items: stretch;
     }
 
     .draft-book-gallery.is-cols-3 {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
+    .draft-book-gallery.is-single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .draft-book-gallery.is-single .draft-book-photo {
+      width: 76%;
+      margin: 0 auto;
+      min-height: 58mm;
+    }
+
+    .draft-book-gallery.is-duo {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .draft-book-photo {
       margin: 0;
-      min-height: 42mm;
+      min-height: 46mm;
       border-radius: 8px;
       overflow: hidden;
       background: rgba(232, 232, 232, 0.45);
@@ -3256,16 +3910,16 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       display: block;
       width: 100%;
       height: 100%;
-      min-height: 42mm;
+      min-height: 46mm;
       object-fit: cover;
     }
 
     .draft-book-media-block {
-      margin: 4mm 0 0;
+      margin: 5mm 0 0;
       border-radius: 8px;
       border: 1px solid rgba(184, 146, 74, 0.18);
       overflow: hidden;
-      min-height: 42mm;
+      min-height: 48mm;
       background: rgba(240, 232, 214, 0.35);
     }
 
@@ -3273,7 +3927,7 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       display: block;
       width: 100%;
       height: 100%;
-      min-height: 42mm;
+      min-height: 48mm;
       object-fit: cover;
     }
 
@@ -3314,6 +3968,27 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       break-inside: avoid-page;
       page-break-after: avoid;
       break-after: avoid;
+    }
+
+    .cover-preview-spread {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .cover-preview-spread.is-single-face {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cover-preview-spread.is-single-face .cover-preview-card {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+    }
+
+    .cover-preview-spread.is-single-face.is-book-page .cover-preview-card {
+      max-width: none;
+      margin: 0;
     }
 
     .cover-preview-card {
@@ -4363,7 +5038,7 @@ async function generateBookDraftFromAI(sourcePayload) {
   const prompt = [
     'Tu rediges un brouillon complet de livre souvenir collaboratif.',
     'Tu dois produire un resultat coherent, chaleureux, fluide et elegant en francais.',
-    'Le livre sera ensuite mis en page avec au moins 4 pages par chapitre.',
+    `Le livre sera ensuite mis en page avec ${CHAPTER_DRAFT_PAGE_COUNT} pages par chapitre.`,
     'Utilise strictement le contenu fourni ci-dessous pour construire un premier jet narratif substantiel.',
     'Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :',
     '{',
@@ -4550,7 +5225,7 @@ function renderBookDraftHtml({ book, draft, sourcePayload }) {
   }).join('');
 
   return `
-    <article class="draft-book">
+    <article class="draft-book" lang="fr">
       <header class="draft-book-header">
         <div class="draft-book-eyebrow">Brouillon genere</div>
         <h1>${escapeHtml(draft.title || book.title || 'Livre souvenir')}</h1>
@@ -4599,65 +5274,134 @@ function renderDraftChapterPages({
     normalizedLayoutSettings.textDensity,
     normalizedPreviewFormat
   );
-  const bodyParts = splitDraftBody(
-    sanitizeDraftBodyText(chapter.body || buildChapterBodyFallback(sourceChapter || {}), chapterTitle),
+  const narrativeParts = splitDraftBody(
+    sanitizeDraftBodyText(
+      [
+        cleanText(chapter?.intro, 1600),
+        chapter.body || buildChapterBodyFallback(sourceChapter || {}),
+        cleanText(chapter?.closing, 1200)
+      ].filter(Boolean).join('\n\n'),
+      chapterTitle
+    ),
     {
       textDensity: normalizedLayoutSettings.textDensity,
-      chapterTitle
+      previewFormat: normalizedPreviewFormat,
+      chapterTitle,
+      segmentCount: 7
     }
   );
   const guestHighlights = Array.isArray(sourceChapter?.guestContributions)
-    ? sourceChapter.guestContributions.slice(0, 2)
+    ? sourceChapter.guestContributions.slice(0, Math.max(2, pageBudget.guestItems + 1))
     : [];
+  const hasFewGuestContributions = guestHighlights.length < 2;
   const allPhotos = collectChapterPhotos(sourceChapter);
   const visiblePhotos = allPhotos.slice(0, imageProfile.maxPhotos);
   const heroPhotoUrl = imageProfile.showHero ? (visiblePhotos[0] || '') : '';
   const galleryPhotos = heroPhotoUrl ? visiblePhotos.slice(1) : visiblePhotos;
+  const totalPages = CHAPTER_DRAFT_PAGE_COUNT;
+  const endingParagraph = cleanText(chapter?.closing, pageBudget.pageTailChars);
+  const endingBody = [
+    narrativeParts[6] || '',
+    endingParagraph || ''
+  ].filter(Boolean).join('\n\n');
 
   return `
-    <section class="draft-book-chapter">
+    <section class="draft-book-chapter" lang="fr">
       <div class="draft-book-chapter-shell">
         <section class="draft-book-page draft-book-page-opening">
           <h3>${escapeHtml(chapterTitle)}</h3>
           ${openingLead ? `<p class="draft-book-intro">${escapeHtml(openingLead)}</p>` : ''}
+          <div class="draft-book-body draft-book-body-blocks">
+            ${formatParagraphs(
+              cleanText(narrativeParts[0] || chapter.intro || '', Math.round(pageBudget.pageBodyChars * 0.72)),
+              { paragraphClass: 'draft-book-text-block' }
+            )}
+          </div>
           ${renderQuestionList(sourceChapter?.questions, {
             maxItems: pageBudget.questionItems,
             maxCharsPerItem: pageBudget.questionChars
           })}
-          ${renderDraftPageFolio({ pageNumber: 1, totalPages: 4 })}
+          ${renderDraftPageFolio({ pageNumber: 1, totalPages })}
         </section>
 
         <section class="draft-book-page">
-          ${chapter.intro ? `<p class="draft-book-intro">${escapeHtml(chapter.intro)}</p>` : ''}
           <div class="draft-book-body draft-book-body-blocks">
             ${formatParagraphs(
-              cleanText(bodyParts[0] || '', pageBudget.pageBodyChars),
+              cleanText(narrativeParts[1] || '', pageBudget.pageBodyChars),
+              { paragraphClass: 'draft-book-text-block' }
+            )}
+          </div>
+          ${renderDraftPageFolio({ pageNumber: 2, totalPages })}
+        </section>
+
+        <section class="draft-book-page">
+          <div class="draft-book-body draft-book-body-blocks">
+            ${formatParagraphs(
+              cleanText(narrativeParts[2] || '', pageBudget.pageBodyChars),
+              { paragraphClass: 'draft-book-text-block' }
+            )}
+          </div>
+          ${renderContributionSpotlight(sourceChapter?.organizerContribution, guestHighlights, {
+            heading: hasFewGuestContributions ? 'Votre contribution en lumiere' : 'Le regard de l organisateur',
+            organizerMaxChars: pageBudget.organizerChars,
+            guestMaxChars: pageBudget.guestChars,
+            maxGuestHighlights: Math.max(1, Math.ceil(pageBudget.guestItems / 2)),
+            preferOrganizer: true
+          })}
+          ${renderDraftPageFolio({ pageNumber: 3, totalPages })}
+        </section>
+
+        <section class="draft-book-page">
+          <div class="draft-book-body draft-book-body-blocks">
+            ${formatParagraphs(
+              cleanText(narrativeParts[3] || '', pageBudget.pageBodyChars),
               { paragraphClass: 'draft-book-text-block' }
             )}
           </div>
           ${heroPhotoUrl ? renderInlineHeroPhoto(heroPhotoUrl, chapterTitle) : ''}
-          ${renderDraftPageFolio({ pageNumber: 2, totalPages: 4 })}
+          ${renderDraftPageFolio({ pageNumber: 4, totalPages })}
         </section>
 
         <section class="draft-book-page">
-          ${renderContributionSpotlight(sourceChapter?.organizerContribution, guestHighlights, {
-            organizerMaxChars: pageBudget.organizerChars,
-            guestMaxChars: pageBudget.guestChars,
-            maxGuestHighlights: pageBudget.guestItems
-          })}
-          ${renderDraftPageFolio({ pageNumber: 3, totalPages: 4 })}
+          <div class="draft-book-body draft-book-body-blocks">
+            ${formatParagraphs(
+              cleanText(narrativeParts[4] || '', pageBudget.pageBodyChars),
+              { paragraphClass: 'draft-book-text-block' }
+            )}
+          </div>
+          ${renderDraftPageFolio({ pageNumber: 5, totalPages })}
         </section>
 
         <section class="draft-book-page draft-book-page-gallery">
           <div class="draft-book-body draft-book-body-blocks">
             ${formatParagraphs(
-              cleanText(bodyParts[1] || '', pageBudget.pageTailChars),
+              cleanText(narrativeParts[5] || '', pageBudget.pageTailChars),
               { paragraphClass: 'draft-book-text-block' }
             )}
           </div>
-          ${chapter.closing ? `<p class="draft-book-closing">${escapeHtml(chapter.closing)}</p>` : ''}
           ${renderPhotoGallery(galleryPhotos, { columns: imageProfile.galleryColumns })}
-          ${renderDraftPageFolio({ pageNumber: 4, totalPages: 4 })}
+          ${renderDraftPageFolio({ pageNumber: 6, totalPages })}
+        </section>
+
+        <section class="draft-book-page">
+          ${renderContributionSpotlight(sourceChapter?.organizerContribution, guestHighlights, {
+            heading: 'Vos proches ont dit...',
+            organizerMaxChars: Math.round(pageBudget.organizerChars * 0.45),
+            guestMaxChars: pageBudget.guestChars,
+            maxGuestHighlights: Math.max(1, pageBudget.guestItems),
+            preferGuests: true
+          })}
+          ${renderDraftPageFolio({ pageNumber: 7, totalPages })}
+        </section>
+
+        <section class="draft-book-page">
+          <div class="draft-book-body draft-book-body-blocks">
+            ${formatParagraphs(
+              cleanText(endingBody || narrativeParts[5] || '', pageBudget.pageTailChars),
+              { paragraphClass: 'draft-book-text-block' }
+            )}
+          </div>
+          ${renderDraftPageFolio({ pageNumber: 8, totalPages })}
         </section>
       </div>
     </section>
@@ -4677,8 +5421,8 @@ function getPreviewPageTextBudget(textDensity, previewFormat = '') {
       organizerChars: 420,
       guestChars: 140,
       guestItems: 1,
-      pageBodyChars: 760,
-      pageTailChars: 620
+      pageBodyChars: 710,
+      pageTailChars: 640
     };
   }
   else if (normalizedDensity === 'compact') {
@@ -4688,8 +5432,8 @@ function getPreviewPageTextBudget(textDensity, previewFormat = '') {
       organizerChars: 700,
       guestChars: 210,
       guestItems: 2,
-      pageBodyChars: 1120,
-      pageTailChars: 900
+      pageBodyChars: 980,
+      pageTailChars: 860
     };
   } else {
     baseBudget = {
@@ -4698,7 +5442,7 @@ function getPreviewPageTextBudget(textDensity, previewFormat = '') {
       organizerChars: 560,
       guestChars: 170,
       guestItems: 1,
-      pageBodyChars: 940,
+      pageBodyChars: 860,
       pageTailChars: 760
     };
   }
@@ -4762,10 +5506,23 @@ function renderContributionSpotlight(organizerContribution, guestHighlights, opt
   const maxGuestHighlights = Number.isFinite(Number(options.maxGuestHighlights))
     ? Math.max(1, Math.min(3, Number(options.maxGuestHighlights)))
     : 1;
+  const heading = cleanText(options.heading, 120);
+  const preferOrganizer = Boolean(options.preferOrganizer);
+  const preferGuests = Boolean(options.preferGuests);
   const blocks = [];
 
   const organizerMessage = cleanText(organizerContribution?.message || '', organizerMaxChars);
-  if (organizerMessage) {
+  const safeGuestHighlights = Array.isArray(guestHighlights) ? guestHighlights : [];
+  const shouldRenderOrganizer = Boolean(
+    organizerMessage
+    && (
+      preferOrganizer
+      || safeGuestHighlights.length === 0
+      || !preferGuests
+    )
+  );
+
+  if (shouldRenderOrganizer) {
     blocks.push(`
       <div class="draft-book-callout">
         ${formatParagraphs(organizerMessage)}
@@ -4773,10 +5530,10 @@ function renderContributionSpotlight(organizerContribution, guestHighlights, opt
     `);
   }
 
-  if (Array.isArray(guestHighlights) && guestHighlights.length > 0) {
+  if (safeGuestHighlights.length > 0) {
     blocks.push(`
       <div class="draft-book-contributor-list">
-        ${guestHighlights.slice(0, maxGuestHighlights).map((contribution) => `
+        ${safeGuestHighlights.slice(0, maxGuestHighlights).map((contribution) => `
           <div class="draft-book-contributor-item">
             <strong>${escapeHtml(contribution.contributorName || 'Contributeur')}</strong>
             <p>${escapeHtml(cleanText(contribution.message, guestMaxChars) || 'Souvenir a integrer dans la version finale.')}</p>
@@ -4790,26 +5547,46 @@ function renderContributionSpotlight(organizerContribution, guestHighlights, opt
     return '';
   }
 
-  return blocks.join('');
+  return `
+    <div class="draft-book-contribution-spotlight">
+      ${heading ? `<div class="draft-book-mini-title">${escapeHtml(heading)}</div>` : ''}
+      ${blocks.join('')}
+    </div>
+  `;
 }
 
 function renderPhotoGallery(photos, options = {}) {
   const galleryColumns = Number.isFinite(Number(options.columns))
     ? Math.max(2, Math.min(3, Number(options.columns)))
     : 2;
-  const galleryClass = galleryColumns === 3
-    ? 'draft-book-gallery is-cols-3'
-    : 'draft-book-gallery';
+  const safePhotos = Array.isArray(photos)
+    ? photos.filter(Boolean).slice(0, 8)
+    : [];
 
-  if (!Array.isArray(photos) || photos.length === 0) {
+  if (safePhotos.length === 0) {
     return '';
   }
 
+  const galleryClasses = ['draft-book-gallery'];
+  if (galleryColumns === 3 && safePhotos.length >= 3) {
+    galleryClasses.push('is-cols-3');
+  }
+  if (safePhotos.length === 1) {
+    galleryClasses.push('is-single');
+  } else if (safePhotos.length === 2) {
+    galleryClasses.push('is-duo');
+  } else if (safePhotos.length >= 5) {
+    galleryClasses.push('is-mosaic');
+  }
+  const galleryWrapClass = safePhotos.length === 1
+    ? 'draft-book-gallery-wrap is-single'
+    : 'draft-book-gallery-wrap';
+
   return `
-    <div class="draft-book-gallery-wrap">
-      <div class="draft-book-mini-title">Photos du chapitre</div>
-      <div class="${galleryClass}">
-        ${photos.map((photoUrl, photoIndex) => `
+    <div class="${galleryWrapClass}">
+      <div class="draft-book-mini-title">Instants en images</div>
+      <div class="${galleryClasses.join(' ')}">
+        ${safePhotos.map((photoUrl, photoIndex) => `
           <figure class="draft-book-photo">
             <img src="${escapeHtml(photoUrl)}" alt="Photo du chapitre ${photoIndex + 1}" loading="lazy" />
           </figure>
@@ -4822,9 +5599,15 @@ function renderPhotoGallery(photos, options = {}) {
 function splitDraftBody(text, options = {}) {
   const textDensity = normalizePreviewTextDensity(options?.textDensity);
   const profile = PREVIEW_TEXT_DENSITY_PROFILES[textDensity];
+  const normalizedPreviewFormat = resolveBookPreviewFormat(null, options?.previewFormat);
+  const formatFactor = PREVIEW_FORMAT_TEXT_BUDGET_FACTORS[normalizedPreviewFormat] || 1;
+  const requestedSegmentCount = Number.isFinite(Number(options?.segmentCount))
+    ? Number(options.segmentCount)
+    : 2;
+  const segmentCount = Math.max(2, Math.min(CHAPTER_DRAFT_PAGE_COUNT, requestedSegmentCount));
   const rawParagraphs = splitTextToParagraphs(
     text,
-    profile.maxChars,
+    Math.round(profile.maxChars * (segmentCount > 2 ? 1.75 : 1) * formatFactor),
     { preserveParagraphs: true }
   );
   const paragraphs = rawParagraphs
@@ -4832,48 +5615,77 @@ function splitDraftBody(text, options = {}) {
     .filter(Boolean);
 
   if (paragraphs.length === 0) {
-    return ['', ''];
+    return Array.from({ length: segmentCount }, () => '');
   }
 
-  const pageOneParagraphs = [];
-  const pageTwoParagraphs = [];
-  let pageOneChars = 0;
+  if (segmentCount === 2) {
+    const pageOneParagraphs = [];
+    const pageTwoParagraphs = [];
+    let pageOneChars = 0;
 
-  paragraphs.forEach((paragraph) => {
-    const candidateLength = pageOneChars + paragraph.length;
-    const shouldStayOnPageOne = (
-      candidateLength <= profile.firstPageChars
-      || (pageOneParagraphs.length <= 1 && candidateLength <= profile.firstPageChars + profile.firstPageFlexChars)
-    );
+    paragraphs.forEach((paragraph) => {
+      const candidateLength = pageOneChars + paragraph.length;
+      const shouldStayOnPageOne = (
+        candidateLength <= profile.firstPageChars
+        || (pageOneParagraphs.length <= 1 && candidateLength <= profile.firstPageChars + profile.firstPageFlexChars)
+      );
 
-    if (shouldStayOnPageOne) {
-      pageOneParagraphs.push(paragraph);
-      pageOneChars = candidateLength;
-      return;
+      if (shouldStayOnPageOne) {
+        pageOneParagraphs.push(paragraph);
+        pageOneChars = candidateLength;
+        return;
+      }
+
+      pageTwoParagraphs.push(paragraph);
+    });
+
+    if (pageTwoParagraphs.length === 0 && pageOneParagraphs.length > 1) {
+      const middle = Math.max(1, Math.floor(pageOneParagraphs.length / 2));
+      return [
+        pageOneParagraphs.slice(0, middle).join('\n\n'),
+        pageOneParagraphs.slice(middle).join('\n\n')
+      ];
     }
 
-    pageTwoParagraphs.push(paragraph);
-  });
+    const fallbackPageOne = pageOneParagraphs.join('\n\n');
+    const fallbackPageTwo = pageTwoParagraphs.join('\n\n');
 
-  if (pageTwoParagraphs.length === 0 && pageOneParagraphs.length > 1) {
-    const middle = Math.max(1, Math.floor(pageOneParagraphs.length / 2));
+    if (!fallbackPageTwo) {
+      return [fallbackPageOne, ''];
+    }
+
     return [
-      pageOneParagraphs.slice(0, middle).join('\n\n'),
-      pageOneParagraphs.slice(middle).join('\n\n')
+      fallbackPageOne,
+      fallbackPageTwo
     ];
   }
 
-  const fallbackPageOne = pageOneParagraphs.join('\n\n');
-  const fallbackPageTwo = pageTwoParagraphs.join('\n\n');
+  const totalChars = paragraphs.reduce((sum, paragraph) => sum + paragraph.length, 0);
+  const targetCharsPerSegment = Math.max(260, Math.floor(totalChars / segmentCount));
+  const segments = Array.from({ length: segmentCount }, () => []);
+  let segmentIndex = 0;
+  let segmentChars = 0;
 
-  if (!fallbackPageTwo) {
-    return [fallbackPageOne, ''];
-  }
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    const remainingParagraphs = paragraphs.length - paragraphIndex;
+    const remainingSegments = segmentCount - segmentIndex;
+    const mustAdvance = remainingParagraphs <= remainingSegments - 1;
+    const wouldOverflow = segmentChars + paragraph.length > targetCharsPerSegment;
 
-  return [
-    fallbackPageOne,
-    fallbackPageTwo
-  ];
+    if (
+      segmentIndex < segmentCount - 1
+      && segmentChars > 0
+      && (wouldOverflow || mustAdvance)
+    ) {
+      segmentIndex += 1;
+      segmentChars = 0;
+    }
+
+    segments[segmentIndex].push(paragraph);
+    segmentChars += paragraph.length;
+  });
+
+  return segments.map((segmentParagraphs) => segmentParagraphs.join('\n\n'));
 }
 
 function splitTextToParagraphs(value, maxLength = 6000, chunkSize = 420) {
