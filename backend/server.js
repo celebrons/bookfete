@@ -69,6 +69,21 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: err.message });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`API started on http://localhost:${PORT}`);
+});
+
+server.on('error', (error) => {
+  if (error?.code === 'EADDRINUSE') {
+    console.error(`Startup failed: port ${PORT} is already in use.`);
+    process.exit(1);
+    return;
+  }
+  if (error?.code === 'EACCES') {
+    console.error(`Startup failed: insufficient permissions for port ${PORT}.`);
+    process.exit(1);
+    return;
+  }
+  console.error('Startup failed:', error?.message || error);
+  process.exit(1);
 });

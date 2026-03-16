@@ -204,59 +204,48 @@ const ChapterWorkflowLuxe = (props) => {
   }, [activeStep, isSoloMode, questionsValidated, hasContributed, contributionsClosed, isClosed]);
 
   const activeStepConfig = steps.find((step) => step.key === activeStep) || steps[0];
+  const getStepVisualState = (step) => {
+    if (activeStep === step.key) {
+      return 'current';
+    }
+    if (step.completed) {
+      return 'done';
+    }
+    if (step.locked) {
+      return 'locked';
+    }
+    return 'upcoming';
+  };
 
   return (
     <div className="workflow-layout" style={{ marginBottom: 'var(--space-xl)' }}>
       <aside className="workflow-steps-nav" aria-label="Etapes du chapitre">
-        <div className="workflow-steps-summary" aria-label="Sommaire compact des etapes">
-          {steps.map((step) => (
-            <button
-              key={`${step.key}-summary`}
-              type="button"
-              className={`workflow-step-chip ${step.completed ? 'completed' : ''} ${step.locked ? 'locked' : ''} ${activeStep === step.key ? 'active' : ''}`}
-              onClick={() => setActiveStep(step.key)}
-              aria-current={activeStep === step.key ? 'step' : undefined}
-            >
-              <span className="workflow-step-chip-number">
-                {step.completed ? completedMarker : `${step.order}`}
-              </span>
-              <span className="workflow-step-chip-text">
-                <span className="workflow-step-chip-label">Etape {step.order}</span>
-                <span className="workflow-step-chip-title">{step.title}</span>
-              </span>
-            </button>
-          ))}
+        <div className="workflow-steps-heading">
+          <h3 className="workflow-steps-heading-title">Etapes</h3>
         </div>
-
-        {steps.map((step) => (
-          <div
-            key={step.key}
-            className={`workflow-step ${step.completed ? 'completed' : ''} ${step.locked ? 'locked' : ''} ${activeStep === step.key ? 'active' : 'inactive'}`}
-          >
-            <button
-              type="button"
-              className={`workflow-header ${activeStep === step.key ? 'active' : ''}`}
-              onClick={() => setActiveStep(step.key)}
-              aria-current={activeStep === step.key ? 'step' : undefined}
+        <ol className="workflow-steps-stair">
+          {steps.map((step) => (
+            <li
+              key={step.key}
+              className="workflow-steps-stair-item"
             >
-              <span className="workflow-step-number">{step.completed ? completedMarker : `${step.order}`}</span>
-              <span className="workflow-step-title-wrap">
-                <span className="workflow-step-title">{step.title}</span>
-                {activeStep === step.key && (
-                  <span className="workflow-step-focus-tag">
-                    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                      <path d="M8 1l1.85 3.75L14 5.36l-3 2.92.71 4.14L8 10.47l-3.71 1.95L5 8.28 2 5.36l4.15-.61L8 1z" />
-                    </svg>
-                    En cours
-                  </span>
-                )}
-              </span>
-              <span className={`workflow-step-status ${step.status.tone}`}>
-                {step.status.label}
-              </span>
-            </button>
-          </div>
-        ))}
+              <button
+                type="button"
+                className={`workflow-stair-step is-${getStepVisualState(step)}`}
+                onClick={() => setActiveStep(step.key)}
+                aria-current={activeStep === step.key ? 'step' : undefined}
+              >
+                <span className="workflow-stair-marker">{step.completed ? completedMarker : `${step.order}`}</span>
+                <span className="workflow-stair-main">
+                  <span className="workflow-stair-title" title={step.title}>{step.title}</span>
+                </span>
+                <span className={`workflow-stair-status ${step.status.tone}`}>
+                  {step.status.label || 'A faire'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
       </aside>
 
       <section className="workflow-detail-panel">

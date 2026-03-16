@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "prompts:seed": "node scripts/seedPromptTemplates.js",
     "prompts:seed:question-variants": "node scripts/seedQuestionPromptVariants.js",
-    "seed:realistic-project": "node scripts/seedRealisticProject.js"
+    "seed:realistic-project": "node scripts/seedRealisticProject.js",
+    "seed:enrich-demo-book": "node scripts/enrichDemoBook.js"
   },
   "dependencies": {
     "@mistralai/mistralai": "^1.14.0",

@@ -2322,8 +2322,8 @@ const BookPageLuxe = () => {
               title={TAB_HELP.chapitres}
               aria-label={`Edition du livre. ${TAB_HELP.chapitres}`}
             >
-              <span>📑</span>
               Edition du livre
+              <span className="tab-icon-luxe tab-icon-book" aria-hidden="true" />
               <span className="tab-help" aria-hidden="true">?</span>
             </button>
             <button
@@ -2333,8 +2333,8 @@ const BookPageLuxe = () => {
               title={TAB_HELP.contributeurs}
               aria-label={`Contributeurs. ${TAB_HELP.contributeurs}`}
             >
-              <span>👥</span>
               Contributeurs
+              <span className="tab-icon-luxe tab-icon-contributors" aria-hidden="true" />
               <span className="tab-help" aria-hidden="true">?</span>
             </button>
             <button
@@ -2344,8 +2344,8 @@ const BookPageLuxe = () => {
               title={TAB_HELP.config}
               aria-label={`Configuration. ${TAB_HELP.config}`}
             >
-              <span>⚙️</span>
               Configuration
+              <span className="tab-icon-luxe tab-icon-config" aria-hidden="true" />
               <span className="tab-help" aria-hidden="true">?</span>
             </button>
           </div>

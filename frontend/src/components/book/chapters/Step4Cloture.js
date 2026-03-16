@@ -303,40 +303,47 @@ const Step4Cloture = ({
     : [];
   const summaryCards = [
     {
+      key: 'questions',
       label: 'Questions',
-      value: questionsReady ? 'Validees' : 'A finaliser',
-      tone: questionsReady ? 'ok' : 'pending'
+      value: questionsReady ? 'OK' : 'A faire',
+      tone: questionsReady ? 'ok' : 'pending',
+      icon: 'questions'
     },
     {
+      key: 'contribution',
       label: 'Votre contribution',
-      value: contributionReady ? 'Prete' : 'A completer',
-      tone: contributionReady ? 'ok' : 'pending'
+      value: contributionReady ? 'Prete' : 'A faire',
+      tone: contributionReady ? 'ok' : 'pending',
+      icon: 'contribution'
     },
     !isSoloMode ? {
+      key: 'invitations',
       label: 'Invitations',
-      value: `${invitationsCount} envoyee(s)`,
-      tone: invitationsReady ? 'ok' : 'pending'
+      value: `${invitationsCount}`,
+      tone: invitationsReady ? 'ok' : 'pending',
+      icon: 'invitations'
     } : null,
     !isSoloMode ? {
+      key: 'received',
       label: 'Contributions recues',
-      value: `${visibleContributionsCount} retenue(s)`,
-      tone: visibleContributionsCount > 0 ? 'ok' : 'pending'
+      value: `${visibleContributionsCount}`,
+      tone: visibleContributionsCount > 0 ? 'ok' : 'pending',
+      icon: 'received'
     } : null,
     !isSoloMode ? {
+      key: 'pending_validation',
       label: 'A valider',
-      value: `${pendingValidationCount} en attente`,
-      tone: pendingValidationCount === 0 ? 'ok' : 'pending'
+      value: `${pendingValidationCount}`,
+      tone: pendingValidationCount === 0 ? 'ok' : 'pending',
+      icon: 'pending'
     } : null,
     !isSoloMode ? {
+      key: 'flow',
       label: 'Flux contributeurs',
       value: contributionsClosed ? 'Clos' : 'Ouvert',
-      tone: contributionsClosed ? 'ok' : 'pending'
-    } : null,
-    {
-      label: 'Brouillon',
-      value: isDraftValidated ? 'Valide' : (chapterDraft ? 'En cours' : 'A generer'),
-      tone: isDraftValidated ? 'ok' : (chapterDraft ? 'active' : 'pending')
-    }
+      tone: contributionsClosed ? 'ok' : 'pending',
+      icon: 'flow'
+    } : null
   ].filter(Boolean);
 
   useEffect(() => {
@@ -744,33 +751,6 @@ const Step4Cloture = ({
         <div className="luxe-feedback-banner is-success">{notice}</div>
       )}
 
-      <div
-        className="card"
-        style={{
-          marginBottom: 'var(--space-lg)',
-          background: isDraftValidated ? '#e9f7ef' : '#fcfbf8',
-          borderColor: isDraftValidated ? '#d9eadf' : 'var(--mist)'
-        }}
-      >
-        <p style={{ margin: 0, color: 'var(--ink)' }}>
-          {isDraftValidated
-            ? 'Le chapitre est valide definitivement. Le contenu ne peut plus etre modifie.'
-            : 'Generez le chapitre, ajustez le texte si besoin puis lancez la validation finale.'}
-        </p>
-      </div>
-
-      <div className="chapter-draft-summary-grid">
-        {summaryCards.map((item) => (
-          <div
-            key={item.label}
-            className={`chapter-draft-summary-card is-${item.tone}`}
-          >
-            <div className="chapter-draft-summary-label">{item.label}</div>
-            <div className="chapter-draft-summary-value">{item.value}</div>
-          </div>
-        ))}
-      </div>
-
       {showContributionsGateWarning && (
         <div className="card chapter-draft-warning-card">
           Fermez d abord les contributions a l etape 3. Les commentaires non valides ne sont jamais pris en compte
@@ -858,12 +838,21 @@ const Step4Cloture = ({
           </div>
         )}
 
-        <div className="chapter-draft-summary-card is-active" style={{ marginTop: 'var(--space-sm)' }}>
-          <div className="chapter-draft-summary-label">Utilisation</div>
-          <div className="chapter-draft-summary-value" style={{ fontSize: '14px', fontWeight: '500' }}>
-            Le texte du chapitre se corrige dans la fenetre d edition, sans afficher les balises HTML.
+        {summaryCards.length > 0 && (
+          <div className="chapter-draft-summary-cloud is-inline is-minimal">
+            {summaryCards.map((item) => (
+              <div
+                key={item.key}
+                className={`chapter-draft-summary-pill is-${item.tone}`}
+                title={`${item.label}: ${item.value}`}
+                aria-label={`${item.label}: ${item.value}`}
+              >
+                <span className={`chapter-draft-summary-pill-icon is-${item.icon}`} aria-hidden="true" />
+                <strong className="chapter-draft-summary-pill-value">{item.value}</strong>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
       </div>
 
       {showPreviewModal && (
