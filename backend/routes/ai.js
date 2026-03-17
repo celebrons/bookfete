@@ -3,6 +3,11 @@ const express = require('express');
 const router = express.Router();
 const aiService = require('../services/aiService');
 const promptTemplateService = require('../services/promptTemplateService');
+const {
+  parseChapterContractOutput,
+  validateChapterTitlesContract,
+  sanitizeBookTitleCandidate
+} = require('../services/aiOutputContracts');
 const authenticate = require('../middleware/auth');
 
 const PROMPT_DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(
@@ -339,6 +344,229 @@ function shapeChaptersFromTitles(titles, count) {
   }));
 }
 
+function mergeChapterTitlesWithFallback({
+  candidateTitles,
+  count,
+  eventType,
+  recipientName,
+  recipientAge,
+  recipientGender
+}) {
+  const targetCount = Number.isInteger(Number(count)) ? Math.max(1, Number(count)) : 8;
+  const normalizedCandidateTitles = (Array.isArray(candidateTitles) ? candidateTitles : [])
+    .map((title) => normalizeTitle(title))
+    .filter(Boolean);
+  const fallbackTitles = generateFallbackTitles(
+    eventType,
+    targetCount,
+    recipientName,
+    recipientAge,
+    recipientGender
+  );
+  const merged = [];
+  const seen = new Set();
+
+  const pushUnique = (value) => {
+    const normalized = normalizeTitle(value);
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(normalized);
+  };
+
+  normalizedCandidateTitles.forEach(pushUnique);
+  fallbackTitles.forEach(pushUnique);
+
+  while (merged.length < targetCount) {
+    pushUnique(`Chapitre ${merged.length + 1}`);
+  }
+
+  return merged.slice(0, targetCount);
+}
+
+function buildChapterRepairPrompt(basePrompt, expectedCount, issues = []) {
+  const normalizedCount = Number.isInteger(Number(expectedCount)) ? Number(expectedCount) : 8;
+  return [
+    String(basePrompt || '').trim(),
+    '',
+    'Correction obligatoire:',
+    `- Reponds uniquement en JSON valide avec exactement ${normalizedCount} titres de chapitres.`,
+    '- Aucun texte avant ou apres le JSON.',
+    '- Aucune variable brute de type [recipientName] ou {{recipientName}}.',
+    '- Evite les doublons et les titres generiques.',
+    '- Structure attendue: { "bookTitle": "Titre optionnel", "chapterTitles": ["Titre 1", "Titre 2"] }',
+    issues.length > 0
+      ? `- Corrige ces erreurs detectees: ${issues.join(', ')}.`
+      : '- Corrige le format de sortie.'
+  ].join('\n');
+}
+
+async function runChapterGenerationWithContract({
+  promptConfig,
+  userPrompt,
+  expectedCount,
+  eventType,
+  recipientName,
+  recipientAge,
+  recipientGender
+}) {
+  const askModel = async (promptText) => {
+    const response = await aiService.mistral.chat.complete({
+      model: 'mistral-small-latest',
+      messages: [
+        {
+          role: 'system',
+          content: promptConfig.systemPrompt
+        },
+        {
+          role: 'user',
+          content: promptText
+        }
+      ],
+      temperature: promptConfig.temperature,
+      maxTokens: promptConfig.maxTokens
+    });
+    return String(response?.choices?.[0]?.message?.content || '');
+  };
+
+  const evaluateAttempt = (output) => {
+    const strictParsed = parseChapterContractOutput(output);
+    const looseTitles = strictParsed.titles.length > 0
+      ? strictParsed.titles
+      : parseChapterTitles(output);
+    const validation = validateChapterTitlesContract(looseTitles, {
+      expectedCount
+    });
+    return {
+      output,
+      strictJson: strictParsed.strictJson,
+      titles: validation.normalizedTitles,
+      issues: validation.issues,
+      isValid: validation.isValid,
+      suggestedBookTitle: sanitizeBookTitleCandidate(
+        strictParsed.suggestedBookTitle || parseSuggestedBookTitle(output)
+      )
+    };
+  };
+
+  const initialOutput = await askModel(userPrompt);
+  const firstAttempt = evaluateAttempt(initialOutput);
+  if (firstAttempt.isValid) {
+    return {
+      titles: mergeChapterTitlesWithFallback({
+        candidateTitles: firstAttempt.titles,
+        count: expectedCount,
+        eventType,
+        recipientName,
+        recipientAge,
+        recipientGender
+      }),
+      suggestedBookTitle: firstAttempt.suggestedBookTitle,
+      usedRepair: false,
+      strictJson: firstAttempt.strictJson,
+      issues: []
+    };
+  }
+
+  const repairPrompt = buildChapterRepairPrompt(userPrompt, expectedCount, firstAttempt.issues);
+  const repairedOutput = await askModel(repairPrompt);
+  const secondAttempt = evaluateAttempt(repairedOutput);
+
+  const bestAttempt = secondAttempt.titles.length >= firstAttempt.titles.length
+    ? secondAttempt
+    : firstAttempt;
+  const mergedTitles = mergeChapterTitlesWithFallback({
+    candidateTitles: bestAttempt.titles,
+    count: expectedCount,
+    eventType,
+    recipientName,
+    recipientAge,
+    recipientGender
+  });
+
+  return {
+    titles: mergedTitles,
+    suggestedBookTitle: bestAttempt.suggestedBookTitle,
+    usedRepair: true,
+    strictJson: bestAttempt.strictJson,
+    issues: Array.from(new Set([
+      ...firstAttempt.issues,
+      ...secondAttempt.issues
+    ]))
+  };
+}
+
+async function generateChaptersFromRequest(body = {}) {
+  const {
+    eventType,
+    style,
+    count,
+    bookTitle,
+    recipientName,
+    recipientAge,
+    recipientGender,
+    recipientNickname,
+    recipientTrait,
+    recipientAnecdote,
+    additionalContext,
+    projectBrief
+  } = body;
+
+  const resolvedAdditionalContext = additionalContext || projectBrief || '';
+  const expectedCount = Number.isInteger(Number(count))
+    ? Number(count)
+    : Number.parseInt(count, 10) || 0;
+
+  if (expectedCount < 1) {
+    const error = new Error('Le nombre de chapitres doit etre superieur a 0');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const promptConfig = await promptTemplateService.buildPrompt({
+    promptKey: promptTemplateService.PROMPT_KEYS.CHAPTER_GENERATION,
+    eventType: eventType || 'generique',
+    variables: {
+      count: expectedCount,
+      eventType: eventType || 'generique',
+      style: style || 'intime',
+      bookTitle: bookTitle || 'Livre souvenir',
+      recipientName: recipientName || 'la personne',
+      recipientAge: recipientAge || 'non specifie',
+      recipientGender: recipientGender || 'non specifie',
+      recipientNickname: recipientNickname || '',
+      recipientTrait: recipientTrait || '',
+      recipientAnecdote: recipientAnecdote || '',
+      additionalContext: resolvedAdditionalContext || ''
+    }
+  });
+
+  const finalPrompt = promptConfig.userPrompt;
+
+  const modelResult = await runChapterGenerationWithContract({
+    promptConfig,
+    userPrompt: finalPrompt,
+    expectedCount,
+    eventType,
+    recipientName,
+    recipientAge,
+    recipientGender
+  });
+
+  return {
+    chapters: shapeChaptersFromTitles(modelResult.titles, expectedCount),
+    suggestedBookTitle: modelResult.suggestedBookTitle,
+    promptSource: promptConfig.source,
+    promptVersion: promptConfig.version,
+    quality: {
+      usedRepair: modelResult.usedRepair,
+      strictJson: modelResult.strictJson,
+      contractIssues: modelResult.issues
+    }
+  };
+}
+
 function buildDefaultPromptTestVariables({
   promptKey,
   eventType = 'generique'
@@ -399,6 +627,14 @@ function buildDefaultPromptTestVariables({
 // Route PUBLIQUE pour générer des chapitres (sans authentification)
 router.post('/generate-chapters-public', async (req, res) => {
   try {
+    const requestedCount = Number.parseInt(req.body?.count, 10);
+    if (!Number.isFinite(requestedCount) || requestedCount < 1) {
+      return res.status(400).json({ error: 'Le nombre de chapitres doit etre superieur a 0' });
+    }
+
+    const payload = await generateChaptersFromRequest(req.body);
+    return res.json(payload);
+
     const { 
       eventType, 
       style, 
@@ -411,9 +647,7 @@ router.post('/generate-chapters-public', async (req, res) => {
       recipientTrait,
       recipientAnecdote,
       additionalContext,
-      projectBrief,
-      prompt,
-      usePromptOverride
+      projectBrief
     } = req.body;
 
     const resolvedAdditionalContext = additionalContext || projectBrief || '';
@@ -457,7 +691,7 @@ router.post('/generate-chapters-public', async (req, res) => {
       }
     });
 
-    const finalPrompt = usePromptOverride && prompt ? prompt : promptConfig.userPrompt;
+    const finalPrompt = promptConfig.userPrompt;
 
     console.log('📤 Appel à Mistral...');
 
@@ -501,6 +735,10 @@ router.post('/generate-chapters-public', async (req, res) => {
     console.error('❌ Erreur génération chapitres (public):', error);
     
     // Fallback en cas d'erreur
+    if (Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 500) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+
     const fallbackChapters = generateFallbackTitles(
       req.body.eventType, 
       req.body.count || 8,
@@ -868,11 +1106,34 @@ router.post('/generate-questions', authenticate, async (req, res) => {
 // Route pour générer une citation
 router.post('/generate-quote', authenticate, async (req, res) => {
   try {
-    const { chapterTitle, eventType, style } = req.body;
+    const {
+      chapterTitle,
+      eventType,
+      style,
+      bookTitle,
+      recipientName,
+      recipientAge,
+      recipientGender,
+      chapterSummary,
+      narrativeContext
+    } = req.body || {};
     
     console.log('📝 Génération de citation pour:', { chapterTitle, eventType, style });
     
-    const quote = await aiService.generateQuote(chapterTitle, eventType, style);
+    const quote = await aiService.generateNarrativeContent({
+      outputType: 'quote',
+      eventType: eventType || 'generique',
+      style: style || 'intime',
+      bookTitle: bookTitle || 'Livre souvenir',
+      chapterTitle: chapterTitle || 'Chapitre',
+      recipientName: recipientName || 'la personne celebree',
+      recipientAge: recipientAge || 'non specifie',
+      recipientGender: recipientGender || 'non specifie',
+      chapterSummary: chapterSummary || '',
+      narrativeContext: narrativeContext || 'Retourne une seule citation courte, memorable et elegante.',
+      targetLength: 180,
+      maxLength: 260
+    });
     
     res.json({ quote });
   } catch (error) {
@@ -884,6 +1145,14 @@ router.post('/generate-quote', authenticate, async (req, res) => {
 // Route protégée pour générer des chapitres (pour utilisateurs connectés)
 router.post('/generate-chapters', authenticate, async (req, res) => {
   try {
+    const requestedCount = Number.parseInt(req.body?.count, 10);
+    if (!Number.isFinite(requestedCount) || requestedCount < 1) {
+      return res.status(400).json({ error: 'Le nombre de chapitres doit etre superieur a 0' });
+    }
+
+    const payload = await generateChaptersFromRequest(req.body);
+    return res.json(payload);
+
     const { 
       eventType, 
       style, 
@@ -896,9 +1165,7 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
       recipientTrait,
       recipientAnecdote,
       additionalContext,
-      projectBrief,
-      prompt,
-      usePromptOverride
+      projectBrief
     } = req.body;
 
     const resolvedAdditionalContext = additionalContext || projectBrief || '';
@@ -939,7 +1206,7 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
       }
     });
 
-    const finalPrompt = usePromptOverride && prompt ? prompt : promptConfig.userPrompt;
+    const finalPrompt = promptConfig.userPrompt;
 
     const response = await aiService.mistral.chat.complete({
       model: 'mistral-small-latest',
@@ -1003,7 +1270,33 @@ router.post('/generate-chapters', authenticate, async (req, res) => {
 // Route pour générer une introduction
 router.post('/generate-introduction', authenticate, async (req, res) => {
   try {
-    const { bookTitle, eventType, style, recipientName, recipientAge, recipientGender } = req.body;
+    const body = req.body || {};
+    const generatedIntroduction = await aiService.generateNarrativeContent({
+      outputType: 'introduction',
+      eventType: body.eventType || 'generique',
+      style: body.style || 'intime',
+      bookTitle: body.bookTitle || 'Livre souvenir',
+      chapterTitle: 'Introduction',
+      recipientName: body.recipientName || 'la personne celebree',
+      recipientAge: body.recipientAge || 'non specifie',
+      recipientGender: body.recipientGender || 'non specifie',
+      chapterSummary: body.chapterSummary || '',
+      narrativeContext: body.narrativeContext || 'Introduction premium du livre, ton elegant et chaleureux.',
+      targetLength: 900,
+      maxLength: 2200
+    });
+    return res.json({ introduction: generatedIntroduction });
+
+    const {
+      bookTitle,
+      eventType,
+      style,
+      recipientName,
+      recipientAge,
+      recipientGender,
+      chapterSummary,
+      narrativeContext
+    } = req.body || {};
     
     const prompt = `Rédige une introduction poétique et chaleureuse pour un livre souvenir.
 
@@ -1046,6 +1339,23 @@ Réponds UNIQUEMENT avec le texte de l'introduction, sans guillemets.`;
 // Route pour générer une conclusion
 router.post('/generate-conclusion', authenticate, async (req, res) => {
   try {
+    const body = req.body || {};
+    const generatedConclusion = await aiService.generateNarrativeContent({
+      outputType: 'conclusion',
+      eventType: body.eventType || 'generique',
+      style: body.style || 'intime',
+      bookTitle: body.bookTitle || 'Livre souvenir',
+      chapterTitle: 'Conclusion',
+      recipientName: body.recipientName || 'la personne celebree',
+      recipientAge: body.recipientAge || 'non specifie',
+      recipientGender: body.recipientGender || 'non specifie',
+      chapterSummary: body.chapterSummary || '',
+      narrativeContext: body.narrativeContext || 'Conclusion premium avec gratitude, fermeture elegante et emotion.',
+      targetLength: 800,
+      maxLength: 2200
+    });
+    return res.json({ conclusion: generatedConclusion });
+
     const { bookTitle, eventType, style, recipientName } = req.body;
     
     const prompt = `Rédige une conclusion touchante pour un livre souvenir.

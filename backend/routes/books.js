@@ -10,6 +10,7 @@ const PDFDocument = require('pdfkit');
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const aiService = require('../services/aiService');
+const promptTemplateService = require('../services/promptTemplateService');
 const authenticate = require('../middleware/auth');
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
@@ -808,6 +809,12 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       req.body?.previewLayoutSettings || book?.cover_config?.previewLayoutSettings,
       previewFormat
     );
+    const forceRegenerate = (
+      req.body?.forceRegenerate === true
+      || req.body?.forceRegenerate === 'true'
+      || req.body?.forceRegenerate === 1
+      || req.body?.forceRegenerate === '1'
+    );
 
     const chaptersWithDrafts = (chapters || []).map((chapter) => ({
       chapter,
@@ -913,7 +920,7 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
     }
 
     const linkedJobId = cleanText(targetOrder?.metadata?.pdfJobId, 120);
-    if (linkedJobId) {
+    if (linkedJobId && !forceRegenerate) {
       const linkedJob = getOwnedPdfExportJob({
         jobId: linkedJobId,
         bookId,
@@ -931,7 +938,11 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       }
     }
 
-    if (targetOrder && String(targetOrder.status || '').toLowerCase() === 'pdf_generating') {
+    if (
+      targetOrder
+      && String(targetOrder.status || '').toLowerCase() === 'pdf_generating'
+      && !forceRegenerate
+    ) {
       const recoveredJob = await recoverMissingPdfExportJob({
         db,
         bookId,
@@ -1064,13 +1075,9 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
       previewFormat: job.previewFormat || DEFAULT_PREVIEW_FORMAT,
       files: job.status === 'ready'
         ? {
-            interior: {
-              kind: 'interior',
-              fileName: job.files?.interior?.fileName || 'interieur.pdf'
-            },
-            cover: {
-              kind: 'cover',
-              fileName: job.files?.cover?.fileName || 'couverture.pdf'
+            final: {
+              kind: 'final',
+              fileName: job.files?.final?.fileName || 'livre-final.pdf'
             }
           }
         : null
@@ -1128,11 +1135,17 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
       });
     }
 
-    if (kind !== 'interior' && kind !== 'cover') {
+    const normalizedKind = kind === 'book' ? 'final' : kind;
+    if (!['final', 'interior', 'cover'].includes(normalizedKind)) {
       return res.status(400).json({ error: 'Type de fichier invalide' });
     }
 
-    const targetFile = job.files?.[kind];
+    const targetFile = (
+      job.files?.[normalizedKind]
+      || (normalizedKind === 'final' ? job.files?.book : null)
+      || (normalizedKind === 'final' ? job.files?.interior : null)
+      || job.files?.final
+    );
     if (!targetFile?.path || !fs.existsSync(targetFile.path)) {
       return res.status(404).json({ error: 'Fichier PDF introuvable' });
     }
@@ -1140,7 +1153,7 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${targetFile.fileName || `${kind}.pdf`}"`
+      `attachment; filename="${targetFile.fileName || `${normalizedKind}.pdf`}"`
     );
 
     const fileStream = fs.createReadStream(targetFile.path);
@@ -1374,6 +1387,8 @@ function buildChapterDraftSourcePayload({
       id: book.id,
       title: cleanText(book.title, 180) || 'Livre souvenir',
       recipientName: cleanText(book.recipient_name, 180) || 'la personne celebree',
+      recipientAge: book.recipient_age || null,
+      recipientGender: cleanText(book.recipient_gender, 120) || '',
       eventType: cleanText(book.event_type, 120) || 'evenement',
       styleNarratif: cleanText(book.style_narratif, 120) || 'intime',
       aiProjectBrief: cleanText(book?.cover_config?.aiProjectBrief, 900),
@@ -1705,51 +1720,97 @@ function analyzeChapterDraftQuality(draft, sourcePayload, detailAnchors = []) {
   };
 }
 
-async function generateChapterPlanFromAI(sourcePayload, fallbackDraft, detailAnchors = []) {
-  const fallbackPlan = buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors);
-
+async function generateStructuredDraftFromContentPrompt({
+  sourcePayload,
+  outputType = 'chapter_content',
+  chapterTitle = '',
+  chapterSummary = '',
+  narrativeContext = '',
+  targetLength = 2400,
+  temperature,
+  maxTokens
+}) {
   if (!aiService?.mistral) {
-    return fallbackPlan;
+    return null;
   }
 
-  const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 3);
-  const prompt = [
-    `Tu es directeur editorial premium. Tu construis un plan narratif en ${CHAPTER_DRAFT_PAGE_COUNT} pages.`,
-    'Objectif: produire un chapitre original, riche, sans blabla.',
-    'Interdits: phrases meta, generalites vides, morale abstraite.',
-    'Retourne UNIQUEMENT un JSON valide avec cette structure exacte:',
-    '{',
-    '  "narrativePromise": "string",',
-    '  "pagePlans": [',
-    '    { "title": "string", "focus": "string", "anchors": ["string", "string"] }',
-    '  ],',
-    '  "forbidden": ["string", "string", "string"]',
-    '}',
-    `"pagePlans" doit contenir exactement ${CHAPTER_DRAFT_PAGE_COUNT} objets.`,
-    '',
-    'DONNEES:',
-    JSON.stringify(sourceSnapshot)
-  ].join('\n');
-
   try {
+    const promptConfig = await promptTemplateService.buildPrompt({
+      promptKey: promptTemplateService.PROMPT_KEYS.CONTENT_GENERATION,
+      eventType: cleanText(sourcePayload?.book?.eventType, 120) || 'generique',
+      variables: {
+        outputType,
+        eventType: cleanText(sourcePayload?.book?.eventType, 120) || 'generique',
+        style: cleanText(sourcePayload?.book?.styleNarratif, 120) || 'intime',
+        bookTitle: cleanText(sourcePayload?.book?.title, 180) || 'Livre souvenir',
+        chapterTitle: cleanText(chapterTitle || sourcePayload?.chapter?.title, 180) || 'Chapitre',
+        recipientName: cleanText(sourcePayload?.book?.recipientName, 180) || 'la personne celebree',
+        recipientAge: sourcePayload?.book?.recipientAge || 'non specifie',
+        recipientGender: cleanText(sourcePayload?.book?.recipientGender, 120) || 'non specifie',
+        chapterSummary: cleanText(chapterSummary, 1200) || '',
+        narrativeContext: cleanText(narrativeContext, 32000) || '',
+        targetLength: Number.isFinite(Number(targetLength)) ? Number(targetLength) : 2400
+      }
+    });
+
     const response = await aiService.mistral.chat.complete({
       model: 'mistral-small-latest',
       messages: [
-        {
-          role: 'system',
-          content: 'Tu renvoies uniquement du JSON valide et compact.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
+        { role: 'system', content: promptConfig.systemPrompt },
+        { role: 'user', content: promptConfig.userPrompt }
       ],
+      temperature: Number.isFinite(Number(temperature))
+        ? Number(temperature)
+        : promptConfig.temperature,
+      maxTokens: Number.isFinite(Number(maxTokens))
+        ? Number(maxTokens)
+        : promptConfig.maxTokens
+    });
+
+    const raw = response?.choices?.[0]?.message?.content || '';
+    return {
+      raw,
+      parsed: parseDraftJson(raw),
+      promptSource: promptConfig.source,
+      promptVersion: promptConfig.version
+    };
+  } catch (error) {
+    console.error('Erreur prompt content_generation (structured):', error);
+    return null;
+  }
+}
+
+async function generateChapterPlanFromAI(sourcePayload, fallbackDraft, detailAnchors = []) {
+  const fallbackPlan = buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors);
+
+  const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 3);
+  const narrativeContext = JSON.stringify({
+    task: 'chapter_plan_json',
+    objective: `Construire un plan narratif premium en ${CHAPTER_DRAFT_PAGE_COUNT} pages.`,
+    constraints: [
+      'Interdits: phrases meta, generalites vides, morale abstraite.',
+      `pagePlans doit contenir exactement ${CHAPTER_DRAFT_PAGE_COUNT} objets.`
+    ],
+    outputSchema: {
+      narrativePromise: 'string',
+      pagePlans: [{ title: 'string', focus: 'string', anchors: ['string', 'string'] }],
+      forbidden: ['string', 'string', 'string']
+    },
+    sourceSnapshot
+  });
+
+  try {
+    const modelResult = await generateStructuredDraftFromContentPrompt({
+      sourcePayload,
+      outputType: 'chapter_plan',
+      chapterTitle: sourcePayload?.chapter?.title || fallbackDraft?.title || 'Chapitre',
+      chapterSummary: fallbackDraft?.summary || '',
+      narrativeContext,
+      targetLength: 1800,
       temperature: 0.45,
       maxTokens: 1800
     });
-
-    const content = response?.choices?.[0]?.message?.content || '';
-    const parsed = parseDraftJson(content);
+    const parsed = modelResult?.parsed;
     return normalizeChapterPlan(parsed, sourcePayload, fallbackDraft, detailAnchors);
   } catch (error) {
     console.error('Erreur IA plan chapitre:', error);
@@ -1765,7 +1826,7 @@ async function maybeRegenerateChapterDraftForQuality({
   fallbackDraft,
   qualityReport
 }) {
-  if (!aiService?.mistral || qualityReport.score >= CHAPTER_DRAFT_QUALITY_THRESHOLD) {
+  if (qualityReport.score >= CHAPTER_DRAFT_QUALITY_THRESHOLD) {
     return {
       draft: candidateDraft,
       quality: qualityReport,
@@ -1774,55 +1835,41 @@ async function maybeRegenerateChapterDraftForQuality({
   }
 
   const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 4);
-  const prompt = [
-    'Tu corriges un brouillon de chapitre pour atteindre un niveau editorial premium.',
-    'Tu dois garder le sens global, mais supprimer le blabla et densifier le concret.',
-    'Tu DOIS ameliorer selon ces points:',
-    ...(qualityReport.issues.length > 0
-      ? qualityReport.issues.map((issue, index) => `${index + 1}. ${issue}`)
-      : ['1. Rendre le texte plus concret et plus vivant.']),
-    '',
-    'Contraintes obligatoires:',
-    `- ${CHAPTER_DRAFT_PAGE_COUNT} pages exactement.`,
-    `- Chaque page entre ${CHAPTER_DRAFT_MIN_PAGE_CHARS} et 1100 caracteres environ.`,
-    '- Titres de pages editoriaux, sans "Page 1" ni "Chapitre 1".',
-    '- Utilise des details sensoriels, gestes, dialogues brefs quand pertinent.',
-    '- Aucun format liste a puces.',
-    '- Aucun meta-commentaire sur la redaction.',
-    '',
-    'Retourne UNIQUEMENT ce JSON:',
-    '{ "title":"string", "pages":[{"title":"string","body":"string"}], "summary":"string" }',
-    `"pages" doit contenir exactement ${CHAPTER_DRAFT_PAGE_COUNT} objets.`,
-    '',
-    'PLAN NARRATIF:',
-    JSON.stringify(chapterPlan),
-    '',
-    'BROUILLON ACTUEL:',
-    JSON.stringify(candidateDraft),
-    '',
-    'DONNEES SOURCE:',
-    JSON.stringify(sourceSnapshot)
-  ].join('\n');
+  const narrativeContext = JSON.stringify({
+    task: 'chapter_revision_json',
+    objective: 'Corriger le brouillon pour un niveau editorial premium.',
+    qualityIssues: Array.isArray(qualityReport.issues) && qualityReport.issues.length > 0
+      ? qualityReport.issues
+      : ['Rendre le texte plus concret et plus vivant.'],
+    constraints: [
+      `${CHAPTER_DRAFT_PAGE_COUNT} pages exactement.`,
+      `Chaque page entre ${CHAPTER_DRAFT_MIN_PAGE_CHARS} et 1100 caracteres environ.`,
+      'Titres editoriaux sans "Page X" ni "Chapitre X".',
+      'Aucun format liste a puces.',
+      'Aucun meta-commentaire.'
+    ],
+    outputSchema: {
+      title: 'string',
+      pages: [{ title: 'string', body: 'string' }],
+      summary: 'string'
+    },
+    chapterPlan,
+    candidateDraft,
+    sourceSnapshot
+  });
 
   try {
-    const response = await aiService.mistral.chat.complete({
-      model: 'mistral-small-latest',
-      messages: [
-        {
-          role: 'system',
-          content: 'Tu renvoies uniquement du JSON valide. Aucune phrase hors JSON.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
+    const modelResult = await generateStructuredDraftFromContentPrompt({
+      sourcePayload,
+      outputType: 'chapter_revision',
+      chapterTitle: sourcePayload?.chapter?.title || candidateDraft?.title || 'Chapitre',
+      chapterSummary: candidateDraft?.summary || fallbackDraft?.summary || '',
+      narrativeContext,
+      targetLength: CHAPTER_DRAFT_PAGE_COUNT * 900,
       temperature: 0.38,
       maxTokens: 3800
     });
-
-    const content = response?.choices?.[0]?.message?.content || '';
-    const parsed = parseDraftJson(content);
+    const parsed = modelResult?.parsed;
     if (!parsed || !Array.isArray(parsed.pages)) {
       return {
         draft: candidateDraft,
@@ -1867,58 +1914,38 @@ async function generateChapterDraftFromAI(sourcePayload) {
   const chapterPlan = await generateChapterPlanFromAI(sourcePayload, fallbackDraft, detailAnchors);
   const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 6);
 
-  if (!aiService?.mistral) {
-    return {
-      ...fallbackDraft,
-      plan: chapterPlan,
-      quality: analyzeChapterDraftQuality(fallbackDraft, sourcePayload, detailAnchors),
-      generationMode: 'fallback'
-    };
-  }
-
-  const prompt = [
-    `Tu rediges un chapitre premium en ${CHAPTER_DRAFT_PAGE_COUNT} pages a partir d un plan narratif.`,
-    'Objectif: texte original, dense, lisible, elegant, sans phrase inutile.',
-    'Regles absolues:',
-    '- Respecter strictement le plan fourni.',
-    `- ${CHAPTER_DRAFT_PAGE_COUNT} pages exactement.`,
-    `- Chaque page doit contenir au moins ${CHAPTER_DRAFT_MIN_PAGE_CHARS} caracteres utiles.`,
-    '- Titres de pages editoriaux, jamais "Page X" ou "Chapitre X".',
-    '- Eviter les phrases meta (ex: "dans ce chapitre").',
-    '- Aucune liste a puces, aucun markdown, aucun HTML.',
-    '- Integrer des details concrets des contributions (lieux, gestes, objets, scenes).',
-    '- Conserver la coherence avec les resumes des chapitres precedents.',
-    '',
-    'Retourne UNIQUEMENT un JSON valide:',
-    '{ "title":"string", "pages":[{"title":"string","body":"string"}], "summary":"string" }',
-    `"pages" doit contenir exactement ${CHAPTER_DRAFT_PAGE_COUNT} objets.`,
-    '',
-    'PLAN NARRATIF:',
-    JSON.stringify(chapterPlan),
-    '',
-    'DONNEES SOURCE:',
-    JSON.stringify(sourceSnapshot)
-  ].join('\n');
+  const narrativeContext = JSON.stringify({
+    task: 'chapter_draft_json',
+    objective: `Rediger un chapitre premium en ${CHAPTER_DRAFT_PAGE_COUNT} pages.`,
+    constraints: [
+      `Respecter strictement ${CHAPTER_DRAFT_PAGE_COUNT} pages.`,
+      `Chaque page doit contenir au moins ${CHAPTER_DRAFT_MIN_PAGE_CHARS} caracteres utiles.`,
+      'Titres editoriaux, jamais "Page X" ou "Chapitre X".',
+      'Aucune liste a puces, aucun markdown, aucun HTML.',
+      'Integrer details concrets des contributions (lieux, gestes, objets, scenes).',
+      'Conserver la coherence avec les resumes precedents.'
+    ],
+    outputSchema: {
+      title: 'string',
+      pages: [{ title: 'string', body: 'string' }],
+      summary: 'string'
+    },
+    chapterPlan,
+    sourceSnapshot
+  });
 
   try {
-    const response = await aiService.mistral.chat.complete({
-      model: 'mistral-small-latest',
-      messages: [
-        {
-          role: 'system',
-          content: 'Tu es un redacteur editorial haut de gamme. Tu renvoies uniquement un JSON strictement valide.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
+    const modelResult = await generateStructuredDraftFromContentPrompt({
+      sourcePayload,
+      outputType: 'chapter_content',
+      chapterTitle: sourcePayload?.chapter?.title || fallbackDraft?.title || 'Chapitre',
+      chapterSummary: fallbackDraft?.summary || '',
+      narrativeContext,
+      targetLength: CHAPTER_DRAFT_PAGE_COUNT * 900,
       temperature: 0.52,
       maxTokens: 4400
     });
-
-    const content = response?.choices?.[0]?.message?.content || '';
-    const parsed = parseDraftJson(content);
+    const parsed = modelResult?.parsed;
 
     if (!parsed || !Array.isArray(parsed.pages)) {
       return {
@@ -3163,6 +3190,7 @@ function cleanupExpiredPdfExportJobs() {
 
 function deletePdfExportFiles(job) {
   const candidateFiles = [
+    job?.files?.final?.path,
     job?.files?.interior?.path,
     job?.files?.cover?.path
   ].filter(Boolean);
@@ -3187,8 +3215,7 @@ async function generateFinalBookPdfFiles({
 }) {
   await fsp.mkdir(PDF_EXPORT_DIR, { recursive: true });
   const safeBookName = normalizePdfFileName(cleanText(book?.title, 120), 'livre');
-  const interiorPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-interieur.pdf`);
-  const coverPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-couverture.pdf`);
+  const finalPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-livre-final.pdf`);
   const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
   const rendererMode = String(process.env.PDF_RENDERER_MODE || 'browser').toLowerCase();
   const shouldUseBrowserRenderer = rendererMode !== 'legacy' && rendererMode !== 'pdfkit';
@@ -3196,9 +3223,8 @@ async function generateFinalBookPdfFiles({
 
   if (shouldUseBrowserRenderer) {
     try {
-      await generateBookPdfFilesFromHtml({
-        interiorPath,
-        coverPath,
+      await generateFinalBookPdfFileFromHtml({
+        finalPath,
         book,
         chaptersWithDrafts,
         jobId,
@@ -3213,57 +3239,34 @@ async function generateFinalBookPdfFiles({
 
       console.error('Generation PDF navigateur indisponible, fallback PDFKit:', browserError);
       rendererUsed = 'legacy';
-      await generateInteriorPdfFile({
-        filePath: interiorPath,
+      await generateFinalBookPdfFileLegacy({
+        filePath: finalPath,
         book,
         chaptersWithDrafts,
-        previewFormat: resolvedPreviewFormat,
-        previewLayoutSettings
-      });
-
-      await generateCoverPdfFile({
-        filePath: coverPath,
-        book,
-        chaptersWithDrafts,
-        previewFormat: resolvedPreviewFormat,
-        previewLayoutSettings
+        previewFormat: resolvedPreviewFormat
       });
     }
   } else {
-    await generateInteriorPdfFile({
-      filePath: interiorPath,
+    await generateFinalBookPdfFileLegacy({
+      filePath: finalPath,
       book,
       chaptersWithDrafts,
-      previewFormat: resolvedPreviewFormat,
-      previewLayoutSettings
-    });
-
-    await generateCoverPdfFile({
-      filePath: coverPath,
-      book,
-      chaptersWithDrafts,
-      previewFormat: resolvedPreviewFormat,
-      previewLayoutSettings
+      previewFormat: resolvedPreviewFormat
     });
     rendererUsed = 'legacy';
   }
 
   return {
     renderer: rendererUsed,
-    interior: {
-      path: interiorPath,
-      fileName: `${safeBookName}-interieur.pdf`
-    },
-    cover: {
-      path: coverPath,
-      fileName: `${safeBookName}-couverture.pdf`
+    final: {
+      path: finalPath,
+      fileName: `${safeBookName}-livre-final.pdf`
     }
   };
 }
 
-async function generateBookPdfFilesFromHtml({
-  interiorPath,
-  coverPath,
+async function generateFinalBookPdfFileFromHtml({
+  finalPath,
   book,
   chaptersWithDrafts,
   jobId,
@@ -3277,41 +3280,25 @@ async function generateBookPdfFilesFromHtml({
     );
   }
 
-  const interiorHtml = renderValidatedBookInteriorHtml({
+  const finalHtml = renderValidatedBookPreviewHtml({
     book,
     chaptersWithDrafts,
     previewFormat,
     previewLayoutSettings
   });
-  const coverHtml = renderValidatedBookCoverHtml({
-    book,
-    previewFormat
-  });
 
-  const interiorDocument = buildPrintableBookHtmlDocument({
-    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Interieur`,
-    bodyHtml: interiorHtml,
+  const finalDocument = buildPrintableBookHtmlDocument({
+    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - PDF final`,
+    bodyHtml: finalHtml,
     mode: 'interior',
     previewFormat
   });
-  const coverDocument = buildPrintableBookHtmlDocument({
-    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Couverture`,
-    bodyHtml: coverHtml,
-    mode: 'cover',
-    previewFormat
-  });
 
   await renderPdfFromHtmlWithBrowser({
     browserPath,
-    html: interiorDocument,
-    outputPath: interiorPath,
-    htmlPath: path.join(PDF_EXPORT_DIR, `job-${jobId}-interieur.html`)
-  });
-  await renderPdfFromHtmlWithBrowser({
-    browserPath,
-    html: coverDocument,
-    outputPath: coverPath,
-    htmlPath: path.join(PDF_EXPORT_DIR, `job-${jobId}-couverture.html`)
+    html: finalDocument,
+    outputPath: finalPath,
+    htmlPath: path.join(PDF_EXPORT_DIR, `job-${jobId}-livre-final.html`)
   });
 }
 
@@ -4532,6 +4519,110 @@ async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts, pre
   });
 }
 
+async function generateFinalBookPdfFileLegacy({ filePath, book, chaptersWithDrafts, previewFormat }) {
+  const formatSpec = getPreviewFormatSpec(resolveBookPreviewFormat(book, previewFormat));
+  const pageWidth = mmToPt(formatSpec.trimWidthMm);
+  const pageHeight = mmToPt(formatSpec.trimHeightMm);
+  const margins = {
+    top: mmToPt(16),
+    right: mmToPt(14),
+    bottom: mmToPt(16),
+    left: mmToPt(14)
+  };
+
+  const {
+    coverConfig,
+    backCoverConfig,
+    textColor,
+    accentColor
+  } = resolveCoverPreviewConfig(book);
+
+  const frontTitle = cleanText(coverConfig?.title, 180) || cleanText(book?.title, 180) || 'Livre souvenir';
+  const frontSubtitle = cleanText(coverConfig?.subtitle, 220);
+  const frontRecipient = cleanText(coverConfig?.recipientLine, 180) || cleanText(book?.recipient_name, 180);
+  const frontEventLine = cleanText(coverConfig?.eventLine, 180)
+    || [cleanText(book?.event_type, 120), book?.recipient_age ? `${book.recipient_age} ans` : '']
+      .filter(Boolean)
+      .join(' | ');
+  const backBlurb = cleanText(backCoverConfig?.blurb, 1800) || 'Texte de quatrieme de couverture a finaliser.';
+  const backQuote = cleanText(backCoverConfig?.quote, 360);
+  const backSignature = cleanText(backCoverConfig?.signature, 180)
+    || (book?.recipient_name ? `Les proches de ${book.recipient_name}` : 'Les proches');
+  const backDateLocation = cleanText(backCoverConfig?.dateLocation, 180);
+
+  const resolvedTextColor = normalizePdfColor(textColor, '#1f2228');
+  const resolvedAccentColor = normalizePdfColor(accentColor, '#b8924a');
+
+  await writePdfFile({
+    filePath,
+    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - PDF final`,
+    draw: (doc) => {
+      const addPage = () => {
+        doc.addPage({
+          size: [pageWidth, pageHeight],
+          margins
+        });
+      };
+
+      addPage();
+      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(10).text('COUVERTURE');
+      doc.moveDown(0.6);
+      doc.fillColor(resolvedTextColor).font('Helvetica-Bold').fontSize(26).text(frontTitle, { align: 'left' });
+      if (frontSubtitle) {
+        doc.moveDown(0.5);
+        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(12).text(frontSubtitle, { align: 'left' });
+      }
+      if (frontEventLine) {
+        doc.moveDown(0.4);
+        doc.fillColor('#4b5563').font('Helvetica').fontSize(10).text(frontEventLine, { align: 'left' });
+      }
+      if (frontRecipient) {
+        doc.moveDown(1.1);
+        doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(12).text(frontRecipient, { align: 'left' });
+      }
+
+      chaptersWithDrafts.forEach(({ chapter, draft }, chapterIndex) => {
+        addPage();
+        doc.fillColor('#8b6a2f').font('Helvetica-Bold').fontSize(10).text(`Volet ${chapterIndex + 1}`);
+        doc.moveDown(0.3);
+        doc.fillColor('#1f2228').font('Helvetica-Bold').fontSize(18).text(
+          sanitizeDraftHeadingStrict(
+            cleanText(draft?.title, 180) || cleanText(chapter?.title, 180) || `Volet ${chapterIndex + 1}`,
+            cleanText(chapter?.title, 180) || `Volet ${chapterIndex + 1}`
+          )
+        );
+        doc.moveDown(0.45);
+        doc.fillColor('#1f2228').font('Helvetica').fontSize(11);
+        doc.text(
+          buildInteriorChapterText({ chapter, draft }),
+          {
+            align: 'left',
+            lineGap: 3
+          }
+        );
+      });
+
+      addPage();
+      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(10).text('4E DE COUVERTURE');
+      doc.moveDown(0.5);
+      doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(11).text(
+        backBlurb,
+        { align: 'left', lineGap: 2 }
+      );
+      if (backQuote) {
+        doc.moveDown(0.8);
+        doc.fillColor(resolvedTextColor).font('Helvetica-Oblique').fontSize(11).text(`"${backQuote}"`, { align: 'left' });
+      }
+      if (backDateLocation) {
+        doc.moveDown(0.8);
+        doc.fillColor('#6b7280').font('Helvetica').fontSize(9).text(backDateLocation, { align: 'left' });
+      }
+      doc.moveDown(0.8);
+      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(11).text(backSignature, { align: 'left' });
+    }
+  });
+}
+
 async function generateCoverPdfFile({ filePath, book, chaptersWithDrafts, previewFormat }) {
   const formatSpec = getPreviewFormatSpec(resolveBookPreviewFormat(book, previewFormat));
   const trimWidthMm = formatSpec.trimWidthMm;
@@ -5030,57 +5121,44 @@ function buildBookDraftSourcePayload({ book, chapters, organizerEmail, contribut
 async function generateBookDraftFromAI(sourcePayload) {
   const fallbackDraft = buildFallbackDraft(sourcePayload);
   const promptSourcePayload = buildAIPromptPayload(sourcePayload);
-
-  if (!aiService?.mistral) {
-    return fallbackDraft;
-  }
-
-  const prompt = [
-    'Tu rediges un brouillon complet de livre souvenir collaboratif.',
-    'Tu dois produire un resultat coherent, chaleureux, fluide et elegant en francais.',
-    `Le livre sera ensuite mis en page avec ${CHAPTER_DRAFT_PAGE_COUNT} pages par chapitre.`,
-    'Utilise strictement le contenu fourni ci-dessous pour construire un premier jet narratif substantiel.',
-    'Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :',
-    '{',
-    '  "title": "string",',
-    '  "subtitle": "string",',
-    '  "introduction": "string",',
-    '  "chapters": [',
-    '    {',
-    '      "title": "string",',
-    '      "intro": "string",',
-    '      "body": "string",',
-    '      "closing": "string"',
-    '    }',
-    '  ],',
-    '  "conclusion": "string"',
-    '}',
-    'Ne mets aucun markdown, aucun commentaire, aucun texte avant ou apres le JSON.',
-    'Si un chapitre a peu de contenu, reste sobre mais genere tout de meme un texte utile.',
-    '',
-    'DONNEES SOURCE DU LIVRE :',
-    JSON.stringify(promptSourcePayload)
-  ].join('\n');
+  const narrativeContext = JSON.stringify({
+    task: 'book_draft_json',
+    objective: 'Produire un brouillon complet du livre, coherent et elegant.',
+    constraints: [
+      'Aucun markdown, aucun commentaire, aucun texte hors JSON.',
+      'Si un chapitre a peu de contenu, rester sobre mais utile.'
+    ],
+    outputSchema: {
+      title: 'string',
+      subtitle: 'string',
+      introduction: 'string',
+      chapters: [{ title: 'string', intro: 'string', body: 'string', closing: 'string' }],
+      conclusion: 'string'
+    },
+    sourceBookPayload: promptSourcePayload
+  });
 
   try {
-    const response = await aiService.mistral.chat.complete({
-      model: 'mistral-small-latest',
-      messages: [
-        {
-          role: 'system',
-          content: 'Tu es un redacteur editoriel expert des livres souvenirs personnalises. Tu renvoies uniquement du JSON valide.'
-        },
-        {
-          role: 'user',
-          content: prompt
+    const modelResult = await generateStructuredDraftFromContentPrompt({
+      sourcePayload: {
+        book: {
+          title: cleanText(sourcePayload?.book?.title, 180) || 'Livre souvenir',
+          eventType: cleanText(sourcePayload?.book?.eventType, 120) || 'generique',
+          styleNarratif: cleanText(sourcePayload?.book?.styleNarratif, 120) || 'intime',
+          recipientName: cleanText(sourcePayload?.book?.recipientName, 180) || 'la personne celebree',
+          recipientAge: sourcePayload?.book?.recipientAge || 'non specifie',
+          recipientGender: cleanText(sourcePayload?.book?.recipientGender, 120) || 'non specifie'
         }
-      ],
+      },
+      outputType: 'book_draft',
+      chapterTitle: 'Livre complet',
+      chapterSummary: '',
+      narrativeContext,
+      targetLength: 5200,
       temperature: 0.5,
       maxTokens: 2600
     });
-
-    const content = response?.choices?.[0]?.message?.content || '';
-    const parsed = parseDraftJson(content);
+    const parsed = modelResult?.parsed;
 
     if (!parsed || !Array.isArray(parsed.chapters)) {
       return fallbackDraft;

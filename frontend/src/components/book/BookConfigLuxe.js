@@ -23,6 +23,8 @@ const STYLES = [
 const MIN_PAGES = 32;
 const MAX_PAGES = 96;
 const DEFAULT_PAGES_PER_CHAPTER = 8;
+const DEFAULT_PRICE_PAGES_BASELINE = 64;
+const EXTRA_PAGE_PRICE = 0.25;
 
 const clampPages = (value) => {
   const numericValue = Number(value) || MIN_PAGES;
@@ -36,6 +38,11 @@ const buildInitialFormData = (book, chaptersCount) => ({
   papier: book?.papier || 'mat',
   style_narratif: book?.style_narratif || 'factuel',
   pages: clampPages(book?.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER || 64)
+});
+
+const formatEuro = (value) => Number(value || 0).toLocaleString('fr-FR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
 });
 
 const BookConfigLuxe = ({
@@ -83,12 +90,11 @@ const BookConfigLuxe = ({
   );
 
   const livePrice = useMemo(() => {
-    let price = selectedFinition.basePrice;
-    const extraPages = Math.max(0, formData.pages - 64);
-    price += extraPages * 0.25;
-    price = price * selectedPapier.multiplier;
-    price = price * selectedStyle.multiplier;
-    return Math.round(price);
+    const extraPages = Math.max(0, formData.pages - DEFAULT_PRICE_PAGES_BASELINE);
+    const baseWithPages = selectedFinition.basePrice + (extraPages * EXTRA_PAGE_PRICE);
+    const withPaper = baseWithPages * selectedPapier.multiplier;
+    const withStyle = withPaper * selectedStyle.multiplier;
+    return Math.round(withStyle * 100) / 100;
   }, [formData.pages, selectedFinition.basePrice, selectedPapier.multiplier, selectedStyle.multiplier]);
 
   const calculatedChapters = useMemo(
@@ -98,6 +104,25 @@ const BookConfigLuxe = ({
 
   const chapterDelta = calculatedChapters - chaptersCount;
   const willChaptersChange = chapterDelta !== 0;
+  const isChapterReduction = chapterDelta < 0;
+  const requiresChapterReductionConfirmation = willChaptersChange
+    && isChapterReduction
+    && formData.pages !== currentBookSnapshot.pages;
+
+  const priceBreakdown = useMemo(() => {
+    const extraPages = Math.max(0, formData.pages - DEFAULT_PRICE_PAGES_BASELINE);
+    const extraPagesAmount = extraPages * EXTRA_PAGE_PRICE;
+    const subtotal = selectedFinition.basePrice + extraPagesAmount;
+    const withPaper = subtotal * selectedPapier.multiplier;
+    const withStyle = withPaper * selectedStyle.multiplier;
+    return {
+      extraPages,
+      extraPagesAmount,
+      subtotal,
+      withPaper,
+      withStyle
+    };
+  }, [formData.pages, selectedFinition.basePrice, selectedPapier.multiplier, selectedStyle.multiplier]);
 
   const hasPendingChanges = useMemo(() => (
     formData.title !== currentBookSnapshot.title
@@ -121,6 +146,18 @@ const BookConfigLuxe = ({
   const persistConfiguration = async ({ showSuccessBanner = true } = {}) => {
     if (!hasPendingChanges) {
       return false;
+    }
+    if (requiresChapterReductionConfirmation && typeof window !== 'undefined') {
+      const confirmed = window.confirm(
+        `Vous allez retirer ${Math.abs(chapterDelta)} chapitre(s).\n\nLes chapitres supprimes et leur contenu ne pourront pas etre recuperes.\nContinuer ?`
+      );
+      if (!confirmed) {
+        setSaveFeedback({
+          type: 'info',
+          message: 'Modification annulee. Le nombre de chapitres n a pas ete reduit.'
+        });
+        return false;
+      }
     }
     setIsSaving(true);
     setSaveFeedback(null);
@@ -183,7 +220,10 @@ const BookConfigLuxe = ({
     setSaveFeedback(null);
     try {
       if (hasPendingChanges) {
-        await persistConfiguration({ showSuccessBanner: false });
+        const persisted = await persistConfiguration({ showSuccessBanner: false });
+        if (!persisted) {
+          return;
+        }
       }
       await onOpenBookPreview();
     } catch (_error) {
@@ -214,7 +254,7 @@ const BookConfigLuxe = ({
 
         <div className="book-config-live-price">
           <span className="book-config-live-price-label">Prix estime</span>
-          <span className="book-config-live-price-value">{livePrice} EUR</span>
+          <span className="book-config-live-price-value">{formatEuro(livePrice)} EUR</span>
           <span className="book-config-live-price-note">TTC</span>
         </div>
       </div>
@@ -360,8 +400,27 @@ const BookConfigLuxe = ({
 
           <div className="book-config-preview-price-card">
             <div className="book-config-preview-price-label">Total estime</div>
-            <div className="book-config-preview-price-value">{livePrice} EUR</div>
+            <div className="book-config-preview-price-value">{formatEuro(livePrice)} EUR</div>
             <div className="book-config-preview-price-note">Mise a jour en direct</div>
+          </div>
+
+          <div className="book-config-price-breakdown">
+            <div className="book-config-price-row">
+              <span>Base {selectedFinition.label}</span>
+              <strong>{formatEuro(selectedFinition.basePrice)} EUR</strong>
+            </div>
+            <div className="book-config-price-row">
+              <span>Pages supplementaires ({priceBreakdown.extraPages})</span>
+              <strong>+{formatEuro(priceBreakdown.extraPagesAmount)} EUR</strong>
+            </div>
+            <div className="book-config-price-row">
+              <span>Coef. papier ({selectedPapier.label})</span>
+              <strong>x{selectedPapier.multiplier.toFixed(2)}</strong>
+            </div>
+            <div className="book-config-price-row">
+              <span>Coef. voix ({selectedStyle.label})</span>
+              <strong>x{selectedStyle.multiplier.toFixed(2)}</strong>
+            </div>
           </div>
 
           <div className="book-config-preview-actions">
@@ -374,10 +433,10 @@ const BookConfigLuxe = ({
             >
               {isSaving || isPreparingPreview || isGeneratingPreview
                 ? 'Preparation...'
-                : 'Apercu au format livre'}
+                : (hasPendingChanges ? 'Enregistrer + ouvrir l apercu' : 'Ouvrir l apercu livre')}
             </button>
             <div className="book-config-preview-helper">
-              Feuilletage reel avec couverture + contenu assembles.
+              Apercu feuillete non contractuel. Vous pouvez encore modifier avant validation definitive.
             </div>
 
             <button
@@ -390,6 +449,11 @@ const BookConfigLuxe = ({
             </button>
             {!canOpenBookPreview && previewUnavailableReason && (
               <div className="book-config-preview-warning">{previewUnavailableReason}</div>
+            )}
+            {requiresChapterReductionConfirmation && (
+              <div className="book-config-preview-warning">
+                Attention: la nouvelle pagination supprimera {Math.abs(chapterDelta)} chapitre(s) a la validation.
+              </div>
             )}
           </div>
         </aside>

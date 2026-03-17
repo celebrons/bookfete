@@ -23,7 +23,15 @@ const SAMPLE_CONTRIBUTORS = [
   { name: 'Camille', email: 'camille.demo@example.com' },
   { name: 'Hugo', email: 'hugo.demo@example.com' },
   { name: 'Lea', email: 'lea.demo@example.com' },
-  { name: 'Nora', email: 'nora.demo@example.com' }
+  { name: 'Nora', email: 'nora.demo@example.com' },
+  { name: 'Yanis', email: 'yanis.demo@example.com' },
+  { name: 'Sofia', email: 'sofia.demo@example.com' },
+  { name: 'Mehdi', email: 'mehdi.demo@example.com' },
+  { name: 'Lina', email: 'lina.demo@example.com' },
+  { name: 'Sarah', email: 'sarah.demo@example.com' },
+  { name: 'Rayan', email: 'rayan.demo@example.com' },
+  { name: 'Nina', email: 'nina.demo@example.com' },
+  { name: 'Karim', email: 'karim.demo@example.com' }
 ];
 
 const PHOTO_POOL = [
@@ -45,6 +53,24 @@ const cleanup = parseBooleanArg(args.cleanup, false);
 const ownerId = cleanArg(args['owner-id']);
 const ownerEmailArg = cleanArg(args['owner-email']);
 const chapterCount = clampInt(args.chapters, 8, 4, 12);
+const contributorCount = clampInt(args.contributors, 8, 2, SAMPLE_CONTRIBUTORS.length);
+const minContributionsPerChapter = clampInt(args['min-contributions'], 2, 2, contributorCount);
+const maxContributionsPerChapter = clampInt(
+  args['max-contributions'],
+  Math.max(minContributionsPerChapter + 2, 4),
+  minContributionsPerChapter,
+  contributorCount
+);
+const eventType = cleanArg(args['event-type']) || 'anniversaire';
+const recipientName = cleanArg(args['recipient-name']) || 'Omar';
+const recipientAge = clampInt(args['recipient-age'], 40, 1, 120);
+const recipientGender = cleanArg(args['recipient-gender']) || 'homme';
+const styleNarratif = cleanArg(args.style) || 'intime';
+const finition = cleanArg(args.finition) || 'classique';
+const papier = cleanArg(args.papier) || 'mat';
+const coverStyle = cleanArg(args['cover-style']) || 'prestige_contemporain';
+const previewFormat = cleanArg(args['preview-format']) || 'luxe';
+const explicitTitle = cleanArg(args.title);
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env');
@@ -54,6 +80,7 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
 if (!ownerId && !ownerEmailArg) {
   console.error('Usage: node scripts/seedRealisticProject.js --owner-id=<uuid> [--variant=editing|finalized] [--cleanup=true]');
   console.error('or    : node scripts/seedRealisticProject.js --owner-email=<email> [--variant=editing|finalized] [--cleanup=true]');
+  console.error('Options: --chapters=6 --contributors=8 --min-contributions=2 --max-contributions=5 --event-type=anniversaire --recipient-name=Omar --recipient-age=40 --recipient-gender=homme --style=intime --finition=classique --papier=mat --cover-style=prestige_contemporain --preview-format=luxe --title=\"[DEMO] Anniversaire de Omar\"');
   process.exit(1);
 }
 
@@ -83,24 +110,36 @@ async function run() {
   }
 
   const nowIso = new Date().toISOString();
-  const bookTitle = buildBookTitle(variant);
+  const bookTitle = explicitTitle || buildBookTitle({
+    seedVariant: variant,
+    recipient: recipientName,
+    eventType
+  });
   const coverConfig = buildCoverConfig({
     bookTitle,
     variant,
-    nowIso
+    nowIso,
+    recipientName,
+    recipientAge,
+    eventType,
+    coverStyle,
+    previewFormat
   });
-  const backCoverConfig = buildBackCoverConfig();
+  const backCoverConfig = buildBackCoverConfig({
+    recipientName,
+    eventType
+  });
 
   const bookPayload = {
     owner_id: owner.id,
     title: bookTitle,
-    event_type: 'anniversaire',
-    recipient_name: 'Omar',
-    recipient_age: 40,
-    recipient_gender: 'homme',
-    style_narratif: 'intime',
-    finition: 'classique',
-    papier: 'mat',
+    event_type: eventType,
+    recipient_name: recipientName,
+    recipient_age: recipientAge,
+    recipient_gender: recipientGender,
+    style_narratif: styleNarratif,
+    finition,
+    papier,
     pages: Math.max(32, chapterCount * 8),
     statut: variant === 'finalized' ? 'termine' : 'en_cours',
     lifecycle_status: variant === 'finalized' ? 'finalized' : 'editing',
@@ -116,7 +155,7 @@ async function run() {
 
   console.log(`Book created: ${createdBook.id} (${createdBook.title})`);
 
-  const selectedContributors = SAMPLE_CONTRIBUTORS.slice(0, 3);
+  const selectedContributors = SAMPLE_CONTRIBUTORS.slice(0, contributorCount);
   const { error: contributorsError } = await supabase
     .from('book_contributors')
     .insert(selectedContributors.map((person) => ({
@@ -151,7 +190,12 @@ async function run() {
 
   for (const chapter of createdChapters) {
     const chapterOrder = Number(chapter.order_index || 0);
-    const contributorSlice = selectedContributors;
+    const contributorSlice = pickRandomContributors({
+      contributors: selectedContributors,
+      chapterOrder,
+      minCount: minContributionsPerChapter,
+      maxCount: maxContributionsPerChapter
+    });
     const chapterImages = pickChapterImages(chapterOrder);
     const chapterState = resolveChapterStateForVariant(variant, chapterOrder, chapterCount);
 
@@ -362,7 +406,7 @@ async function seedChapterContributions({ chapter, owner, contributors, chapterI
     contributor_name: person.name,
     contributor_email: person.email,
     message: buildGuestContributionText(chapter.title, chapterOrder, index),
-    photo_urls: chapterImages.slice(index % 2, (index % 2) + 1),
+    photo_urls: [chapterImages[(index + 1) % chapterImages.length]],
     approved: true,
     is_finalized: true,
     needs_revision: false,
@@ -571,41 +615,61 @@ function buildPageBodyText(chapterTitle, chapterIndex, pageNumber) {
   ].join('\n\n');
 }
 
-function buildCoverConfig({ bookTitle, variant, nowIso }) {
+function buildCoverConfig({
+  bookTitle,
+  variant,
+  nowIso,
+  recipientName,
+  recipientAge,
+  eventType,
+  coverStyle,
+  previewFormat
+}) {
+  const safeEvent = eventType || 'anniversaire';
+  const safeRecipient = recipientName || 'Omar';
+  const safeAge = Number.isFinite(Number(recipientAge)) ? Number(recipientAge) : 40;
+
   return {
     title: bookTitle,
     subtitle: 'Edition prestige collaborative',
-    recipientLine: 'Pour Omar',
-    eventLine: 'Anniversaire | 40 ans',
-    quote: 'Les souvenirs sont des preuves d amour.',
+    recipientLine: `Pour ${safeRecipient}`,
+    eventLine: `${capitalizeFirstLetter(safeEvent)} | ${safeAge} ans`,
+    quote: `Pour ses ${safeAge} ans, ses proches racontent Omar avec chaleur, humour et precision.`,
     signature: 'Ses proches',
     qrLabel: 'Galerie privee',
-    style: 'elegance_intemporelle',
-    previewFormat: 'standard',
+    style: coverStyle || 'prestige_contemporain',
+    previewFormat: previewFormat || 'luxe',
     previewLayoutSettings: {
       textDensity: 'balanced',
       imageDensity: 'balanced'
     },
     lifecycleStatus: variant === 'finalized' ? 'finalized' : 'editing',
-    finalValidatedAt: variant === 'finalized' ? nowIso : null
+    finalValidatedAt: variant === 'finalized' ? nowIso : null,
+    motif: 'olive',
+    showMonogram: true,
+    showPhotoFrame: false,
+    photoLabel: 'Portrait anniversaire'
   };
 }
 
-function buildBackCoverConfig() {
+function buildBackCoverConfig({ recipientName, eventType }) {
+  const safeRecipient = recipientName || 'Omar';
+  const safeEvent = eventType || 'anniversaire';
   return {
-    blurb: 'Un ouvrage collaboratif qui rassemble les souvenirs marquants, les voix des proches et une mise en page premium.',
-    signature: 'Contributions reunies par la famille',
+    blurb: `Un ouvrage collaboratif pour ${safeRecipient}, qui rassemble les souvenirs marquants de cet ${safeEvent}, les voix des proches et une mise en page premium.`,
+    signature: 'Contributions reunies par ses proches',
     quote: 'Un livre unique pour une personne unique.',
-    qrLabel: 'Photos et videos'
+    qrLabel: 'Photos et videos',
+    dateLocation: `Paris, ${new Date().getFullYear()}`
   };
 }
 
-function buildBookTitle(seedVariant) {
+function buildBookTitle({ seedVariant, recipient, eventType }) {
   const suffix = new Date().toISOString().slice(0, 10);
-  if (seedVariant === 'finalized') {
-    return `[DEMO] Livre finalise ${suffix}`;
-  }
-  return `[DEMO] Livre en edition ${suffix}`;
+  const safeRecipient = recipient || 'Omar';
+  const safeEvent = eventType || 'anniversaire';
+  const statusLabel = seedVariant === 'finalized' ? 'finalise' : 'edition';
+  return `[DEMO] ${capitalizeFirstLetter(safeEvent)} de ${safeRecipient} - ${statusLabel} ${suffix}`;
 }
 
 function pickChapterImages(chapterOrder) {
@@ -665,6 +729,49 @@ function cleanArg(value) {
 function deriveNameFromEmail(email) {
   const localPart = String(email || '').split('@')[0] || 'organisateur';
   return localPart.replace(/[._-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function pickRandomContributors({ contributors, chapterOrder, minCount, maxCount }) {
+  const source = Array.isArray(contributors) ? contributors.slice() : [];
+  if (source.length === 0) {
+    return [];
+  }
+
+  const minSafe = Math.max(1, Math.min(Number(minCount) || 1, source.length));
+  const maxSafe = Math.max(minSafe, Math.min(Number(maxCount) || source.length, source.length));
+  const random = createSeededRandom(chapterOrder + source.length * 7 + 11);
+  const targetCount = Math.floor(random() * (maxSafe - minSafe + 1)) + minSafe;
+
+  shuffleInPlace(source, random);
+  return source.slice(0, targetCount);
+}
+
+function createSeededRandom(seed) {
+  let state = Math.floor(Number(seed) || 1) >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleInPlace(array, random) {
+  for (let i = array.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    const tmp = array[i];
+    array[i] = array[j];
+    array[j] = tmp;
+  }
+}
+
+function capitalizeFirstLetter(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return '';
+  }
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function escapeHtml(value) {

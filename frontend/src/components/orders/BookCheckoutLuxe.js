@@ -62,6 +62,11 @@ const isMissingPdfJobError = (error) => (
 const isPdfOrderLinkError = (error) => (
   /commande associee au pdf introuvable/i.test(String(error?.message || ''))
 );
+const getPdfFallbackName = (kind) => {
+  if (kind === 'cover') return 'couverture.pdf';
+  if (kind === 'interior') return 'interieur.pdf';
+  return 'livre-final.pdf';
+};
 const NETWORK_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 20000);
 const PREVIEW_FORMAT_IDS = new Set(['livret', 'standard', 'luxe']);
 const PREVIEW_FORMAT_ALIASES = {
@@ -377,7 +382,7 @@ const BookCheckoutLuxe = () => {
     }
 
     const blob = await response.blob();
-    const fallbackName = kind === 'cover' ? 'couverture.pdf' : 'interieur.pdf';
+    const fallbackName = getPdfFallbackName(kind);
     const disposition = response.headers.get('content-disposition') || '';
     const match = disposition.match(/filename="?([^";]+)"?/i);
     const fileName = match?.[1] || fallbackName;
@@ -1003,18 +1008,10 @@ const BookCheckoutLuxe = () => {
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => downloadPdfFile('interior')}
-                  disabled={downloadingKind === 'interior'}
+                  onClick={() => downloadPdfFile('final')}
+                  disabled={downloadingKind === 'final'}
                 >
-                  {downloadingKind === 'interior' ? 'Telechargement...' : 'Telecharger interieur.pdf'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => downloadPdfFile('cover')}
-                  disabled={downloadingKind === 'cover'}
-                >
-                  {downloadingKind === 'cover' ? 'Telechargement...' : 'Telecharger couverture.pdf'}
+                  {downloadingKind === 'final' ? 'Telechargement...' : 'Telecharger PDF final complet'}
                 </button>
               </div>
             )}
