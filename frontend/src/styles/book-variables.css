@@ -1,0 +1,57 @@
+:root {
+  --page-width: 595px;
+  --page-height: 842px;
+  --margin-top: 36px;
+  --margin-bottom: 28px;
+  --margin-outer: 32px;
+  --margin-inner: 32px;
+
+  --font-body: "Cormorant Garamond", Georgia, serif;
+  --font-display: "Playfair Display", Georgia, serif;
+
+  --size-chapter-num: 10px;
+  --size-chapter-title: 22px;
+  --size-chapter-sub: 12px;
+  --size-body: 11.5px;
+  --size-callout: 11.5px;
+  --size-caption: 9.5px;
+  --size-folio: 9px;
+  --size-section-label: 10px;
+
+  --leading-body: 1.85;
+  --leading-tight: 1.35;
+  --leading-callout: 1.65;
+
+  --color-ink: #1c1b18;
+  --color-ink-light: #5a5248;
+  --color-ink-muted: #9a8f7e;
+  --color-rule: #d4ccc0;
+  --color-accent: #b09070;
+  --color-page-bg: #faf9f6;
+  --color-page-dark-bg: #1a1916;
+  --color-callout-bg: rgba(176, 144, 112, 0.06);
+  --color-img-ph: #ede9e2;
+}
+
+@media print {
+  .draft-book-page,
+  .draft-book-section {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .draft-book-callout,
+  .draft-book-photo,
+  .draft-book-media-block,
+  .draft-book-gallery,
+  .draft-book-question-list li,
+  .draft-book-contributor-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .chapter-opening {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}

@@ -71,7 +71,9 @@ const PREVIEW_FORMATS = {
     trimWidthMm: 148,
     trimHeightMm: 210,
     defaultTextDensity: 'compact',
-    defaultImageDensity: 'discrete'
+    defaultImageDensity: 'discrete',
+    defaultLineSpacing: 'compact',
+    defaultFontScale: 0.96
   },
   standard: {
     id: 'standard',
@@ -79,7 +81,9 @@ const PREVIEW_FORMATS = {
     trimWidthMm: 210,
     trimHeightMm: 297,
     defaultTextDensity: 'balanced',
-    defaultImageDensity: 'balanced'
+    defaultImageDensity: 'balanced',
+    defaultLineSpacing: 'balanced',
+    defaultFontScale: 1
   },
   luxe: {
     id: 'luxe',
@@ -87,7 +91,9 @@ const PREVIEW_FORMATS = {
     trimWidthMm: 240,
     trimHeightMm: 320,
     defaultTextDensity: 'airy',
-    defaultImageDensity: 'immersive'
+    defaultImageDensity: 'immersive',
+    defaultLineSpacing: 'airy',
+    defaultFontScale: 1.04
   }
 };
 const PREVIEW_TEXT_DENSITY_PROFILES = {
@@ -532,21 +538,45 @@ function normalizePreviewImageDensity(value) {
   return PREVIEW_IMAGE_DENSITY_PROFILES[normalized]?.id || PREVIEW_IMAGE_DENSITY_PROFILES.balanced.id;
 }
 
+function normalizePreviewLineSpacing(value) {
+  const normalized = cleanText(value, 40).toLowerCase();
+  if (normalized === 'compact') return 'compact';
+  if (normalized === 'airy') return 'airy';
+  return 'balanced';
+}
+
+function normalizePreviewFontScale(value, fallback = 1) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return Math.min(1.08, Math.max(0.9, numeric));
+  }
+  return Math.min(1.08, Math.max(0.9, Number(fallback) || 1));
+}
+
 function normalizePreviewLayoutSettings(value, previewFormat = '') {
   const candidate = value && typeof value === 'object' ? value : {};
   const formatSpec = getPreviewFormatSpec(previewFormat);
   const defaultTextDensity = normalizePreviewTextDensity(formatSpec?.defaultTextDensity);
   const defaultImageDensity = normalizePreviewImageDensity(formatSpec?.defaultImageDensity);
+  const defaultLineSpacing = normalizePreviewLineSpacing(formatSpec?.defaultLineSpacing);
+  const defaultFontScale = normalizePreviewFontScale(formatSpec?.defaultFontScale, 1);
 
   return {
     textDensity: normalizePreviewTextDensity(candidate.textDensity || defaultTextDensity),
-    imageDensity: normalizePreviewImageDensity(candidate.imageDensity || defaultImageDensity)
+    imageDensity: normalizePreviewImageDensity(candidate.imageDensity || defaultImageDensity),
+    lineSpacing: normalizePreviewLineSpacing(candidate.lineSpacing || defaultLineSpacing),
+    fontScale: normalizePreviewFontScale(candidate.fontScale, defaultFontScale)
   };
 }
 
 function buildPreviewLayoutClassName(layoutSettings, previewFormat = '') {
   const normalized = normalizePreviewLayoutSettings(layoutSettings, previewFormat);
-  return `draft-book-layout-text-${normalized.textDensity} draft-book-layout-image-${normalized.imageDensity}`;
+  return `draft-book-layout-text-${normalized.textDensity} draft-book-layout-image-${normalized.imageDensity} draft-book-layout-line-${normalized.lineSpacing}`;
+}
+
+function buildPreviewLayoutInlineStyle(layoutSettings, previewFormat = '') {
+  const normalized = normalizePreviewLayoutSettings(layoutSettings, previewFormat);
+  return `--layout-font-scale:${normalized.fontScale};`;
 }
 
 function extractBearerToken(req) {
@@ -2242,6 +2272,36 @@ function formatFolioNumber(value) {
   return String(Math.floor(safeNumber)).padStart(2, '0');
 }
 
+function toRomanNumeral(value) {
+  const safeValue = Math.max(1, Math.floor(Number(value) || 1));
+  const numerals = [
+    ['M', 1000],
+    ['CM', 900],
+    ['D', 500],
+    ['CD', 400],
+    ['C', 100],
+    ['XC', 90],
+    ['L', 50],
+    ['XL', 40],
+    ['X', 10],
+    ['IX', 9],
+    ['V', 5],
+    ['IV', 4],
+    ['I', 1]
+  ];
+  let remaining = safeValue;
+  let output = '';
+
+  numerals.forEach(([token, amount]) => {
+    while (remaining >= amount) {
+      output += token;
+      remaining -= amount;
+    }
+  });
+
+  return output || String(safeValue);
+}
+
 function renderDraftPageFolio({ pageNumber, totalPages }) {
   const safePage = formatFolioNumber(pageNumber);
   const safeTotal = formatFolioNumber(totalPages || CHAPTER_DRAFT_PAGE_COUNT);
@@ -2290,6 +2350,8 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
     chapterHeading
   );
   const totalPages = draftPages.length;
+  const chapterRoman = toRomanNumeral(chapterNumber);
+  const chapterSub = cleanText(sourcePayload?.chapter?.description, 170);
 
   return `
     <section class="draft-book-chapter" lang="fr">
@@ -2305,7 +2367,20 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
                   && normalizeComparableText(pageHeading) !== normalizeComparableText(chapterHeading)
                 )
               );
-              return showHeading ? `<h3>${escapeHtml(pageHeading)}</h3>` : '';
+              if (!showHeading) {
+                return '';
+              }
+              if (index === 0) {
+                return `
+                  <header class="chapter-opening">
+                    <p class="chapter-num">Chapitre ${escapeHtml(chapterRoman)}</p>
+                    <h3 class="chapter-title">${escapeHtml(pageHeading)}</h3>
+                    ${chapterSub ? `<p class="chapter-sub">${escapeHtml(chapterSub)}</p>` : ''}
+                    <hr class="chapter-rule" />
+                  </header>
+                `;
+              }
+              return `<h3 class="chapter-title">${escapeHtml(pageHeading)}</h3>`;
             })()}
             ${index === 0 && openingLead
               ? `<p class="draft-book-intro">${escapeHtml(openingLead)}</p>`
@@ -2531,6 +2606,7 @@ function renderValidatedBookPreviewHtml({
   const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
   const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
   const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings, resolvedPreviewFormat);
+  const layoutStyle = buildPreviewLayoutInlineStyle(previewLayoutSettings, resolvedPreviewFormat);
   const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings, resolvedPreviewFormat);
   const chapterBlocks = (chaptersWithDrafts || [])
     .map(({ chapter, draft }, index) => {
@@ -2556,7 +2632,7 @@ function renderValidatedBookPreviewHtml({
     || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
 
   return `
-    <article class="draft-book draft-book-assembled ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}">
+    <article class="draft-book draft-book-assembled ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}" style="${escapeHtml(layoutStyle)}">
       ${frontCoverBlock}
       ${chaptersContent}
       ${backCoverBlock}
@@ -3400,6 +3476,7 @@ function renderValidatedBookInteriorHtml({
   const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
   const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
   const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings, resolvedPreviewFormat);
+  const layoutStyle = buildPreviewLayoutInlineStyle(previewLayoutSettings, resolvedPreviewFormat);
   const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings, resolvedPreviewFormat);
   const chapterBlocks = (chaptersWithDrafts || [])
     .map(({ chapter, draft }, index) => {
@@ -3423,7 +3500,7 @@ function renderValidatedBookInteriorHtml({
     || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
 
   return `
-    <article class="draft-book ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}">
+    <article class="draft-book ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}" style="${escapeHtml(layoutStyle)}">
       <header class="draft-book-header">
         <div class="draft-book-eyebrow">Version finale</div>
         <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
@@ -3469,6 +3546,9 @@ function buildPrintableBookHtmlDocument({ title, bodyHtml, mode, previewFormat }
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Playfair+Display:wght@400;500&display=swap" rel="stylesheet" />
     <title>${escapeHtml(title || 'Livre')}</title>
     <style>
       ${getPrintableBookStyles({ isCoverMode, previewFormat })}
@@ -3499,6 +3579,37 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
   const coverContentHeightMm = Math.max(120, coverHeightMm - pageMarginMm * 2);
 
   return `
+    :root {
+      --page-width: ${Math.round(trimWidthMm * 2.83465)}px;
+      --page-height: ${Math.round(trimHeightMm * 2.83465)}px;
+      --margin-top: 36px;
+      --margin-bottom: 28px;
+      --margin-outer: 32px;
+      --margin-inner: 32px;
+      --font-body: "Cormorant Garamond", Georgia, serif;
+      --font-display: "Playfair Display", Georgia, serif;
+      --size-chapter-num: 10px;
+      --size-chapter-title: 22px;
+      --size-chapter-sub: 12px;
+      --size-body: 11.5px;
+      --size-callout: 11.5px;
+      --size-caption: 9.5px;
+      --size-folio: 9px;
+      --size-section-label: 10px;
+      --leading-body: 1.85;
+      --leading-tight: 1.35;
+      --leading-callout: 1.65;
+      --color-ink: #1c1b18;
+      --color-ink-light: #5a5248;
+      --color-ink-muted: #9a8f7e;
+      --color-rule: #d4ccc0;
+      --color-accent: #b09070;
+      --color-page-bg: #faf9f6;
+      --color-page-dark-bg: #1a1916;
+      --color-callout-bg: rgba(176, 144, 112, 0.06);
+      --color-img-ph: #ede9e2;
+    }
+
     @page {
       ${pageSizeRule}
       margin: ${pageMarginMm}mm;
@@ -3513,8 +3624,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     html, body {
       margin: 0;
       padding: 0;
-      font-family: "Inter", "Segoe UI", Arial, sans-serif;
-      color: #1f2228;
+      font-family: var(--font-body);
+      color: var(--color-ink);
       background: #ffffff;
     }
 
@@ -3546,7 +3657,7 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
 
     .draft-book-header h1 {
       margin: 0 0 4mm;
-      font-family: "Baskerville", "Palatino Linotype", serif;
+      font-family: var(--font-display);
       font-size: 26px;
       line-height: 1.14;
       letter-spacing: 0.01em;
@@ -3554,7 +3665,7 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
 
     .draft-book-meta {
       font-size: 11px;
-      color: #5f6770;
+      color: var(--color-ink-light);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       line-height: 1.5;
@@ -3621,8 +3732,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     .draft-book-section h2,
     .draft-book-chapter h3 {
       margin: 0 0 4.8mm;
-      font-family: "Baskerville", "Palatino Linotype", serif;
-      color: #1f2228;
+      font-family: var(--font-display);
+      color: var(--color-ink);
       letter-spacing: 0.01em;
     }
 
@@ -3632,9 +3743,49 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     }
 
     .draft-book-chapter h3 {
-      font-size: 23px;
-      line-height: 1.14;
-      letter-spacing: 0.012em;
+      font-size: calc(var(--size-chapter-title) * var(--layout-font-scale, 1));
+      line-height: var(--leading-tight);
+      letter-spacing: -0.02em;
+      font-weight: 400;
+    }
+
+    .chapter-opening {
+      margin-bottom: 4.6mm;
+      break-after: avoid-page;
+      page-break-after: avoid;
+    }
+
+    .chapter-num {
+      margin: 0 0 2.4mm;
+      font-family: var(--font-body);
+      font-size: var(--size-chapter-num);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-ink-muted);
+    }
+
+    .chapter-title {
+      margin: 0 0 1.4mm;
+      font-family: var(--font-display);
+      font-size: var(--size-chapter-title);
+      font-weight: 400;
+      line-height: var(--leading-tight);
+      color: var(--color-ink);
+      letter-spacing: -0.02em;
+    }
+
+    .chapter-sub {
+      margin: 0 0 4.2mm;
+      font-family: var(--font-body);
+      font-size: calc(var(--size-chapter-sub) * var(--layout-font-scale, 1));
+      font-style: italic;
+      color: var(--color-ink-muted);
+    }
+
+    .chapter-rule {
+      border: none;
+      border-top: 0.5px solid var(--color-rule);
+      margin: 0;
     }
 
     .draft-book-chapter {
@@ -3646,14 +3797,23 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     }
 
     .draft-book-page {
-      background: #ffffff;
+      background: var(--color-page-bg);
       border: 1px solid rgba(223, 216, 201, 0.9);
-      border-radius: 10px;
-      padding: 6mm;
+      border-radius: 3px;
+      padding:
+        max(4.6mm, calc(var(--margin-top) * 0.66))
+        max(3.8mm, calc(var(--margin-outer) * 0.66))
+        max(6mm, calc(var(--margin-bottom) + 2.6mm))
+        max(3.8mm, calc(var(--margin-inner) * 0.66));
       min-height: ${interiorPageMinHeightMm}mm;
       box-shadow: none;
       display: flex;
       flex-direction: column;
+      position: relative;
+      text-align: justify;
+      hyphens: auto;
+      orphans: 3;
+      widows: 3;
       page-break-inside: avoid;
       break-inside: avoid-page;
       page-break-after: always;
@@ -3672,9 +3832,9 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       margin: 0 0 5mm;
       max-width: 90%;
       font-style: italic;
-      color: #5f6770;
+      color: var(--color-ink-light);
       line-height: 1.66;
-      font-size: 11.6px;
+      font-size: calc(var(--size-chapter-sub) * var(--layout-font-scale, 1));
     }
 
     .draft-book-body {
@@ -3686,11 +3846,12 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     .draft-book-callout p,
     .draft-book-contributor-item p {
       margin: 0 0 4.1mm;
-      line-height: 1.68;
-      font-size: 11.5px;
+      line-height: var(--leading-body);
+      font-size: calc(var(--size-body) * var(--layout-font-scale, 1));
       text-align: justify;
       text-align-last: left;
       hyphens: auto;
+      text-indent: 1.4em;
       page-break-inside: avoid;
       break-inside: avoid-page;
       orphans: 3;
@@ -3701,24 +3862,60 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
 
     .draft-book-text-block {
       margin: 0 0 4.1mm;
-      line-height: 1.68;
-      font-size: 11.5px;
+      line-height: var(--leading-body);
+      font-size: calc(var(--size-body) * var(--layout-font-scale, 1));
+      text-indent: 1.4em;
+    }
+
+    .draft-book-page-opening .draft-book-body p:first-child,
+    .draft-book-page-opening .draft-book-text-block:first-child {
+      text-indent: 0;
+    }
+
+    .draft-book-page-opening .draft-book-body p:first-child::first-letter,
+    .draft-book-page-opening .draft-book-text-block:first-child::first-letter {
+      font-family: var(--font-display);
+      font-size: 44px;
+      font-weight: 400;
+      float: left;
+      line-height: 0.82;
+      margin-right: 5px;
+      margin-top: 4px;
+      color: var(--color-accent);
     }
 
     .draft-book-layout-text-airy .draft-book-text-block,
     .draft-book-layout-text-airy .draft-book-body p,
     .draft-book-layout-text-airy .draft-book-section p {
-      font-size: 11.1px;
-      line-height: 1.74;
+      font-size: calc(11.1px * var(--layout-font-scale, 1));
+      line-height: calc(var(--leading-body) * 1.08);
       margin-bottom: 4.2mm;
     }
 
     .draft-book-layout-text-compact .draft-book-text-block,
     .draft-book-layout-text-compact .draft-book-body p,
     .draft-book-layout-text-compact .draft-book-section p {
-      font-size: 11.9px;
-      line-height: 1.52;
+      font-size: calc(11.9px * var(--layout-font-scale, 1));
+      line-height: calc(var(--leading-body) * 0.82);
       margin-bottom: 2.8mm;
+    }
+
+    .draft-book-layout-line-compact .draft-book-text-block,
+    .draft-book-layout-line-compact .draft-book-body p,
+    .draft-book-layout-line-compact .draft-book-section p {
+      line-height: calc(var(--leading-body) * 0.9);
+    }
+
+    .draft-book-layout-line-balanced .draft-book-text-block,
+    .draft-book-layout-line-balanced .draft-book-body p,
+    .draft-book-layout-line-balanced .draft-book-section p {
+      line-height: var(--leading-body);
+    }
+
+    .draft-book-layout-line-airy .draft-book-text-block,
+    .draft-book-layout-line-airy .draft-book-body p,
+    .draft-book-layout-line-airy .draft-book-section p {
+      line-height: calc(var(--leading-body) * 1.16);
     }
 
     .draft-book-body p:last-child,
@@ -3734,24 +3931,28 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     }
 
     .draft-book-folio {
-      margin-top: auto;
-      padding-top: 4mm;
+      position: absolute;
+      bottom: 3.2mm;
+      left: 50%;
+      transform: translateX(-50%);
+      margin: 0;
+      padding: 0;
       display: inline-flex;
       align-items: center;
-      align-self: center;
       gap: 6px;
-      color: #8b6a2f;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
+      color: var(--color-rule);
+      font-size: var(--size-folio);
+      font-weight: 500;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
+      font-family: var(--font-body);
     }
 
     .draft-book-folio-dot {
-      width: 5px;
-      height: 5px;
+      width: 3px;
+      height: 3px;
       border-radius: 999px;
-      background: rgba(184, 146, 74, 0.78);
+      background: var(--color-rule);
     }
 
     .draft-book-source {
@@ -3830,6 +4031,25 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       break-inside: avoid-page;
     }
 
+    .draft-book-callout {
+      border-left: 1.5px solid var(--color-accent);
+      border-right: none;
+      border-top: none;
+      border-bottom: none;
+      border-radius: 0;
+      padding: 10px 14px;
+      margin: 4mm 0;
+      background: var(--color-callout-bg);
+    }
+
+    .draft-book-callout p {
+      font-size: calc(var(--size-callout) * var(--layout-font-scale, 1));
+      line-height: var(--leading-callout);
+      color: var(--color-ink-light);
+      font-style: italic;
+      text-indent: 0;
+    }
+
     .draft-book-contributor-list {
       margin-top: 4mm;
     }
@@ -3888,9 +4108,10 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
     .draft-book-photo {
       margin: 0;
       min-height: 46mm;
+      height: 46mm;
       border-radius: 8px;
       overflow: hidden;
-      background: rgba(232, 232, 232, 0.45);
+      background: var(--color-img-ph);
     }
 
     .draft-book-photo img {
@@ -3907,7 +4128,8 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       border: 1px solid rgba(184, 146, 74, 0.18);
       overflow: hidden;
       min-height: 48mm;
-      background: rgba(240, 232, 214, 0.35);
+      height: 48mm;
+      background: var(--color-img-ph);
     }
 
     .draft-book-media-block img {
@@ -5337,10 +5559,13 @@ function renderDraftChapterPages({
   layoutSettings = null,
   previewFormat = ''
 }) {
+  const chapterNumber = Number(index || 0) + 1;
+  const chapterRoman = toRomanNumeral(chapterNumber);
   const chapterTitle = sanitizeDraftHeadingStrict(
     chapter.title || sourceChapter?.title || `Volet ${index + 1}`,
     sourceChapter?.title || `Volet ${index + 1}`
   );
+  const chapterSub = cleanText(sourceChapter?.description, 170);
   const openingLead = sanitizeOpeningLead(sourceChapter?.description, chapterTitle);
   const normalizedPreviewFormat = resolveBookPreviewFormat(null, previewFormat);
   const normalizedLayoutSettings = normalizePreviewLayoutSettings(
@@ -5387,7 +5612,12 @@ function renderDraftChapterPages({
     <section class="draft-book-chapter" lang="fr">
       <div class="draft-book-chapter-shell">
         <section class="draft-book-page draft-book-page-opening">
-          <h3>${escapeHtml(chapterTitle)}</h3>
+          <header class="chapter-opening">
+            <p class="chapter-num">Chapitre ${escapeHtml(chapterRoman)}</p>
+            <h3 class="chapter-title">${escapeHtml(chapterTitle)}</h3>
+            ${chapterSub ? `<p class="chapter-sub">${escapeHtml(chapterSub)}</p>` : ''}
+            <hr class="chapter-rule" />
+          </header>
           ${openingLead ? `<p class="draft-book-intro">${escapeHtml(openingLead)}</p>` : ''}
           <div class="draft-book-body draft-book-body-blocks">
             ${formatParagraphs(
@@ -5603,7 +5833,7 @@ function renderContributionSpotlight(organizerContribution, guestHighlights, opt
   if (shouldRenderOrganizer) {
     blocks.push(`
       <div class="draft-book-callout">
-        ${formatParagraphs(organizerMessage)}
+        <p class="draft-book-callout-text">« ${escapeHtml(organizerMessage)} »</p>
       </div>
     `);
   }

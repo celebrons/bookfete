@@ -75,6 +75,7 @@ const PREVIEW_FORMAT_ALIASES = {
 };
 const PREVIEW_TEXT_DENSITY_IDS = new Set(['airy', 'balanced', 'compact']);
 const PREVIEW_IMAGE_DENSITY_IDS = new Set(['discrete', 'balanced', 'immersive']);
+const PREVIEW_LINE_SPACING_IDS = new Set(['compact', 'balanced', 'airy']);
 const PREVIEW_FORMAT_LAYOUT_DEFAULTS = {
   livret: { textDensity: 'compact', imageDensity: 'discrete' },
   standard: { textDensity: 'balanced', imageDensity: 'balanced' },
@@ -268,7 +269,13 @@ const BookCheckoutLuxe = () => {
           : previewLayoutDefaults.textDensity,
         imageDensity: PREVIEW_IMAGE_DENSITY_IDS.has(rawLayoutSettings.imageDensity)
           ? rawLayoutSettings.imageDensity
-          : previewLayoutDefaults.imageDensity
+          : previewLayoutDefaults.imageDensity,
+        lineSpacing: PREVIEW_LINE_SPACING_IDS.has(rawLayoutSettings.lineSpacing)
+          ? rawLayoutSettings.lineSpacing
+          : 'balanced',
+        fontScale: Number.isFinite(Number(rawLayoutSettings.fontScale))
+          ? Math.min(1.08, Math.max(0.9, Number(rawLayoutSettings.fontScale)))
+          : 1
       }
     };
     if (normalizedOrderId) {

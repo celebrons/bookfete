@@ -1,4 +1,5 @@
 /* C:\Users\USER\bookfete\frontend\src\components\book\BookLuxe.css */
+@import '../../styles/book-variables.css';
 
 .book-container {
   --book-soft-surface: #ecebe7;
@@ -1856,6 +1857,22 @@
   z-index: 0;
 }
 
+.book-draft-preview.is-protected .draft-book-page::after,
+.book-draft-preview.is-protected .draft-book-section::after {
+  content: "APERCU";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(24px, 4vw, 52px);
+  letter-spacing: 0.2em;
+  font-weight: 600;
+  color: rgba(121, 100, 65, 0.08);
+  transform: rotate(-33deg);
+  pointer-events: none;
+}
+
 .book-draft-preview > * {
   position: relative;
   z-index: 1;
@@ -2322,6 +2339,203 @@
 .draft-book-question-list li {
   break-inside: avoid;
   page-break-inside: avoid;
+}
+
+/* Premium chapter editorial system */
+.book-draft-preview .draft-book,
+.book-draft-preview .draft-book-page,
+.book-draft-preview .draft-book-section,
+.book-draft-preview .draft-book-body,
+.book-draft-preview .draft-book-callout,
+.book-draft-preview .draft-book-contributor-item {
+  --layout-font-scale: var(--draft-font-scale, 1);
+  font-family: var(--font-body);
+  color: var(--color-ink);
+}
+
+.book-draft-preview .draft-book-page {
+  background: var(--color-page-bg);
+  border: 0.5px solid #e0ddd8;
+  border-radius: 3px;
+  text-align: justify;
+  hyphens: auto;
+  orphans: 3;
+  widows: 3;
+  padding:
+    max(16px, calc(var(--margin-top) * 0.66))
+    max(14px, calc(var(--margin-outer) * 0.66))
+    max(28px, calc(var(--margin-bottom) + 12px))
+    max(14px, calc(var(--margin-inner) * 0.66));
+  box-shadow: none;
+  position: relative;
+}
+
+.book-draft-preview .chapter-opening {
+  margin-bottom: 14px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.book-draft-preview .chapter-num {
+  margin: 0 0 8px;
+  font-family: var(--font-body);
+  font-size: var(--size-chapter-num);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted) !important;
+}
+
+.book-draft-preview .chapter-title {
+  margin: 0 0 4px;
+  font-family: var(--font-display) !important;
+  font-size: calc(var(--size-chapter-title) * var(--layout-font-scale, 1)) !important;
+  font-weight: 400 !important;
+  line-height: var(--leading-tight) !important;
+  letter-spacing: -0.02em;
+  color: var(--color-ink) !important;
+  flex: none !important;
+}
+
+.book-draft-preview .chapter-sub {
+  margin: 0 0 12px;
+  font-family: var(--font-body);
+  font-size: calc(var(--size-chapter-sub) * var(--layout-font-scale, 1));
+  font-style: italic;
+  color: var(--color-ink-muted) !important;
+}
+
+.book-draft-preview .chapter-rule {
+  border: none;
+  border-top: 0.5px solid var(--color-rule);
+  margin: 0;
+}
+
+.book-draft-preview .draft-book-body p,
+.book-draft-preview .draft-book-text-block {
+  margin: 0 0 10px;
+  font-size: calc(var(--size-body) * var(--layout-font-scale, 1));
+  line-height: calc(var(--leading-body) * var(--draft-line-height-factor, 1));
+  text-indent: 1.4em;
+  text-align: justify;
+  text-align-last: left;
+  orphans: 3;
+  widows: 3;
+}
+
+.book-draft-preview .draft-book-page-opening .draft-book-body .draft-book-text-block:first-child,
+.book-draft-preview .draft-book-page-opening .draft-book-body p:first-child {
+  text-indent: 0;
+}
+
+.book-draft-preview .draft-book-page-opening .draft-book-body .draft-book-text-block:first-child::first-letter,
+.book-draft-preview .draft-book-page-opening .draft-book-body p:first-child::first-letter {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 400;
+  float: left;
+  line-height: 0.82;
+  margin-right: 5px;
+  margin-top: 4px;
+  color: var(--color-accent);
+}
+
+.book-draft-preview .draft-book-callout {
+  border-left: 1.5px solid var(--color-accent);
+  padding: 10px 14px;
+  margin: 14px 0;
+  background: var(--color-callout-bg);
+  border-radius: 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.book-draft-preview .draft-book-callout p {
+  font-size: calc(var(--size-callout) * var(--layout-font-scale, 1));
+  line-height: var(--leading-callout);
+  color: var(--color-ink-light);
+  font-style: italic;
+  text-indent: 0;
+}
+
+.book-draft-preview .draft-book-media-block,
+.book-draft-preview .draft-book-photo,
+.book-draft-preview .draft-book-gallery,
+.book-draft-preview .draft-book-question-list li,
+.book-draft-preview .draft-book-contributor-item {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.book-draft-preview .draft-book-media-block {
+  min-height: 180px;
+  height: 180px;
+  border-radius: 2px;
+  border: 1px solid rgba(180, 164, 139, 0.32);
+  background: var(--color-img-ph);
+}
+
+.book-draft-preview .draft-book-media-block img {
+  min-height: 180px;
+  height: 180px;
+  object-fit: cover;
+}
+
+.book-draft-preview .draft-book-photo {
+  min-height: 146px;
+  border-radius: 2px;
+}
+
+.book-draft-preview .draft-book-photo img {
+  min-height: 146px;
+  height: 146px;
+  object-fit: cover;
+}
+
+.book-draft-preview .draft-book-mini-title {
+  font-size: var(--size-section-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.book-draft-preview .draft-book-folio {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0;
+  font-size: var(--size-folio);
+  letter-spacing: 0.08em;
+  color: var(--color-rule);
+  font-family: var(--font-body);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.book-draft-preview .draft-book-folio-dot {
+  width: 3px;
+  height: 3px;
+  background: var(--color-rule);
+}
+
+.book-draft-preview .draft-book-layout-text-airy .draft-book-body p,
+.book-draft-preview .draft-book-layout-text-airy .draft-book-text-block {
+  line-height: calc(var(--leading-body) + 0.08);
+}
+
+.book-draft-preview .draft-book-layout-text-compact .draft-book-body p,
+.book-draft-preview .draft-book-layout-text-compact .draft-book-text-block {
+  line-height: calc(var(--leading-body) - 0.22);
+}
+
+.book-draft-preview .draft-book-layout-image-immersive .draft-book-media-block {
+  min-height: 230px;
+  height: 230px;
+}
+
+.book-draft-preview .draft-book-layout-image-immersive .draft-book-photo img {
+  height: 204px;
 }
 
 .book-pdf-preview-modal {
