@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
-import '../BookLuxe.css';
+import '../BookLuxe.css';
+import ChapterPromptInlineAdmin from './ChapterPromptInlineAdmin';
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
@@ -103,7 +104,7 @@ const sanitizeLegacyChapterPreviewHtml = (html = '') => {
   return source
     .replace(/<div[^>]*class="[^"]*\bdraft-book-page-label\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
     .replace(/<div[^>]*class="[^"]*\bdraft-book-chapter-index\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-    .replace(/<p[^>]*class="[^"]*\bdraft-book-intro\b[^"]*"[^>]*>\s*Chapitre\s*\d+\s*[-:–][\s\S]*?<\/p>/gi, '');
+    .replace(/<p[^>]*class="[^"]*\bdraft-book-intro\b[^"]*"[^>]*>\s*Chapitre\s*\d+\s*[-:â€“][\s\S]*?<\/p>/gi, '');
 };
 
 const sanitizeChapterPreviewHtml = (html = '') => {
@@ -117,7 +118,7 @@ const sanitizeChapterPreviewHtml = (html = '') => {
   }
 
   const doc = new window.DOMParser().parseFromString(source, 'text/html');
-  const duplicatedHeadingPattern = /^\s*(?:page\s*\d+\s*)?(?:chapitre\s*\d+\s*)+(?:[-:–—]\s*)?/i;
+  const duplicatedHeadingPattern = /^\s*(?:page\s*\d+\s*)?(?:chapitre\s*\d+\s*)+(?:[-:â€“â€”]\s*)?/i;
   const legacySummaryTitles = Array.from(doc.body.querySelectorAll('.draft-book-mini-title'));
   legacySummaryTitles.forEach((node) => {
     const text = String(node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -142,7 +143,7 @@ const sanitizeChapterPreviewHtml = (html = '') => {
     const looksLikeSinglePageLabel = /^page\s*\d+(?:\s*\/\s*\d+)?$/i.test(text);
     const looksLikeSingleChapterLabel = /^chapitre\s*\d+$/i.test(text);
     const looksLikeRepeatedChapterHeader = duplicatedHeadingPattern.test(text);
-    const looksLikeLegacyChapterLead = /^chapitre\s*\d+\s*[-:–—]/i.test(text);
+    const looksLikeLegacyChapterLead = /^chapitre\s*\d+\s*[-:â€“â€”]/i.test(text);
     const looksLikeLegacySummaryLabel = normalizedLowerText === 'fils directeurs';
 
     if (
@@ -204,7 +205,7 @@ const Step4Cloture = ({
   chapter,
   user,
   book,
-  questionsValidated,
+  amorceValidated,
   hasContributed,
   invitations,
   onGenerateChapterDraft,
@@ -236,7 +237,11 @@ const Step4Cloture = ({
   const generationCount = Number(chapterDraft?.generationCount || 0);
   const maxGenerations = Number(chapterDraft?.maxGenerations || 3);
   const remainingGenerations = Math.max(0, maxGenerations - generationCount);
-  const questionsReady = Boolean(chapter?.questions_validated ?? questionsValidated);
+  const questionsReady = Boolean(
+    chapter?.amorce_validated
+    || chapter?.questions_validated
+    || amorceValidated
+  );
   const contributionReady = Boolean(chapter?.hasContributed ?? hasContributed);
   const fallbackVisibleContributions = Array.isArray(chapter?.contributions)
     ? chapter.contributions.filter(
@@ -304,7 +309,7 @@ const Step4Cloture = ({
   const summaryCards = [
     {
       key: 'questions',
-      label: 'Questions',
+      label: 'Amorce',
       value: questionsReady ? 'OK' : 'A faire',
       tone: questionsReady ? 'ok' : 'pending',
       icon: 'questions'
@@ -853,6 +858,9 @@ const Step4Cloture = ({
             ))}
           </div>
         )}
+
+
+        <ChapterPromptInlineAdmin chapter={chapter} />
       </div>
 
       {showPreviewModal && (
@@ -1052,3 +1060,5 @@ const Step4Cloture = ({
 };
 
 export default Step4Cloture;
+
+

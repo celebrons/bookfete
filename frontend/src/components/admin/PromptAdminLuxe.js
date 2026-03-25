@@ -71,63 +71,63 @@ const CHAPTER_PROMPT_VARIABLES = [
   },
   {
     placeholder: '{{eventType}}',
-    frontKey: 'bookData.event_type / book.event_type',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    frontKey: 'form.event_type / book.event_type',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Type d evenement (anniversaire, projet, etc.).'
   },
   {
     placeholder: '{{style}}',
-    frontKey: 'bookData.style_narratif / book.style_narratif',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    frontKey: 'form.style_narratif / book.style_narratif',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Ton narratif cible.'
   },
   {
     placeholder: '{{bookTitle}}',
-    frontKey: 'bookData.title / book.title',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    frontKey: 'form.title / book.title',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Titre du livre.'
   },
   {
     placeholder: '{{recipientName}}',
-    frontKey: 'bookData.recipient_name / book.recipient_name',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    frontKey: 'form.recipient_name / book.recipient_name',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Nom de la personne ou equipe cible.'
   },
   {
     placeholder: '{{recipientAge}}',
-    frontKey: 'bookData.recipient_age / book.recipient_age',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    frontKey: 'form.recipient_age / book.recipient_age',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Age/anciennete utile pour adapter le vocabulaire.'
   },
   {
     placeholder: '{{recipientGender}}',
-    frontKey: 'bookData.recipient_gender / book.recipient_gender',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    frontKey: 'form.recipient_gender / book.recipient_gender',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Genre de reference.'
   },
   {
     placeholder: '{{recipientNickname}}',
-    frontKey: 'bookData.recipient_nickname',
-    source: 'CreateBookWizardLuxe',
+    frontKey: 'form.recipient_nickname',
+    source: 'CreateBookLuxe',
     description: 'Surnom pour personnalisation emotionnelle.'
   },
   {
     placeholder: '{{recipientTrait}}',
-    frontKey: 'bookData.recipient_trait',
-    source: 'CreateBookWizardLuxe',
+    frontKey: 'form.character_trait',
+    source: 'CreateBookLuxe',
     description: 'Trait marquant.'
   },
   {
     placeholder: '{{recipientAnecdote}}',
-    frontKey: 'bookData.recipient_anecdote',
-    source: 'CreateBookWizardLuxe',
+    frontKey: 'form.signature_anecdote',
+    source: 'CreateBookLuxe',
     description: 'Anecdote centrale.'
   },
   {
     placeholder: '{{additionalContext}}',
-    frontKey: 'bookData.ai_project_brief / book.cover_config.aiProjectBrief',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
-    description: 'Contexte additionnel libre.'
+    frontKey: 'hors create-book actuel / book.cover_config.aiProjectBrief',
+    source: 'BookPageLuxe',
+    description: 'Contexte additionnel libre, surtout utile apres creation.'
   }
 ];
 
@@ -135,43 +135,43 @@ const QUESTION_PROMPT_VARIABLES = [
   {
     placeholder: '{{chapterTitle}}',
     frontKey: 'chapter.title',
-    source: 'useQuestions / Step1Questions',
+    source: 'Step1Amorce / generate-amorce',
     description: 'Titre du chapitre en cours.'
   },
   {
     placeholder: '{{eventType}}',
     frontKey: 'book.event_type',
-    source: 'useQuestions / Step1Questions',
+    source: 'Step1Amorce / generate-amorce',
     description: 'Type d evenement.'
   },
   {
     placeholder: '{{style}}',
     frontKey: 'book.style_narratif',
-    source: 'useQuestions / Step1Questions',
+    source: 'Step1Amorce / generate-amorce',
     description: 'Ton narratif choisi.'
   },
   {
     placeholder: '{{bookTitle}}',
     frontKey: 'book.title',
-    source: 'useQuestions / Step1Questions',
+    source: 'Step1Amorce / generate-amorce',
     description: 'Titre du livre.'
   },
   {
     placeholder: '{{recipientName}}',
     frontKey: 'book.recipient_name',
-    source: 'useQuestions / Step1Questions',
+    source: 'Step1Amorce / generate-amorce',
     description: 'Nom cible.'
   },
   {
     placeholder: '{{recipientAge}}',
     frontKey: 'book.recipient_age',
-    source: 'useQuestions / Step1Questions',
+    source: 'Step1Amorce / generate-amorce',
     description: 'Age cible.'
   },
   {
     placeholder: '{{recipientGender}}',
     frontKey: 'book.recipient_gender',
-    source: 'useQuestions / Step1Questions',
+    source: 'Step1Amorce / generate-amorce',
     description: 'Genre cible.'
   },
   {
@@ -216,19 +216,19 @@ const CONTENT_PROMPT_VARIABLES = [
   {
     placeholder: '{{eventType}}',
     frontKey: 'book.event_type',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Type d evenement.'
   },
   {
     placeholder: '{{style}}',
     frontKey: 'book.style_narratif',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Style narratif.'
   },
   {
     placeholder: '{{bookTitle}}',
     frontKey: 'book.title',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Titre du livre.'
   },
   {
@@ -240,19 +240,19 @@ const CONTENT_PROMPT_VARIABLES = [
   {
     placeholder: '{{recipientName}}',
     frontKey: 'book.recipient_name',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Nom de la personne cible.'
   },
   {
     placeholder: '{{recipientAge}}',
     frontKey: 'book.recipient_age',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Age cible.'
   },
   {
     placeholder: '{{recipientGender}}',
     frontKey: 'book.recipient_gender',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Genre cible.'
   },
   {
@@ -264,7 +264,7 @@ const CONTENT_PROMPT_VARIABLES = [
   {
     placeholder: '{{narrativeContext}}',
     frontKey: 'book.cover_config.aiProjectBrief',
-    source: 'CreateBookWizardLuxe, BookPageLuxe',
+    source: 'CreateBookLuxe, BookPageLuxe',
     description: 'Contexte narratif additionnel.'
   },
   {

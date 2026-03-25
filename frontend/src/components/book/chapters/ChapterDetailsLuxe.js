@@ -11,8 +11,6 @@ const ChapterDetailsLuxe = ({
   onGenerateChapterDraft,
   onSaveChapterDraft,
   onFinalizeChapterDraft,
-  onGenerateQuestions,
-  generatingQuestions,
   contributionText,
   setContributionText,
   photos,
@@ -25,12 +23,7 @@ const ChapterDetailsLuxe = ({
   userEmail,
   user,
   book,
-  onEditQuestions,
-  onValidateQuestions,
   questionsValidated,
-  isEditing,
-  onEditContribution,
-  invitations
 }) => {
   const [loading, setLoading] = useState(true);
 
@@ -62,8 +55,9 @@ const ChapterDetailsLuxe = ({
 
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
   const totalSteps = isSoloMode ? 3 : 4;
+  const amorceValidated = Boolean(chapter?.amorce_validated || chapter?.questions_validated || questionsValidated);
   const baseCompletedSteps = [
-    Boolean(chapter?.questions_validated),
+    amorceValidated,
     Boolean(chapter?.isFinalized),
     ...(isSoloMode ? [] : [Boolean(chapter?.contributionsClosed)]),
     Boolean(chapter?.isChapterClosed)
@@ -100,8 +94,6 @@ const ChapterDetailsLuxe = ({
         onGenerateChapterDraft={onGenerateChapterDraft}
         onSaveChapterDraft={onSaveChapterDraft}
         onFinalizeChapterDraft={onFinalizeChapterDraft}
-        onGenerateQuestions={onGenerateQuestions}
-        generatingQuestions={generatingQuestions}
         contributionText={contributionText}
         setContributionText={setContributionText}
         photos={photos}
@@ -114,12 +106,7 @@ const ChapterDetailsLuxe = ({
         userEmail={userEmail}
         user={user}
         book={book}
-        onEditQuestions={onEditQuestions}
-        onValidateQuestions={onValidateQuestions}
-        questionsValidated={questionsValidated}
-        isEditing={isEditing}
-        onEditContribution={onEditContribution}
-        invitations={invitations}
+        amorceValidated={amorceValidated}
       />
     </>
   );

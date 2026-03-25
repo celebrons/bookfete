@@ -277,6 +277,7 @@ const checkInviteToken = async (req, res) => {
         });
       }
       
+      const amorceReady = Boolean(invite.chapter.amorce_validated || invite.chapter.questions_validated);
       return res.json({
         valid: true,
         bookTitle: invite.chapter.book.title,
@@ -286,8 +287,11 @@ const checkInviteToken = async (req, res) => {
         eventType: invite.chapter.book.event_type || 'evenement',
         recipientName: invite.chapter.book.recipient_name,
         organizerName,
-        questions: invite.chapter.questions_validated ? invite.chapter.questions_ia : [],
-        questionsValidated: invite.chapter.questions_validated,
+        amorceText: amorceReady ? invite.chapter.amorce_text : '',
+        triggers: amorceReady && Array.isArray(invite.chapter.triggers)
+          ? invite.chapter.triggers
+          : [],
+        amorceValidated: amorceReady,
         existingContribution: {
           id: existingContribution.id,
           message: existingContribution.message,
@@ -304,6 +308,7 @@ const checkInviteToken = async (req, res) => {
       return res.status(400).json({ error: 'Vous avez déjà contribué' });
     }
 
+    const amorceReady = Boolean(invite.chapter.amorce_validated || invite.chapter.questions_validated);
     res.json({
       valid: true,
       bookTitle: invite.chapter.book.title,
@@ -313,8 +318,11 @@ const checkInviteToken = async (req, res) => {
       eventType: invite.chapter.book.event_type || 'evenement',
       recipientName: invite.chapter.book.recipient_name,
       organizerName,
-      questions: invite.chapter.questions_validated ? invite.chapter.questions_ia : [],
-      questionsValidated: invite.chapter.questions_validated
+      amorceText: amorceReady ? invite.chapter.amorce_text : '',
+      triggers: amorceReady && Array.isArray(invite.chapter.triggers)
+        ? invite.chapter.triggers
+        : [],
+      amorceValidated: amorceReady
     });
 
   } catch (error) {

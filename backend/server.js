@@ -28,6 +28,7 @@ const PORT = process.env.PORT || 5001;
 
 const orderRoutes = require('./routes/orders');
 const authRoutes = require('./routes/auth');
+const bookCreationRoutes = require('./routes/bookCreation');
 const bookRoutes = require('./routes/books');
 const chapterRoutes = require('./routes/chapters');
 const inviteRoutes = require('./routes/invites');
@@ -50,6 +51,7 @@ if (typeof orderRoutes.handleStripeWebhook === 'function') {
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
+app.use('/api/books/create', bookCreationRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/chapters', chapterRoutes);
 app.use('/api/invites', inviteRoutes);

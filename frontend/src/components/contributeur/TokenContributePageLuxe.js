@@ -1,39 +1,45 @@
-// C:\Users\USER\bookfete\frontend\src\components\contributeur\TokenContributePageLuxe.js
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import Loading from '../common/Loading';
+import ContributionAmorceBlock from './ContributionAmorceBlock';
 import '../../styles/luxe-theme.css';
 import './InvitationLuxe.css';
+
+const DRAFT_STORAGE_PREFIX = 'draft_contribute_';
+
+const buildApiUrl = (token) => {
+  const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  const trimmed = configured.replace(/\/$/, '');
+  const baseUrl = trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+  return `${baseUrl}/invites/token/${token}`;
+};
 
 const TokenContributePageLuxe = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [invitation, setInvitation] = useState(null);
   const [error, setError] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [saved, setSaved] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
+  const [existingContribution, setExistingContribution] = useState(null);
+  const [isRevision, setIsRevision] = useState(false);
+  const [moderationFeedback, setModerationFeedback] = useState('');
+  const [amorceText, setAmorceText] = useState('');
+  const [triggers, setTriggers] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     message: ''
   });
-  const [questions, setQuestions] = useState([]);
-  const [deadline, setDeadline] = useState(null);
-  const [existingContribution, setExistingContribution] = useState(null);
-  const [isRevision, setIsRevision] = useState(false);
-  const [moderationFeedback, setModerationFeedback] = useState('');
-  
-  // États pour les photos
   const [photos, setPhotos] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
   const [existingPhotoUrls, setExistingPhotoUrls] = useState([]);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState([]);
   const [uploading, setUploading] = useState(false);
 
-  // Vérifier l'invitation et charger le brouillon
   useEffect(() => {
     if (!token) {
       setError('Token manquant');
@@ -41,26 +47,21 @@ const TokenContributePageLuxe = () => {
       return;
     }
 
-    const loadInvitationAndDraft = async () => {
+    const loadInvitation = async () => {
       try {
-        // Charger l'invitation
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-        const url = `${apiUrl}/invites/token/${token}`;
-        
-        const response = await fetch(url);
+        const response = await fetch(buildApiUrl(token));
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || 'Lien invalide ou expiré');
+          throw new Error(data.error || 'Lien invalide ou expire');
         }
 
         setInvitation(data);
-        
-        // Vérifier si on a un brouillon local
-        const savedDraft = localStorage.getItem(`draft_contribute_${token}`);
-        
+        setAmorceText(data.amorceText || '');
+        setTriggers(Array.isArray(data.triggers) ? data.triggers : []);
+
+        const savedDraft = localStorage.getItem(`${DRAFT_STORAGE_PREFIX}${token}`);
         if (savedDraft) {
-          // Restaurer le brouillon
           const draft = JSON.parse(savedDraft);
           setFormData({
             name: draft.name || '',
@@ -69,68 +70,67 @@ const TokenContributePageLuxe = () => {
           setUploadedPhotoUrls(draft.uploadedPhotoUrls || []);
           setExistingPhotoUrls(draft.existingPhotoUrls || []);
           setIsDraft(true);
-        }
-
-        // Charger les données de l'API si pas de brouillon
-        if (!savedDraft) {
-          setFormData(prev => ({
+        } else {
+          const defaultName = data.email ? data.email.split('@')[0] : '';
+          setFormData((prev) => ({
             ...prev,
-            name: data.email ? data.email.split('@')[0] : ''
+            name: defaultName
           }));
 
           if (data.existingContribution) {
             setExistingContribution(data.existingContribution);
-            setFormData(prev => ({
-              ...prev,
-              name: data.email.split('@')[0],
+            setFormData({
+              name: defaultName,
               message: data.existingContribution.message || ''
-            }));
+            });
             setExistingPhotoUrls(data.existingContribution.photo_urls || []);
-            setIsRevision(data.existingContribution.needs_revision || false);
+            setIsRevision(Boolean(data.existingContribution.needs_revision));
             setModerationFeedback(data.existingContribution.moderation_feedback || '');
-            // Si la contribution existe mais n'est pas finalisée, c'est un brouillon
             setIsDraft(!data.existingContribution.is_finalized);
           }
-
-          if (data.questions && data.questions.length > 0) {
-            setQuestions(data.questions);
-          }
         }
-
-        const deadlineDate = new Date();
-        deadlineDate.setDate(deadlineDate.getDate() + 7);
-        setDeadline(deadlineDate);
-
-      } catch (err) {
-        console.error('❌ Erreur:', err);
-        setError(err.message);
+      } catch (loadError) {
+        console.error('Erreur chargement contribution token:', loadError);
+        setError(loadError.message);
       } finally {
         setLoading(false);
       }
     };
 
-    loadInvitationAndDraft();
+    loadInvitation();
   }, [token]);
 
-  // Auto-sauvegarde toutes les 30 secondes
-  useEffect(() => {
-    if (!invitation || submitted) return;
+  const handleAutoSave = useCallback(() => {
+    try {
+      localStorage.setItem(`${DRAFT_STORAGE_PREFIX}${token}`, JSON.stringify({
+        name: formData.name,
+        message: formData.message,
+        uploadedPhotoUrls,
+        existingPhotoUrls,
+        lastSaved: new Date().toISOString()
+      }));
+    } catch (autoSaveError) {
+      console.error('Erreur auto-sauvegarde:', autoSaveError);
+    }
+  }, [existingPhotoUrls, formData.message, formData.name, token, uploadedPhotoUrls]);
 
-    const autoSaveInterval = setInterval(() => {
-      if (formData.message.trim() || formData.name.trim() || uploadedPhotoUrls.length > 0) {
+  useEffect(() => {
+    if (!invitation || submitted) return undefined;
+
+    const intervalId = setInterval(() => {
+      if (formData.name.trim() || formData.message.trim() || uploadedPhotoUrls.length > 0 || existingPhotoUrls.length > 0) {
         handleAutoSave();
       }
     }, 30000);
 
-    return () => clearInterval(autoSaveInterval);
-  }, [formData, uploadedPhotoUrls, invitation, submitted]);
+    return () => clearInterval(intervalId);
+  }, [existingPhotoUrls.length, formData.message, formData.name, handleAutoSave, invitation, submitted, uploadedPhotoUrls.length]);
 
-  // Fonction pour uploader une photo immédiatement
   const uploadPhotoImmediately = async (file) => {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${invitation.chapterId}/${Date.now()}.${fileExt}`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from('contribution-photos')
         .upload(fileName, file);
@@ -142,169 +142,99 @@ const TokenContributePageLuxe = () => {
         .getPublicUrl(fileName);
 
       return publicUrl;
-    } catch (error) {
-      console.error('❌ Erreur upload:', error);
+    } catch (uploadError) {
+      console.error('Erreur upload photo:', uploadError);
       return null;
     }
   };
 
-  const handlePhotoChange = async (e) => {
-    const files = Array.from(e.target.files);
-    
+  const handlePhotoChange = async (event) => {
+    const files = Array.from(event.target.files || []);
+
     if (photos.length + files.length > 2) {
       alert('Maximum 2 photos');
       return;
     }
 
-    const validFiles = files.filter(file => {
+    const validFiles = files.filter((file) => {
       const isValid = file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024;
-      if (!isValid) alert(`${file.name} : format invalide ou trop volumineux (max 5MB)`);
+      if (!isValid) {
+        alert(`${file.name} : format invalide ou trop volumineux (max 5MB)`);
+      }
       return isValid;
     });
 
     setUploading(true);
-
     const newUrls = [];
+
     for (const file of validFiles) {
-        const url = await uploadPhotoImmediately(file);
-        if (url) {
-          newUrls.push(url);
-        }
+      const url = await uploadPhotoImmediately(file);
+      if (url) {
+        newUrls.push(url);
+      }
     }
 
-    setUploadedPhotoUrls(prev => [...prev, ...newUrls]);
-    setPhotos(prev => [...prev, ...validFiles]);
+    setUploadedPhotoUrls((prev) => [...prev, ...newUrls]);
+    setPhotos((prev) => [...prev, ...validFiles]);
     setUploading(false);
     handleAutoSave();
   };
 
-  const removePhoto = (index) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index));
-    setUploadedPhotoUrls(prev => prev.filter((_, i) => i !== index));
-    handleAutoSave();
-  };
-
-  const removeExistingPhoto = (index) => {
-    setExistingPhotoUrls(prev => prev.filter((_, i) => i !== index));
-    handleAutoSave();
-  };
-
-  const handleAutoSave = () => {
-    try {
-      localStorage.setItem(`draft_contribute_${token}`, JSON.stringify({
+  const saveContribution = async ({ isDraftSave }) => {
+    const allPhotoUrls = [...existingPhotoUrls, ...uploadedPhotoUrls];
+    const response = await fetch(buildApiUrl(token), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: formData.name,
         message: formData.message,
-        uploadedPhotoUrls: uploadedPhotoUrls,
-        existingPhotoUrls: existingPhotoUrls,
-        lastSaved: new Date().toISOString()
-      }));
-    } catch (error) {
-      console.error('Erreur auto-sauvegarde:', error);
+        photoUrls: allPhotoUrls,
+        contributionId: existingContribution?.id,
+        isDraft: isDraftSave
+      })
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Erreur lors de l envoi');
     }
+
+    return data;
   };
 
-  // Sauvegarde en brouillon
   const handleSaveDraft = async () => {
-    if (!formData.name.trim() || !formData.message.trim()) {
-      alert('Veuillez remplir tous les champs');
-      return;
-    }
-
     setSaving(true);
-
     try {
-      const allPhotoUrls = [...existingPhotoUrls, ...uploadedPhotoUrls];
-
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const url = `${apiUrl}/invites/token/${token}`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          message: formData.message,
-          photoUrls: allPhotoUrls,
-          contributionId: existingContribution?.id,
-          isDraft: true
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de la sauvegarde');
-      }
-
-      localStorage.setItem(`draft_contribute_${token}`, JSON.stringify({
+      const data = await saveContribution({ isDraftSave: true });
+      localStorage.setItem(`${DRAFT_STORAGE_PREFIX}${token}`, JSON.stringify({
         name: formData.name,
         message: formData.message,
-        uploadedPhotoUrls: uploadedPhotoUrls,
-        existingPhotoUrls: existingPhotoUrls,
+        uploadedPhotoUrls,
+        existingPhotoUrls,
         contributionId: data.contributionId,
         lastSaved: new Date().toISOString()
       }));
-
       setIsDraft(true);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-      
-    } catch (error) {
-      alert(error.message);
+    } catch (saveError) {
+      alert(saveError.message);
     } finally {
       setSaving(false);
     }
   };
 
-  // Validation finale
   const handleFinalize = async () => {
-    if (!formData.name.trim() || !formData.message.trim()) {
-      alert('Veuillez remplir tous les champs');
-      return;
-    }
-
     setSubmitting(true);
-
     try {
-      const allPhotoUrls = [...existingPhotoUrls, ...uploadedPhotoUrls];
-
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const url = `${apiUrl}/invites/token/${token}`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          message: formData.message,
-          photoUrls: allPhotoUrls,
-          contributionId: existingContribution?.id,
-          isDraft: false
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'envoi');
-      }
-
-      localStorage.removeItem(`draft_contribute_${token}`);
+      await saveContribution({ isDraftSave: false });
+      localStorage.removeItem(`${DRAFT_STORAGE_PREFIX}${token}`);
       setSubmitted(true);
-      
-    } catch (error) {
-      alert(error.message);
+    } catch (submitError) {
+      alert(submitError.message);
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
   };
 
   if (loading) {
@@ -315,13 +245,13 @@ const TokenContributePageLuxe = () => {
     return (
       <div className="invitation-container">
         <div className="invitation-card" style={{ textAlign: 'center' }}>
-          <div className="empty-state-icon">😕</div>
+          <div className="empty-state-icon">•</div>
           <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-md)' }}>Oups !</h2>
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-xl)' }}>
             {error}
           </p>
           <button onClick={() => navigate('/')} className="btn btn-primary">
-            Retour à l'accueil
+            Retour a l accueil
           </button>
         </div>
       </div>
@@ -332,10 +262,10 @@ const TokenContributePageLuxe = () => {
     return (
       <div className="invitation-container">
         <div className="invitation-card" style={{ textAlign: 'center' }}>
-          <div className="empty-state-icon">✨</div>
+          <div className="empty-state-icon">*</div>
           <h2 style={{ color: 'var(--gold)', marginBottom: 'var(--space-md)' }}>Merci !</h2>
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-sm)' }}>
-            Votre contribution a été envoyée avec succès.
+            Votre contribution a ete envoyee avec succes.
           </p>
           <p className="body-text" style={{ color: 'var(--text-light)' }}>
             {invitation?.organizerName || "L'organisateur"} la validera prochainement.
@@ -358,75 +288,50 @@ const TokenContributePageLuxe = () => {
           </p>
         </div>
 
-        {isRevision && moderationFeedback && (
-          <div className="card" style={{ 
-            background: '#fff3cd', 
-            borderColor: '#ffeeba',
-            marginBottom: 'var(--space-lg)'
-          }}>
-            <p style={{ fontWeight: '600', marginBottom: 'var(--space-xs)' }}>✏️ Demande de modification :</p>
+        {isRevision && moderationFeedback ? (
+          <div
+            className="card"
+            style={{
+              background: '#fff3cd',
+              borderColor: '#ffeeba',
+              marginBottom: 'var(--space-lg)'
+            }}
+          >
+            <p style={{ fontWeight: '600', marginBottom: 'var(--space-xs)' }}>Demande de modification :</p>
             <p style={{ fontStyle: 'italic', color: 'var(--ink)' }}>"{moderationFeedback}"</p>
           </div>
-        )}
+        ) : null}
 
-        <form onSubmit={(e) => e.preventDefault()}>
+        <form onSubmit={(event) => event.preventDefault()}>
           <div className="form-group">
-            <label className="label-gold">Votre nom *</label>
+            <label className="label-gold">Votre nom</label>
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-              placeholder="Comment souhaitez-vous être nommé ?"
+              onChange={(event) => setFormData((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="Comment souhaitez-vous etre nomme ?"
               className="input-luxe"
             />
           </div>
 
-          <div className="form-group">
-            <label className="label-gold">Votre message *</label>
-            <textarea
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              required
-              rows="6"
-              placeholder="Rédigez ici votre message, souvenir ou témoignage..."
-              className="input-luxe"
-              style={{ resize: 'vertical' }}
-            />
-          </div>
+          <ContributionAmorceBlock
+            amorceText={amorceText}
+            triggers={triggers}
+            message={formData.message}
+            onChangeMessage={(message) => setFormData((prev) => ({ ...prev, message }))}
+          />
 
-          {existingPhotoUrls.length > 0 && (
+          {existingPhotoUrls.length > 0 ? (
             <div className="form-group">
-              <label className="label-gold">Photos déjà envoyées</label>
+              <label className="label-gold">Photos deja envoyees</label>
               <div className="photo-grid">
                 {existingPhotoUrls.map((url, index) => (
                   <div key={index} className="photo-item">
-                    <img src={url} alt={`Photo ${index + 1}`} />
-                    <button
-                      type="button"
-                      onClick={() => removeExistingPhoto(index)}
-                      className="photo-remove"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {uploadedPhotoUrls.length > 0 && (
-            <div className="form-group">
-              <label className="label-gold">Nouvelles photos</label>
-              <div className="photo-grid">
-                {uploadedPhotoUrls.map((url, index) => (
-                  <div key={index} className="photo-item">
-                    <img src={url} alt={`Uploaded ${index + 1}`} />
+                    <img src={url} alt={`Illustration ${index + 1}`} />
                     <button
                       type="button"
                       onClick={() => {
-                        setUploadedPhotoUrls(prev => prev.filter((_, i) => i !== index));
-                        setPhotos(prev => prev.filter((_, i) => i !== index));
+                        setExistingPhotoUrls((prev) => prev.filter((_, i) => i !== index));
                         handleAutoSave();
                       }}
                       className="photo-remove"
@@ -437,11 +342,34 @@ const TokenContributePageLuxe = () => {
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
+
+          {uploadedPhotoUrls.length > 0 ? (
+            <div className="form-group">
+              <label className="label-gold">Nouvelles photos</label>
+              <div className="photo-grid">
+                {uploadedPhotoUrls.map((url, index) => (
+                  <div key={index} className="photo-item">
+                    <img src={url} alt={`Illustration importee ${index + 1}`} />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadedPhotoUrls((prev) => prev.filter((_, i) => i !== index));
+                        setPhotos((prev) => prev.filter((_, i) => i !== index));
+                        handleAutoSave();
+                      }}
+                      className="photo-remove"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="form-group">
-            <label className="label-gold">Ajouter des photos (max 2)</label>
-            
+            <label className="label-gold">Ajouter une photo</label>
             <input
               type="file"
               accept="image/*"
@@ -451,7 +379,7 @@ const TokenContributePageLuxe = () => {
               style={{ display: 'none' }}
               disabled={uploading || photos.length >= 2}
             />
-            
+
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', marginTop: 'var(--space-xs)' }}>
               <label
                 htmlFor="photo-upload"
@@ -471,35 +399,41 @@ const TokenContributePageLuxe = () => {
             </div>
           </div>
 
-          {saved && (
-            <div className="card" style={{
-              background: '#d4edda',
-              borderColor: '#c3e6cb',
-              color: '#155724',
+          {saved ? (
+            <div
+              className="card"
+              style={{
+                background: '#d4edda',
+                borderColor: '#c3e6cb',
+                color: '#155724',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-sm)',
+                marginBottom: 'var(--space-lg)',
+                padding: 'var(--space-sm) var(--space-md)'
+              }}
+            >
+              <span>✓</span>
+              <span>Brouillon sauvegarde</span>
+            </div>
+          ) : null}
+
+          <div
+            className="card"
+            style={{
+              background: '#fff3cd',
+              borderColor: '#ffeeba',
+              color: '#856404',
               display: 'flex',
               alignItems: 'center',
-              gap: 'var(--space-sm)',
-              marginBottom: 'var(--space-lg)',
-              padding: 'var(--space-sm) var(--space-md)'
-            }}>
-              <span>✅</span>
-              <span>Brouillon sauvegardé</span>
-            </div>
-          )}
-
-          <div className="card" style={{
-            background: '#fff3cd',
-            borderColor: '#ffeeba',
-            color: '#856404',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-md)',
-            marginBottom: 'var(--space-xl)',
-            padding: 'var(--space-md) var(--space-lg)'
-          }}>
+              gap: 'var(--space-md)',
+              marginBottom: 'var(--space-xl)',
+              padding: 'var(--space-md) var(--space-lg)'
+            }}
+          >
             <span style={{ fontSize: '20px' }}>⚡</span>
             <p style={{ margin: 0, fontSize: '14px' }}>
-              La validation est définitive. Vous pouvez sauvegarder un brouillon et revenir plus tard.
+              La validation est definitive. Vous pouvez sauvegarder un brouillon et revenir plus tard.
             </p>
           </div>
 
@@ -507,37 +441,39 @@ const TokenContributePageLuxe = () => {
             <button
               type="button"
               onClick={handleSaveDraft}
-              disabled={saving || submitting || !formData.name.trim() || !formData.message.trim()}
+              disabled={saving || submitting}
               className="btn btn-outline"
               style={{ flex: 1 }}
             >
               <span style={{ marginRight: 'var(--space-xs)' }}>💾</span>
               {saving ? 'Sauvegarde...' : 'Sauvegarder le brouillon'}
             </button>
-            
+
             <button
               type="button"
               onClick={handleFinalize}
-              disabled={submitting || saving || !formData.name.trim() || !formData.message.trim()}
+              disabled={submitting || saving}
               className="btn btn-primary"
               style={{ flex: 2 }}
             >
-              <span style={{ marginRight: 'var(--space-xs)' }}>✨</span>
-              {submitting ? 'Envoi...' : 'Valider définitivement'}
+              <span style={{ marginRight: 'var(--space-xs)' }}>✦</span>
+              {submitting ? 'Envoi...' : 'Valider definitivement'}
             </button>
           </div>
 
-          {isDraft && !submitted && (
-            <p style={{ 
-              marginTop: 'var(--space-md)', 
-              fontSize: '12px', 
-              color: 'var(--gold)',
-              textAlign: 'center',
-              fontStyle: 'italic'
-            }}>
-              📝 Brouillon sauvegardé - Vous pouvez revenir plus tard avec le même lien
+          {isDraft && !submitted ? (
+            <p
+              style={{
+                marginTop: 'var(--space-md)',
+                fontSize: '12px',
+                color: 'var(--gold)',
+                textAlign: 'center',
+                fontStyle: 'italic'
+              }}
+            >
+              Brouillon sauvegarde - Vous pouvez revenir plus tard avec le meme lien
             </p>
-          )}
+          ) : null}
         </form>
       </div>
     </div>

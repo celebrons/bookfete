@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Step1Questions from './Step1Questions';
+import Step1Amorce from './Step1Amorce';
 import Step2Contribution from './Step2Contribution';
 import Step3Invitations from './Step3Invitations';
 import Step4Cloture from './Step4Cloture';
 import '../BookLuxe.css';
 
 const getDefaultActiveStep = ({
-  questionsValidated,
+  amorceValidated,
   hasContributed,
   contributionsClosed,
   isClosed,
   isSoloMode
 }) => {
-  if (!questionsValidated) {
+  if (!amorceValidated) {
     return 'step1';
   }
 
@@ -45,7 +45,7 @@ const ChapterWorkflowLuxe = (props) => {
     onFinalizeContribution
   } = props;
 
-  const questionsValidated = chapter?.questions_validated || false;
+  const amorceValidated = Boolean(chapter?.amorce_validated || chapter?.questions_validated);
   const hasContributed = chapter?.hasContributed || false;
   const isFinalized = chapter?.isFinalized || false;
   const invitationsCount = chapter?.invitationsCount || 0;
@@ -56,7 +56,7 @@ const ChapterWorkflowLuxe = (props) => {
   const completedMarker = '\u2713';
   const [activeStep, setActiveStep] = useState(() =>
     getDefaultActiveStep({
-      questionsValidated,
+      amorceValidated,
       hasContributed,
       contributionsClosed,
       isClosed,
@@ -64,7 +64,7 @@ const ChapterWorkflowLuxe = (props) => {
     })
   );
   const previousStateRef = useRef({
-    questionsValidated,
+    amorceValidated,
     hasContributed,
     isFinalized,
     contributionsClosed,
@@ -75,7 +75,7 @@ const ChapterWorkflowLuxe = (props) => {
   useEffect(() => {
     const previousState = previousStateRef.current;
     const progressed =
-      (!previousState.questionsValidated && questionsValidated) ||
+      (!previousState.amorceValidated && amorceValidated) ||
       (!previousState.hasContributed && hasContributed) ||
       (!previousState.isFinalized && isFinalized) ||
       (!previousState.contributionsClosed && contributionsClosed) ||
@@ -84,7 +84,7 @@ const ChapterWorkflowLuxe = (props) => {
 
     if (progressed) {
       setActiveStep(getDefaultActiveStep({
-        questionsValidated,
+        amorceValidated,
         hasContributed,
         contributionsClosed,
         isClosed,
@@ -93,28 +93,28 @@ const ChapterWorkflowLuxe = (props) => {
     }
 
     previousStateRef.current = {
-      questionsValidated,
+      amorceValidated,
       hasContributed,
       isFinalized,
       contributionsClosed,
       isClosed,
       isSoloMode
     };
-  }, [questionsValidated, hasContributed, isFinalized, contributionsClosed, isClosed, isSoloMode]);
+  }, [amorceValidated, hasContributed, isFinalized, contributionsClosed, isClosed, isSoloMode]);
 
   const steps = [
     {
       key: 'step1',
       order: 1,
-      title: 'Questions pour vous aider',
-      completed: questionsValidated,
-      locked: isClosed && !questionsValidated,
+      title: 'Amorce du chapitre',
+      completed: amorceValidated,
+      locked: isClosed && !amorceValidated,
       status: {
-        tone: isClosed && !questionsValidated ? 'is-locked' : (questionsValidated ? 'is-complete' : 'is-todo'),
-        label: isClosed && !questionsValidated ? 'Verrouille' : (questionsValidated ? 'Valide' : 'A faire')
+        tone: isClosed && !amorceValidated ? 'is-locked' : (amorceValidated ? 'is-complete' : 'is-todo'),
+        label: isClosed && !amorceValidated ? 'Verrouille' : (amorceValidated ? 'Valide' : 'A faire')
       },
       content: (
-        <Step1Questions
+        <Step1Amorce
           chapter={chapter}
           user={user}
           book={book}
@@ -127,16 +127,16 @@ const ChapterWorkflowLuxe = (props) => {
       order: 2,
       title: 'Votre contribution',
       completed: isFinalized,
-      locked: !questionsValidated || (isClosed && !isFinalized),
+      locked: !amorceValidated || (isClosed && !isFinalized),
       status: {
-        tone: !questionsValidated
+        tone: !amorceValidated
           ? 'is-locked'
           : ((isClosed && !isFinalized) ? 'is-locked' : (isFinalized ? 'is-complete' : (hasContributed ? 'is-draft' : 'is-todo'))),
-        label: !questionsValidated
+        label: !amorceValidated
           ? 'Verrouille'
           : ((isClosed && !isFinalized) ? 'Verrouille' : (isFinalized ? 'Validee' : (hasContributed ? 'Brouillon' : 'A faire')))
       },
-      content: questionsValidated ? (
+      content: amorceValidated ? (
         <Step2Contribution
           chapter={chapter}
           user={user}
@@ -146,7 +146,7 @@ const ChapterWorkflowLuxe = (props) => {
         />
       ) : (
         <div className="workflow-content workflow-empty-state">
-          Validez d abord l etape 1 pour acceder a votre contribution.
+          Validez d abord l amorce du chapitre pour acceder a votre contribution.
         </div>
       )
     },
@@ -195,13 +195,13 @@ const ChapterWorkflowLuxe = (props) => {
     }
 
     setActiveStep(getDefaultActiveStep({
-      questionsValidated,
+      amorceValidated,
       hasContributed,
       contributionsClosed,
       isClosed,
       isSoloMode
     }));
-  }, [activeStep, isSoloMode, questionsValidated, hasContributed, contributionsClosed, isClosed]);
+  }, [activeStep, isSoloMode, amorceValidated, hasContributed, contributionsClosed, isClosed]);
 
   const activeStepConfig = steps.find((step) => step.key === activeStep) || steps[0];
   const getStepVisualState = (step) => {

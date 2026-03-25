@@ -11,7 +11,7 @@ const FINITIONS = [
 const PAPIERS = [
   { id: 'satine', label: 'Satine', description: 'Brillant et lisse', multiplier: 1.0 },
   { id: 'mat', label: 'Mat', description: 'Doux et naturel', multiplier: 1.0 },
-  { id: 'verge', label: 'Verge ivoire', description: 'Texture noble', multiplier: 1.15 }
+  { id: 'verge_ivoire', label: 'Verge ivoire', description: 'Texture noble', multiplier: 1.15 }
 ];
 
 const STYLES = [
@@ -26,6 +26,10 @@ const DEFAULT_PAGES_PER_CHAPTER = 8;
 const DEFAULT_PRICE_PAGES_BASELINE = 64;
 const EXTRA_PAGE_PRICE = 0.25;
 
+const normalizePaperType = (value) => (
+  value === 'verge' ? 'verge_ivoire' : (value || 'mat')
+);
+
 const clampPages = (value) => {
   const numericValue = Number(value) || MIN_PAGES;
   const snapped = Math.round(numericValue / DEFAULT_PAGES_PER_CHAPTER) * DEFAULT_PAGES_PER_CHAPTER;
@@ -35,7 +39,7 @@ const clampPages = (value) => {
 const buildInitialFormData = (book, chaptersCount) => ({
   title: book?.title || '',
   finition: book?.finition || 'classique',
-  papier: book?.papier || 'mat',
+  papier: normalizePaperType(book?.papier),
   style_narratif: book?.style_narratif || 'factuel',
   pages: clampPages(book?.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER || 64)
 });
@@ -82,7 +86,7 @@ const BookConfigLuxe = ({
     () => ({
       title: book?.title || '',
       finition: book?.finition || 'classique',
-      papier: book?.papier || 'mat',
+      papier: normalizePaperType(book?.papier),
       style_narratif: book?.style_narratif || 'factuel',
       pages: clampPages(book?.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER || 64)
     }),

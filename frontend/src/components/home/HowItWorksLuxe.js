@@ -1,5 +1,5 @@
 // C:\Users\USER\bookfete\frontend\src\components\home\HowItWorksLuxe.js
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import '../../styles/luxe-theme.css';
 import './HowItWorksLuxe.css';

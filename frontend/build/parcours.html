@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parcours complet - Création d'un livre souvenir</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9eef5 100%);
+            color: #1a1a1a;
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.8rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .content {
+            padding: 3rem;
+        }
+        
+        .toc {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 20px;
+            margin-bottom: 3rem;
+            border: 1px solid #e9ecef;
+        }
+        
+        .toc h2 {
+            font-family: 'Playfair Display', serif;
+            color: #333;
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+        }
+        
+        .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        
+        .toc-item {
+            padding: 0.8rem 1rem;
+            background: white;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s;
+            color: #764ba2;
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .toc-item:hover {
+            background: #f3e8ff;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(118, 75, 162, 0.1);
+        }
+        
+        .step {
+            margin-bottom: 4rem;
+            scroll-margin-top: 2rem;
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .step-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            box-shadow: 0 10px 20px rgba(118, 75, 162, 0.3);
+        }
+        
+        .step-title {
+            flex: 1;
+        }
+        
+        .step-title h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 0.3rem;
+        }
+        
+        .step-title p {
+            color: #666;
+            font-size: 1rem;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid #e9ecef;
+            margin-bottom: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+        
+        .mockup {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
+            font-family: 'Courier New', monospace;
+            margin: 1rem 0;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            color: #333;
+        }
+        
+        .mockup-title {
+            color: #764ba2;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+        
+        .badge-primary {
+            background: #e8f4fd;
+            color: #0c5460;
+        }
+        
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-purple {
+            background: #f3e8ff;
+            color: #764ba2;
+        }
+        
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 1.5rem 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #764ba2;
+            line-height: 1.2;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        
+        .button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.8rem 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            box-shadow: 0 10px 20px rgba(118, 75, 162, 0.3);
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(118, 75, 162, 0.4);
+        }
+        
+        .button-secondary {
+            background: #6c757d;
+            box-shadow: 0 10px 20px rgba(108, 117, 125, 0.3);
+        }
+        
+        .button-danger {
+            background: #dc3545;
+            box-shadow: 0 10px 20px rgba(220, 53, 69, 0.3);
+        }
+        
+        .timeline {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .timeline-item:last-child {
+            border-bottom: none;
+        }
+        
+        .timeline-day {
+            width: 100px;
+            font-weight: bold;
+            color: #764ba2;
+        }
+        
+        .timeline-desc {
+            flex: 1;
+        }
+        
+        .timeline-time {
+            color: #28a745;
+            font-weight: 500;
+        }
+        
+        .footer {
+            background: #f8f9fa;
+            padding: 2rem;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #666;
+        }
+        
+        .highlight {
+            background: linear-gradient(120deg, #f3e8ff 0%, #f3e8ff 100%);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            color: #764ba2;
+            font-weight: 600;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px dashed #e9ecef;
+            margin: 3rem 0;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+            
+            .content {
+                padding: 1.5rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .two-columns {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .step-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 1rem;
+            }
+            
+            .toc-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 PARCOURS COMPLET</h1>
+            <p>Création d'un livre souvenir - "Les 60 ans de Gégé"</p>
+        </div>
+        
+        <div class="content">
+            <!-- Sommaire -->
+            <div class="toc">
+                <h2>📑 SOMMAIRE</h2>
+                <div class="toc-grid">
+                    <a href="#etape1" class="toc-item">🚪 1. Page d'accueil</a>
+                    <a href="#etape2" class="toc-item">📖 2. Page événement</a>
+                    <a href="#etape3" class="toc-item">⚙️ 3. Configuration</a>
+                    <a href="#etape4" class="toc-item">📚 4. BookPage</a>
+                    <a href="#etape5" class="toc-item">👥 5. Contributeurs</a>
+                    <a href="#etape6" class="toc-item">📧 6. Invitations</a>
+                    <a href="#etape7" class="toc-item">📱 7. Contributeur</a>
+                    <a href="#etape8" class="toc-item">✅ 8. Modération</a>
+                    <a href="#etape9" class="toc-item">📊 9. Réception</a>
+                    <a href="#etape10" class="toc-item">📖 10. Génération</a>
+                    <a href="#etape11" class="toc-item">💳 11. Commande</a>
+                    <a href="#etape12" class="toc-item">📦 12. Livraison</a>
+                    <a href="#recap" class="toc-item">⏱️ Récapitulatif</a>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 1 -->
+            <div id="etape1" class="step">
+                <div class="step-header">
+                    <div class="step-icon">🚪</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 1 - Page d'accueil</h2>
+                        <p>Sophie arrive sur <span class="highlight">memoire-collective.fr</span></p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="mockup">
+                        <div class="mockup-title">✨ MEMOIRE COLLECTIVE</div>
+                        TRANSFORMER VOS SOUVENIRS EN UN LIVRE UNIQUE<br><br>
+                        Pour tous vos événements :<br>
+                        [🎂 Anniversaire] [💍 Mariage] [👶 Naissance] [✈️ Départ] [🍾 Pot de départ]<br><br>
+                        Des souvenirs partagés, immortalisés dans un livre unique.<br>
+                        [Commencez gratuitement →]
+                    </div>
+                    <p style="margin-top: 1rem; color: #666;">👉 Sophie clique sur <strong>"Anniversaire"</strong></p>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 2 -->
+            <div id="etape2" class="step">
+                <div class="step-header">
+                    <div class="step-icon">📖</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 2 - Page événement</h2>
+                        <p>Page dédiée à l'anniversaire</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="mockup">
+                        <div class="mockup-title">🎂 LIVRE D'ANNIVERSAIRE</div>
+                        Célébrez un anniversaire inoubliable<br><br>
+                        Rassemblez les messages, photos et souvenirs de tous vos proches<br>
+                        pour créer un livre unique qui marquera cet anniversaire.<br><br>
+                        Ce que votre livre contiendra :<br>
+                        ✓ Messages personnalisés de chaque invité<br>
+                        ✓ Photos des meilleurs moments<br>
+                        ✓ Souvenirs d'enfance et anecdotes<br>
+                        ✓ Vœux pour l'avenir<br><br>
+                        [✨ Créer mon livre d'anniversaire]
+                    </div>
+                    <p style="margin-top: 1rem; color: #666;">👉 Sophie clique sur <strong>"Créer mon livre"</strong></p>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 3 -->
+            <div id="etape3" class="step">
+                <div class="step-header">
+                    <div class="step-icon">⚙️</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 3 - Configuration du livre (Wizard)</h2>
+                        <p>Création en 3 étapes</p>
+                    </div>
+                </div>
+                
+                <div class="two-columns">
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem; color: #764ba2;">Page 1 - Informations</h3>
+                        <div class="mockup">
+                            CRÉEZ VOTRE LIVRE UNIQUE - Étape 1/3<br><br>
+                            Titre du livre * : [Les 60 ans de Gégé 🎂]<br>
+                            Type d'événement : [Anniversaire]<br><br>
+                            Style narratif de l'IA :<br>
+                            ○ Poétique  ● Intime  ○ Factuel<br><br>
+                            Aperçu des chapitres proposés :<br>
+                            📖 1. Souvenirs d'enfance<br>
+                            📖 2. Nos moments complices<br>
+                            📖 3. Ce que j'aime chez toi<br>
+                            📖 4. Les plus belles anecdotes<br>
+                            📖 5. Messages d'anniversaire<br>
+                            📖 6. Vœux pour l'avenir<br><br>
+                            [Suivant →]
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3 style="margin-bottom: 1rem; color: #764ba2;">Page 2 - Options</h3>
+                        <div class="mockup">
+                            CRÉEZ VOTRE LIVRE UNIQUE - Étape 2/3<br><br>
+                            Finition :<br>
+                            □ Livret 69€   ■ Classique 89€   □ Luxe 129€<br><br>
+                            Papier :<br>
+                            □ Satiné        ■ Mat             □ Vergé Ivoire<br><br>
+                            Nombre de pages : [96 pages]<br><br>
+                            PRIX TOTAL : 89€<br><br>
+                            [← Précédent] [Suivant →]
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3 style="margin-bottom: 1rem; color: #764ba2;">Page 3 - Récapitulatif</h3>
+                    <div class="mockup">
+                        CRÉEZ VOTRE LIVRE UNIQUE - Étape 3/3<br><br>
+                        Vérifiez votre livre :<br><br>
+                        📕 LES 60 ANS DE GÉGÉ<br>
+                        Anniversaire • Style intime • 96 pages • 6 chapitres<br><br>
+                        Finition : Classique rigide<br>
+                        Papier : Mat<br><br>
+                        Total : 89€<br><br>
+                        [← Précédent] [🚀 CRÉER MON LIVRE]
+                    </div>
+                    <p style="margin-top: 1rem; color: #666;">👉 Sophie clique sur <strong>"CRÉER MON LIVRE"</strong></p>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 4 -->
+            <div id="etape4" class="step">
+                <div class="step-header">
+                    <div class="step-icon">📚</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 4 - Le livre est créé (BookPage)</h2>
+                        <p>Interface à deux colonnes</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div style="margin-bottom: 1rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <span class="badge badge-purple">📑 Chapitres</span>
+                        <span class="badge badge-purple">👥 Contributeurs</span>
+                        <span class="badge badge-purple">⚙️ Configuration</span>
+                    </div>
+                    
+                    <div class="two-columns">
+                        <div>
+                            <div style="background: #f3e8ff; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #b8924a;">
+                                📕 COUVERTURE<br>
+                                <small>Personnalisable</small>
+                            </div>
+                            
+                            <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 0.5rem;">
+                                <strong>📖 1. Souvenirs d'enfance</strong><br>
+                                <span style="color: #666;">💬 0 • 📝 4 questions</span>
+                            </div>
+                            
+                            <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 0.5rem;">
+                                <strong>📖 2. Nos moments complices</strong><br>
+                                <span style="color: #666;">💬 0 • 📝 4 questions</span>
+                            </div>
+                            
+                            <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 0.5rem;">
+                                <strong>📖 3. Ce que j'aime chez toi</strong><br>
+                                <span style="color: #666;">💬 0 • 📝 4 questions</span>
+                            </div>
+                            
+                            <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 0.5rem;">
+                                <strong>📖 4. Les plus belles anecdotes</strong><br>
+                                <span style="color: #666;">💬 0 • 📝 4 questions</span>
+                            </div>
+                            
+                            <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 0.5rem;">
+                                <strong>📖 5. Messages d'anniversaire</strong><br>
+                                <span style="color: #666;">💬 0 • 📝 4 questions</span>
+                            </div>
+                            
+                            <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 0.5rem;">
+                                <strong>📖 6. Vœux pour l'avenir</strong><br>
+                                <span style="color: #666;">💬 0 • 📝 4 questions</span>
+                            </div>
+                            
+                            <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; margin-top: 0.5rem; border-left: 4px solid #17a2b8;">
+                                📘 4ÈME COUVERTURE<br>
+                                <small>0 contributeurs</small>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 style="margin-top: 0; color: #764ba2;">✨ SOUVENIRS D'ENFANCE</h3>
+                            
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 8px; color: white;">
+                                <h4 style="margin: 0 0 1rem;">QUESTIONS SUGGÉRÉES PAR L'IA</h4>
+                                <ul style="margin: 0; padding-left: 1.2rem;">
+                                    <li>Quel est ton premier souvenir de Gégé ?</li>
+                                    <li>Comment était-il enfant ?</li>
+                                    <li>Quelle qualité avait-il déjà ?</li>
+                                    <li>Raconte une anecdote d'enfance.</li>
+                                </ul>
+                            </div>
+                            
+                            <div style="margin-top: 1.5rem;">
+                                <h4>MA CONTRIBUTION PERSONNELLE</h4>
+                                <textarea rows="4" style="width: 100%; padding: 1rem; border: 1px solid #ddd; border-radius: 8px;" placeholder="Je me souviens de Gégé quand..."></textarea>
+                                <p style="margin: 0.5rem 0; color: #666;">[📷 Ajouter des photos] 0/2</p>
+                                <button class="button" style="width: 100%;">ENREGISTRER MA CONTRIBUTION</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 5 -->
+            <div id="etape5" class="step">
+                <div class="step-header">
+                    <div class="step-icon">👥</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 5 - Gestion des contributeurs</h2>
+                        <p>Sophie ajoute 15 personnes</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                        <span class="badge badge-primary">Total: 0</span>
+                        <span class="badge badge-success">Invités: 0</span>
+                        <span class="badge badge-warning">En attente: 0</span>
+                    </div>
+                    
+                    <h3>AJOUTER UN CONTRIBUTEUR</h3>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <input type="email" placeholder="Email *" style="flex: 2; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;" value="marie@gmail.com">
+                        <input type="text" placeholder="Nom" style="flex: 1; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;" value="Marie">
+                        <button class="button">➕ Ajouter</button>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                        <input type="email" placeholder="Email *" style="flex: 2; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;" value="pierre@yahoo.fr">
+                        <input type="text" placeholder="Nom" style="flex: 1; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;" value="Pierre">
+                        <button class="button">➕ Ajouter</button>
+                    </div>
+                    
+                    <h3>LISTE DES CONTRIBUTEURS</h3>
+                    <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #ddd;">
+                            <span><strong>Marie</strong> marie@gmail.com</span>
+                            <button class="button button-danger" style="padding: 0.3rem 1rem;">Supprimer</button>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #ddd;">
+                            <span><strong>Pierre</strong> pierre@yahoo.fr</span>
+                            <button class="button button-danger" style="padding: 0.3rem 1rem;">Supprimer</button>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem;">
+                            <span><strong>Claire</strong> claire@free.fr</span>
+                            <button class="button button-danger" style="padding: 0.3rem 1rem;">Supprimer</button>
+                        </div>
+                        <p style="margin-top: 1rem; color: #666; text-align: center;">... et 12 autres</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 6 -->
+            <div id="etape6" class="step">
+                <div class="step-header">
+                    <div class="step-icon">📧</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 6 - Envoi des invitations</h2>
+                        <p>Sélection et envoi en batch</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="mockup">
+                        INVITER DES CONTRIBUTEURS<br><br>
+                        Total: 15 • Disponibles: 15 • Déjà invités: 0<br><br>
+                        ☑ Tous sélectionner (15/15)<br><br>
+                        ☑ Marie (marie@gmail.com)<br>
+                        ☑ Pierre (pierre@yahoo.fr)<br>
+                        ☑ Claire (claire@free.fr)<br>
+                        ☑ Paul (paul@gmail.com)<br>
+                        ... (les 11 autres)<br><br>
+                        [Annuler] [Inviter (15)]
+                    </div>
+                    
+                    <p style="margin-top: 1rem;">👉 Sophie clique sur <strong>"Inviter (15)"</strong></p>
+                    
+                    <div style="margin-top: 2rem; background: #d4edda; padding: 1.5rem; border-radius: 8px; color: #155724;">
+                        <h3 style="margin: 0 0 1rem;">✅ INVITATIONS ENVOYÉES</h3>
+                        <p>15 invitation(s) envoyée(s)</p>
+                        
+                        <div style="margin-top: 1rem;">
+                            <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                                <strong>👤 Marie</strong><br>
+                                <code style="background: #f8f9fa; padding: 0.3rem;">https://memoire-collective.fr/invite/abc123</code>
+                                <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                                    <button class="button" style="padding: 0.3rem 1rem;">Copier</button>
+                                    <button class="button button-secondary" style="padding: 0.3rem 1rem;">Tester</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 7 -->
+            <div id="etape7" class="step">
+                <div class="step-header">
+                    <div class="step-icon">📱</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 7 - Le contributeur reçoit l'invitation</h2>
+                        <p>Pierre reçoit un email et contribue</p>
+                    </div>
+                </div>
+                
+                <div class="two-columns">
+                    <div class="card">
+                        <h3>Email reçu</h3>
+                        <div class="mockup">
+                            📧 De: Sophie<br>
+                            📧 À: Pierre<br>
+                            Objet: Invitation à contribuer - Les 60 ans de Gégé<br><br>
+                            ---<br><br>
+                            Sophie vous invite à contribuer au livre "Les 60 ans de Gégé"<br>
+                            pour l'anniversaire de Gégé.<br><br>
+                            Chapitre : Souvenirs d'enfance<br><br>
+                            [✨ AJOUTER MA CONTRIBUTION]
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Page de contribution</h3>
+                        <div style="background: white; padding: 1.5rem; border-radius: 8px;">
+                            <h2 style="margin: 0 0 0.5rem;">📖 LES 60 ANS DE GÉGÉ</h2>
+                            <p style="color: #666;">Chapitre : Souvenirs d'enfance</p>
+                            
+                            <div style="background: #f3e8ff; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                                Sophie vous a invité à contribuer à un livre personnalisé<br>
+                                pour <strong>Gégé</strong> à l'occasion de son <strong>60ème anniversaire</strong>.
+                            </div>
+                            
+                            <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                                ⏰ Contribuez avant le 15 mars 2024
+                            </div>
+                            
+                            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                                <strong>💡 Questions guides :</strong>
+                                <ol style="margin: 0.5rem 0 0;">
+                                    <li>Quel est ton premier souvenir de Gégé ?</li>
+                                    <li>Comment était-il enfant ?</li>
+                                    <li>Quelle qualité avait-il déjà ?</li>
+                                    <li>Raconte une anecdote d'enfance.</li>
+                                </ol>
+                            </div>
+                            
+                            <input type="text" placeholder="Votre nom *" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 8px;" value="Pierre">
+                            
+                            <textarea rows="4" style="width: 100%; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 1rem;" placeholder="Votre message">Je me souviens de Gégé quand on jouait au foot ensemble...</textarea>
+                            
+                            <p style="margin: 0.5rem 0;">[📷 Choisir des photos] 1/2</p>
+                            
+                            <div style="display: flex; gap: 1rem; margin: 1.5rem 0;">
+                                <button class="button button-secondary" style="flex: 1;">💾 Sauvegarder</button>
+                                <button class="button" style="flex: 2;">✨ Valider ma contribution</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 8 -->
+            <div id="etape8" class="step">
+                <div class="step-header">
+                    <div class="step-icon">✅</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 8 - Modération</h2>
+                        <p>Sophie approuve les contributions</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="two-columns">
+                        <div>
+                            <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 0.5rem; background: #f3e8ff;">
+                                <strong>📖 1. Souvenirs d'enfance</strong>
+                                <span style="float: right;">💬 3 • 📝 4</span>
+                            </div>
+                            <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 0.5rem;">
+                                <strong>📖 2. Nos moments complices</strong>
+                                <span style="float: right;">💬 1 • 📝 4</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 style="margin-top: 0;">Contributions pour "Souvenirs d'enfance"</h3>
+                            
+                            <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <strong>⏳ Pierre - En attente</strong>
+                                </div>
+                                <p style="margin: 0.5rem 0;">"Je me souviens de Gégé quand..."</p>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button class="button" style="padding: 0.3rem 1rem;">✓ Approuver</button>
+                                    <button class="button button-danger" style="padding: 0.3rem 1rem;">🗑️ Supprimer</button>
+                                </div>
+                            </div>
+                            
+                            <div style="background: #d4edda; padding: 1rem; border-radius: 8px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <strong>✓ Marie - Approuvée</strong>
+                                </div>
+                                <p style="margin: 0.5rem 0;">"Gégé et moi à la pêche..."</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 9 -->
+            <div id="etape9" class="step">
+                <div class="step-header">
+                    <div class="step-icon">📊</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 9 - Toutes les contributions sont reçues</h2>
+                        <p>12 contributions sur 15</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                        <span class="badge badge-primary">Total: 15</span>
+                        <span class="badge badge-warning">En attente: 3</span>
+                        <span class="badge badge-success">Répondu: 12</span>
+                    </div>
+                    
+                    <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #ddd;">
+                            <span><strong>✓ Marie</strong> - Répondu</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #ddd;">
+                            <span><strong>✓ Pierre</strong> - Répondu</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid #ddd;">
+                            <span><strong>⏳ Claire</strong> - En attente</span>
+                            <button class="button button-secondary" style="padding: 0.3rem 1rem;">Relancer</button>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.5rem;">
+                            <span><strong>⏳ Julie</strong> - En attente</span>
+                            <button class="button button-secondary" style="padding: 0.3rem 1rem;">Relancer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 10 -->
+            <div id="etape10" class="step">
+                <div class="step-header">
+                    <div class="step-icon">📖</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 10 - Génération du livre</h2>
+                        <p>L'IA assemble tout</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div style="background: white; padding: 2rem; border-radius: 8px;">
+                        <h3 style="margin-top: 0;">GÉNÉRATION DE VOTRE LIVRE...</h3>
+                        
+                        <div style="background: #e9ecef; height: 20px; border-radius: 10px; margin: 1rem 0; overflow: hidden;">
+                            <div style="width: 70%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
+                        </div>
+                        
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 0.5rem;">✓ Structure des chapitres conservée</li>
+                            <li style="margin-bottom: 0.5rem;">✓ 12 contributions intégrées</li>
+                            <li style="margin-bottom: 0.5rem;">✓ 8 photos placées harmonieusement</li>
+                            <li style="margin-bottom: 0.5rem;">✓ Introduction personnalisée générée par l'IA</li>
+                            <li style="margin-bottom: 0.5rem;">✓ Conclusion générée par l'IA</li>
+                            <li style="margin-bottom: 0.5rem;">✓ Page de remerciements créée</li>
+                        </ul>
+                        
+                        <div style="margin-top: 2rem; text-align: center;">
+                            <button class="button">📥 Télécharger le PDF</button>
+                            <button class="button" style="margin-left: 1rem;">🖨️ Commander l'impression</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card" style="margin-top: 1rem;">
+                    <h3>Aperçu du PDF généré</h3>
+                    <div style="background: #f8f9fa; padding: 2rem; border-radius: 8px; font-family: 'Times New Roman', serif;">
+                        <div style="text-align: center; margin-bottom: 2rem;">
+                            <h1 style="font-size: 2.5rem;">LES 60 ANS DE GÉGÉ</h1>
+                        </div>
+                        
+                        <h2>Chapitre 1 - Souvenirs d'enfance</h2>
+                        <p style="font-style: italic; color: #666;">« Quel est ton premier souvenir de Gégé ? »</p>
+                        
+                        <p><strong>Pierre :</strong> "Je me souviens de Gégé quand on jouait au foot ensemble..."</p>
+                        
+                        <div style="border: 1px solid #ddd; padding: 1rem; margin: 1rem 0; text-align: center;">
+                            [Photo: Pierre et Gégé, 1975]
+                        </div>
+                        
+                        <p><strong>Marie :</strong> "Gégé et moi à la pêche au bord de la rivière..."</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 11 -->
+            <div id="etape11" class="step">
+                <div class="step-header">
+                    <div class="step-icon">💳</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 11 - Commande du livre physique</h2>
+                        <p>Paiement et expédition</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="mockup">
+                        COMMANDEZ VOTRE LIVRE<br><br>
+                        Récapitulatif de votre commande :<br>
+                        ┌─────────────────────────────────────┐<br>
+                        │ 📕 Les 60 ans de Gégé                │<br>
+                        │ 📖 96 pages • 12 contributeurs       │<br>
+                        │ 📸 8 photos • 6 chapitres            │<br>
+                        │                                      │<br>
+                        │ Finition : Classique rigide          │<br>
+                        │ Papier : Mat                          │<br>
+                        │                                      │<br>
+                        │ Sous-total : 89€                      │<br>
+                        │ Livraison : 5€                        │<br>
+                        │ TOTAL : 94€                           │<br>
+                        └─────────────────────────────────────┘<br><br>
+                        Adresse de livraison :<br>
+                        [12 rue des Lilas                    ]<br>
+                        [75001 Paris                         ]<br>
+                        [France                               ]<br><br>
+                        [💳 PAYER PAR CARTE]
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 12 -->
+            <div id="etape12" class="step">
+                <div class="step-header">
+                    <div class="step-icon">📦</div>
+                    <div class="step-title">
+                        <h2>ÉTAPE 12 - Livraison</h2>
+                        <p>Le livre arrive</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div style="background: #d4edda; padding: 2rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📧</div>
+                        <h3>Votre livre "Les 60 ans de Gégé" est expédié !</h3>
+                        <p>Numéro de suivi : #123456789</p>
+                        <button class="button">📦 SUIVRE MON COLIS</button>
+                    </div>
+                    
+                    <div style="margin-top: 2rem; text-align: center;">
+                        <div style="font-size: 4rem;">📕</div>
+                        <h2>Gégé est heureux. Sophie est fière.</h2>
+                        <p style="color: #666;">Mission accomplie ! 🚀</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Récapitulatif temporel -->
+            <div id="recap" class="timeline">
+                <h2 style="margin-bottom: 2rem; font-family: 'Playfair Display', serif;">⏱️ RÉCAPITULATIF TEMPOREL</h2>
+                
+                <div class="timeline-item">
+                    <div class="timeline-day">Jour 1</div>
+                    <div class="timeline-desc">Création du livre</div>
+                    <div class="timeline-time">15 min</div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-day">Jour 1</div>
+                    <div class="timeline-desc">Ajout des 15 contacts</div>
+                    <div class="timeline-time">10 min</div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-day">Jour 1</div>
+                    <div class="timeline-desc">Envoi des invitations</div>
+                    <div class="timeline-time">2 min</div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-day">Jours 2-14</div>
+                    <div class="timeline-desc">Réception des contributions</div>
+                    <div class="timeline-time">-</div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-day">Jour 14</div>
+                    <div class="timeline-desc">Modération et relances</div>
+                    <div class="timeline-time">15 min</div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-day">Jour 14</div>
+                    <div class="timeline-desc">Commande du livre</div>
+                    <div class="timeline-time">5 min</div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-day">Jours 15-28</div>
+                    <div class="timeline-desc">Impression et expédition</div>
+                    <div class="timeline-time">-</div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-day">Jour 28</div>
+                    <div class="timeline-desc">Livraison</div>
+                    <div class="timeline-time">-</div>
+                </div>
+                
+                <hr>
+                
+                <div style="text-align: center;">
+                    <p style="font-size: 1.2rem;"><span class="highlight">⏱️ Temps actif total pour Sophie : ~45 minutes</span></p>
+                    <p style="color: #666;">📅 Délai total : ~4 semaines</p>
+                </div>
+            </div>
+            
+            <!-- Rôle de l'IA -->
+            <div style="margin-top: 3rem; background: linear-gradient(135deg, #f3e8ff 0%, #e9d8ff 100%); padding: 2rem; border-radius: 20px;">
+                <h2 style="font-family: 'Playfair Display', serif; margin-bottom: 1.5rem;">🤖 CE QUE L'IA A FAIT</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">6</div>
+                        <div class="stat-label">Chapitres générés</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">24</div>
+                        <div class="stat-label">Questions créées</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">12</div>
+                        <div class="stat-label">Contributions intégrées</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">8</div>
+                        <div class="stat-label">Photos placées</div>
+                    </div>
+                </div>
+                
+                <ul style="margin-top: 1.5rem;">
+                    <li><strong>Création</strong> : Génération des 6 chapitres adaptés à l'événement</li>
+                    <li><strong>Questions</strong> : Création de 4 questions uniques par chapitre</li>
+                    <li><strong>Contributeur</strong> : Affichage des questions personnalisées</li>
+                    <li><strong>Génération</strong> : Assemblage des contributions, création intro/conclusion</li>
+                    <li><strong>Mise en page</strong> : Placement harmonieux des textes et photos</li>
+                </ul>
+                
+                <p style="margin-top: 1.5rem; font-style: italic;">L'IA a travaillé en coulisses pour que Sophie n'ait qu'à orchestrer le tout !</p>
+            </div>
+            
+            <!-- Résultat final -->
+            <div style="margin-top: 3rem; text-align: center;">
+                <div style="font-size: 5rem; margin-bottom: 1rem;">🎁</div>
+                <h2 style="font-family: 'Playfair Display', serif; font-size: 2rem;">RÉSULTAT FINAL</h2>
+                <p style="font-size: 1.2rem; max-width: 600px; margin: 1rem auto;">
+                    Un magnifique livre de <strong>96 pages</strong>, <strong>12 contributeurs</strong>, <strong>8 photos</strong>, 
+                    relié avec soin, qui restera dans la famille pour des générations.
+                </p>
+                <p style="font-size: 1.1rem; color: #764ba2; margin-top: 2rem;">
+                    Gégé est heureux. Sophie est fière. Les contributeurs sont touchés.
+                </p>
+                <p style="font-size: 1.5rem; margin-top: 2rem;">🚀 <strong>Mission accomplie !</strong></p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Document généré le 24 février 2026 - Parcours complet de création d'un livre souvenir</p>
+            <p style="margin-top: 0.5rem; color: #999;">Mémoire Collective - Transformez vos souvenirs en livres uniques</p>
+        </div>
+    </div>
+</body>
+</html>

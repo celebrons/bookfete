@@ -4,11 +4,9 @@ import Tooltip from '../ui/Tooltip';
 import ChapterDetailsLuxe from './chapters/ChapterDetailsLuxe';
 import ContributionsModerationLuxe from './chapters/ContributionsModerationLuxe';
 import ChapterEditorLuxe from './chapters/ChapterEditorLuxe';
-import QuestionsEditorLuxe from './chapters/QuestionsEditorLuxe';
 import BookCoverDesignerLuxe from './BookCoverDesignerLuxe';
 import { useChapterActions } from './hooks/useChapterActions';
 import { useContributions } from './hooks/useContributions';
-import { useQuestions } from './hooks/useQuestions';
 import './BookLuxe.css';
 
 const COVER_CARD_ID = 'cover-card';
@@ -154,19 +152,6 @@ const ChapterListLuxe = ({
     submitContribution
   } = useContributions();
 
-  const {
-    editingQuestions,
-    setEditingQuestions,
-    newQuestion,
-    setNewQuestion,
-    generatingQuestions,
-    handleEditQuestions,
-    handleSaveQuestions,
-    addQuestion,
-    removeQuestion,
-    generateAIQuestions
-  } = useQuestions(onUpdateChapter);
-
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: authUser } }) => {
       setUser(authUser);
@@ -193,11 +178,9 @@ const ChapterListLuxe = ({
     setSelectedChapterId(null);
     setShowContributions(false);
     setEditingChapter(null);
-    setEditingQuestions(null);
   }, [
     editionGalleryRequest,
     setEditingChapter,
-    setEditingQuestions,
     setSelectedChapterId,
     setShowContributions
   ]);
@@ -206,7 +189,6 @@ const ChapterListLuxe = ({
     setSelectedChapterId(null);
     setShowContributions(false);
     setEditingChapter(null);
-    setEditingQuestions(null);
   };
 
   const getStatusColor = (contributions) => {
@@ -223,7 +205,8 @@ const ChapterListLuxe = ({
     }
 
     const hasStarted = Boolean(
-      chapter?.questions_validated
+      chapter?.amorce_validated
+      || chapter?.questions_validated
       || chapter?.workflowState
       || chapter?.hasContributed
       || Number(chapter?.contributionsCount || 0) > 0
@@ -277,7 +260,6 @@ const ChapterListLuxe = ({
     handleSelectChapter(itemId);
     setShowContributions(false);
     setEditingChapter(null);
-    setEditingQuestions(null);
   };
 
   return (
@@ -534,17 +516,6 @@ const ChapterListLuxe = ({
               onSave={handleSaveEdit}
               onCancel={() => setEditingChapter(null)}
             />
-          ) : editingQuestions ? (
-            <QuestionsEditorLuxe
-              editingQuestions={editingQuestions}
-              setEditingQuestions={setEditingQuestions}
-              newQuestion={newQuestion}
-              setNewQuestion={setNewQuestion}
-              onAddQuestion={addQuestion}
-              onRemoveQuestion={removeQuestion}
-              onSave={handleSaveQuestions}
-              onCancel={() => setEditingQuestions(null)}
-            />
           ) : showContributions ? (
             <ContributionsModerationLuxe
               chapterTitle={selectedChapterTitle}
@@ -565,8 +536,6 @@ const ChapterListLuxe = ({
               onGenerateChapterDraft={onGenerateChapterDraft}
               onSaveChapterDraft={onSaveChapterDraft}
               onFinalizeChapterDraft={onFinalizeChapterDraft}
-              onGenerateQuestions={(chapterItem) => generateAIQuestions(chapterItem, bookId, selectedChapter)}
-              generatingQuestions={generatingQuestions}
               contributionText={contributionText}
               setContributionText={setContributionText}
               photos={photos}
@@ -583,13 +552,7 @@ const ChapterListLuxe = ({
               userEmail={user?.email}
               user={user}
               book={book}
-              onEditQuestions={() => handleEditQuestions(selectedChapter)}
-              onValidateQuestions={() => {
-                onUpdateChapter(selectedChapter.id, { questions_validated: true });
-              }}
-              questionsValidated={selectedChapter?.questions_validated || false}
-              onEditContribution={() => {}}
-              invitations={[]}
+              amorceValidated={Boolean(selectedChapter?.amorce_validated || selectedChapter?.questions_validated)}
             />
           )}
         </div>

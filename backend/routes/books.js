@@ -10,7 +10,7 @@ const PDFDocument = require('pdfkit');
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const aiService = require('../services/aiService');
-const promptTemplateService = require('../services/promptTemplateService');
+const promptEngine = require('../services/promptEngine');
 const authenticate = require('../middleware/auth');
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
@@ -253,7 +253,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 
 router.post('/:id/chapters/:chapterId/generate-draft', authenticate, async (req, res) => {
   try {
-    const { book, chapters, currentChapter, contributors } = await loadOwnedBookChapterContext({
+    const { book, config, chapters, currentChapter, contributors } = await loadOwnedBookChapterContext({
       bookId: req.params.id,
       chapterId: req.params.chapterId,
       ownerId: req.user.id
@@ -288,6 +288,7 @@ router.post('/:id/chapters/:chapterId/generate-draft', authenticate, async (req,
     const contributorNamesByEmail = buildContributorNamesByEmail(contributors);
     const sourcePayload = buildChapterDraftSourcePayload({
       book,
+      config,
       chapters,
       currentChapter,
       organizerEmail: req.user.email || '',
@@ -311,6 +312,13 @@ router.post('/:id/chapters/:chapterId/generate-draft', authenticate, async (req,
       html,
       aiQuality: generatedDraft?.quality || null,
       aiPlan: generatedDraft?.plan || null,
+      sections: generatedDraft?.sections && typeof generatedDraft.sections === 'object'
+        ? {
+            ouverture: cleanText(generatedDraft.sections.ouverture, 5000),
+            corps: cleanText(generatedDraft.sections.corps, 20000),
+            coda: cleanText(generatedDraft.sections.coda, 5000)
+          }
+        : null,
       generationMode: cleanText(generatedDraft?.generationMode, 40) || 'single_pass',
       lastGeneratedAt: generatedAt,
       lastEditedAt: existingDraftState?.lastEditedAt || null,
@@ -382,6 +390,7 @@ router.post('/:id/chapters/:chapterId/save-draft', authenticate, async (req, res
       html: nextHtml,
       aiQuality: existingDraftState?.aiQuality || null,
       aiPlan: existingDraftState?.aiPlan || null,
+      sections: existingDraftState?.sections || null,
       generationMode: cleanText(existingDraftState?.generationMode, 40) || 'single_pass',
       lastGeneratedAt: existingDraftState?.lastGeneratedAt || null,
       lastEditedAt: new Date().toISOString(),
@@ -440,6 +449,7 @@ router.post('/:id/chapters/:chapterId/finalize-draft', authenticate, async (req,
       html: nextHtml,
       aiQuality: existingDraftState?.aiQuality || null,
       aiPlan: existingDraftState?.aiPlan || null,
+      sections: existingDraftState?.sections || null,
       generationMode: cleanText(existingDraftState?.generationMode, 40) || 'single_pass',
       lastGeneratedAt: existingDraftState?.lastGeneratedAt || null,
       lastEditedAt: existingDraftState?.lastEditedAt || finalizedAt,
@@ -1218,7 +1228,7 @@ async function loadOwnedBookChapterContext({ bookId, chapterId = null, ownerId }
     throw error;
   }
 
-  const [{ data: chapters, error: chaptersError }, { data: contributors, error: contributorsError }] = await Promise.all([
+  const [{ data: chapters, error: chaptersError }, { data: contributors, error: contributorsError }, { data: config, error: configError }] = await Promise.all([
     supabase
       .from('chapters')
       .select(`
@@ -1231,7 +1241,12 @@ async function loadOwnedBookChapterContext({ bookId, chapterId = null, ownerId }
     supabase
       .from('book_contributors')
       .select('id, name, email')
+      .eq('book_id', bookId),
+    supabase
+      .from('book_configs')
+      .select('*')
       .eq('book_id', bookId)
+      .maybeSingle()
   ]);
 
   if (chaptersError) {
@@ -1240,6 +1255,10 @@ async function loadOwnedBookChapterContext({ bookId, chapterId = null, ownerId }
 
   if (contributorsError) {
     throw contributorsError;
+  }
+
+  if (configError) {
+    throw configError;
   }
 
   const orderedChapters = Array.isArray(chapters) ? chapters : [];
@@ -1255,6 +1274,7 @@ async function loadOwnedBookChapterContext({ bookId, chapterId = null, ownerId }
 
   return {
     book,
+    config: config || {},
     chapters: orderedChapters,
     contributors: contributors || [],
     currentChapter
@@ -1309,6 +1329,13 @@ function extractChapterDraftState(chapter) {
         : null,
       aiPlan: parsed.aiPlan && typeof parsed.aiPlan === 'object'
         ? parsed.aiPlan
+        : null,
+      sections: parsed.sections && typeof parsed.sections === 'object'
+        ? {
+            ouverture: cleanText(parsed.sections.ouverture, 5000),
+            corps: cleanText(parsed.sections.corps, 20000),
+            coda: cleanText(parsed.sections.coda, 5000)
+          }
         : null,
       generationMode: cleanText(parsed.generationMode, 40),
       lastGeneratedAt: parsed.lastGeneratedAt || null,
@@ -1371,6 +1398,7 @@ async function upsertSystemContributionRecord({
 
 function buildChapterDraftSourcePayload({
   book,
+  config = {},
   chapters,
   currentChapter,
   organizerEmail,
@@ -1407,10 +1435,22 @@ function buildChapterDraftSourcePayload({
           contributorNamesByEmail[normalizedEmail] ||
           cleanText(normalizedEmail.split('@')[0], 180) ||
           'Contributeur',
+        role: normalizeEmail(contribution?.contributor_email) || 'proche',
         message: cleanText(contribution.message, 2400),
-        photoUrls: normalizePhotoUrls(contribution.photo_urls)
+        photoUrls: normalizePhotoUrls(contribution.photo_urls),
+        createdAt: contribution?.created_at || null
       };
     });
+
+  const orderedChapters = Array.isArray(chapters)
+    ? [...chapters].sort((left, right) => Number(left?.order_index || 0) - Number(right?.order_index || 0))
+    : [];
+  const currentOrderIndex = Number(currentChapter?.order_index || 0);
+  const previousChapter = orderedChapters
+    .filter((chapter) => Number(chapter?.order_index || 0) < currentOrderIndex)
+    .slice(-1)[0] || null;
+  const nextChapter = orderedChapters
+    .find((chapter) => Number(chapter?.order_index || 0) > currentOrderIndex) || null;
 
   return {
     book: {
@@ -1424,21 +1464,36 @@ function buildChapterDraftSourcePayload({
       aiProjectBrief: cleanText(book?.cover_config?.aiProjectBrief, 900),
       minPagesPerChapter: 4
     },
-    chapter: {
-      id: currentChapter.id,
-      orderIndex: Number(currentChapter.order_index || 0),
-      title: cleanText(currentChapter.title, 180) || 'Chapitre',
-      description: cleanText(currentChapter.description, 700),
-      questions: Array.isArray(currentChapter.questions_ia)
-        ? currentChapter.questions_ia.map((question) => cleanText(question, 260)).filter(Boolean)
-        : [],
-      organizerContribution: organizerContribution
-        ? {
+    config: {
+      eventType: cleanText(config?.event_type || book.event_type, 120) || 'evenement',
+      eventSubtype: cleanText(config?.event_subtype, 120) || '',
+      narrativePerson: cleanText(config?.narrative_person, 120) || 'third_person',
+      recipientNickname: cleanText(config?.recipient_nickname, 160) || '',
+      characterTrait: cleanText(config?.character_trait, 220) || '',
+      signatureAnecdote: cleanText(config?.signature_anecdote, 500) || '',
+      signaturePhrase: cleanText(config?.signature_phrase, 220) || '',
+      futureWish: cleanText(config?.future_wish, 320) || ''
+    },
+      chapter: {
+        id: currentChapter.id,
+        orderIndex: Number(currentChapter.order_index || 0),
+        chapterTotal: orderedChapters.length,
+        title: cleanText(currentChapter.title, 180) || 'Chapitre',
+        description: cleanText(currentChapter.description, 700),
+        previousTitle: cleanText(previousChapter?.title, 180),
+        nextTitle: cleanText(nextChapter?.title, 180),
+        amorceText: cleanText(currentChapter.amorce_text, 320),
+        triggers: Array.isArray(currentChapter.triggers)
+          ? currentChapter.triggers.map((trigger) => cleanText(trigger, 80)).filter(Boolean)
+          : [],
+        organizerContribution: organizerContribution
+          ? {
             message: cleanText(organizerContribution.message, 3200),
-            photoUrls: normalizePhotoUrls(organizerContribution.photo_urls)
+            photoUrls: normalizePhotoUrls(organizerContribution.photo_urls),
+            createdAt: organizerContribution?.created_at || null
           }
-        : null,
-      guestContributions,
+          : null,
+        guestContributions,
       photoUrls: collectChapterPhotos({
         organizerContribution: organizerContribution
           ? { photoUrls: normalizePhotoUrls(organizerContribution.photo_urls) }
@@ -1533,7 +1588,8 @@ function buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors = [],
       orderIndex: chapter.orderIndex,
       title: chapter.title,
       description: chapter.description,
-      questions: Array.isArray(chapter.questions) ? chapter.questions : [],
+      amorceText: cleanText(chapter.amorceText, 320),
+      triggers: Array.isArray(chapter.triggers) ? chapter.triggers : [],
       organizerContribution: chapter.organizerContribution
         ? {
             message: cleanText(chapter.organizerContribution.message, 2200),
@@ -1750,12 +1806,252 @@ function analyzeChapterDraftQuality(draft, sourcePayload, detailAnchors = []) {
   };
 }
 
+function countWords(value = '') {
+  return String(value || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+
+function evaluateContributionsRichness(contributions = []) {
+  const safeContributions = Array.isArray(contributions) ? contributions : [];
+  const wordCounts = safeContributions.map((entry) => countWords(cleanText(entry?.response_text || '', 5000)));
+  const longResponses = wordCounts.filter((count) => count >= 100).length;
+  const shortResponses = wordCounts.filter((count) => count < 50).length;
+
+  if (safeContributions.length >= 6 && longResponses >= 6) {
+    return 'riche';
+  }
+
+  if (safeContributions.length < 3 || shortResponses >= safeContributions.length) {
+    return 'faible';
+  }
+
+  return 'moyenne';
+}
+
+function buildChapterBodyPromptVariables({
+  sourcePayload,
+  chapterTitle = '',
+  chapterSummary = ''
+}) {
+  const book = sourcePayload?.book || {};
+  const config = sourcePayload?.config || {};
+  const chapter = sourcePayload?.chapter || {};
+  const organizerContribution = chapter?.organizerContribution || null;
+  const guestContributions = Array.isArray(chapter?.guestContributions)
+    ? chapter.guestContributions
+    : [];
+
+  const promptContributions = [];
+  if (organizerContribution?.message) {
+    promptContributions.push({
+      name: cleanText(book.recipientName, 180) ? 'Organisateur' : 'Organisateur',
+      role: 'organisateur',
+      response_text: cleanText(organizerContribution.message, 5000)
+    });
+  }
+
+  guestContributions.forEach((contribution) => {
+    const responseText = cleanText(contribution?.message, 5000);
+    if (!responseText) return;
+    promptContributions.push({
+      name: cleanText(contribution?.contributorName, 180) || 'Contributeur',
+      role: cleanText(contribution?.role, 180) || 'proche',
+      response_text: responseText
+    });
+  });
+
+  const chapterPhotos = collectChapterPhotos({
+    organizerContribution: organizerContribution
+      ? { photoUrls: normalizePhotoUrls(organizerContribution.photoUrls) }
+      : null,
+    guestContributions
+  }).slice(0, 24);
+  const promptPhotos = chapterPhotos.map((url, index) => ({
+    caption: `Photo ${index + 1}`,
+    date: null,
+    url
+  }));
+
+  const normalizedEventType = cleanText(config?.eventType || book.eventType, 160) || 'evenement';
+  const normalizedEventSubtype = cleanText(config?.eventSubtype, 160) || '';
+  const normalizedNarrativePerson = cleanText(config?.narrativePerson, 120) || 'third_person';
+  const normalizedRecipientName = cleanText(book.recipientName, 160) || 'la personne celebree';
+  const normalizedRecipientNickname = cleanText(config?.recipientNickname, 160) || '';
+  const normalizedCharacterTrait = cleanText(config?.characterTrait, 220) || '';
+  const normalizedSignatureAnecdote = cleanText(config?.signatureAnecdote, 500) || '';
+  const normalizedSignaturePhrase = cleanText(config?.signaturePhrase, 220) || '';
+  const normalizedFutureWish = cleanText(config?.futureWish, 320) || '';
+  const normalizedChapterTitle = cleanText(chapterTitle || chapter.title, 180) || 'Chapitre';
+  const normalizedChapterTheme = cleanText(chapter.description, 700) || normalizedChapterTitle || 'Souvenirs marquants';
+  const normalizedChapterArc = cleanText(chapterSummary, 1200) || '';
+  const normalizedChapterEmotion = cleanText(book.styleNarratif, 120) || 'intime';
+  const normalizedBookTitle = cleanText(book.title, 180) || 'Livre souvenir';
+  const normalizedBookTone = cleanText(book.styleNarratif, 120) || 'intime';
+  const normalizedBookLocation = cleanText(book.location, 140) || '';
+  const normalizedBookYear = cleanText(book.year, 40) || String(new Date().getFullYear());
+  const normalizedRecipientAge = cleanText(book.recipientAge, 80) || 'non specifie';
+  const normalizedPrevChapterTitle = cleanText(chapter.previousTitle, 180) || '';
+  const normalizedNextChapterTitle = cleanText(chapter.nextTitle, 180) || '';
+  const normalizedChapterAmorce = cleanText(chapter.amorceText, 320) || '';
+  const normalizedChapterTriggers = Array.isArray(chapter.triggers)
+    ? chapter.triggers.map((trigger) => cleanText(trigger, 80)).filter(Boolean)
+    : [];
+  const chapterIndex = Number(chapter.orderIndex || 0) + 1;
+  const chapterTotal = Number(chapter.chapterTotal || sourcePayload?.book?.chapterTotal || 0) || 0;
+  const contributionsCount = promptContributions.length;
+  const contributionsRichness = evaluateContributionsRichness(promptContributions);
+  const contributionsText = promptContributions
+    .map((entry) => `${cleanText(entry?.name, 160) || 'Contributeur'} (${cleanText(entry?.role, 120) || 'proche'}) : ${cleanText(entry?.response_text, 700)}`)
+    .filter(Boolean)
+    .join('\n');
+  const photosText = promptPhotos
+    .map((entry) => cleanText([entry.caption, entry.date].filter(Boolean).join(' '), 160))
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    book_title: normalizedBookTitle,
+    book_occasion: normalizedEventType,
+    event_type: normalizedEventType,
+    event_subtype: normalizedEventSubtype,
+    narrative_person: normalizedNarrativePerson,
+    recipient_name: normalizedRecipientName,
+    recipient_nickname: normalizedRecipientNickname,
+    recipient_age: normalizedRecipientAge,
+    book_tone: normalizedBookTone,
+    book_location: normalizedBookLocation,
+    book_year: normalizedBookYear,
+    chapter_total: chapterTotal,
+    chapter_index: chapterIndex,
+    chapter_title: normalizedChapterTitle,
+    chapter_theme: normalizedChapterTheme,
+    chapter_arc: normalizedChapterArc,
+    chapter_emotion: normalizedChapterEmotion,
+    prev_chapter_title: normalizedPrevChapterTitle,
+    next_chapter_title: normalizedNextChapterTitle,
+    character_trait: normalizedCharacterTrait,
+    signature_anecdote: normalizedSignatureAnecdote,
+    signature_phrase: normalizedSignaturePhrase,
+    future_wish: normalizedFutureWish,
+    chapter_amorce: normalizedChapterAmorce,
+    chapter_triggers: normalizedChapterTriggers,
+    contributions_count: contributionsCount,
+    contributions_richness: contributionsRichness,
+    contributions: promptContributions,
+    photos: promptPhotos,
+    contributions_text: contributionsText,
+    contributionstext: contributionsText,
+    contributionsText: contributionsText,
+    photos_text: photosText,
+    photostext: photosText,
+    photosText: photosText,
+
+    bookTitle: normalizedBookTitle,
+    bookOccasion: normalizedEventType,
+    eventType: normalizedEventType,
+    eventSubtype: normalizedEventSubtype,
+    narrativePerson: normalizedNarrativePerson,
+    recipientName: normalizedRecipientName,
+    recipientNickname: normalizedRecipientNickname,
+    recipientAge: normalizedRecipientAge,
+    bookTone: normalizedBookTone,
+    bookLocation: normalizedBookLocation,
+    bookYear: normalizedBookYear,
+    chapterTotal: chapterTotal,
+    chapterIndex: chapterIndex,
+    chapterTitle: normalizedChapterTitle,
+    chapterTheme: normalizedChapterTheme,
+    chapterArc: normalizedChapterArc,
+    chapterEmotion: normalizedChapterEmotion,
+    prevChapterTitle: normalizedPrevChapterTitle,
+    nextChapterTitle: normalizedNextChapterTitle,
+    characterTrait: normalizedCharacterTrait,
+    signatureAnecdote: normalizedSignatureAnecdote,
+    signaturePhrase: normalizedSignaturePhrase,
+    futureWish: normalizedFutureWish,
+    chapterAmorce: normalizedChapterAmorce,
+    chapterTriggers: normalizedChapterTriggers,
+    contributionsCount: contributionsCount,
+    contributionsRichness: contributionsRichness,
+    contributionsText: contributionsText,
+    photosText: photosText
+  };
+}
+
+function buildDraftFromChapterSections({
+  chapterTitle = '',
+  sections = {},
+  sourcePayload
+}) {
+  const openingText = cleanText(sections?.ouverture, 5000);
+  const bodyText = cleanText(sections?.corps, 20000);
+  const codaText = cleanText(sections?.coda, 5000);
+
+  const mergedNarrative = [
+    openingText,
+    bodyText,
+    codaText
+  ].filter(Boolean).join('\n\n');
+
+  const normalizedNarrative = sanitizeDraftBodyText(
+    mergedNarrative,
+    chapterTitle
+  );
+  const segmented = splitDraftBody(normalizedNarrative, {
+    textDensity: 'balanced',
+    previewFormat: 'standard',
+    chapterTitle,
+    segmentCount: CHAPTER_DRAFT_PAGE_COUNT
+  });
+
+  const pages = Array.from({ length: CHAPTER_DRAFT_PAGE_COUNT }, (_, index) => {
+    const defaultTitle = index === 0
+      ? 'Ouverture'
+      : index === CHAPTER_DRAFT_PAGE_COUNT - 1
+        ? 'Cloture'
+        : `Mouvement ${index + 1}`;
+
+    const pageBody = cleanText(segmented[index], 3200)
+      || cleanText(segmented[index - 1], 3200)
+      || cleanText(mergedNarrative, 3200);
+
+    return {
+      title: defaultTitle,
+      body: pageBody || 'Contenu en cours de structuration.'
+    };
+  });
+
+  const chapterFallback = buildFallbackChapterDraft(sourcePayload);
+  const normalizedDraft = normalizeGeneratedDraft(
+    {
+      title: cleanText(chapterTitle, 180) || chapterFallback.title,
+      summary: buildDraftSummaryFromPages(pages, chapterTitle),
+      pages,
+      ouverture: openingText,
+      corps: bodyText,
+      coda: codaText
+    },
+    chapterFallback,
+    chapterTitle
+  );
+  return {
+    ...normalizedDraft,
+    sections: {
+      ouverture: openingText,
+      corps: bodyText,
+      coda: codaText
+    }
+  };
+}
+
 async function generateStructuredDraftFromContentPrompt({
   sourcePayload,
   outputType = 'chapter_content',
   chapterTitle = '',
   chapterSummary = '',
-  narrativeContext = '',
   targetLength = 2400,
   temperature,
   maxTokens
@@ -1765,87 +2061,52 @@ async function generateStructuredDraftFromContentPrompt({
   }
 
   try {
-    const promptConfig = await promptTemplateService.buildPrompt({
-      promptKey: promptTemplateService.PROMPT_KEYS.CONTENT_GENERATION,
-      eventType: cleanText(sourcePayload?.book?.eventType, 120) || 'generique',
-      variables: {
-        outputType,
-        eventType: cleanText(sourcePayload?.book?.eventType, 120) || 'generique',
-        style: cleanText(sourcePayload?.book?.styleNarratif, 120) || 'intime',
-        bookTitle: cleanText(sourcePayload?.book?.title, 180) || 'Livre souvenir',
-        chapterTitle: cleanText(chapterTitle || sourcePayload?.chapter?.title, 180) || 'Chapitre',
-        recipientName: cleanText(sourcePayload?.book?.recipientName, 180) || 'la personne celebree',
-        recipientAge: sourcePayload?.book?.recipientAge || 'non specifie',
-        recipientGender: cleanText(sourcePayload?.book?.recipientGender, 120) || 'non specifie',
-        chapterSummary: cleanText(chapterSummary, 1200) || '',
-        narrativeContext: cleanText(narrativeContext, 32000) || '',
-        targetLength: Number.isFinite(Number(targetLength)) ? Number(targetLength) : 2400
-      }
-    });
+    const normalizedOutputType = cleanText(outputType, 'chapter_content').toLowerCase();
+    if (normalizedOutputType !== 'chapter_content') {
+      return null;
+    }
 
-    const response = await aiService.mistral.chat.complete({
+    const resolvedChapterTitle = cleanText(chapterTitle || sourcePayload?.chapter?.title, 180) || 'Chapitre';
+    const promptVariables = buildChapterBodyPromptVariables({
+      sourcePayload,
+      chapterTitle: resolvedChapterTitle,
+      chapterSummary
+    });
+    const generationResult = await promptEngine.runPromptGeneration({
+      promptType: 'chapter_body',
+      variables: promptVariables,
+      mistralClient: aiService.mistral,
       model: 'mistral-small-latest',
-      messages: [
-        { role: 'system', content: promptConfig.systemPrompt },
-        { role: 'user', content: promptConfig.userPrompt }
-      ],
-      temperature: Number.isFinite(Number(temperature))
-        ? Number(temperature)
-        : promptConfig.temperature,
-      maxTokens: Number.isFinite(Number(maxTokens))
-        ? Number(maxTokens)
-        : promptConfig.maxTokens
+      temperature: Number.isFinite(Number(temperature)) ? Number(temperature) : undefined,
+      maxTokens: Number.isFinite(Number(maxTokens)) ? Number(maxTokens) : undefined,
+      maxRetries: 2
     });
 
-    const raw = response?.choices?.[0]?.message?.content || '';
+    const raw = generationResult?.output || '';
+    const sections = promptEngine.parseChapterBodyBlocks(raw);
+    const parsedDraft = buildDraftFromChapterSections({
+      chapterTitle: resolvedChapterTitle,
+      sections,
+      sourcePayload
+    });
+
     return {
       raw,
-      parsed: parseDraftJson(raw),
-      promptSource: promptConfig.source,
-      promptVersion: promptConfig.version
+      parsed: parsedDraft,
+      sections,
+      promptSource: 'database',
+      promptVersion: generationResult?.template?.version || null,
+      promptTemplateId: generationResult?.template?.id || null,
+      promptValidation: generationResult?.validation || null
     };
   } catch (error) {
-    console.error('Erreur prompt content_generation (structured):', error);
+    console.error('Erreur prompt chapter_body (structured):', error);
     return null;
   }
 }
 
 async function generateChapterPlanFromAI(sourcePayload, fallbackDraft, detailAnchors = []) {
-  const fallbackPlan = buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors);
-
-  const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 3);
-  const narrativeContext = JSON.stringify({
-    task: 'chapter_plan_json',
-    objective: `Construire un plan narratif premium en ${CHAPTER_DRAFT_PAGE_COUNT} pages.`,
-    constraints: [
-      'Interdits: phrases meta, generalites vides, morale abstraite.',
-      `pagePlans doit contenir exactement ${CHAPTER_DRAFT_PAGE_COUNT} objets.`
-    ],
-    outputSchema: {
-      narrativePromise: 'string',
-      pagePlans: [{ title: 'string', focus: 'string', anchors: ['string', 'string'] }],
-      forbidden: ['string', 'string', 'string']
-    },
-    sourceSnapshot
-  });
-
-  try {
-    const modelResult = await generateStructuredDraftFromContentPrompt({
-      sourcePayload,
-      outputType: 'chapter_plan',
-      chapterTitle: sourcePayload?.chapter?.title || fallbackDraft?.title || 'Chapitre',
-      chapterSummary: fallbackDraft?.summary || '',
-      narrativeContext,
-      targetLength: 1800,
-      temperature: 0.45,
-      maxTokens: 1800
-    });
-    const parsed = modelResult?.parsed;
-    return normalizeChapterPlan(parsed, sourcePayload, fallbackDraft, detailAnchors);
-  } catch (error) {
-    console.error('Erreur IA plan chapitre:', error);
-    return fallbackPlan;
-  }
+  return buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors);
 }
 
 async function maybeRegenerateChapterDraftForQuality({
@@ -1856,113 +2117,22 @@ async function maybeRegenerateChapterDraftForQuality({
   fallbackDraft,
   qualityReport
 }) {
-  if (qualityReport.score >= CHAPTER_DRAFT_QUALITY_THRESHOLD) {
-    return {
-      draft: candidateDraft,
-      quality: qualityReport,
-      improved: false
-    };
-  }
+  void sourcePayload;
+  void chapterPlan;
+  void detailAnchors;
+  void fallbackDraft;
 
-  const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 4);
-  const narrativeContext = JSON.stringify({
-    task: 'chapter_revision_json',
-    objective: 'Corriger le brouillon pour un niveau editorial premium.',
-    qualityIssues: Array.isArray(qualityReport.issues) && qualityReport.issues.length > 0
-      ? qualityReport.issues
-      : ['Rendre le texte plus concret et plus vivant.'],
-    constraints: [
-      `${CHAPTER_DRAFT_PAGE_COUNT} pages exactement.`,
-      `Chaque page entre ${CHAPTER_DRAFT_MIN_PAGE_CHARS} et 1100 caracteres environ.`,
-      'Titres editoriaux sans "Page X" ni "Chapitre X".',
-      'Aucun format liste a puces.',
-      'Aucun meta-commentaire.'
-    ],
-    outputSchema: {
-      title: 'string',
-      pages: [{ title: 'string', body: 'string' }],
-      summary: 'string'
-    },
-    chapterPlan,
-    candidateDraft,
-    sourceSnapshot
-  });
-
-  try {
-    const modelResult = await generateStructuredDraftFromContentPrompt({
-      sourcePayload,
-      outputType: 'chapter_revision',
-      chapterTitle: sourcePayload?.chapter?.title || candidateDraft?.title || 'Chapitre',
-      chapterSummary: candidateDraft?.summary || fallbackDraft?.summary || '',
-      narrativeContext,
-      targetLength: CHAPTER_DRAFT_PAGE_COUNT * 900,
-      temperature: 0.38,
-      maxTokens: 3800
-    });
-    const parsed = modelResult?.parsed;
-    if (!parsed || !Array.isArray(parsed.pages)) {
-      return {
-        draft: candidateDraft,
-        quality: qualityReport,
-        improved: false
-      };
-    }
-
-    const revisedDraft = normalizeGeneratedDraft(
-      parsed,
-      fallbackDraft,
-      sourcePayload?.chapter?.title || candidateDraft?.title || 'Chapitre'
-    );
-    const revisedQuality = analyzeChapterDraftQuality(revisedDraft, sourcePayload, detailAnchors);
-
-    if (revisedQuality.score > qualityReport.score) {
-      return {
-        draft: revisedDraft,
-        quality: revisedQuality,
-        improved: true
-      };
-    }
-
-    return {
-      draft: candidateDraft,
-      quality: qualityReport,
-      improved: false
-    };
-  } catch (error) {
-    console.error('Erreur IA revision qualite chapitre:', error);
-    return {
-      draft: candidateDraft,
-      quality: qualityReport,
-      improved: false
-    };
-  }
+  return {
+    draft: candidateDraft,
+    quality: qualityReport,
+    improved: false
+  };
 }
 
 async function generateChapterDraftFromAI(sourcePayload) {
   const fallbackDraft = buildFallbackChapterDraft(sourcePayload);
   const detailAnchors = extractDetailAnchorsFromSourcePayload(sourcePayload, 8);
   const chapterPlan = await generateChapterPlanFromAI(sourcePayload, fallbackDraft, detailAnchors);
-  const sourceSnapshot = buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors, 6);
-
-  const narrativeContext = JSON.stringify({
-    task: 'chapter_draft_json',
-    objective: `Rediger un chapitre premium en ${CHAPTER_DRAFT_PAGE_COUNT} pages.`,
-    constraints: [
-      `Respecter strictement ${CHAPTER_DRAFT_PAGE_COUNT} pages.`,
-      `Chaque page doit contenir au moins ${CHAPTER_DRAFT_MIN_PAGE_CHARS} caracteres utiles.`,
-      'Titres editoriaux, jamais "Page X" ou "Chapitre X".',
-      'Aucune liste a puces, aucun markdown, aucun HTML.',
-      'Integrer details concrets des contributions (lieux, gestes, objets, scenes).',
-      'Conserver la coherence avec les resumes precedents.'
-    ],
-    outputSchema: {
-      title: 'string',
-      pages: [{ title: 'string', body: 'string' }],
-      summary: 'string'
-    },
-    chapterPlan,
-    sourceSnapshot
-  });
 
   try {
     const modelResult = await generateStructuredDraftFromContentPrompt({
@@ -1970,7 +2140,6 @@ async function generateChapterDraftFromAI(sourcePayload) {
       outputType: 'chapter_content',
       chapterTitle: sourcePayload?.chapter?.title || fallbackDraft?.title || 'Chapitre',
       chapterSummary: fallbackDraft?.summary || '',
-      narrativeContext,
       targetLength: CHAPTER_DRAFT_PAGE_COUNT * 900,
       temperature: 0.52,
       maxTokens: 4400
@@ -1986,11 +2155,21 @@ async function generateChapterDraftFromAI(sourcePayload) {
       };
     }
 
-    const candidateDraft = normalizeGeneratedDraft(
+    const normalizedCandidateDraft = normalizeGeneratedDraft(
       parsed,
       fallbackDraft,
       sourcePayload?.chapter?.title || fallbackDraft.title
     );
+    const candidateDraft = {
+      ...normalizedCandidateDraft,
+      sections: parsed?.sections && typeof parsed.sections === 'object'
+        ? {
+            ouverture: cleanText(parsed.sections.ouverture, 5000),
+            corps: cleanText(parsed.sections.corps, 20000),
+            coda: cleanText(parsed.sections.coda, 5000)
+          }
+        : null
+    };
     const qualityReport = analyzeChapterDraftQuality(candidateDraft, sourcePayload, detailAnchors);
     const reviewOutcome = await maybeRegenerateChapterDraftForQuality({
       sourcePayload,
@@ -2005,7 +2184,12 @@ async function generateChapterDraftFromAI(sourcePayload) {
       ...reviewOutcome.draft,
       plan: chapterPlan,
       quality: reviewOutcome.quality,
-      generationMode: reviewOutcome.improved ? 'plan_plus_revision' : 'plan_plus_redaction'
+      sections: candidateDraft.sections || null,
+      generationMode: reviewOutcome.improved ? 'plan_plus_revision' : 'single_pass_db_prompt',
+      promptSource: modelResult?.promptSource || 'database',
+      promptVersion: modelResult?.promptVersion || null,
+      promptTemplateId: modelResult?.promptTemplateId || null,
+      promptValidation: modelResult?.promptValidation || null
     };
   } catch (error) {
     console.error('Erreur IA brouillon chapitre:', error);
@@ -2021,7 +2205,8 @@ async function generateChapterDraftFromAI(sourcePayload) {
 function buildFallbackChapterDraft(sourcePayload) {
   const chapter = sourcePayload.chapter || {};
   const recipientName = sourcePayload.book?.recipientName || 'la personne celebree';
-  const questions = Array.isArray(chapter.questions) ? chapter.questions : [];
+  const amorceText = cleanText(chapter.amorceText, 320);
+  const triggers = Array.isArray(chapter.triggers) ? chapter.triggers : [];
   const guestContributions = Array.isArray(chapter.guestContributions) ? chapter.guestContributions : [];
   const detailAnchors = extractDetailAnchorsFromSourcePayload(sourcePayload, 6);
   const organizerText = chapter.organizerContribution?.message || '';
@@ -2063,7 +2248,8 @@ function buildFallbackChapterDraft(sourcePayload) {
           chapter.description || `Nous ouvrons sur ${chapterTitle} avec un angle concret et narratif.`,
           previousBridge,
           projectIntent,
-          questions.length > 0 ? `Pistes editoriales : ${questions.slice(0, 3).join(' ')}` : '',
+          amorceText ? `Amorce du chapitre : ${amorceText}` : '',
+          triggers.length > 0 ? `Mots declencheurs : ${triggers.slice(0, 4).join(' | ')}` : '',
           detailAnchors.length > 0 ? `Details a faire vivre : ${detailAnchors.slice(0, 2).join(' | ')}` : ''
         ].filter(Boolean).join('\n\n')
       },
@@ -2391,7 +2577,7 @@ function renderChapterDraftPreviewHtml({ book, chapter, draft, sourcePayload }) 
                 index === 5 ? pageBudget.pageTailChars : pageBudget.pageBodyChars
               ))}
             </div>
-            ${index === 0 ? renderQuestionList(sourcePayload?.chapter?.questions, {
+            ${index === 0 ? renderAmorcePrompt(sourcePayload?.chapter?.amorceText, sourcePayload?.chapter?.triggers, {
               maxItems: pageBudget.questionItems,
               maxCharsPerItem: pageBudget.questionChars
             }) : ''}
@@ -2561,8 +2747,9 @@ function buildPreviewSourceChapter(chapter) {
   return {
     title: cleanText(chapter?.title, 180) || 'Chapitre',
     description: cleanText(chapter?.description, 700),
-    questions: Array.isArray(chapter?.questions_ia)
-      ? chapter.questions_ia.map((question) => cleanText(question, 260)).filter(Boolean)
+    amorceText: cleanText(chapter?.amorce_text, 320),
+    triggers: Array.isArray(chapter?.triggers)
+      ? chapter.triggers.map((trigger) => cleanText(trigger, 80)).filter(Boolean)
       : [],
     organizerContribution: organizerRow
       ? {
@@ -3981,39 +4168,37 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
       background: rgba(245, 237, 220, 0.55);
     }
 
+    .draft-book-amorce-text {
+      margin: 0 0 3mm;
+      font-size: 12.2px;
+      font-style: italic;
+      line-height: 1.6;
+      color: #4f4333;
+    }
+
     .draft-book-question-list {
       margin: 0;
       padding: 0;
       list-style: none;
-      counter-reset: luxe-question;
-      display: grid;
-      gap: 2.4mm;
-      font-size: 11.2px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2mm;
+      font-size: 10.8px;
     }
 
     .draft-book-question-list li {
       margin: 0;
-      padding: 2.5mm 3.2mm;
-      border-radius: 6px;
+      padding: 1.8mm 3.2mm;
+      border-radius: 999px;
       border: 1px solid rgba(184, 146, 74, 0.24);
       background: rgba(255, 255, 255, 0.72);
-      line-height: 1.5;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: start;
-      gap: 2.2mm;
-      counter-increment: luxe-question;
+      line-height: 1.4;
       page-break-inside: avoid;
       break-inside: avoid-page;
     }
 
     .draft-book-question-list li::before {
-      content: counter(luxe-question, decimal-leading-zero);
-      color: #8b6a2f;
-      font-size: 9.5px;
-      font-weight: 700;
-      letter-spacing: 0.09em;
-      margin-top: 0.2mm;
+      content: none;
     }
 
     .draft-book-question-list li > span {
@@ -5320,8 +5505,9 @@ function buildBookDraftSourcePayload({ book, chapters, organizerEmail, contribut
         id: chapter.id,
         title: cleanText(chapter.title) || 'Chapitre',
         description: cleanText(chapter.description, 600),
-        questions: Array.isArray(chapter.questions_ia)
-          ? chapter.questions_ia.map((question) => cleanText(question, 300)).filter(Boolean)
+        amorceText: cleanText(chapter.amorce_text, 320),
+        triggers: Array.isArray(chapter.triggers)
+          ? chapter.triggers.map((trigger) => cleanText(trigger, 80)).filter(Boolean)
           : [],
         organizerContribution: organizerContribution
           ? {
@@ -5341,70 +5527,9 @@ function buildBookDraftSourcePayload({ book, chapters, organizerEmail, contribut
 }
 
 async function generateBookDraftFromAI(sourcePayload) {
-  const fallbackDraft = buildFallbackDraft(sourcePayload);
-  const promptSourcePayload = buildAIPromptPayload(sourcePayload);
-  const narrativeContext = JSON.stringify({
-    task: 'book_draft_json',
-    objective: 'Produire un brouillon complet du livre, coherent et elegant.',
-    constraints: [
-      'Aucun markdown, aucun commentaire, aucun texte hors JSON.',
-      'Si un chapitre a peu de contenu, rester sobre mais utile.'
-    ],
-    outputSchema: {
-      title: 'string',
-      subtitle: 'string',
-      introduction: 'string',
-      chapters: [{ title: 'string', intro: 'string', body: 'string', closing: 'string' }],
-      conclusion: 'string'
-    },
-    sourceBookPayload: promptSourcePayload
-  });
-
-  try {
-    const modelResult = await generateStructuredDraftFromContentPrompt({
-      sourcePayload: {
-        book: {
-          title: cleanText(sourcePayload?.book?.title, 180) || 'Livre souvenir',
-          eventType: cleanText(sourcePayload?.book?.eventType, 120) || 'generique',
-          styleNarratif: cleanText(sourcePayload?.book?.styleNarratif, 120) || 'intime',
-          recipientName: cleanText(sourcePayload?.book?.recipientName, 180) || 'la personne celebree',
-          recipientAge: sourcePayload?.book?.recipientAge || 'non specifie',
-          recipientGender: cleanText(sourcePayload?.book?.recipientGender, 120) || 'non specifie'
-        }
-      },
-      outputType: 'book_draft',
-      chapterTitle: 'Livre complet',
-      chapterSummary: '',
-      narrativeContext,
-      targetLength: 5200,
-      temperature: 0.5,
-      maxTokens: 2600
-    });
-    const parsed = modelResult?.parsed;
-
-    if (!parsed || !Array.isArray(parsed.chapters)) {
-      return fallbackDraft;
-    }
-
-    return {
-      title: cleanText(parsed.title, 180) || fallbackDraft.title,
-      subtitle: cleanText(parsed.subtitle, 220) || fallbackDraft.subtitle,
-      introduction: cleanText(parsed.introduction, 2600) || fallbackDraft.introduction,
-      chapters: sourcePayload.chapters.map((chapter, index) => {
-        const generatedChapter = parsed.chapters[index] || {};
-        return {
-          title: cleanText(generatedChapter.title, 180) || chapter.title,
-          intro: cleanText(generatedChapter.intro, 1200),
-          body: cleanText(generatedChapter.body, 3600) || buildChapterBodyFallback(chapter),
-          closing: cleanText(generatedChapter.closing, 1200)
-        };
-      }),
-      conclusion: cleanText(parsed.conclusion, 2200) || fallbackDraft.conclusion
-    };
-  } catch (error) {
-    console.error('Erreur IA brouillon livre:', error);
-    return fallbackDraft;
-  }
+  // DB-first prompt policy: no hardcoded prompt flows here.
+  // Full-book narrative generation can be added later via dedicated DB template type.
+  return buildFallbackDraft(sourcePayload);
 }
 
 function buildAIPromptPayload(sourcePayload) {
@@ -5414,7 +5539,8 @@ function buildAIPromptPayload(sourcePayload) {
       id: chapter.id,
       title: chapter.title,
       description: chapter.description,
-      questions: chapter.questions,
+      amorceText: chapter.amorceText,
+      triggers: chapter.triggers,
       organizerContribution: chapter.organizerContribution
         ? {
             message: chapter.organizerContribution.message,
@@ -5476,7 +5602,8 @@ function buildFallbackDraft(sourcePayload) {
 function buildChapterBodyFallback(chapter) {
   const sections = [];
   const guestContributions = Array.isArray(chapter?.guestContributions) ? chapter.guestContributions : [];
-  const questions = Array.isArray(chapter?.questions) ? chapter.questions : [];
+  const amorceText = cleanText(chapter?.amorceText, 320);
+  const triggers = Array.isArray(chapter?.triggers) ? chapter.triggers : [];
 
   if (chapter?.description) {
     sections.push(`Cadre du chapitre : ${chapter.description}`);
@@ -5495,8 +5622,12 @@ function buildChapterBodyFallback(chapter) {
     );
   }
 
-  if (questions.length > 0) {
-    sections.push(`Pistes editoriales : ${questions.join(' ')}`);
+  if (amorceText) {
+    sections.push(`Amorce du chapitre : ${amorceText}`);
+  }
+
+  if (triggers.length > 0) {
+    sections.push(`Mots declencheurs : ${triggers.join(' | ')}`);
   }
 
   if (sections.length === 0) {
@@ -5625,7 +5756,7 @@ function renderDraftChapterPages({
               { paragraphClass: 'draft-book-text-block' }
             )}
           </div>
-          ${renderQuestionList(sourceChapter?.questions, {
+          ${renderAmorcePrompt(sourceChapter?.amorceText, sourceChapter?.triggers, {
             maxItems: pageBudget.questionItems,
             maxCharsPerItem: pageBudget.questionChars
           })}
@@ -5780,26 +5911,30 @@ function renderInlineHeroPhoto(photoUrl, chapterTitle) {
   `;
 }
 
-function renderQuestionList(questions, options = {}) {
+function renderAmorcePrompt(amorceText, triggers, options = {}) {
   const maxItems = Number.isFinite(Number(options.maxItems))
     ? Math.max(1, Math.min(4, Number(options.maxItems)))
     : 3;
   const maxCharsPerItem = Number.isFinite(Number(options.maxCharsPerItem))
     ? Math.max(90, Math.min(220, Number(options.maxCharsPerItem)))
     : 170;
-  const items = Array.isArray(questions)
-    ? questions.map((question) => cleanText(question, maxCharsPerItem)).filter(Boolean)
+  const safeAmorceText = cleanText(amorceText, 280);
+  const items = Array.isArray(triggers)
+    ? triggers.map((trigger) => cleanText(trigger, maxCharsPerItem)).filter(Boolean)
     : [];
 
-  if (items.length === 0) {
+  if (!safeAmorceText && items.length === 0) {
     return '';
   }
 
   return `
     <div class="draft-book-question-block">
-      <ol class="draft-book-question-list">
-        ${items.slice(0, maxItems).map((question) => `<li><span>${escapeHtml(question)}</span></li>`).join('')}
-      </ol>
+      ${safeAmorceText ? `<p class="draft-book-amorce-text">« ${escapeHtml(safeAmorceText)} »</p>` : ''}
+      ${items.length > 0 ? `
+        <ul class="draft-book-question-list">
+          ${items.slice(0, maxItems).map((trigger) => `<li><span>${escapeHtml(trigger)}</span></li>`).join('')}
+        </ul>
+      ` : ''}
     </div>
   `;
 }

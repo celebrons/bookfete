@@ -28,13 +28,12 @@ const LoginLuxe = () => {
 
       if (loginError) throw loginError;
 
-      const pendingData = localStorage.getItem('pendingBookData');
-      const pendingChapters = localStorage.getItem('pendingChapters');
+      const returnTo = localStorage.getItem('returnTo');
+      localStorage.removeItem('pendingBookData');
+      localStorage.removeItem('pendingChapters');
 
-      if (pendingData) {
-        const bookData = JSON.parse(pendingData);
-        const chapters = pendingChapters ? JSON.parse(pendingChapters) : [];
-        await createBookAfterLogin(bookData, chapters);
+      if (returnTo) {
+        navigate(returnTo, { replace: true });
       } else {
         navigate('/dashboard');
       }
@@ -57,79 +56,6 @@ const LoginLuxe = () => {
     await runLogin(TEST1_CREDENTIALS.email, TEST1_CREDENTIALS.password);
   };
 
-  const createBookAfterLogin = async (bookData, chapters) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Utilisateur non connecte');
-
-      const { data: book, error: bookError } = await supabase
-        .from('books')
-        .insert([{
-          owner_id: user.id,
-          title: bookData.title,
-          event_type: bookData.event_type,
-          recipient_name: bookData.recipient_name,
-          recipient_age: bookData.recipient_age,
-          recipient_gender: bookData.recipient_gender,
-          finition: bookData.finition,
-          papier: bookData.papier,
-          style_narratif: bookData.style_narratif,
-          pages: bookData.pages,
-          statut: 'en_cours'
-        }])
-        .select()
-        .single();
-
-      if (bookError) throw bookError;
-
-      if (chapters && chapters.length > 0) {
-        const chaptersToInsert = chapters.map((chapter, index) => ({
-          book_id: book.id,
-          title: chapter.title,
-          description: chapter.description || `Chapitre ${index + 1}`,
-          order_index: index,
-          questions_ia: [
-            `Quel est votre plus beau souvenir lie a "${chapter.title}" ?`,
-            'Que retenez-vous de ce moment ?',
-            'Quelle emotion cela evoque-t-il ?',
-            'Un detail qui vous a marque ?'
-          ]
-        }));
-
-        const { error: chaptersError } = await supabase
-          .from('chapters')
-          .insert(chaptersToInsert);
-
-        if (chaptersError) throw chaptersError;
-      }
-
-      await supabase
-        .from('books')
-        .update({
-          cover_config: {
-            title: bookData.title,
-            template: 'classic',
-            color: '#8B4513',
-            font: 'Playfair Display'
-          },
-          back_cover_config: {
-            template: 'classic',
-            show_contributors: true,
-            color: '#f5f5f5'
-          }
-        })
-        .eq('id', book.id);
-
-      localStorage.removeItem('pendingBookData');
-      localStorage.removeItem('pendingChapters');
-      localStorage.removeItem('returnTo');
-
-      navigate(`/book/${book.id}`);
-    } catch (createError) {
-      alert(`Erreur lors de la creation du livre: ${createError.message}`);
-      navigate('/dashboard');
-    }
-  };
 
   return (
     <div className="auth-container">

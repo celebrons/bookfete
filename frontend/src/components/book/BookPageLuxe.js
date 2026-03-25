@@ -59,6 +59,52 @@ const TAB_HELP = {
 
 const getSoloMode = (book) => Boolean(book?.cover_config?.soloMode);
 const normalizeText = (value) => (value === null || value === undefined ? '' : String(value).trim());
+const INVALID_CHAPTER_TITLE_PATTERNS = [
+  /system settings/i,
+  /user management/i,
+  /roles?, permissions?/i,
+  /database configuration/i,
+  /database connections?/i,
+  /api integrations?/i,
+  /api keys?/i,
+  /environment variables?/i,
+  /\badmin\b/i,
+  /\bdashboard\b/i,
+  /\bsettings\b/i,
+  /\bbackend\b/i,
+  /\bfrontend\b/i,
+  /\bschema\b/i,
+  /\bprompts?\b/i,
+  /\bplatform\b/i,
+  /\berror messages?\b/i,
+  /\bissues?\b/i,
+  /\bi['’]d be happy\b/i,
+  /\bguide you\b/i
+];
+const sanitizeChapterDisplayTitle = (value) => normalizeText(value)
+  .replace(/^["'`]+|["'`]+$/g, '')
+  .replace(/^\*\*|\*\*$/g, '')
+  .replace(/^(?:chapitre|chapter)\s*\d+\s*[:\-]\s*/i, '')
+  .replace(/^\d+[\.\)\-:]\s*/g, '')
+  .trim();
+const isLikelyDisplayChapterTitle = (value) => {
+  const normalized = sanitizeChapterDisplayTitle(value);
+  if (!normalized) return false;
+  if (normalized.length < 4 || normalized.length > 84) return false;
+  if (normalized.endsWith('?')) return false;
+  if (/\*\*/.test(normalized)) return false;
+  if (/[{}[\]]/.test(normalized)) return false;
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  if (wordCount > 8) return false;
+  if (/^(?:what|which|why|how|are|is|can|could|would|please|it\s+seems|i['’]d)/i.test(normalized)) return false;
+  if (INVALID_CHAPTER_TITLE_PATTERNS.some((pattern) => pattern.test(normalized))) return false;
+  return true;
+};
+const getSafeChapterTitle = (value, index) => {
+  if (index === 0) return 'Introduction';
+  const normalized = sanitizeChapterDisplayTitle(value);
+  return isLikelyDisplayChapterTitle(normalized) ? normalized : `Chapitre ${index + 1}`;
+};
 const ORDER_STATUSES_WITH_PDF_ACCESS = new Set([
   'paid',
   'pdf_generating',
@@ -1016,7 +1062,7 @@ const BookPageLuxe = () => {
       .map((chapter, index) => decorateChapter({
         ...chapter,
         order_index: index,
-        title: index === 0 ? 'Introduction' : (chapter?.title || `Chapitre ${index + 1}`)
+        title: getSafeChapterTitle(chapter?.title, index)
       }))
   );
 
@@ -1163,6 +1209,23 @@ const BookPageLuxe = () => {
     }
   };
 
+  const generateChapterAmorce = async (chapterId, { force = false } = {}) => {
+    const token = await getAuthAccessToken();
+    const response = await fetch(`${getApiBaseUrl()}/chapters/${chapterId}/generate-amorce`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ force })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur lors de la generation de l amorce.');
+    }
+    return payload?.chapter || null;
+  };
+
   const handleUpdateChapter = async (chapterId, updates) => {
     try {
       const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
@@ -1202,6 +1265,25 @@ const BookPageLuxe = () => {
 
       if (error) throw error;
       updateChapterInState(chapterId, (chapter) => ({ ...chapter, ...data }));
+
+      const titleChanged = Object.prototype.hasOwnProperty.call(safeChapterUpdates, 'title')
+        && normalizeText(safeChapterUpdates.title) !== normalizeText(currentChapter?.title);
+      const canAutoRefreshAmorce = titleChanged
+        && !currentChapter?.amorce_validated
+        && (!currentChapter?.amorce_text || Boolean(currentChapter?.amorce_generated_at));
+
+      if (canAutoRefreshAmorce) {
+        try {
+          const regeneratedChapter = await generateChapterAmorce(chapterId);
+          if (regeneratedChapter) {
+            updateChapterInState(chapterId, (chapter) => ({ ...chapter, ...regeneratedChapter }));
+            return regeneratedChapter;
+          }
+        } catch (amorceError) {
+          showPageNotice(amorceError.message || 'Le titre a ete modifie, mais l amorce n a pas pu etre regeneree.', 'info');
+        }
+      }
+
       return data;
     } catch (error) {
       console.error('❌ Erreur mise à jour:', error);
@@ -1414,6 +1496,11 @@ const BookPageLuxe = () => {
 
   const handleDeleteChapter = async (chapterId) => {
     try {
+      if (chapters.length <= 4) {
+        showPageNotice('Le livre doit conserver au moins 4 chapitres.', 'info');
+        return;
+      }
+
       const { error } = await supabase
         .from('chapters')
         .delete()
@@ -1447,7 +1534,7 @@ const BookPageLuxe = () => {
       }
 
       setChapters(normalizeChaptersForState(remainingChapters));
-      const syncedPages = Math.max(8, remainingChapters.length * 8);
+      const syncedPages = Math.max(32, remainingChapters.length * 8);
       if (Number(book?.pages || 0) !== syncedPages) {
         await handleUpdateBook({ pages: syncedPages });
       }
@@ -1788,13 +1875,18 @@ const BookPageLuxe = () => {
 
   const handleUpdateChaptersFromPages = async (newPages) => {
     try {
+      const minPages = 32;
       const maxPages = MAX_CHAPTERS * 8;
-      const pagesToPersist = Math.min(newPages, maxPages);
-      const newChaptersCount = Math.min(MAX_CHAPTERS, Math.floor(pagesToPersist / 8));
+      const pagesToPersist = Math.max(minPages, Math.min(newPages, maxPages));
+      const newChaptersCount = Math.max(4, Math.min(MAX_CHAPTERS, Math.floor(pagesToPersist / 8)));
       const currentChaptersCount = chapters.length;
 
       if (newPages > maxPages) {
         showPageNotice(`Le livre est limité à ${MAX_CHAPTERS} chapitres maximum.`, 'info');
+      }
+
+      if (newPages < minPages) {
+        showPageNotice('Le livre conserve un minimum de 4 chapitres.', 'info');
       }
 
       if (newChaptersCount > currentChaptersCount) {
@@ -1810,6 +1902,7 @@ const BookPageLuxe = () => {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
+            bookId,
             eventType: book.event_type,
             style: book.style_narratif,
             count: chaptersToAdd,
@@ -1829,22 +1922,33 @@ const BookPageLuxe = () => {
         if (response.ok) {
           const newChapters = data.chapters.map((ch, index) => ({
             book_id: bookId,
-            title: currentChaptersCount === 0 && index === 0 ? 'Introduction' : ch.title,
+            title: getSafeChapterTitle(ch.title, currentChaptersCount + index),
             description: ch.description || `Chapitre ${currentChaptersCount + index + 1}`,
             order_index: currentChaptersCount + index,
-            questions_ia: [
-              `Quel est votre plus beau souvenir lié à "${ch.title}" ?`,
-              `Que retenez-vous de ce moment ?`,
-              `Quelle émotion cela évoque-t-il ?`,
-              `Un détail qui vous a marqué ?`
-            ]
+            amorce_text: null,
+            triggers: [],
+            amorce_generated_at: null,
+            amorce_validated: false,
+            questions_ia: []
           }));
 
-          const { error: insertError } = await supabase
+          const { data: insertedChapters, error: insertError } = await supabase
             .from('chapters')
-            .insert(newChapters);
+            .insert(newChapters)
+            .select('*');
 
           if (insertError) throw insertError;
+
+          if (Array.isArray(insertedChapters) && insertedChapters.length > 0) {
+            for (const insertedChapter of insertedChapters) {
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                await generateChapterAmorce(insertedChapter.id);
+              } catch (_error) {
+                // Keep chapter creation resilient even if the amorce prompt is unavailable.
+              }
+            }
+          }
         }
       } else if (newChaptersCount < currentChaptersCount) {
         const chaptersToRemove = currentChaptersCount - newChaptersCount;

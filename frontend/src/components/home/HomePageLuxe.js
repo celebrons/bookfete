@@ -97,6 +97,44 @@ const IconRetraite = () => (
   </svg>
 );
 
+const IconDeparture = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="5" y="7" width="10" height="10" rx="2" fill="#EEF2F7" stroke="#5B7189" strokeWidth="1.2"/>
+    <path d="M8 7.5V6.5C8 5.67 8.67 5 9.5 5H10.5C11.33 5 12 5.67 12 6.5V7.5" stroke="#5B7189" strokeWidth="1.2"/>
+    <path d="M16 12H20" stroke="#5B7189" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M18 10L20 12L18 14" stroke="#5B7189" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="10" cy="12" r="1" fill="#5B7189" opacity="0.35"/>
+  </svg>
+);
+
+const IconBirth = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 12C6 8.69 8.69 6 12 6C15.31 6 18 8.69 18 12C18 15.31 15.31 18 12 18C8.69 18 6 15.31 6 12Z" fill="#FFF1E8" stroke="#C9865B" strokeWidth="1.2"/>
+    <path d="M9.5 13C10.4 14 11.2 14.5 12 14.5C12.8 14.5 13.6 14 14.5 13" stroke="#C9865B" strokeWidth="1.4" strokeLinecap="round"/>
+    <circle cx="10" cy="11" r="0.8" fill="#C9865B" opacity="0.5"/>
+    <circle cx="14" cy="11" r="0.8" fill="#C9865B" opacity="0.5"/>
+    <path d="M12 4V2.8" stroke="#C9865B" strokeWidth="1.2" strokeLinecap="round" opacity="0.6"/>
+  </svg>
+);
+
+const IconFamily = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="10" r="2.2" fill="#F2ECFF" stroke="#7C6AA6" strokeWidth="1.2"/>
+    <circle cx="16" cy="10" r="2.2" fill="#F2ECFF" stroke="#7C6AA6" strokeWidth="1.2"/>
+    <circle cx="12" cy="7.5" r="2.2" fill="#F2ECFF" stroke="#7C6AA6" strokeWidth="1.2"/>
+    <path d="M5.5 17C6.3 15.5 7.8 14.5 9.6 14.5H14.4C16.2 14.5 17.7 15.5 18.5 17" stroke="#7C6AA6" strokeWidth="1.3" strokeLinecap="round"/>
+    <path d="M9 17.5H15" stroke="#7C6AA6" strokeWidth="1.3" strokeLinecap="round" opacity="0.55"/>
+  </svg>
+);
+
+const IconSpark = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 4L13.6 8.4L18 10L13.6 11.6L12 16L10.4 11.6L6 10L10.4 8.4L12 4Z" fill="#FFF4E8" stroke="#B8924A" strokeWidth="1.2"/>
+    <path d="M18.5 4.5L19.2 6.3L21 7L19.2 7.7L18.5 9.5L17.8 7.7L16 7L17.8 6.3L18.5 4.5Z" fill="#FFF4E8" stroke="#B8924A" strokeWidth="1"/>
+    <path d="M5.5 15.5L6.1 17L7.5 17.6L6.1 18.2L5.5 19.7L4.9 18.2L3.5 17.6L4.9 17L5.5 15.5Z" fill="#FFF4E8" stroke="#B8924A" strokeWidth="1"/>
+  </svg>
+);
+
 // ============================================
 // LISTE DES ÉVÉNEMENTS (à remplacer)
 // ============================================
@@ -137,10 +175,85 @@ const events = [
     description: 'Un livre rempli de témoignages pour une nouvelle vie.',
     icon: <IconRetraite />,
     link: '/create-book?event=retraite'
+  },
+  {
+    title: 'Naissance',
+    description: 'Rassemblez les mots des proches autour d une arrivée très attendue.',
+    icon: <IconAnniversaire />,
+    link: '/create-book?event=naissance'
+  },
+  {
+    title: 'Réunion de famille',
+    description: 'Capturez les rituels, les légendes et la transmission entre générations.',
+    icon: <IconVacances />,
+    link: '/create-book?event=famille'
+  },
+  {
+    title: 'Choix libre',
+    description: 'Un parcours souple pour les événements qui ne rentrent dans aucune case.',
+    icon: <IconRocket />,
+    link: '/create-book?event=choix-libre'
   }
 ];
 
   // Étapes avec chiffres stylisés (version luxe)
+const homepageEvents = events.slice(0, 0).concat([
+  {
+    title: 'Anniversaire',
+    description: 'Creez un livre chaleureux pour celebrer un age, une personnalite et tous les souvenirs partages.',
+    icon: <IconAnniversaire />,
+    link: '/create-book?event=anniversaire'
+  },
+  {
+    title: 'Retraite',
+    description: 'Rassemblez les voix des collegues, de la famille ou des deux pour marquer un grand passage.',
+    icon: <IconRetraite />,
+    link: '/create-book?event=retraite'
+  },
+  {
+    title: 'Depart',
+    description: 'Accompagnez un changement de vie, un nouveau poste, un demenagement ou un grand envol.',
+    icon: <IconDeparture />,
+    link: '/create-book?event=depart'
+  },
+  {
+    title: 'Mariage / union',
+    description: 'Faites participer les proches pour raconter une rencontre, une complicite et une promesse.',
+    icon: <IconWedding />,
+    link: '/create-book?event=mariage'
+  },
+  {
+    title: 'Naissance',
+    description: 'Rassemblez les mots des proches autour d une arrivee attendue ou d une grossesse deja pleine d amour.',
+    icon: <IconBirth />,
+    link: '/create-book?event=naissance'
+  },
+  {
+    title: 'Voyage / vacances',
+    description: 'Transformez un voyage en recit collectif avec photos, anecdotes et moments inattendus.',
+    icon: <IconVacances />,
+    link: '/create-book?event=voyage'
+  },
+  {
+    title: 'Fin de projet',
+    description: 'Immortalisez une aventure d equipe, un defi surmonte et tout ce que le projet a change.',
+    icon: <IconRocket />,
+    link: '/create-book?event=fin-projet'
+  },
+  {
+    title: 'Reunion de famille',
+    description: 'Capturez les rituels, les legendes et les transmissions qui soudent une famille au fil du temps.',
+    icon: <IconFamily />,
+    link: '/create-book?event=famille'
+  },
+  {
+    title: 'Choix libre',
+    description: 'Un parcours souple pour les evenements qui ne rentrent dans aucune case.',
+    icon: <IconSpark />,
+    link: '/create-book?event=choix-libre'
+  }
+]);
+
   const steps = [
     {
       number: '01',
@@ -256,6 +369,13 @@ const events = [
             }}>
               Pour tous vos événements
             </h2>
+            <p style={{
+              marginTop: 'var(--space-sm)',
+              color: 'var(--text-light)',
+              fontSize: '15px'
+            }}>
+              9 parcours disponibles, du plus classique au plus libre.
+            </p>
           </div>
 
           <div style={{
@@ -263,7 +383,7 @@ const events = [
             gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: 'var(--space-lg)'
           }}>
-            {events.map((event, index) => (
+            {homepageEvents.map((event, index) => (
               <Link 
                 to={event.link} 
                 key={index}

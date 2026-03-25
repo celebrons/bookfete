@@ -1,39 +1,53 @@
 require('dotenv').config();
 
-const promptTemplateService = require('../services/promptTemplateService');
+const promptEngine = require('../services/promptEngine');
 
 async function run() {
-  const keys = Object.keys(promptTemplateService.DEFAULT_PROMPTS);
+  for (const promptType of promptEngine.TEMPLATE_TYPES) {
+    const existing = await promptEngine.listPromptTemplates({ type: promptType });
+    const versions = Array.isArray(existing) ? existing : [];
+    const activeVersion = versions.find((row) => String(row.status || '').toLowerCase() === 'active');
 
-  for (const promptKey of keys) {
-    const defaults = promptTemplateService.DEFAULT_PROMPTS[promptKey];
+    if (versions.length === 0) {
+      const inserted = await promptEngine.createPromptTemplateVersion(
+        {
+          type: promptType,
+          status: 'active',
+          label: `${promptType} - to configure`,
+          system_prompt: '[TO CONFIGURE IN ADMIN]',
+          context_block: '',
+          data_block: '',
+          output_format: '',
+          forbidden_phrases: [],
+          min_words: 0,
+          max_words: 0
+        },
+        'seed-script'
+      );
+      console.log(`OK prompt seed active type=${promptType} version=${inserted.version}`);
+      continue;
+    }
 
-    const result = await promptTemplateService.upsertPromptVersion({
-      promptKey,
-      eventType: '*',
-      locale: 'fr',
-      systemPrompt: defaults.systemPrompt,
-      userPromptTemplate: defaults.userPromptTemplate,
-      temperature: defaults.temperature,
-      maxTokens: defaults.maxTokens,
-      status: 'published',
-      publish: true,
-      createdBy: 'seed-script'
-    });
+    if (activeVersion) {
+      console.log(`INFO prompt templates already present for type=${promptType} (${versions.length}, active=v${activeVersion.version})`);
+      continue;
+    }
 
-    console.log(
-      `✅ Prompt seed: ${promptKey} event=* locale=fr version=${result.insertedVersion.version}`
-    );
+    const latest = versions
+      .slice()
+      .sort((a, b) => Number(b.version || 0) - Number(a.version || 0))[0];
+    const activated = await promptEngine.activatePromptTemplate(latest.id);
+    console.log(`OK activated existing template type=${promptType} version=${activated.version}`);
   }
 }
 
 run()
   .then(() => {
-    console.log('🎯 Prompt templates seeded successfully.');
+    console.log('DONE prompt templates seeded.');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('❌ Failed to seed prompt templates:', error.message);
-    console.error('ℹ️ Ensure SQL from sql/ai_prompt_templates.sql is applied first.');
+    console.error('FAILED to seed prompt templates:', error.message);
+    console.error('Apply SQL from sql/prompt_engine.sql first.');
     process.exit(1);
   });
