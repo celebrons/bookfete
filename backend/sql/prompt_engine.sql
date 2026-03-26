@@ -8,6 +8,8 @@ create table if not exists public.prompt_templates (
   type text not null check (type in (
     'book_title',
     'chapter_titles',
+    'book_introduction',
+    'book_conclusion',
     'chapter_amorce',
     'contributor_questions',
     'chapter_body',

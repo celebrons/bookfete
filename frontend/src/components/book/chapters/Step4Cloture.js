@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import '../BookLuxe.css';
+import BookPromptInlineAdmin from '../BookPromptInlineAdmin';
 import ChapterPromptInlineAdmin from './ChapterPromptInlineAdmin';
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
@@ -203,6 +204,7 @@ const buildChapterPreviewPages = (html = '') => {
 
 const Step4Cloture = ({
   chapter,
+  chaptersCount,
   user,
   book,
   amorceValidated,
@@ -280,6 +282,10 @@ const Step4Cloture = ({
     () => buildChapterPreviewPages(previewHtml),
     [previewHtml]
   );
+  const chapterOrderIndex = Number(chapter?.order_index ?? chapter?.position ?? 0);
+  const totalChapters = Number(chaptersCount || book?.chapter_count || 0);
+  const isFirstChapter = chapterOrderIndex === 0;
+  const isLastChapter = totalChapters > 0 && chapterOrderIndex === totalChapters - 1;
   const previewSpreadCount = Math.max(1, Math.ceil(chapterPreviewPages.length / 2));
   const currentPreviewSpreadIndex = Math.min(
     previewSpreadIndex,
@@ -858,9 +864,34 @@ const Step4Cloture = ({
             ))}
           </div>
         )}
-
-
-        <ChapterPromptInlineAdmin chapter={chapter} />
+        {isFirstChapter || isLastChapter ? (
+          <div className="book-prompt-admin-stack">
+            {isFirstChapter && (
+              <BookPromptInlineAdmin
+                endpointBase={`/books/${book?.id}/prompt-admin/introduction`}
+                panelTitle="Generation de l introduction"
+                panelSubtitle="Texte d ouverture du livre. Testez les directives ici, puis regenerez le chapitre pour voir le rendu."
+                emptyResultLabel={'Cliquez sur "Tester" pour voir une introduction ici.'}
+                publishNotice="Cette version est maintenant active pour la generation de l introduction."
+                onPublished={onGenerateChapterDraft}
+                className="book-prompt-admin-inline"
+              />
+            )}
+            {isLastChapter && (
+              <BookPromptInlineAdmin
+                endpointBase={`/books/${book?.id}/prompt-admin/epilogue`}
+                panelTitle="Generation de l epilogue"
+                panelSubtitle="Texte de fermeture du livre. Testez les directives ici, puis regenerez le chapitre pour voir le rendu."
+                emptyResultLabel={'Cliquez sur "Tester" pour voir un epilogue ici.'}
+                publishNotice="Cette version est maintenant active pour la generation de l epilogue."
+                onPublished={onGenerateChapterDraft}
+                className="book-prompt-admin-inline"
+              />
+            )}
+          </div>
+        ) : (
+          <ChapterPromptInlineAdmin chapter={chapter} />
+        )}
       </div>
 
       {showPreviewModal && (
@@ -872,7 +903,7 @@ const Step4Cloture = ({
             <div className="book-draft-modal-header chapter-draft-preview-header-compact">
               <div>
                 <h3 className="book-draft-modal-title">
-                  {chapter?.order_index === 0 ? 'Introduction' : chapter?.title}
+                  {isFirstChapter ? 'Introduction' : (isLastChapter ? 'Epilogue' : chapter?.title)}
                 </h3>
                 <div className="book-draft-modal-meta">
                   Version {isDraftValidated ? 'finale' : 'de travail'}
@@ -1001,7 +1032,7 @@ const Step4Cloture = ({
               <div>
                 <div className="label-gold">Edition plein ecran</div>
                 <h3 className="book-draft-modal-title">
-                  {chapter?.order_index === 0 ? 'Introduction' : chapter?.title}
+                  {isFirstChapter ? 'Introduction' : (isLastChapter ? 'Epilogue' : chapter?.title)}
                 </h3>
                 <div className="book-draft-modal-meta">
                   Ajustez uniquement le texte du chapitre, sans balises HTML visibles.

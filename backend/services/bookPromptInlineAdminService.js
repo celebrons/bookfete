@@ -11,6 +11,68 @@ function normalizeText(value, fallback = '') {
   return normalized || fallback;
 }
 
+function normalizeVariableName(value = '') {
+  const normalized = normalizeText(
+    typeof value === 'string' ? value : value?.name
+  );
+  if (!normalized || normalized === '[object Object]') {
+    return '';
+  }
+  if (!/^[a-zA-Z0-9_@.]+$/.test(normalized)) {
+    return '';
+  }
+  return normalized;
+}
+
+function buildVariableFamilyKey(name = '') {
+  return normalizeVariableName(name).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
+
+function choosePreferredVariableName(leftName = '', rightName = '') {
+  const scoreName = (name) => {
+    let score = 0;
+    if (name.includes('_')) score += 2;
+    if (name === name.toLowerCase()) score += 1;
+    if (name.includes('.')) score -= 1;
+    return score;
+  };
+
+  const leftScore = scoreName(leftName);
+  const rightScore = scoreName(rightName);
+
+  if (rightScore !== leftScore) {
+    return rightScore > leftScore ? rightName : leftName;
+  }
+
+  return rightName.length < leftName.length ? rightName : leftName;
+}
+
+function buildCanonicalVariableLookup(variables = {}) {
+  const families = new Map();
+
+  Object.keys(variables || {}).forEach((rawName) => {
+    const name = normalizeVariableName(rawName);
+    if (!name) return;
+    const familyKey = buildVariableFamilyKey(name);
+    if (!familyKey) return;
+
+    const existing = families.get(familyKey);
+    families.set(
+      familyKey,
+      existing ? choosePreferredVariableName(existing, name) : name
+    );
+  });
+
+  return families;
+}
+
+function resolveCanonicalVariableName(variableName = '', variables = {}) {
+  const name = normalizeVariableName(variableName);
+  if (!name) return '';
+  const canonicalLookup = buildCanonicalVariableLookup(variables);
+  return canonicalLookup.get(buildVariableFamilyKey(name)) || name;
+}
+
 function cleanText(value, maxLength = 0) {
   const normalized = normalizeText(value);
   if (!normalized || !Number.isFinite(Number(maxLength)) || Number(maxLength) <= 0) {
@@ -19,6 +81,36 @@ function cleanText(value, maxLength = 0) {
   return normalized.length > maxLength
     ? `${normalized.slice(0, Math.max(0, Number(maxLength) - 3)).trim()}...`
     : normalized;
+}
+
+function serializePreviewValue(value, depth = 0) {
+  if (value === null || value === undefined) return '';
+  if (depth > 2) return '';
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 2)
+      .map((item) => serializePreviewValue(item, depth + 1))
+      .filter(Boolean)
+      .join(' | ');
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .slice(0, 4)
+      .map(([key, nestedValue]) => {
+        const nestedPreview = serializePreviewValue(nestedValue, depth + 1);
+        return nestedPreview ? `${key}: ${nestedPreview}` : '';
+      })
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  return '';
 }
 
 function getDeepValue(source, pathSegments) {
@@ -51,17 +143,47 @@ function hasRenderableValue(value) {
 }
 
 function formatVariableValuePreview(value) {
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '';
-    if (typeof value[0] === 'string') {
-      return cleanText(value.join(', '), 140);
+  return cleanText(serializePreviewValue(value), 320);
+}
+
+function dedupeVariableMeta(items = []) {
+  const byName = new Map();
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const name = normalizeVariableName(item);
+    if (!name) return;
+
+    const existing = byName.get(name);
+    const next = typeof item === 'string'
+      ? {
+          name,
+          required: false,
+          hasValue: true,
+          preview: ''
+        }
+      : {
+          name,
+          required: Boolean(item?.required),
+          hasValue: Boolean(item?.hasValue),
+          preview: normalizeText(item?.preview)
+        };
+
+    if (!existing) {
+      byName.set(name, next);
+      return;
     }
-    return `${value.length} element(s)`;
-  }
-  if (value && typeof value === 'object') {
-    return `${Object.keys(value).length} champ(s)`;
-  }
-  return cleanText(value, 140);
+
+    byName.set(name, {
+      name,
+      required: Boolean(existing.required || next.required),
+      hasValue: Boolean(existing.hasValue || next.hasValue),
+      preview: existing.preview || next.preview || ''
+    });
+  });
+
+  return [...byName.values()].sort((left, right) => (
+    String(left?.name || '').localeCompare(String(right?.name || ''), 'fr')
+  ));
 }
 
 function extractPromptVariableMeta(template = {}, variables = {}) {
@@ -109,15 +231,30 @@ function extractPromptVariableMeta(template = {}, variables = {}) {
     ...conditionalVariables
   ].filter((name, index, list) => name && list.indexOf(name) === index);
 
-  return orderedNames.map((name) => {
+  return dedupeVariableMeta(orderedNames.map((name) => {
     const value = resolveVariableValue(variables, name);
+    const canonicalName = resolveCanonicalVariableName(name, variables);
     return {
-      name,
+      name: canonicalName || name,
       required: directVariables.has(name) || loopVariables.has(name),
       hasValue: hasRenderableValue(value),
       preview: formatVariableValuePreview(value)
     };
-  });
+  }));
+}
+
+function buildAvailableVariableMeta(variables = {}) {
+  return dedupeVariableMeta(Object.keys(variables || {})
+    .sort((left, right) => left.localeCompare(right, 'fr'))
+    .map((name) => {
+      const value = resolveVariableValue(variables, name);
+      return {
+        name: resolveCanonicalVariableName(name, variables) || name,
+        required: false,
+        hasValue: hasRenderableValue(value),
+        preview: formatVariableValuePreview(value)
+      };
+    }));
 }
 
 function firstNonEmptyText(...values) {
@@ -263,7 +400,7 @@ function buildDefaultBookPromptDirectives(promptConfig = {}, variables = {}) {
     return buildIntroductionDefaultDirectives();
   }
 
-  if (promptConfig?.key === 'conclusion') {
+  if (promptConfig?.key === 'epilogue' || promptConfig?.key === 'conclusion') {
     return buildConclusionDefaultDirectives();
   }
 
@@ -288,7 +425,7 @@ function buildBookInlineContextBlock(promptConfig = {}, variables = {}) {
     Number(variables.chapter_count || 0) ? `- Nombre de chapitres : ${Number(variables.chapter_count || 0)}` : ''
   ];
 
-  if (promptConfig?.key === 'introduction' || promptConfig?.key === 'conclusion') {
+  if (promptConfig?.key === 'introduction' || promptConfig?.key === 'epilogue' || promptConfig?.key === 'conclusion') {
     const chapterTitles = Array.isArray(variables.chapter_titles) ? variables.chapter_titles : [];
     if (chapterTitles.length > 0) {
       baseLines.push('- Titres de chapitres disponibles :');
@@ -502,6 +639,54 @@ async function getLatestTemplateForTypes(promptTypes = []) {
   return null;
 }
 
+async function bootstrapSeparatedBookTemplate(promptType) {
+  const normalizedType = normalizeText(promptType).toLowerCase();
+  if (!['book_introduction', 'book_conclusion'].includes(normalizedType)) {
+    return null;
+  }
+
+  const sourceTemplate = await getLatestTemplateForTypes(['frame_texts']);
+  if (!sourceTemplate) {
+    return null;
+  }
+
+  const label = normalizedType === 'book_introduction'
+    ? 'Introduction - bootstrap'
+    : 'Epilogue - bootstrap';
+
+  try {
+    return await promptEngine.createPromptTemplateVersion({
+      type: normalizedType,
+      label,
+      status: 'active',
+      system_prompt: sourceTemplate.system_prompt || '',
+      context_block: sourceTemplate.context_block || '',
+      data_block: sourceTemplate.data_block || '',
+      output_format: sourceTemplate.output_format || '',
+      forbidden_phrases: Array.isArray(sourceTemplate.forbidden_phrases)
+        ? sourceTemplate.forbidden_phrases
+        : [],
+      min_words: Number(sourceTemplate.min_words || 0),
+      max_words: Number(sourceTemplate.max_words || 0)
+    }, 'book-prompt-inline-bootstrap');
+  } catch (error) {
+    if (String(error?.message || '').includes('prompt_templates_type_check')) {
+      throw new promptEngine.PromptEngineError(
+        'La base ne reconnait pas encore les types "book_introduction" / "book_conclusion". Executez backend/sql/book_frame_prompts_refactor.sql dans Supabase, puis rechargez la page.',
+        'BOOK_PROMPT_ADMIN_SCHEMA_OUTDATED',
+        400
+      );
+    }
+    if (error?.code === 'PROMPT_TEMPLATE_CREATE_FAILED') {
+      const createdTemplate = await getLatestTemplateForTypes([normalizedType]);
+      if (createdTemplate) {
+        return createdTemplate;
+      }
+    }
+    throw error;
+  }
+}
+
 async function resolveEditablePromptTemplate(promptType, fallbackTypes = []) {
   try {
     return await promptEngine.getActivePromptTemplate(promptType);
@@ -509,6 +694,11 @@ async function resolveEditablePromptTemplate(promptType, fallbackTypes = []) {
     if (error?.code !== 'PROMPT_TEMPLATE_NOT_FOUND') {
       throw error;
     }
+  }
+
+  const bootstrappedTemplate = await bootstrapSeparatedBookTemplate(promptType);
+  if (bootstrappedTemplate) {
+    return bootstrappedTemplate;
   }
 
   const latestTemplate = await getLatestTemplateForTypes([promptType, ...fallbackTypes]);
@@ -718,17 +908,17 @@ function buildPromptConfigForKey(promptKey = '') {
     return {
       key: normalizedKey,
       promptType: 'book_introduction',
-      fallbackTypes: ['frame_texts'],
+      fallbackTypes: [],
       resultKind: 'text',
       outputType: 'introduction'
     };
   }
 
-  if (normalizedKey === 'conclusion') {
+  if (normalizedKey === 'epilogue' || normalizedKey === 'conclusion') {
     return {
-      key: normalizedKey,
+      key: 'epilogue',
       promptType: 'book_conclusion',
-      fallbackTypes: ['frame_texts'],
+      fallbackTypes: [],
       resultKind: 'text',
       outputType: 'conclusion'
     };
@@ -746,7 +936,7 @@ function buildVariablesForPromptConfig(context = {}, promptConfig = {}) {
     return buildChapterTitlesPromptVariables(context);
   }
 
-  if (promptConfig.key === 'introduction' || promptConfig.key === 'conclusion') {
+  if (promptConfig.key === 'introduction' || promptConfig.key === 'epilogue' || promptConfig.key === 'conclusion') {
     return buildFramePromptVariables(context, promptConfig.outputType);
   }
 
@@ -791,6 +981,7 @@ async function getBookPromptAdminContext({
     ...context,
     promptConfig,
     variables,
+    availableVariableMeta: buildAvailableVariableMeta(variables),
     activeTemplate,
     templateVariables,
     directives,

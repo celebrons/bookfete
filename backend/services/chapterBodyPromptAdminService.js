@@ -14,6 +14,68 @@ function normalizeText(value, fallback = '') {
   return normalized || fallback;
 }
 
+function normalizeVariableName(value = '') {
+  const normalized = normalizeText(
+    typeof value === 'string' ? value : value?.name
+  );
+  if (!normalized || normalized === '[object Object]') {
+    return '';
+  }
+  if (!/^[a-zA-Z0-9_@.]+$/.test(normalized)) {
+    return '';
+  }
+  return normalized;
+}
+
+function buildVariableFamilyKey(name = '') {
+  return normalizeVariableName(name).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
+
+function choosePreferredVariableName(leftName = '', rightName = '') {
+  const scoreName = (name) => {
+    let score = 0;
+    if (name.includes('_')) score += 2;
+    if (name === name.toLowerCase()) score += 1;
+    if (name.includes('.')) score -= 1;
+    return score;
+  };
+
+  const leftScore = scoreName(leftName);
+  const rightScore = scoreName(rightName);
+
+  if (rightScore !== leftScore) {
+    return rightScore > leftScore ? rightName : leftName;
+  }
+
+  return rightName.length < leftName.length ? rightName : leftName;
+}
+
+function buildCanonicalVariableLookup(variables = {}) {
+  const families = new Map();
+
+  Object.keys(variables || {}).forEach((rawName) => {
+    const name = normalizeVariableName(rawName);
+    if (!name) return;
+    const familyKey = buildVariableFamilyKey(name);
+    if (!familyKey) return;
+
+    const existing = families.get(familyKey);
+    families.set(
+      familyKey,
+      existing ? choosePreferredVariableName(existing, name) : name
+    );
+  });
+
+  return families;
+}
+
+function resolveCanonicalVariableName(variableName = '', variables = {}) {
+  const name = normalizeVariableName(variableName);
+  if (!name) return '';
+  const canonicalLookup = buildCanonicalVariableLookup(variables);
+  return canonicalLookup.get(buildVariableFamilyKey(name)) || name;
+}
+
 function cleanText(value, maxLength = 0) {
   const normalized = normalizeText(value);
   if (!normalized || !Number.isFinite(Number(maxLength)) || Number(maxLength) <= 0) {
@@ -22,6 +84,36 @@ function cleanText(value, maxLength = 0) {
   return normalized.length > maxLength
     ? `${normalized.slice(0, Math.max(0, Number(maxLength) - 3)).trim()}...`
     : normalized;
+}
+
+function serializePreviewValue(value, depth = 0) {
+  if (value === null || value === undefined) return '';
+  if (depth > 2) return '';
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 2)
+      .map((item) => serializePreviewValue(item, depth + 1))
+      .filter(Boolean)
+      .join(' | ');
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .slice(0, 4)
+      .map(([key, nestedValue]) => {
+        const nestedPreview = serializePreviewValue(nestedValue, depth + 1);
+        return nestedPreview ? `${key}: ${nestedPreview}` : '';
+      })
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  return '';
 }
 
 function normalizeEmail(value) {
@@ -67,17 +159,47 @@ function hasRenderableValue(value) {
 }
 
 function formatVariableValuePreview(value) {
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '';
-    if (typeof value[0] === 'string') {
-      return cleanText(value.join(', '), 140);
+  return cleanText(serializePreviewValue(value), 320);
+}
+
+function dedupeVariableMeta(items = []) {
+  const byName = new Map();
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const name = normalizeVariableName(item);
+    if (!name) return;
+
+    const existing = byName.get(name);
+    const next = typeof item === 'string'
+      ? {
+          name,
+          required: false,
+          hasValue: true,
+          preview: ''
+        }
+      : {
+          name,
+          required: Boolean(item?.required),
+          hasValue: Boolean(item?.hasValue),
+          preview: normalizeText(item?.preview)
+        };
+
+    if (!existing) {
+      byName.set(name, next);
+      return;
     }
-    return `${value.length} element(s)`;
-  }
-  if (value && typeof value === 'object') {
-    return `${Object.keys(value).length} champ(s)`;
-  }
-  return cleanText(value, 140);
+
+    byName.set(name, {
+      name,
+      required: Boolean(existing.required || next.required),
+      hasValue: Boolean(existing.hasValue || next.hasValue),
+      preview: existing.preview || next.preview || ''
+    });
+  });
+
+  return [...byName.values()].sort((left, right) => (
+    String(left?.name || '').localeCompare(String(right?.name || ''), 'fr')
+  ));
 }
 
 function extractPromptVariableMeta(template = {}, variables = {}) {
@@ -125,15 +247,30 @@ function extractPromptVariableMeta(template = {}, variables = {}) {
     ...conditionalVariables
   ].filter((name, index, list) => name && list.indexOf(name) === index);
 
-  return orderedNames.map((name) => {
+  return dedupeVariableMeta(orderedNames.map((name) => {
     const value = resolveVariableValue(variables, name);
+    const canonicalName = resolveCanonicalVariableName(name, variables);
     return {
-      name,
+      name: canonicalName || name,
       required: directVariables.has(name) || loopVariables.has(name),
       hasValue: hasRenderableValue(value),
       preview: formatVariableValuePreview(value)
     };
-  });
+  }));
+}
+
+function buildAvailableVariableMeta(variables = {}) {
+  return dedupeVariableMeta(Object.keys(variables || {})
+    .sort((left, right) => left.localeCompare(right, 'fr'))
+    .map((name) => {
+      const value = resolveVariableValue(variables, name);
+      return {
+        name: resolveCanonicalVariableName(name, variables) || name,
+        required: false,
+        hasValue: hasRenderableValue(value),
+        preview: formatVariableValuePreview(value)
+      };
+    }));
 }
 
 function collectChapterPhotos({ organizerContribution = null, guestContributions = [] } = {}) {
@@ -646,6 +783,7 @@ async function getChapterPromptAdminContext(chapterId, ownerId = '', ownerEmail 
     config: config || {},
     sourcePayload,
     variables,
+    availableVariableMeta: buildAvailableVariableMeta(variables),
     templateVariables,
     activeTemplate,
     directives,

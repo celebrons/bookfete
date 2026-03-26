@@ -98,8 +98,68 @@ function resolveStyleInstruction(style) {
 function resolveNarrativePromptType(outputType = '') {
   const normalizedOutputType = normalizeText(outputType).toLowerCase();
   if (normalizedOutputType === 'introduction') return 'book_introduction';
+  if (normalizedOutputType === 'epilogue') return 'book_conclusion';
   if (normalizedOutputType === 'conclusion') return 'book_conclusion';
   return 'frame_texts';
+}
+
+async function bootstrapNarrativePromptTemplate(promptType = '') {
+  const normalizedType = normalizeText(promptType).toLowerCase();
+  if (!['book_introduction', 'book_conclusion'].includes(normalizedType)) {
+    return;
+  }
+
+  try {
+    await promptEngine.getActivePromptTemplate(normalizedType);
+    return;
+  } catch (error) {
+    if (error?.code !== 'PROMPT_TEMPLATE_NOT_FOUND') {
+      throw error;
+    }
+  }
+
+  let sourceTemplate = null;
+
+  try {
+    sourceTemplate = await promptEngine.getActivePromptTemplate('frame_texts');
+  } catch (_error) {
+    const frameTemplates = await promptEngine.listPromptTemplates({ type: 'frame_texts' });
+    sourceTemplate = frameTemplates[0] || null;
+  }
+
+  if (!sourceTemplate) {
+    return;
+  }
+
+  try {
+    await promptEngine.createPromptTemplateVersion({
+      type: normalizedType,
+      label: normalizedType === 'book_introduction'
+        ? 'Introduction - bootstrap'
+        : 'Epilogue - bootstrap',
+      status: 'active',
+      system_prompt: sourceTemplate.system_prompt || '',
+      context_block: sourceTemplate.context_block || '',
+      data_block: sourceTemplate.data_block || '',
+      output_format: sourceTemplate.output_format || '',
+      forbidden_phrases: Array.isArray(sourceTemplate.forbidden_phrases)
+        ? sourceTemplate.forbidden_phrases
+        : [],
+      min_words: Number(sourceTemplate.min_words || 0),
+      max_words: Number(sourceTemplate.max_words || 0)
+    }, 'ai-service-bootstrap');
+  } catch (error) {
+    if (String(error?.message || '').includes('prompt_templates_type_check')) {
+      throw new promptEngine.PromptEngineError(
+        'La base ne reconnait pas encore les types "book_introduction" / "book_conclusion". Executez backend/sql/book_frame_prompts_refactor.sql dans Supabase, puis relancez la generation.',
+        'AI_SERVICE_SCHEMA_OUTDATED',
+        400
+      );
+    }
+    if (error?.code !== 'PROMPT_TEMPLATE_CREATE_FAILED') {
+      throw error;
+    }
+  }
 }
 
 async function generateQuestions(params = {}) {
@@ -231,34 +291,14 @@ async function generateNarrativeContent(params = {}) {
   };
 
   const primaryPromptType = resolveNarrativePromptType(outputType);
-  let result;
-
-  try {
-    result = await promptEngine.runPromptGeneration({
-      promptType: primaryPromptType,
-      variables,
-      mistralClient: mistral,
-      model: 'mistral-small-latest',
-      maxRetries: 2
-    });
-  } catch (error) {
-    const shouldFallbackToFrameTexts = (
-      primaryPromptType !== 'frame_texts'
-      && error?.code === 'PROMPT_TEMPLATE_NOT_FOUND'
-    );
-
-    if (!shouldFallbackToFrameTexts) {
-      throw error;
-    }
-
-    result = await promptEngine.runPromptGeneration({
-      promptType: 'frame_texts',
-      variables,
-      mistralClient: mistral,
-      model: 'mistral-small-latest',
-      maxRetries: 2
-    });
-  }
+  await bootstrapNarrativePromptTemplate(primaryPromptType);
+  const result = await promptEngine.runPromptGeneration({
+    promptType: primaryPromptType,
+    variables,
+    mistralClient: mistral,
+    model: 'mistral-small-latest',
+    maxRetries: 2
+  });
 
   return normalizeText(result.output);
 }

@@ -301,7 +301,8 @@ router.get('/:id/prompt-admin/:promptKey', authenticate, ensurePromptAdmin, asyn
       contextSummary: context.contextSummary,
       variables: context.variables,
       templateVariables: context.templateVariables || [],
-      availableVariables: Object.keys(context.variables || {})
+      availableVariables: Object.keys(context.variables || {}),
+      availableVariableMeta: context.availableVariableMeta || []
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
@@ -340,6 +341,7 @@ router.post('/:id/prompt-admin/:promptKey/test', authenticate, ensurePromptAdmin
       variables: tested.variables,
       templateVariables: tested.templateVariables || [],
       availableVariables: Object.keys(tested.variables || {}),
+      availableVariableMeta: tested.availableVariableMeta || [],
       result: tested.result
     });
   } catch (error) {
@@ -378,7 +380,8 @@ router.post('/:id/prompt-admin/:promptKey/publish', authenticate, ensurePromptAd
       contextSummary: published.contextSummary,
       variables: published.variables,
       templateVariables: published.templateVariables || [],
-      availableVariables: Object.keys(published.variables || {})
+      availableVariables: Object.keys(published.variables || {}),
+      availableVariableMeta: published.availableVariableMeta || []
     });
   } catch (error) {
     const status = Number(error?.status) || 500;

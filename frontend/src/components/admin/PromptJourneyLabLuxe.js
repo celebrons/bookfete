@@ -16,23 +16,27 @@ const FIELD_LABELS = {
   forbidden_phrases: 'Phrases interdites',
   min_words: 'Minimum de mots',
   max_words: 'Maximum de mots',
-  variables: 'Variables envoyées',
-  compiled: 'Prompt compilé',
-  modelOutput: 'Sortie du modèle'
+  variables: 'Variables envoyÃ©es',
+  compiled: 'Prompt compilÃ©',
+  modelOutput: 'Sortie du modÃ¨le'
 };
 
 const PROMPT_SCENARIOS = [
-  { id: 'book_title', label: 'Titre du livre', hint: 'Le titre principal proposé dans le parcours de création.' },
+  { id: 'book_title', label: 'Titre du livre', hint: 'Le titre principal propose dans le parcours de creation.' },
   { id: 'chapter_titles', label: 'Titres des chapitres', hint: 'Le sommaire et les titres de chapitres du livre.' },
-  { id: 'chapter_amorce', label: 'Amorce du chapitre', hint: 'La phrase d accroche et les mots-déclencheurs proposés aux contributeurs.' },
-  { id: 'chapter_body', label: 'Texte du chapitre', hint: 'La génération du texte long structuré du chapitre.' }
+  { id: 'book_introduction', label: 'Introduction', hint: 'Le texte d ouverture du livre avant le premier chapitre.' },
+  { id: 'chapter_amorce', label: 'Amorce du chapitre', hint: 'La phrase d accroche et les mots-declencheurs proposes aux contributeurs.' },
+  { id: 'chapter_body', label: 'Texte du chapitre', hint: 'La generation du texte long structure du chapitre.' },
+  { id: 'book_conclusion', label: 'Epilogue', hint: 'Le texte de fermeture du livre apres le dernier chapitre.' }
 ];
 
 const VARIABLE_GUIDE = {
   book_title: ['eventType', 'style', 'bookTitle', 'recipientName', 'recipientAge', 'recipientGender', 'recipientNickname', 'recipientTrait', 'recipientAnecdote', 'additionalContext'],
   chapter_titles: ['eventType', 'style', 'bookTitle', 'recipientName', 'recipientAge', 'recipientGender', 'recipientNickname', 'recipientTrait', 'recipientAnecdote', 'additionalContext', 'count'],
+  book_introduction: ['output_type', 'event_type', 'event_subtype', 'book_title', 'recipient_name', 'recipient_nickname', 'recipient_age', 'recipient_gender', 'character_trait', 'signature_anecdote', 'signature_phrase', 'future_wish', 'event_date', 'event_location', 'chapter_titles_text', 'chapter_summary', 'narrative_context', 'target_length'],
   chapter_amorce: ['book_title', 'event_type', 'event_subtype', 'narrative_person', 'recipient_name', 'recipient_nickname', 'character_trait', 'signature_anecdote', 'signature_phrase', 'future_wish', 'chapter_index', 'chapter_total', 'chapter_title', 'chapter_theme', 'chapter_arc', 'prev_chapter_title', 'next_chapter_title', 'chapter_role', 'chapter_focus_hint', 'marker_policy', 'generation_mode', 'fallback_formulations'],
-  chapter_body: ['book_title', 'book_occasion', 'recipient_name', 'recipient_age', 'book_tone', 'book_location', 'book_year', 'chapter_total', 'chapter_index', 'chapter_title', 'chapter_theme', 'chapter_arc', 'chapter_emotion', 'prev_chapter_title', 'next_chapter_title', 'contributions_count', 'contributions_richness', 'contributions', 'photos', 'narrative_context']
+  chapter_body: ['book_title', 'book_occasion', 'recipient_name', 'recipient_age', 'book_tone', 'book_location', 'book_year', 'chapter_total', 'chapter_index', 'chapter_title', 'chapter_theme', 'chapter_arc', 'chapter_emotion', 'prev_chapter_title', 'next_chapter_title', 'contributions_count', 'contributions_richness', 'contributions', 'photos', 'narrative_context'],
+  book_conclusion: ['output_type', 'event_type', 'event_subtype', 'book_title', 'recipient_name', 'recipient_nickname', 'recipient_age', 'recipient_gender', 'character_trait', 'signature_anecdote', 'signature_phrase', 'future_wish', 'event_date', 'event_location', 'chapter_titles_text', 'chapter_summary', 'narrative_context', 'target_length']
 };
 
 const initialProjectForm = {
@@ -171,6 +175,32 @@ const PromptJourneyLabLuxe = () => {
     if (scenarioId === 'book_title') return common;
     if (scenarioId === 'chapter_titles') {
       return { ...common, count: Number(projectForm.chaptersCount) || 8 };
+    }
+    if (scenarioId === 'book_introduction' || scenarioId === 'book_conclusion') {
+      return {
+        output_type: scenarioId === 'book_conclusion' ? 'epilogue' : 'introduction',
+        event_type: common.eventType,
+        event_subtype: normalizeText(projectForm.eventType, 'anniversaire'),
+        book_title: common.bookTitle,
+        recipient_name: common.recipientName,
+        recipient_nickname: normalizeText(projectForm.recipientNickname),
+        recipient_age: common.recipientAge,
+        recipient_gender: common.recipientGender,
+        narrative_style: common.style,
+        narrative_person: 'third_person',
+        character_trait: normalizeText(projectForm.recipientTrait),
+        signature_anecdote: normalizeText(projectForm.recipientAnecdote),
+        signature_phrase: normalizeText(projectForm.additionalContext),
+        future_wish: normalizeText(projectForm.additionalContext),
+        event_date: '',
+        event_location: normalizeText(projectForm.bookLocation),
+        chapter_titles: Array.from({ length: Number(projectForm.chaptersCount) || 6 }, (_, index) => (
+          index === 0 ? 'Introduction' : `Chapitre ${index + 1}`
+        )),
+        chapter_summary: normalizeText(projectForm.chapterSummary),
+        narrative_context: normalizeText(projectForm.narrativeContext),
+        target_length: scenarioId === 'book_conclusion' ? '120 a 180 mots' : '140 a 200 mots'
+      };
     }
     if (scenarioId === 'chapter_amorce') {
       const hasPersonalMarkers = [
@@ -551,7 +581,7 @@ const PromptJourneyLabLuxe = () => {
                   </div>
                   <label className="prompt-journey-check prompt-journey-run-toggle">
                     <input type="checkbox" checked={Boolean(current.runModel)} onChange={(event) => updateScenarioState(scenario.id, { runModel: event.target.checked })} />
-                    <span>Tester avec génération</span>
+                    <span>Tester avec gÃ©nÃ©ration</span>
                   </label>
                   <details className="prompt-journey-variable-details">
                     <summary>Afficher les variables possibles ({(scenarioVariableGuides[scenario.id] || []).length})</summary>
@@ -574,7 +604,7 @@ const PromptJourneyLabLuxe = () => {
                   <div className="prompt-journey-actions">
                     <button type="button" className="btn btn-secondary" onClick={() => handleTestScenario(scenario)} disabled={current.isTesting}>{current.isTesting ? 'Test...' : 'Tester le prompt'}</button>
                     <button type="button" className="btn btn-primary" onClick={() => handleValidateScenario(scenario)} disabled={current.isPublishing}>{current.isPublishing ? 'Validation...' : 'Valider et versionner'}</button>
-                    <button type="button" className="btn btn-outline" onClick={() => handleActivateScenario(scenario)} disabled={current.isActivating || !current.templateId}>{current.isActivating ? 'Activation...' : 'Utiliser pour la création'}</button>
+                    <button type="button" className="btn btn-outline" onClick={() => handleActivateScenario(scenario)} disabled={current.isActivating || !current.templateId}>{current.isActivating ? 'Activation...' : 'Utiliser pour la crÃ©ation'}</button>
                     <button type="button" className="btn btn-outline" onClick={() => handleArchiveScenario(scenario)} disabled={current.isArchiving || !current.templateId}>{current.isArchiving ? 'Archivage...' : 'Archiver'}</button>
                     <button type="button" className="btn btn-outline" onClick={() => loadScenarioLogs(scenario.id)} disabled={current.isLoadingLogs || !current.templateId}>{current.isLoadingLogs ? 'Logs...' : 'Voir logs'}</button>
                   </div>

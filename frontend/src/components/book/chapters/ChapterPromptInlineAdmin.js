@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import PromptTestingGuide from '../PromptTestingGuide';
 import '../BookLuxe.css';
+
+const VARIABLE_NAME_PATTERN = /^[a-zA-Z0-9_@.]+$/;
 
 const getApiBaseUrl = () => {
   const envBase = String(process.env.REACT_APP_API_URL || '').trim();
@@ -12,6 +15,19 @@ const getApiBaseUrl = () => {
 };
 
 const normalizeText = (value = '') => String(value || '').replace(/\s+/g, ' ').trim();
+const DIRECTIVES_PLACEHOLDER = [
+  'OBJECTIF',
+  '- Expliquer ce que le rendu doit produire.',
+  '',
+  'OBLIGATOIRE',
+  '- Les contraintes a respecter absolument.',
+  '',
+  'A EXCLURE',
+  '- Ce qu il ne faut surtout pas faire.',
+  '',
+  'FORMAT ATTENDU',
+  '- La forme finale attendue.'
+].join('\n');
 
 const splitMissingItems = (items = []) => {
   const safeItems = Array.isArray(items) ? items : [];
@@ -46,6 +62,135 @@ const formatContextLine = (summary = {}) => [
   summary?.eventType ? `Occasion : ${summary.eventType}` : ''
 ].filter(Boolean).join('   ');
 
+const normalizeVariableName = (value = '') => {
+  const normalized = normalizeText(
+    typeof value === 'string' ? value : value?.name
+  );
+  if (!normalized || normalized === '[object Object]') {
+    return '';
+  }
+  if (!VARIABLE_NAME_PATTERN.test(normalized)) {
+    return '';
+  }
+  return normalized;
+};
+
+const buildVariableFamilyKey = (name = '') => (
+  normalizeVariableName(name).replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+);
+
+const choosePreferredVariableItem = (left = {}, right = {}) => {
+  const leftName = normalizeVariableName(left?.name || left);
+  const rightName = normalizeVariableName(right?.name || right);
+
+  const scoreName = (name) => {
+    let score = 0;
+    if (name.includes('_')) score += 2;
+    if (name === name.toLowerCase()) score += 1;
+    if (name.includes('.')) score -= 1;
+    return score;
+  };
+
+  const leftScore = scoreName(leftName);
+  const rightScore = scoreName(rightName);
+
+  if (rightScore !== leftScore) {
+    return rightScore > leftScore ? right : left;
+  }
+
+  if (Boolean(right?.hasValue) !== Boolean(left?.hasValue)) {
+    return right?.hasValue ? right : left;
+  }
+
+  return rightName.length < leftName.length ? right : left;
+};
+
+const normalizeVariableItems = (items = []) => {
+  const byName = new Map();
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const name = normalizeVariableName(item);
+    if (!name) return;
+
+    const existing = byName.get(name);
+    const next = typeof item === 'string'
+      ? {
+          name,
+          required: false,
+          hasValue: true,
+          preview: ''
+        }
+      : {
+          name,
+          required: Boolean(item?.required),
+          hasValue: Boolean(item?.hasValue),
+          preview: normalizeText(item?.preview)
+        };
+
+    if (!existing) {
+      byName.set(name, next);
+      return;
+    }
+
+    byName.set(name, {
+      name,
+      required: Boolean(existing.required || next.required),
+      hasValue: Boolean(existing.hasValue || next.hasValue),
+      preview: existing.preview || next.preview || ''
+    });
+  });
+
+  return [...byName.values()];
+};
+
+const collapseVariableAliases = (items = []) => {
+  const families = new Map();
+
+  normalizeVariableItems(items).forEach((item) => {
+    const familyKey = buildVariableFamilyKey(item?.name);
+    if (!familyKey) return;
+
+    const existing = families.get(familyKey);
+    if (!existing) {
+      families.set(familyKey, item);
+      return;
+    }
+
+    families.set(familyKey, choosePreferredVariableItem(existing, item));
+  });
+
+  return [...families.values()];
+};
+
+const buildVariablePreviewText = (item = {}) => {
+  if (normalizeText(item?.preview)) {
+    return `Valeur actuelle : ${normalizeText(item.preview)}`;
+  }
+  return item?.hasValue ? 'Valeur disponible.' : 'Aucune valeur disponible';
+};
+
+const copyTextToClipboard = async (text = '') => {
+  const content = String(text || '');
+  if (!content.trim()) {
+    throw new Error('Aucun texte a copier.');
+  }
+
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(content);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = content;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'absolute';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+};
+
 const ChapterPromptInlineAdmin = ({ chapter }) => {
   const [available, setAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -54,6 +199,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
   const [notice, setNotice] = useState('');
   const [contextSummary, setContextSummary] = useState(null);
   const [availableVariables, setAvailableVariables] = useState([]);
+  const [availableVariableMeta, setAvailableVariableMeta] = useState([]);
   const [templateVariables, setTemplateVariables] = useState([]);
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [directives, setDirectives] = useState('');
@@ -62,6 +208,8 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
   const [resultText, setResultText] = useState('');
   const [validation, setValidation] = useState(null);
   const [missingVariables, setMissingVariables] = useState([]);
+  const [compiledPromptText, setCompiledPromptText] = useState('');
+  const [isOpen, setIsOpen] = useState(true);
 
   const requestJson = useCallback(async (path, options = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -112,12 +260,14 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
       const nextDirectives = String(payload?.directives || '');
       setContextSummary(payload?.contextSummary || null);
       setAvailableVariables(Array.isArray(payload?.availableVariables) ? payload.availableVariables : []);
+      setAvailableVariableMeta(Array.isArray(payload?.availableVariableMeta) ? payload.availableVariableMeta : []);
       setTemplateVariables(Array.isArray(payload?.templateVariables) ? payload.templateVariables : []);
       setActiveTemplate(payload?.activeTemplate || null);
       setDirectives(nextDirectives);
       setInitialDirectives(nextDirectives);
       setTestedDirectives('');
       setResultText('');
+      setCompiledPromptText('');
       setValidation(null);
       setMissingVariables([]);
     } catch (loadError) {
@@ -148,35 +298,46 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
   );
 
   const sortedVariables = useMemo(() => {
-    if (templateVariables.length > 0) {
-      return [...templateVariables].sort((left, right) => (
+    const normalizedTemplateVariables = normalizeVariableItems(templateVariables);
+
+    if (normalizedTemplateVariables.length > 0) {
+      return collapseVariableAliases(normalizedTemplateVariables).sort((left, right) => (
         Number(Boolean(right?.required)) - Number(Boolean(left?.required))
         || Number(Boolean(right?.hasValue)) - Number(Boolean(left?.hasValue))
         || String(left?.name || '').localeCompare(String(right?.name || ''), 'fr')
       ));
     }
 
-    return [...availableVariables]
+    return normalizeVariableItems([...availableVariables]
       .sort((left, right) => left.localeCompare(right, 'fr'))
       .map((name) => ({
         name,
         required: false,
         hasValue: true,
         preview: ''
-      }));
+      })));
   }, [availableVariables, templateVariables]);
 
   const availableOnlyVariables = useMemo(() => {
     const usedNames = new Set(
-      (Array.isArray(templateVariables) ? templateVariables : [])
-        .map((item) => String(item?.name || '').trim())
+      collapseVariableAliases(templateVariables)
+        .map((item) => buildVariableFamilyKey(item?.name))
         .filter(Boolean)
     );
 
-    return [...availableVariables]
-      .filter((name) => !usedNames.has(name))
-      .sort((left, right) => left.localeCompare(right, 'fr'));
-  }, [availableVariables, templateVariables]);
+    const metaSource = Array.isArray(availableVariableMeta) && availableVariableMeta.length > 0
+      ? availableVariableMeta
+      : [...availableVariables].map((name) => ({
+          name,
+          required: false,
+          hasValue: true,
+          preview: ''
+        }));
+
+    return collapseVariableAliases(metaSource)
+      .filter((item) => !usedNames.has(buildVariableFamilyKey(item?.name)))
+      .sort((left, right) => String(left?.name || '').localeCompare(String(right?.name || ''), 'fr'));
+  }, [availableVariableMeta, availableVariables, templateVariables]);
 
   const hasResult = Boolean(String(resultText || '').trim());
   const canPublish = !loading && !busyAction && hasResult && !needsRetest;
@@ -200,9 +361,11 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
 
       setContextSummary(payload?.contextSummary || null);
       setAvailableVariables(Array.isArray(payload?.availableVariables) ? payload.availableVariables : []);
+      setAvailableVariableMeta(Array.isArray(payload?.availableVariableMeta) ? payload.availableVariableMeta : []);
       setTemplateVariables(Array.isArray(payload?.templateVariables) ? payload.templateVariables : []);
       setActiveTemplate(payload?.activeTemplate || null);
       setResultText(String(payload?.result?.output || '').trim());
+      setCompiledPromptText(String(payload?.result?.compiledPrompt || '').trim());
       setValidation(payload?.result?.validation || null);
       setTestedDirectives(directives);
       setMissingVariables([]);
@@ -234,10 +397,12 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
       setActiveTemplate(payload?.activeTemplate || null);
       setContextSummary(payload?.contextSummary || contextSummary);
       setAvailableVariables(Array.isArray(payload?.availableVariables) ? payload.availableVariables : availableVariables);
+      setAvailableVariableMeta(Array.isArray(payload?.availableVariableMeta) ? payload.availableVariableMeta : availableVariableMeta);
       setTemplateVariables(Array.isArray(payload?.templateVariables) ? payload.templateVariables : templateVariables);
       setDirectives(nextDirectives);
       setInitialDirectives(nextDirectives);
       setTestedDirectives(nextDirectives);
+      setCompiledPromptText('');
       setMissingVariables([]);
       setNotice('Cette version est maintenant active pour la creation du chapitre.');
     } catch (publishError) {
@@ -253,6 +418,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     setDirectives(initialDirectives);
     setTestedDirectives('');
     setResultText('');
+    setCompiledPromptText('');
     setValidation(null);
     setMissingVariables([]);
     setError('');
@@ -263,6 +429,34 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     return null;
   }
 
+  const handleCopy = async (mode = 'combined') => {
+    try {
+      setError('');
+      const chunks = [];
+
+      if (mode === 'input' || mode === 'combined') {
+        chunks.push('[ENTREE DU PROMPT]');
+        chunks.push(compiledPromptText || 'Aucune entree disponible.');
+      }
+
+      if (mode === 'output' || mode === 'combined') {
+        chunks.push(mode === 'combined' ? '\n[SORTIE DU TEST]' : '[SORTIE DU TEST]');
+        chunks.push(resultText || 'Aucune sortie disponible.');
+      }
+
+      await copyTextToClipboard(chunks.join('\n'));
+      setNotice(
+        mode === 'input'
+          ? 'Entree du prompt copiee.'
+          : mode === 'output'
+            ? 'Sortie du test copiee.'
+            : 'Entree et sortie copiees.'
+      );
+    } catch (copyError) {
+      setError(copyError?.message || 'Impossible de copier le texte.');
+    }
+  };
+
   return (
     <div className="chapter-prompt-admin-panel">
       <div className="chapter-prompt-admin-header">
@@ -272,16 +466,29 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
             Testez des directives simples sans quitter cette page, puis activez la version si le rendu convient.
           </p>
         </div>
-        <span className="chapter-prompt-admin-status">{statusLabel}</span>
+        <div className="chapter-prompt-admin-header-actions">
+          <span className="chapter-prompt-admin-status">{statusLabel}</span>
+          <button
+            type="button"
+            className="btn btn-ghost chapter-prompt-admin-toggle"
+            onClick={() => setIsOpen((current) => !current)}
+          >
+            {isOpen ? 'Replier' : 'Deplier'}
+          </button>
+        </div>
       </div>
 
       <div className="chapter-prompt-admin-context">
         {formatContextLine(contextSummary) || `Chapitre : ${chapter?.title || 'Chapitre en cours'}`}
       </div>
 
+      <PromptTestingGuide currentAreaLabel="Generation du chapitre" />
+
       {error && <div className="luxe-feedback-banner is-error">{error}</div>}
       {notice && <div className="luxe-feedback-banner is-success">{notice}</div>}
 
+      {isOpen && (
+        <>
       <div className="chapter-prompt-admin-section">
         <div className="chapter-prompt-admin-label">Variables utilisees par ce prompt</div>
         <p className="chapter-prompt-admin-helper">
@@ -293,8 +500,10 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
           {sortedVariables.map((variableItem) => (
             <span
               key={variableItem.name}
-              className={`chapter-prompt-admin-variable ${variableItem.required ? 'is-required' : ''} ${variableItem.hasValue ? 'is-filled' : 'is-empty'}`}
-              title={variableItem.preview || variableItem.name}
+              className={`chapter-prompt-admin-variable ${variableItem.required ? 'is-required' : ''} ${variableItem.hasValue ? 'is-filled has-preview' : 'is-empty'}`}
+              title={buildVariablePreviewText(variableItem)}
+              data-preview={buildVariablePreviewText(variableItem)}
+              tabIndex={0}
             >
               <span>{`{{${variableItem.name}}}`}</span>
               {variableItem.required && <span className="chapter-prompt-admin-variable-mark">*</span>}
@@ -309,13 +518,15 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
           Ces variables existent dans ce contexte, meme si le prompt ne les utilise pas encore.
         </p>
         <div className="chapter-prompt-admin-variables">
-          {availableOnlyVariables.length > 0 ? availableOnlyVariables.map((name) => (
+          {availableOnlyVariables.length > 0 ? availableOnlyVariables.map((item) => (
             <span
-              key={name}
-              className="chapter-prompt-admin-variable is-filled"
-              title={name}
+              key={item.name}
+              className={`chapter-prompt-admin-variable ${item?.hasValue ? 'is-filled has-preview' : 'is-empty'}`}
+              title={buildVariablePreviewText(item)}
+              data-preview={buildVariablePreviewText(item)}
+              tabIndex={0}
             >
-              {`{{${name}}}`}
+              {`{{${item.name}}}`}
             </span>
           )) : (
             <span className="chapter-prompt-admin-helper">Aucune autre variable disponible.</span>
@@ -329,7 +540,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
           className="input-luxe chapter-prompt-admin-textarea"
           value={directives}
           onChange={(event) => setDirectives(event.target.value)}
-          placeholder="Ex : ouvrir sur une scene concrete, eviter les generalites, garder un ton chaleureux et tres lisible."
+          placeholder={DIRECTIVES_PLACEHOLDER}
           disabled={loading || busyAction !== ''}
         />
         <p className="chapter-prompt-admin-helper">
@@ -357,6 +568,24 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
         )}
         <div className={`chapter-prompt-admin-result ${hasResult ? '' : 'is-empty'}`}>
           {hasResult ? resultText : 'Cliquez sur "Tester" pour voir le resultat ici.'}
+        </div>
+        <div className="chapter-prompt-admin-copy-actions">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => handleCopy('input')}
+            disabled={!compiledPromptText || busyAction !== ''}
+          >
+            Copier l entree
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => handleCopy('combined')}
+            disabled={!compiledPromptText || !hasResult || busyAction !== ''}
+          >
+            Copier entree + sortie
+          </button>
         </div>
         {validation && Array.isArray(validation.errors) && validation.errors.length > 0 && (
           <div className="chapter-prompt-admin-issues">
@@ -424,6 +653,8 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
           Reinitialiser
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 };
