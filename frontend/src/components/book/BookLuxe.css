@@ -7536,6 +7536,16 @@
   flex-wrap: wrap;
 }
 
+.book-prompt-admin-inline {
+  margin-top: 18px;
+}
+
+.book-prompt-admin-stack {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
 @media (max-width: 900px) {
   .chapter-prompt-admin-header {
     flex-direction: column;
@@ -7547,6 +7557,10 @@
 
   .chapter-prompt-admin-actions-left {
     width: 100%;
+  }
+
+  .book-prompt-admin-stack {
+    gap: 14px;
   }
 
   .chapter-prompt-admin-actions-left .btn,

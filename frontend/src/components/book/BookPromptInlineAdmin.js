@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '../../../services/supabaseClient';
-import '../BookLuxe.css';
+import { supabase } from '../../services/supabaseClient';
+import './BookLuxe.css';
 
 const getApiBaseUrl = () => {
   const envBase = String(process.env.REACT_APP_API_URL || '').trim();
@@ -41,12 +41,33 @@ const buildPromptErrorMessage = (fallbackMessage = '', items = []) => {
 
 const formatContextLine = (summary = {}) => [
   summary?.bookTitle ? `Livre : ${summary.bookTitle}` : '',
-  summary?.chapterTitle ? `Chapitre : ${summary.chapterTitle}` : '',
   summary?.tone ? `Ton : ${summary.tone}` : '',
-  summary?.eventType ? `Occasion : ${summary.eventType}` : ''
+  summary?.eventType ? `Occasion : ${summary.eventType}` : '',
+  summary?.chapterCount ? `${summary.chapterCount} chapitre${summary.chapterCount > 1 ? 's' : ''}` : ''
 ].filter(Boolean).join('   ');
 
-const ChapterPromptInlineAdmin = ({ chapter }) => {
+const buildStatusLabel = (template = null) => {
+  if (!template?.version) {
+    return 'Version active';
+  }
+
+  if (template?.status === 'active') {
+    return `Version active v${template.version}`;
+  }
+
+  return `Base ${template.status || 'brouillon'} v${template.version}`;
+};
+
+const BookPromptInlineAdmin = ({
+  endpointBase = '',
+  panelTitle = '',
+  panelSubtitle = '',
+  emptyResultLabel = 'Cliquez sur "Tester" pour voir le resultat ici',
+  publishNotice = 'Cette version est maintenant active pour la creation.',
+  resultMode = 'text',
+  onPublished = null,
+  className = ''
+}) => {
   const [available, setAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
@@ -82,7 +103,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const nextError = new Error(payload?.error || 'Erreur chargement prompt chapitre.');
+      const nextError = new Error(payload?.error || 'Erreur chargement prompt livre.');
       nextError.status = response.status;
       nextError.missingVariables = Array.isArray(payload?.missingVariables)
         ? payload.missingVariables
@@ -93,8 +114,19 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     return payload;
   }, []);
 
+  const formatResultOutput = useCallback((resultPayload = {}) => {
+    if (resultMode === 'titles') {
+      const parsedTitles = Array.isArray(resultPayload?.parsedTitles) ? resultPayload.parsedTitles : [];
+      if (parsedTitles.length > 0) {
+        return parsedTitles.map((title, index) => `${index + 1}. ${title}`).join('\n');
+      }
+    }
+
+    return String(resultPayload?.output || '').trim();
+  }, [resultMode]);
+
   const loadPanel = useCallback(async () => {
-    if (!chapter?.id) {
+    if (!endpointBase) {
       setAvailable(false);
       setLoading(false);
       return;
@@ -105,10 +137,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     setError('');
 
     try {
-      const payload = await requestJson(`/chapters/${chapter.id}/prompt-admin/chapter-body`, {
-        method: 'GET'
-      });
-
+      const payload = await requestJson(endpointBase, { method: 'GET' });
       const nextDirectives = String(payload?.directives || '');
       setContextSummary(payload?.contextSummary || null);
       setAvailableVariables(Array.isArray(payload?.availableVariables) ? payload.availableVariables : []);
@@ -131,7 +160,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     } finally {
       setLoading(false);
     }
-  }, [chapter?.id, requestJson]);
+  }, [endpointBase, requestJson]);
 
   useEffect(() => {
     setNotice('');
@@ -180,12 +209,9 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
 
   const hasResult = Boolean(String(resultText || '').trim());
   const canPublish = !loading && !busyAction && hasResult && !needsRetest;
-  const statusLabel = activeTemplate?.version
-    ? `Version active v${activeTemplate.version}`
-    : 'Version active';
 
   const handleTest = async () => {
-    if (!chapter?.id) return;
+    if (!endpointBase) return;
 
     setBusyAction('test');
     setError('');
@@ -193,7 +219,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     setMissingVariables([]);
 
     try {
-      const payload = await requestJson(`/chapters/${chapter.id}/prompt-admin/chapter-body/test`, {
+      const payload = await requestJson(`${endpointBase}/test`, {
         method: 'POST',
         body: JSON.stringify({ directives })
       });
@@ -202,22 +228,22 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
       setAvailableVariables(Array.isArray(payload?.availableVariables) ? payload.availableVariables : []);
       setTemplateVariables(Array.isArray(payload?.templateVariables) ? payload.templateVariables : []);
       setActiveTemplate(payload?.activeTemplate || null);
-      setResultText(String(payload?.result?.output || '').trim());
+      setResultText(formatResultOutput(payload?.result || {}));
       setValidation(payload?.result?.validation || null);
       setTestedDirectives(directives);
       setMissingVariables([]);
-      setNotice('Resultat mis a jour avec les donnees reelles du chapitre.');
+      setNotice('Resultat mis a jour avec les donnees reelles du livre.');
     } catch (testError) {
       const missing = Array.isArray(testError?.missingVariables) ? testError.missingVariables : [];
       setMissingVariables(missing);
-      setError(buildPromptErrorMessage(testError.message || 'Erreur test prompt chapitre.', missing));
+      setError(buildPromptErrorMessage(testError.message || 'Erreur test prompt livre.', missing));
     } finally {
       setBusyAction('');
     }
   };
 
   const handlePublish = async () => {
-    if (!chapter?.id || !canPublish) return;
+    if (!endpointBase || !canPublish) return;
 
     setBusyAction('publish');
     setError('');
@@ -225,7 +251,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     setMissingVariables([]);
 
     try {
-      const payload = await requestJson(`/chapters/${chapter.id}/prompt-admin/chapter-body/publish`, {
+      const payload = await requestJson(`${endpointBase}/publish`, {
         method: 'POST',
         body: JSON.stringify({ directives })
       });
@@ -239,11 +265,15 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
       setInitialDirectives(nextDirectives);
       setTestedDirectives(nextDirectives);
       setMissingVariables([]);
-      setNotice('Cette version est maintenant active pour la creation du chapitre.');
+      setNotice(publishNotice);
+
+      if (typeof onPublished === 'function') {
+        onPublished(payload);
+      }
     } catch (publishError) {
       const missing = Array.isArray(publishError?.missingVariables) ? publishError.missingVariables : [];
       setMissingVariables(missing);
-      setError(buildPromptErrorMessage(publishError.message || 'Erreur validation prompt chapitre.', missing));
+      setError(buildPromptErrorMessage(publishError.message || 'Erreur validation prompt livre.', missing));
     } finally {
       setBusyAction('');
     }
@@ -259,35 +289,30 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     setNotice('Le brouillon local a ete reinitialise.');
   };
 
-  if (!chapter?.id || !available) {
+  if (!endpointBase || !available) {
     return null;
   }
 
   return (
-    <div className="chapter-prompt-admin-panel">
+    <div className={`chapter-prompt-admin-panel ${className}`.trim()}>
       <div className="chapter-prompt-admin-header">
         <div>
-          <h5 className="chapter-prompt-admin-title">Generation du chapitre</h5>
-          <p className="chapter-prompt-admin-subtitle">
-            Testez des directives simples sans quitter cette page, puis activez la version si le rendu convient.
-          </p>
+          <h5 className="chapter-prompt-admin-title">{panelTitle}</h5>
+          <p className="chapter-prompt-admin-subtitle">{panelSubtitle}</p>
         </div>
-        <span className="chapter-prompt-admin-status">{statusLabel}</span>
+        <span className="chapter-prompt-admin-status">{buildStatusLabel(activeTemplate)}</span>
       </div>
 
       <div className="chapter-prompt-admin-context">
-        {formatContextLine(contextSummary) || `Chapitre : ${chapter?.title || 'Chapitre en cours'}`}
+        {formatContextLine(contextSummary)}
       </div>
-
-      {error && <div className="luxe-feedback-banner is-error">{error}</div>}
-      {notice && <div className="luxe-feedback-banner is-success">{notice}</div>}
 
       <div className="chapter-prompt-admin-section">
         <div className="chapter-prompt-admin-label">Variables utilisees par ce prompt</div>
         <p className="chapter-prompt-admin-helper">
           <span className="chapter-prompt-admin-helper-legend is-required">*</span> attendue par le prompt
           {' · '}
-          <span className="chapter-prompt-admin-helper-legend is-filled">bleu</span> = valeur disponible dans ce chapitre
+          <span className="chapter-prompt-admin-helper-legend is-filled">bleu</span> = valeur disponible dans ce contexte
         </p>
         <div className="chapter-prompt-admin-variables">
           {sortedVariables.map((variableItem) => (
@@ -296,8 +321,8 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
               className={`chapter-prompt-admin-variable ${variableItem.required ? 'is-required' : ''} ${variableItem.hasValue ? 'is-filled' : 'is-empty'}`}
               title={variableItem.preview || variableItem.name}
             >
-              <span>{`{{${variableItem.name}}}`}</span>
               {variableItem.required && <span className="chapter-prompt-admin-variable-mark">*</span>}
+              {`{{${variableItem.name}}}`}
             </span>
           ))}
         </div>
@@ -329,15 +354,14 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
           className="input-luxe chapter-prompt-admin-textarea"
           value={directives}
           onChange={(event) => setDirectives(event.target.value)}
-          placeholder="Ex : ouvrir sur une scene concrete, eviter les generalites, garder un ton chaleureux et tres lisible."
-          disabled={loading || busyAction !== ''}
+          placeholder="Ecrivez simplement ce que vous voulez obtenir. Exemple : une introduction sobre, en 2 paragraphes, sans annoncer la structure du livre."
         />
         <p className="chapter-prompt-admin-helper">
-          Toutes les consignes utilisees pour ce test sont visibles ici. Aucune consigne cachee n est ajoutee pendant le test. Seules les donnees reelles du chapitre restent injectees en contexte.
+          Toutes les consignes utilisees pour ce test sont visibles ici. Aucune consigne cachee n est ajoutee pendant le test. Seules les donnees reelles du livre restent injectees en contexte.
         </p>
         {normalizedDirectives !== normalizedInitialDirectives && (
           <p className="chapter-prompt-admin-helper is-attention">
-            Les directives ont change. Lancez un test avant de valider cette version.
+            Le test actuel ne correspond plus au brouillon local. Retestez avant de valider cette version.
           </p>
         )}
       </div>
@@ -347,7 +371,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
         {validation && (
           <div className="chapter-prompt-admin-meta">
             <span className={`chapter-prompt-admin-meta-chip ${validation?.isValid ? 'is-valid' : 'is-warning'}`}>
-              {validation?.isValid ? 'Conforme' : 'A revoir'}
+              {validation?.isValid ? 'Valide' : 'Ajustements conseilles'}
             </span>
             <span className="chapter-prompt-admin-meta-chip">{`${Number(validation?.wordCount || 0)} mots`}</span>
             {Array.isArray(validation?.warnings) && validation.warnings.length > 0 && (
@@ -356,40 +380,41 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
           </div>
         )}
         <div className={`chapter-prompt-admin-result ${hasResult ? '' : 'is-empty'}`}>
-          {hasResult ? resultText : 'Cliquez sur "Tester" pour voir le resultat ici.'}
+          {hasResult ? resultText : emptyResultLabel}
         </div>
-        {validation && Array.isArray(validation.errors) && validation.errors.length > 0 && (
+
+        {error && (
           <div className="chapter-prompt-admin-issues">
             <div className="chapter-prompt-admin-label">Points a revoir</div>
             <ul className="chapter-prompt-admin-issue-list">
-              {validation.errors.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
+              <li>{error}</li>
             </ul>
           </div>
         )}
+
         {syntaxIssues.length > 0 && (
           <div className="chapter-prompt-admin-issues">
             <div className="chapter-prompt-admin-label">Structure du prompt a corriger</div>
             <p className="chapter-prompt-admin-helper">
-              Ce n est pas une variable du chapitre : il manque ou il y a une balise de boucle mal fermee dans le template.
+              Ces balises doivent etre corrigees dans le template avant de retester.
             </p>
             <ul className="chapter-prompt-admin-issue-list">
-              {syntaxIssues.map((item) => (
-                <li key={item}>{item}</li>
+              {syntaxIssues.map((issue) => (
+                <li key={issue}>{issue}</li>
               ))}
             </ul>
           </div>
         )}
+
         {trueMissing.length > 0 && (
           <div className="chapter-prompt-admin-issues">
             <div className="chapter-prompt-admin-label">Variables a completer</div>
             <p className="chapter-prompt-admin-helper">
-              Ces variables sont appelees par le template, mais aucune valeur exploitable n a ete trouvee dans ce chapitre.
+              Le prompt demande encore ces variables, mais elles sont vides dans ce livre.
             </p>
             <ul className="chapter-prompt-admin-issue-list">
-              {trueMissing.map((item) => (
-                <li key={item}>{item}</li>
+              {trueMissing.map((issue) => (
+                <li key={issue}>{issue}</li>
               ))}
             </ul>
           </div>
@@ -400,32 +425,36 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
         <div className="chapter-prompt-admin-actions-left">
           <button
             type="button"
-            className="btn btn-outline"
+            className="btn btn-primary"
             onClick={handleTest}
-            disabled={loading || busyAction !== ''}
+            disabled={loading || busyAction === 'test'}
           >
             {busyAction === 'test' ? 'Test en cours...' : 'Tester avec les donnees reelles'}
           </button>
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-outline"
             onClick={handlePublish}
-            disabled={!canPublish}
+            disabled={!canPublish || busyAction === 'publish'}
           >
             {busyAction === 'publish' ? 'Validation...' : 'Valider cette version'}
           </button>
         </div>
         <button
           type="button"
-          className="btn btn-outline"
+          className="btn btn-ghost"
           onClick={handleReset}
-          disabled={loading || busyAction !== ''}
+          disabled={loading || busyAction === 'test' || busyAction === 'publish'}
         >
           Reinitialiser
         </button>
       </div>
+
+      {notice && (
+        <p className="chapter-prompt-admin-helper">{notice}</p>
+      )}
     </div>
   );
 };
 
-export default ChapterPromptInlineAdmin;
+export default BookPromptInlineAdmin;

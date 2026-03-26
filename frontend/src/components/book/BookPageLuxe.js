@@ -5,6 +5,7 @@ import { supabase } from '../../services/supabaseClient';
 import { listOrdersByBook } from '../../services/ordersApi';
 import ChapterListLuxe from './ChapterListLuxe';
 import BookConfigLuxe from './BookConfigLuxe';
+import BookPromptInlineAdmin from './BookPromptInlineAdmin';
 import ContributorsTabLuxe from './contributors/ContributorsTabLuxe';
 import Loading from '../common/Loading';
 import {
@@ -2870,6 +2871,27 @@ const BookPageLuxe = () => {
                 <div className="book-draft-modal-action-note">
                   Les reglages de mise en page s appliquent en direct. Ce bouton relance uniquement la generation IA.
                 </div>
+              </div>
+
+              <div className="book-prompt-admin-stack">
+                <BookPromptInlineAdmin
+                  endpointBase={`/books/${bookId}/prompt-admin/introduction`}
+                  panelTitle="Generation de l introduction"
+                  panelSubtitle="Texte d ouverture du livre. Testez des directives simples ici, puis regenerez l apercu pour voir le rendu dans le livre."
+                  emptyResultLabel={'Cliquez sur "Tester" pour voir une introduction ici.'}
+                  publishNotice="Cette version est maintenant active pour la generation de l introduction."
+                  onPublished={handleGenerateDraft}
+                  className="book-prompt-admin-inline"
+                />
+                <BookPromptInlineAdmin
+                  endpointBase={`/books/${bookId}/prompt-admin/conclusion`}
+                  panelTitle="Generation de la conclusion"
+                  panelSubtitle="Texte de fermeture du livre. Le resultat apparait ici sans quitter l apercu."
+                  emptyResultLabel={'Cliquez sur "Tester" pour voir une conclusion ici.'}
+                  publishNotice="Cette version est maintenant active pour la generation de la conclusion."
+                  onPublished={handleGenerateDraft}
+                  className="book-prompt-admin-inline"
+                />
               </div>
             </div>
 

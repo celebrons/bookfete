@@ -11,6 +11,12 @@ const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const aiService = require('../services/aiService');
 const promptEngine = require('../services/promptEngine');
+const {
+  getBookPromptAdminContext,
+  testInlineBookPrompt,
+  publishInlineBookPrompt,
+  buildFramePromptVariables
+} = require('../services/bookPromptInlineAdminService');
 const authenticate = require('../middleware/auth');
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
@@ -146,6 +152,27 @@ const PREVIEW_FORMAT_TEXT_BUDGET_FACTORS = {
 };
 const pdfExportJobs = new Map();
 
+function ensurePromptAdmin(req, res, next) {
+  const allowListRaw = process.env.AI_PROMPT_ADMIN_EMAILS || '';
+  const allowList = allowListRaw
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowList.length === 0) {
+    return next();
+  }
+
+  const userEmail = String(req.user?.email || '').trim().toLowerCase();
+  if (!userEmail || !allowList.includes(userEmail)) {
+    return res.status(403).json({
+      error: 'Acces refuse. Utilisateur non autorise a gerer les prompts.'
+    });
+  }
+
+  return next();
+}
+
 const pdfExportCleanupTimer = setInterval(() => {
   cleanupExpiredPdfExportJobs();
 }, 30 * 60 * 1000);
@@ -248,6 +275,119 @@ router.delete('/:id', authenticate, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/:id/prompt-admin/:promptKey', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const context = await getBookPromptAdminContext({
+      bookId: req.params.id,
+      ownerId: req.user?.id,
+      promptKey: req.params.promptKey
+    });
+
+    return res.json({
+      ok: true,
+      activeTemplate: context.activeTemplate
+        ? {
+            id: context.activeTemplate.id,
+            type: context.activeTemplate.type,
+            label: context.activeTemplate.label,
+            version: context.activeTemplate.version,
+            status: context.activeTemplate.status
+          }
+        : null,
+      directives: context.directives || '',
+      contextSummary: context.contextSummary,
+      variables: context.variables,
+      templateVariables: context.templateVariables || [],
+      availableVariables: Object.keys(context.variables || {})
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    return res.status(status).json({
+      error: error.message || 'Erreur chargement administration prompt livre.',
+      missingVariables: Array.isArray(error?.details?.missingVariables)
+        ? error.details.missingVariables
+        : []
+    });
+  }
+});
+
+router.post('/:id/prompt-admin/:promptKey/test', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const tested = await testInlineBookPrompt({
+      bookId: req.params.id,
+      ownerId: req.user?.id,
+      promptKey: req.params.promptKey,
+      directives: req.body?.directives || '',
+      model: req.body?.model || process.env.MISTRAL_MODEL || 'mistral-small-latest'
+    });
+
+    return res.json({
+      ok: true,
+      activeTemplate: tested.template
+        ? {
+            id: tested.template.id,
+            type: tested.template.type,
+            label: tested.template.label,
+            version: tested.template.version,
+            status: tested.template.status
+          }
+        : null,
+      directives: req.body?.directives || '',
+      contextSummary: tested.contextSummary,
+      variables: tested.variables,
+      templateVariables: tested.templateVariables || [],
+      availableVariables: Object.keys(tested.variables || {}),
+      result: tested.result
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    return res.status(status).json({
+      error: error.message || 'Erreur test prompt livre.',
+      missingVariables: Array.isArray(error?.details?.missingVariables)
+        ? error.details.missingVariables
+        : []
+    });
+  }
+});
+
+router.post('/:id/prompt-admin/:promptKey/publish', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const published = await publishInlineBookPrompt({
+      bookId: req.params.id,
+      ownerId: req.user?.id,
+      promptKey: req.params.promptKey,
+      directives: req.body?.directives || '',
+      createdBy: req.user?.email || req.user?.id || 'inline-admin'
+    });
+
+    return res.json({
+      ok: true,
+      activeTemplate: published.template
+        ? {
+            id: published.template.id,
+            type: published.template.type,
+            label: published.template.label,
+            version: published.template.version,
+            status: published.template.status
+          }
+        : null,
+      directives: published.directives || '',
+      contextSummary: published.contextSummary,
+      variables: published.variables,
+      templateVariables: published.templateVariables || [],
+      availableVariables: Object.keys(published.variables || {})
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    return res.status(status).json({
+      error: error.message || 'Erreur validation prompt livre.',
+      missingVariables: Array.isArray(error?.details?.missingVariables)
+        ? error.details.missingVariables
+        : []
+    });
   }
 });
 
@@ -787,7 +927,7 @@ async function syncOrderWithPdfJobResult({ job, outcome, errorMessage = '' }) {
 router.post('/:id/generate-draft', authenticate, async (req, res) => {
   try {
     const bookId = req.params.id;
-    const { book, chapters } = await loadOwnedBookChapterContext({
+    const { book, config, chapters } = await loadOwnedBookChapterContext({
       bookId,
       ownerId: req.user.id
     });
@@ -817,18 +957,26 @@ router.post('/:id/generate-draft', authenticate, async (req, res) => {
       });
     }
 
+    const frameTexts = await generateBookFrameTextsForPreview({
+      book,
+      config,
+      chaptersWithDrafts
+    });
+
     const html = renderValidatedBookPreviewHtml({
       book,
       chaptersWithDrafts,
       previewFormat,
-      previewLayoutSettings
+      previewLayoutSettings,
+      frameTexts
     });
 
     res.json({
       generatedAt: new Date().toISOString(),
       html,
       previewFormat,
-      previewLayoutSettings
+      previewLayoutSettings,
+      frameTexts
     });
   } catch (error) {
     console.error('Erreur apercu livre:', error);
@@ -840,7 +988,7 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
   try {
     const db = supabase;
     const bookId = req.params.id;
-    const { book, chapters } = await loadOwnedBookChapterContext({
+    const { book, config, chapters } = await loadOwnedBookChapterContext({
       bookId,
       ownerId: req.user.id
     });
@@ -860,6 +1008,11 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       chapter,
       draft: extractChapterDraftState(chapter)
     }));
+    const frameTexts = await generateBookFrameTextsForPreview({
+      book,
+      config,
+      chaptersWithDrafts
+    });
     const incompleteCount = chaptersWithDrafts.filter(
       ({ draft }) => draft?.status !== 'validated'
     ).length;
@@ -2787,6 +2940,7 @@ function buildChapterNarrativeForPreview({ chapter, draft, sourceChapter }) {
 function renderValidatedBookPreviewHtml({
   book,
   chaptersWithDrafts,
+  frameTexts = null,
   previewFormat,
   previewLayoutSettings
 }) {
@@ -2821,9 +2975,32 @@ function renderValidatedBookPreviewHtml({
   return `
     <article class="draft-book draft-book-assembled ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}" style="${escapeHtml(layoutStyle)}">
       ${frontCoverBlock}
+      ${renderBookFramePreviewSection({
+        title: 'Introduction',
+        content: frameTexts?.introduction || ''
+      })}
       ${chaptersContent}
+      ${renderBookFramePreviewSection({
+        title: 'Conclusion',
+        content: frameTexts?.conclusion || ''
+      })}
       ${backCoverBlock}
     </article>
+  `;
+}
+
+function renderBookFramePreviewSection({ title = '', content = '' } = {}) {
+  const normalizedTitle = cleanText(title, 120);
+  const normalizedContent = cleanText(content, 4200);
+  if (!normalizedTitle || !normalizedContent) {
+    return '';
+  }
+
+  return `
+    <section class="draft-book-section draft-book-section-frame">
+      <h2>${escapeHtml(normalizedTitle)}</h2>
+      ${formatParagraphs(normalizedContent)}
+    </section>
   `;
 }
 
@@ -3490,6 +3667,7 @@ async function generateFinalBookPdfFiles({
         finalPath,
         book,
         chaptersWithDrafts,
+        frameTexts,
         jobId,
         previewFormat: resolvedPreviewFormat,
         previewLayoutSettings
@@ -3532,6 +3710,7 @@ async function generateFinalBookPdfFileFromHtml({
   finalPath,
   book,
   chaptersWithDrafts,
+  frameTexts,
   jobId,
   previewFormat,
   previewLayoutSettings
@@ -3546,6 +3725,7 @@ async function generateFinalBookPdfFileFromHtml({
   const finalHtml = renderValidatedBookPreviewHtml({
     book,
     chaptersWithDrafts,
+    frameTexts,
     previewFormat,
     previewLayoutSettings
   });
@@ -3657,6 +3837,7 @@ function execFilePromise(command, args, options = {}) {
 function renderValidatedBookInteriorHtml({
   book,
   chaptersWithDrafts,
+  frameTexts = null,
   previewFormat,
   previewLayoutSettings
 }) {
@@ -3699,7 +3880,15 @@ function renderValidatedBookInteriorHtml({
           ].filter(Boolean).join(' | '))}
         </div>
       </header>
+      ${renderBookFramePreviewSection({
+        title: 'Introduction',
+        content: frameTexts?.introduction || ''
+      })}
       ${chaptersContent}
+      ${renderBookFramePreviewSection({
+        title: 'Conclusion',
+        content: frameTexts?.conclusion || ''
+      })}
     </article>
   `;
 }
@@ -3718,6 +3907,89 @@ function renderValidatedBookCoverHtml({ book, previewFormat }) {
       </section>
     </article>
   `;
+}
+
+function buildBookFrameFallbackText({ book = {}, chaptersWithDrafts = [], outputType = 'introduction' }) {
+  const recipientName = cleanText(book?.recipient_name, 180) || 'la personne celebree';
+  const chapterTitles = (Array.isArray(chaptersWithDrafts) ? chaptersWithDrafts : [])
+    .map(({ chapter }, index) => cleanText(index === 0 ? 'Introduction' : chapter?.title, 160))
+    .filter(Boolean);
+
+  if (normalizeText(outputType).toLowerCase() === 'conclusion') {
+    return `Ce livre trace deja une ligne claire autour de ${recipientName}, entre ${chapterTitles.slice(0, 3).join(', ') || 'ses moments forts'} et ce que chacun choisit d en retenir pour la suite.`;
+  }
+
+  return `Ce livre s ouvre comme une entree en matiere autour de ${recipientName}, en laissant d abord place aux chapitres ${chapterTitles.slice(0, 3).join(', ') || 'deja poses'} avant d en faire emerger le fil sensible.`;
+}
+
+async function generateBookFrameTextWithFallback({
+  book,
+  config,
+  chaptersWithDrafts,
+  outputType
+}) {
+  const context = {
+    book,
+    config,
+    chapters: (Array.isArray(chaptersWithDrafts) ? chaptersWithDrafts : []).map(({ chapter }) => chapter)
+  };
+  const variables = buildFramePromptVariables(context, outputType);
+
+  try {
+    const content = await aiService.generateNarrativeContent({
+      outputType,
+      eventType: variables.event_type,
+      eventSubtype: variables.event_subtype,
+      style: variables.narrative_style,
+      bookTitle: variables.book_title,
+      chapterTitle: variables.chapter_title,
+      recipientName: variables.recipient_name,
+      recipientNickname: variables.recipient_nickname,
+      recipientAge: variables.recipient_age,
+      recipientGender: variables.recipient_gender,
+      narrativePerson: variables.narrative_person,
+      characterTrait: variables.character_trait,
+      signatureAnecdote: variables.signature_anecdote,
+      signaturePhrase: variables.signature_phrase,
+      futureWish: variables.future_wish,
+      eventDate: variables.event_date,
+      eventLocation: variables.event_location,
+      chapterTitles: variables.chapter_titles,
+      chapterSummary: variables.chapter_summary,
+      narrativeContext: variables.narrative_context,
+      targetLength: variables.target_length
+    });
+
+    return cleanText(content, 5000) || buildBookFrameFallbackText({ book, chaptersWithDrafts, outputType });
+  } catch (_error) {
+    return buildBookFrameFallbackText({ book, chaptersWithDrafts, outputType });
+  }
+}
+
+async function generateBookFrameTextsForPreview({
+  book,
+  config,
+  chaptersWithDrafts
+}) {
+  const [introduction, conclusion] = await Promise.all([
+    generateBookFrameTextWithFallback({
+      book,
+      config,
+      chaptersWithDrafts,
+      outputType: 'introduction'
+    }),
+    generateBookFrameTextWithFallback({
+      book,
+      config,
+      chaptersWithDrafts,
+      outputType: 'conclusion'
+    })
+  ]);
+
+  return {
+    introduction,
+    conclusion
+  };
 }
 
 function extractCoverCardMarkup(sectionHtml) {

@@ -3,6 +3,8 @@ const supabase = require('../config/supabase');
 const TEMPLATE_TYPES = Object.freeze([
   'book_title',
   'chapter_titles',
+  'book_introduction',
+  'book_conclusion',
   'chapter_amorce',
   'contributor_questions',
   'chapter_body',
@@ -520,10 +522,12 @@ async function runPromptGeneration({
     const response = await mistralClient.chat.complete({
       model: normalizeText(model, 'mistral-small-latest'),
       messages: [
-        {
-          role: 'system',
-          content: String(template.system_prompt || '')
-        },
+        ...(normalizeText(template.system_prompt)
+          ? [{
+              role: 'system',
+              content: String(template.system_prompt || '')
+            }]
+          : []),
         {
           role: 'user',
           content: promptForAttempt
@@ -643,10 +647,7 @@ function ensureTemplatePayload(raw = {}) {
   if (!normalizeText(raw.label)) {
     throw new PromptEngineError('label requis.', 'PROMPT_LABEL_REQUIRED', 400);
   }
-  if (!normalizeText(systemPrompt)) {
-    throw new PromptEngineError('system_prompt requis.', 'PROMPT_SYSTEM_REQUIRED', 400);
-  }
-  if (hasPromptPlaceholders(systemPrompt)) {
+  if (normalizeText(systemPrompt) && hasPromptPlaceholders(systemPrompt)) {
     throw new PromptEngineError(
       'Le system_prompt ne doit jamais contenir de variables {{...}}.',
       'PROMPT_SYSTEM_VARIABLES_FORBIDDEN',
@@ -952,10 +953,12 @@ async function testPromptTemplate({
   const response = await mistralClient.chat.complete({
     model: normalizeText(model, 'mistral-small-latest'),
     messages: [
-      {
-        role: 'system',
-        content: template.system_prompt
-      },
+      ...(normalizeText(template.system_prompt)
+        ? [{
+            role: 'system',
+            content: template.system_prompt
+          }]
+        : []),
       {
         role: 'user',
         content: userPrompt

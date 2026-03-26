@@ -230,6 +230,95 @@ function buildInlineTemplateLabel(label = '') {
   return `${baseLabel} - inline`;
 }
 
+function buildVisibleDirectiveText(sections = {}) {
+  const orderedSections = [
+    ['OBJECTIF', sections.objective],
+    ['OBLIGATOIRE', sections.required],
+    ['A EXCLURE', sections.excluded],
+    ['FORMAT ATTENDU', sections.output]
+  ];
+
+  return orderedSections
+    .map(([label, items]) => {
+      const safeItems = (Array.isArray(items) ? items : [])
+        .map((item) => normalizeText(item))
+        .filter(Boolean);
+
+      if (safeItems.length === 0) {
+        return '';
+      }
+
+      return [
+        label,
+        ...safeItems.map((item) => `- ${item}`)
+      ].join('\n');
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function buildChapterBodyDefaultDirectives() {
+  return buildVisibleDirectiveText({
+    objective: [
+      'Redige le chapitre a partir des donnees reelles disponibles pour ce livre et ce chapitre.',
+      'Le texte doit etre clair, naturel et directement utile dans le rendu du livre.'
+    ],
+    required: [
+      'Utilise uniquement les informations presentes dans le contexte et dans les contributions.',
+      'Reste coherent avec le titre du chapitre, l evenement et le ton du livre.',
+      'S il manque des informations, ne les invente pas.',
+      'Organise le texte selon les directives saisies par le testeur.'
+    ],
+    excluded: [
+      'N invente aucun nom, lieu, anecdote, relation ou detail absent des donnees.',
+      'Pas de meta-commentaire sur la generation.',
+      'Pas de liste technique ni de reprise brute des variables.'
+    ],
+    output: [
+      'Retourne uniquement le texte du chapitre.',
+      'Respecte exactement la structure demandee dans les directives du testeur.'
+    ]
+  });
+}
+
+function buildChapterBodyInlineContextBlock(variables = {}) {
+  const baseLines = [
+    'Contexte reel disponible :',
+    `- Titre du livre : ${normalizeText(variables.book_title, 'Livre souvenir')}`,
+    `- Evenement : ${normalizeText(variables.event_type || variables.book_occasion, 'evenement')}`,
+    normalizeText(variables.event_subtype) ? `- Sous-type : ${normalizeText(variables.event_subtype)}` : '',
+    normalizeText(variables.book_tone) ? `- Ton du livre : ${normalizeText(variables.book_tone)}` : '',
+    normalizeText(variables.narrative_person) ? `- Registre narratif : ${normalizeText(variables.narrative_person)}` : '',
+    normalizeText(variables.recipient_name) ? `- Destinataire : ${normalizeText(variables.recipient_name)}` : '',
+    normalizeText(variables.recipient_nickname) ? `- Surnom : ${normalizeText(variables.recipient_nickname)}` : '',
+    normalizeText(variables.character_trait) ? `- Trait marquant : ${normalizeText(variables.character_trait)}` : '',
+    normalizeText(variables.signature_anecdote) ? `- Anecdote signature : ${normalizeText(variables.signature_anecdote)}` : '',
+    normalizeText(variables.signature_phrase) ? `- Expression signature : ${normalizeText(variables.signature_phrase)}` : '',
+    normalizeText(variables.future_wish) ? `- Souhait ou horizon : ${normalizeText(variables.future_wish)}` : '',
+    `- Chapitre : ${normalizeText(variables.chapter_title, 'Chapitre')}`,
+    normalizeText(variables.chapter_theme) ? `- Theme : ${normalizeText(variables.chapter_theme)}` : '',
+    normalizeText(variables.chapter_arc) ? `- Arc narratif : ${normalizeText(variables.chapter_arc)}` : '',
+    normalizeText(variables.chapter_amorce) ? `- Amorce validee : ${normalizeText(variables.chapter_amorce)}` : '',
+    Array.isArray(variables.chapter_triggers) && variables.chapter_triggers.length > 0
+      ? `- Mots-declencheurs : ${variables.chapter_triggers.map((item) => normalizeText(item)).filter(Boolean).join(', ')}`
+      : '',
+    Number(variables.contributions_count || 0) ? `- Contributions disponibles : ${Number(variables.contributions_count || 0)}` : '',
+    normalizeText(variables.contributions_text) ? `- Contributions concatenees : ${normalizeText(variables.contributions_text)}` : '',
+    normalizeText(variables.photos_text) ? `- Photos disponibles : ${normalizeText(variables.photos_text)}` : ''
+  ];
+
+  return baseLines.filter(Boolean).join('\n');
+}
+
+function resolveVisibleChapterBodyDirectives(template = {}) {
+  const existing = extractInlineDirectives(template?.data_block || '', template);
+  if (existing) {
+    return existing;
+  }
+
+  return buildChapterBodyDefaultDirectives();
+}
+
 function buildChapterPromptVariables(sourcePayload, chapterTitle = '', chapterSummary = '') {
   const book = sourcePayload?.book || {};
   const config = sourcePayload?.config || {};
@@ -547,8 +636,9 @@ async function getChapterPromptAdminContext(chapterId, ownerId = '', ownerEmail 
     sourcePayload.chapter.description
   );
   const activeTemplate = await promptEngine.getActivePromptTemplate('chapter_body');
-  const directives = extractInlineDirectives(activeTemplate?.data_block || '', activeTemplate);
-  const templateVariables = extractPromptVariableMeta(activeTemplate, variables);
+  const directives = resolveVisibleChapterBodyDirectives(activeTemplate);
+  const inlinePreviewTemplate = buildChapterBodyPromptTemplateWithDirectives(activeTemplate, directives, variables);
+  const templateVariables = extractPromptVariableMeta(inlinePreviewTemplate, variables);
 
   return {
     chapter,
@@ -570,17 +660,14 @@ async function getChapterPromptAdminContext(chapterId, ownerId = '', ownerEmail 
   };
 }
 
-function buildChapterBodyPromptTemplateWithDirectives(activeTemplate, directives = '') {
-  const normalizedDirectives = normalizeText(directives);
-  if (!normalizedDirectives) {
-    return {
-      ...activeTemplate
-    };
-  }
+function buildChapterBodyPromptTemplateWithDirectives(activeTemplate, directives = '', variables = {}) {
+  const effectiveDirectives = normalizeText(directives) || buildChapterBodyDefaultDirectives();
 
   return {
     ...activeTemplate,
-    data_block: normalizedDirectives,
+    system_prompt: '',
+    context_block: buildChapterBodyInlineContextBlock(variables),
+    data_block: effectiveDirectives,
     output_format: '',
     min_words: 0,
     max_words: 0
@@ -595,7 +682,11 @@ async function testInlineChapterBodyPrompt({
   model = 'mistral-small-latest'
 }) {
   const context = await getChapterPromptAdminContext(chapterId, ownerId, ownerEmail);
-  const template = buildChapterBodyPromptTemplateWithDirectives(context.activeTemplate, directives);
+  const template = buildChapterBodyPromptTemplateWithDirectives(
+    context.activeTemplate,
+    directives,
+    context.variables
+  );
   const templateVariables = extractPromptVariableMeta(template, context.variables);
   const result = await promptEngine.testPromptTemplate({
     template,
@@ -622,17 +713,22 @@ async function publishInlineChapterBodyPrompt({
 }) {
   const context = await getChapterPromptAdminContext(chapterId, ownerId, ownerEmail);
   const activeTemplate = context.activeTemplate;
+  const inlineTemplate = buildChapterBodyPromptTemplateWithDirectives(
+    activeTemplate,
+    directives,
+    context.variables
+  );
   const nextTemplatePayload = {
     type: 'chapter_body',
     label: buildInlineTemplateLabel(activeTemplate?.label),
     status: 'draft',
-    system_prompt: activeTemplate?.system_prompt || '',
-    context_block: activeTemplate?.context_block || '',
-    data_block: normalizeText(directives),
-    output_format: '',
+    system_prompt: inlineTemplate.system_prompt || '',
+    context_block: inlineTemplate.context_block || '',
+    data_block: inlineTemplate.data_block,
+    output_format: inlineTemplate.output_format,
     forbidden_phrases: Array.isArray(activeTemplate?.forbidden_phrases) ? activeTemplate.forbidden_phrases : [],
-    min_words: 0,
-    max_words: 0
+    min_words: inlineTemplate.min_words,
+    max_words: inlineTemplate.max_words
   };
 
   const createdTemplate = await promptEngine.createPromptTemplateVersion(nextTemplatePayload, createdBy);

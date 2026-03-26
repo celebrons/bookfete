@@ -5,6 +5,7 @@ import ChapterDetailsLuxe from './chapters/ChapterDetailsLuxe';
 import ContributionsModerationLuxe from './chapters/ContributionsModerationLuxe';
 import ChapterEditorLuxe from './chapters/ChapterEditorLuxe';
 import BookCoverDesignerLuxe from './BookCoverDesignerLuxe';
+import BookPromptInlineAdmin from './BookPromptInlineAdmin';
 import { useChapterActions } from './hooks/useChapterActions';
 import { useContributions } from './hooks/useContributions';
 import './BookLuxe.css';
@@ -315,6 +316,16 @@ const ChapterListLuxe = ({
               </button>
             </div>
           </div>
+
+          <BookPromptInlineAdmin
+            endpointBase={`/books/${bookId}/prompt-admin/chapter-titles`}
+            panelTitle="Generation des titres de chapitres"
+            panelSubtitle="Testez le prompt utilise pour proposer les titres du sommaire. Le resultat s affiche ici, sans quitter le livre."
+            emptyResultLabel={'Cliquez sur "Tester" pour voir les propositions de titres ici.'}
+            publishNotice="Cette version est maintenant active pour la generation des titres de chapitres."
+            resultMode="titles"
+            className="book-prompt-admin-inline"
+          />
 
           {editionLayout === 'gallery' ? (
             <div className="sidebar-content">
