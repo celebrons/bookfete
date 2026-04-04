@@ -8,7 +8,7 @@ const ChapterEditorLuxe = ({ editingChapter, setEditingChapter, onSave, onCancel
   return (
     <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
       <h3 style={{ margin: '0 0 var(--space-lg)', fontSize: '18px', fontWeight: '600' }}>
-        Modifier le chapitre
+        Renommer le chapitre
       </h3>
       
       <div style={{ marginBottom: 'var(--space-lg)' }}>

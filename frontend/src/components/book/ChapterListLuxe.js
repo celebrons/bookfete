@@ -72,26 +72,6 @@ const CoverFaceIcon = ({ side = 'front' }) => (
   </svg>
 );
 
-const ChapterCardIcon = () => (
-  <svg
-    viewBox="0 0 56 56"
-    focusable="false"
-    aria-hidden="true"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="10" y="8" width="36" height="40" rx="8.5" />
-    <path d="M18 8v40" />
-    <path d="M23 19h15" />
-    <path d="M23 25h12" />
-    <path d="M23 31h15" />
-    <path d="M23 37h10" />
-  </svg>
-);
-
 const ChapterListLuxe = ({
   chapters,
   onUpdateChapter,
@@ -103,7 +83,10 @@ const ChapterListLuxe = ({
   onDeleteChapter,
   bookId,
   book,
+  bookTitle = '',
   onUpdateBook,
+  onWorkspaceModeChange,
+  onOpenTab,
   editionGalleryRequest = 0
 }) => {
   const [user, setUser] = useState(null);
@@ -134,6 +117,18 @@ const ChapterListLuxe = ({
     ? (selectedChapter.order_index === 0 ? 'Introduction' : selectedChapter.title)
     : (selectedSpecialFace === 'front' ? 'Couverture' : selectedSpecialFace === 'back' ? '4e de couverture' : '');
   const isGalleryOnly = !selectedChapter && !isSpecialWorkspace;
+
+  useEffect(() => {
+    if (typeof onWorkspaceModeChange === 'function') {
+      onWorkspaceModeChange(!isGalleryOnly);
+    }
+
+    return () => {
+      if (typeof onWorkspaceModeChange === 'function') {
+        onWorkspaceModeChange(false);
+      }
+    };
+  }, [isGalleryOnly, onWorkspaceModeChange]);
 
   const {
     showContributions,
@@ -186,17 +181,22 @@ const ChapterListLuxe = ({
     setShowContributions
   ]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'auto'
+    });
+  }, [selectedChapterId, editingChapter, showContributions, selectedSpecialFace]);
+
   const handleBackToGallery = () => {
     setSelectedChapterId(null);
     setShowContributions(false);
     setEditingChapter(null);
-  };
-
-  const getStatusColor = (contributions) => {
-    const count = Array.isArray(contributions) ? contributions.length : 0;
-    if (count === 0) return '#b9c4cf';
-    if (count < 3) return '#d89434';
-    return '#2f6e78';
   };
 
   const getChapterProgressState = (chapter) => {
@@ -216,6 +216,92 @@ const ChapterListLuxe = ({
     );
 
     return hasStarted ? PROGRESSION_STATUS.inProgress : PROGRESSION_STATUS.notStarted;
+  };
+
+  const getChapterCardSignals = (chapter) => {
+    const chapterProgress = getChapterProgressState(chapter);
+    const contributionsCount = Number(
+      chapter?.contributionsCount
+      || (Array.isArray(chapter?.contributions) ? chapter.contributions.length : 0)
+      || 0
+    );
+    const isSoloMode = Boolean(book?.cover_config?.soloMode);
+    const totalSteps = isSoloMode ? 2 : 3;
+    const preparationReady = Boolean(
+      normalizeText(chapter?.amorce_text)
+      && (chapter?.amorce_validated || chapter?.questions_validated)
+      && chapter?.isFinalized
+    );
+    const collectionStarted = Boolean(
+      chapter?.contributionsClosed
+      || contributionsCount > 0
+      || Number(chapter?.invitationsCount || 0) > 0
+    );
+    const finalizationStarted = Boolean(
+      chapter?.chapterDraft?.status === 'draft'
+      || Number(chapter?.chapterDraft?.generationCount || 0) > 0
+      || normalizeText(chapter?.chapterDraft?.html)
+    );
+    const startedSteps = [
+      preparationReady,
+      ...(isSoloMode ? [] : [collectionStarted]),
+      finalizationStarted
+    ].filter(Boolean).length;
+
+    const progressPercent = chapterProgress.key === 'done'
+      ? 100
+      : chapterProgress.key === 'inProgress'
+        ? Math.max(24, Math.round((startedSteps / totalSteps) * 100))
+        : 0;
+
+    if (chapterProgress.key === 'done') {
+      return {
+        chapterProgress,
+        accent: '#7fae5d',
+        statusDotTone: 'done',
+        /* legacy detail kept for encoding cleanup
+          ? `${contributionsCount} contribution${contributionsCount > 1 ? 's' : ''} · Clos`
+        */
+        detail: contributionsCount > 0 ? `${contributionsCount} contribution${contributionsCount > 1 ? 's' : ''} · Chapitre cloture` : 'Chapitre cloture',
+        statusLabel: contributionsCount > 0
+          ? `${contributionsCount} contribution${contributionsCount > 1 ? 's' : ''} · chapitre cloture`
+          : 'Chapitre cloture',
+        showProgressBar: false,
+        progressPercent
+      };
+    }
+
+    if (chapterProgress.key === 'inProgress') {
+      return {
+        chapterProgress,
+        accent: contributionsCount > 0 ? '#c29a4b' : '#b69e76',
+        topBadge: contributionsCount > 0
+          ? `${contributionsCount} contribution${contributionsCount > 1 ? 's' : ''}`
+          : '',
+        topBadgeTone: contributionsCount > 0 ? 'contrib' : 'progress',
+        statusDotTone: contributionsCount > 0 ? 'contrib' : 'progress',
+        detail: contributionsCount > 0 ? 'Collecte ouverte' : 'En preparation',
+        detailTone: contributionsCount > 0 ? 'contrib' : 'progress',
+        statusLabel: contributionsCount > 0
+          ? `${contributionsCount} contribution${contributionsCount > 1 ? 's' : ''} recue${contributionsCount > 1 ? 's' : ''}`
+          : 'Chapitre en preparation',
+        showProgressBar: true,
+        progressPercent
+      };
+    }
+
+    return {
+      chapterProgress,
+      accent: '#d9d0c2',
+      topBadge: '',
+      topBadgeTone: 'default',
+      statusDotTone: '',
+      detail: '',
+      detailTone: 'default',
+      statusLabel: '',
+      showProgressBar: false,
+      progressPercent: 0
+    };
   };
 
   const getCoverProgressState = (face) => {
@@ -345,27 +431,22 @@ const ChapterListLuxe = ({
                       </div>
                       <div className="chapter-special-title">{isFront ? 'Couverture' : '4e de couverture'}</div>
                       <div className="chapter-special-subtitle">Configurer</div>
-                      <div
-                        className="chapter-state-badge chapter-state-badge-pinned"
-                        style={{
-                          color: coverProgress.color,
-                          background: coverProgress.background
-                        }}
-                      >
-                        {coverProgress.label}
-                      </div>
+                      {coverProgress.key !== 'notStarted' ? (
+                        <span
+                          className={`chapter-card-status-dot is-${coverProgress.key === 'done' ? 'done' : 'progress'}`}
+                          aria-hidden="true"
+                          title={coverProgress.label}
+                        />
+                      ) : (
+                        <span className="chapter-book-footer-spacer" aria-hidden="true" />
+                      )}
                     </div>
                   );
                 }
 
                 const { chapter, index } = item;
-                const chapterProgress = getChapterProgressState(chapter);
+                const chapterSignals = getChapterCardSignals(chapter);
                 const displayTitle = index === 0 ? 'Introduction' : chapter.title;
-                const chapterAccent = chapterProgress.key === 'done'
-                  ? '#2f8f58'
-                  : chapterProgress.key === 'inProgress'
-                    ? '#d89434'
-                    : getStatusColor(chapter.contributions);
 
                 return (
                   <div
@@ -375,13 +456,13 @@ const ChapterListLuxe = ({
                     style={{
                       opacity: deleteConfirm?.id === chapter.id ? 0.5 : 1
                     }}
-                  >
-                    <div className="chapter-actions chapter-actions-floating">
-                      <Tooltip text="Modifier le chapitre" position="bottom">
+                    >
+                      <div className="chapter-actions chapter-actions-floating">
+                      <Tooltip text="Renommer le chapitre" position="bottom">
                         <button
                           type="button"
                           className="chapter-action-btn"
-                          aria-label={`Modifier ${displayTitle}`}
+                          aria-label={`Renommer ${displayTitle}`}
                           onClick={(event) => {
                             event.stopPropagation();
                             openEditionItem(chapter.id);
@@ -413,30 +494,41 @@ const ChapterListLuxe = ({
 
                     <div
                       className="chapter-book-visual"
-                      style={{ '--chapter-accent': chapterAccent }}
+                      style={{ '--chapter-accent': chapterSignals.accent }}
                     >
-                      <div className="chapter-book-glyph" aria-hidden="true">
-                        <ChapterCardIcon />
+                      <div
+                        className={`chapter-book-index-art is-${chapterSignals.chapterProgress.key}`}
+                        aria-hidden="true"
+                      >
+                        {index + 1}
                       </div>
                     </div>
 
                     <div className="chapter-book-content">
-                      <div className="chapter-book-heading">
-                        <span className="chapter-book-number">{index + 1}</span>
-                        <div className="chapter-book-title">{displayTitle}</div>
+                      <div className="chapter-book-title">{displayTitle}</div>
+
+                      <div
+                        className="chapter-book-footer"
+                        title={chapterSignals.statusLabel || undefined}
+                      >
+                        {chapterSignals.statusDotTone ? (
+                          <span
+                            className={`chapter-card-status-dot is-${chapterSignals.statusDotTone}`}
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <span className="chapter-book-footer-spacer" aria-hidden="true" />
+                        )}
                       </div>
 
-                      <div className="chapter-book-footer">
-                        <div
-                          className="chapter-state-badge chapter-state-badge-pinned"
-                          style={{
-                            color: chapterProgress.color,
-                            background: chapterProgress.background
-                          }}
-                        >
-                          {chapterProgress.label}
+                      {chapterSignals.showProgressBar ? (
+                        <div className="chapter-card-progress" aria-hidden="true">
+                          <span
+                            className={`chapter-card-progress-bar is-${chapterSignals.statusDotTone || 'progress'}`}
+                            style={{ width: `${chapterSignals.progressPercent}%` }}
+                          />
                         </div>
-                      </div>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -459,21 +551,23 @@ const ChapterListLuxe = ({
                         <span className="edition-summary-index">{isFront ? 'C' : '4'}</span>
                         <span className="edition-summary-title">{isFront ? 'Couverture' : '4e de couverture'}</span>
                       </div>
-                      <span
-                        className="chapter-state-badge"
-                        style={{
-                          color: coverProgress.color,
-                          background: coverProgress.background
-                        }}
-                      >
-                        {coverProgress.label}
-                      </span>
+                      {coverProgress.key !== 'notStarted' ? (
+                        <span
+                          className="chapter-state-badge"
+                          style={{
+                            color: coverProgress.color,
+                            background: coverProgress.background
+                          }}
+                        >
+                          {coverProgress.label}
+                        </span>
+                      ) : null}
                     </button>
                   );
                 }
 
                 const { chapter, index } = item;
-                const chapterProgress = getChapterProgressState(chapter);
+                const chapterSignals = getChapterCardSignals(chapter);
                 const displayTitle = index === 0 ? 'Introduction' : chapter.title;
                 return (
                   <button
@@ -486,15 +580,11 @@ const ChapterListLuxe = ({
                       <span className="edition-summary-index">{index + 1}</span>
                       <span className="edition-summary-title">{displayTitle}</span>
                     </div>
-                    <span
-                      className="chapter-state-badge"
-                      style={{
-                        color: chapterProgress.color,
-                        background: chapterProgress.background
-                      }}
-                    >
-                      {chapterProgress.label}
-                    </span>
+                    {chapterSignals.topBadge ? (
+                      <span className={`chapter-state-badge is-${chapterSignals.topBadgeTone}`}>
+                        {chapterSignals.topBadge}
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -503,16 +593,18 @@ const ChapterListLuxe = ({
         </div>
       ) : (
         <div className="right-panel right-panel-full">
-          <div className="chapter-workspace-header">
-            <button
-              type="button"
-              className="sidebar-gallery-btn"
-              onClick={handleBackToGallery}
-            >
-              Retour structure
-            </button>
-            <h3 className="chapter-workspace-title">{selectedChapterTitle}</h3>
-          </div>
+          {(isSpecialWorkspace || editingChapter || showContributions) && (
+            <div className="chapter-workspace-header">
+              <button
+                type="button"
+                className="sidebar-gallery-btn"
+                onClick={handleBackToGallery}
+              >
+                Retour structure
+              </button>
+              <h3 className="chapter-workspace-title">{selectedChapterTitle}</h3>
+            </div>
+          )}
 
           {isSpecialWorkspace ? (
             <BookCoverDesignerLuxe
@@ -563,6 +655,11 @@ const ChapterListLuxe = ({
               userEmail={user?.email}
               user={user}
               book={book}
+              bookTitle={bookTitle || book?.title || ''}
+              chapterTitle={selectedChapterTitle}
+              onBackToStructure={handleBackToGallery}
+              onOpenContributors={() => onOpenTab?.('contributeurs')}
+              onOpenConfig={() => onOpenTab?.('config')}
               amorceValidated={Boolean(selectedChapter?.amorce_validated || selectedChapter?.questions_validated)}
             />
           )}

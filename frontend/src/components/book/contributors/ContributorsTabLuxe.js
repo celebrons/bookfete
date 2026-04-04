@@ -1,15 +1,18 @@
-// C:\Users\USER\bookfete\frontend\src\components\book\contributors\ContributorsTabLuxe.js
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import ContributorListLuxe from './ContributorListLuxe';
 import AddContributorFormLuxe from './AddContributorFormLuxe';
+import BookWorkspaceHeader from '../BookWorkspaceHeader';
+import Tooltip from '../../ui/Tooltip';
 import '../BookLuxe.css';
 
-const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
+const ContributorsTabLuxe = ({ bookId, book, onUpdateBook, bookTitle = '', onOpenTab }) => {
   const [contributors, setContributors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [updatingSoloMode, setUpdatingSoloMode] = useState(false);
+  const addFormRef = useRef(null);
+  const emailInputRef = useRef(null);
 
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
   const stats = useMemo(() => {
@@ -117,8 +120,22 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
     }
   };
 
+  const focusAddContributorForm = () => {
+    addFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (emailInputRef.current instanceof HTMLInputElement) {
+      emailInputRef.current.focus();
+    }
+  };
+
   return (
     <div className="contributors-live">
+      <BookWorkspaceHeader
+        sectionLabel="Contributeurs"
+        bookTitle={bookTitle || book?.title || 'Livre'}
+        activeTab="contributeurs"
+        onOpenTab={onOpenTab}
+      />
+
       {showWelcome && !isSoloMode && (
         <div className="guide-card contributors-guide-card">
           <button onClick={dismissWelcome} className="guide-close" aria-label="Fermer le guide">
@@ -156,34 +173,64 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
 
       <div className="contributors-live-head">
         <div className="contributors-live-main">
-          <div className="label-gold">Espace collaborateurs</div>
-          <h2 className="contributors-live-title">Gestion des contributeurs</h2>
-          <p className="contributors-live-subtitle">
-            Centralisez votre liste d invites puis activez les invitations depuis les chapitres.
-          </p>
           {!isSoloMode && (
-            <div className="contributors-top-note">
-              Ajoutez vos contacts ici, puis selectionnez-les dans chaque chapitre (etape Invitations).
+            <div className="contributors-live-helper">
+              <span className="contributors-live-helper-text">
+                Ajoutez vos contacts ici, puis invitez-les depuis les chapitres.
+              </span>
+              <Tooltip
+                text="Le formulaire sert a enregistrer les personnes. Les invitations s envoient ensuite chapitre par chapitre dans l atelier d edition."
+                position="right"
+              >
+                <button
+                  type="button"
+                  className="contributors-live-helper-info"
+                  aria-label="Aide sur le fonctionnement des invitations"
+                >
+                  i
+                </button>
+              </Tooltip>
             </div>
           )}
         </div>
 
-        {!isSoloMode && (
-          <div className="contributors-live-stats">
-            <div className="contributors-stat-pill">
-              <span>Total</span>
-              <strong>{stats.total}</strong>
+        <div className="contributors-live-aside">
+          {!isSoloMode && (
+            <button
+              type="button"
+              className="contributors-head-link"
+              onClick={focusAddContributorForm}
+            >
+              Aller au formulaire
+            </button>
+          )}
+
+          {!isSoloMode && (
+            <div className="contributors-live-stats">
+              <div className="contributors-stat-pill">
+                <span className="contributors-stat-label">
+                  <span className="contributors-stat-dot" aria-hidden="true" />
+                  Total
+                </span>
+                <strong>{stats.total}</strong>
+              </div>
+              <div className="contributors-stat-pill is-invited">
+                <span className="contributors-stat-label">
+                  <span className="contributors-stat-dot" aria-hidden="true" />
+                  Invites
+                </span>
+                <strong>{stats.invited}</strong>
+              </div>
+              <div className="contributors-stat-pill is-pending">
+                <span className="contributors-stat-label">
+                  <span className="contributors-stat-dot" aria-hidden="true" />
+                  En attente
+                </span>
+                <strong>{stats.pending}</strong>
+              </div>
             </div>
-            <div className="contributors-stat-pill is-invited">
-              <span>Invites</span>
-              <strong>{stats.invited}</strong>
-            </div>
-            <div className="contributors-stat-pill is-pending">
-              <span>En attente</span>
-              <strong>{stats.pending}</strong>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className={`contributors-solo-card ${isSoloMode ? 'is-enabled' : ''}`}>
@@ -197,11 +244,17 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook }) => {
           <span className="contributors-solo-toggle-title">Je souhaite creer le livre seul</span>
         </label>
         <p className="contributors-solo-note">
-          En mode solo, les invitations et la liste des contributeurs sont masques.
+          En mode solo, les invitations et la liste des contributeurs sont masquees.
         </p>
       </div>
 
-      {!isSoloMode && <AddContributorFormLuxe onAdd={handleAddContributor} />}
+      {!isSoloMode && (
+        <AddContributorFormLuxe
+          onAdd={handleAddContributor}
+          containerRef={addFormRef}
+          emailInputRef={emailInputRef}
+        />
+      )}
 
       {isSoloMode ? (
         <div className="contributors-solo-empty card">

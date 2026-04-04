@@ -23,6 +23,11 @@ const ChapterDetailsLuxe = ({
   userEmail,
   user,
   book,
+  bookTitle,
+  chapterTitle,
+  onBackToStructure,
+  onOpenContributors,
+  onOpenConfig,
   questionsValidated,
 }) => {
   const [loading, setLoading] = useState(true);
@@ -53,37 +58,10 @@ const ChapterDetailsLuxe = ({
     );
   }
 
-  const isSoloMode = Boolean(book?.cover_config?.soloMode);
-  const totalSteps = isSoloMode ? 3 : 4;
   const amorceValidated = Boolean(chapter?.amorce_validated || chapter?.questions_validated || questionsValidated);
-  const baseCompletedSteps = [
-    amorceValidated,
-    Boolean(chapter?.isFinalized),
-    ...(isSoloMode ? [] : [Boolean(chapter?.contributionsClosed)]),
-    Boolean(chapter?.isChapterClosed)
-  ].filter(Boolean).length;
-  const completedSteps = chapter?.isChapterClosed ? totalSteps : baseCompletedSteps;
-  const progressPercent = Math.round((completedSteps / totalSteps) * 100);
 
   return (
     <>
-      <div className="chapter-progress-wrap" role="status" aria-live="polite">
-        <div className="chapter-progress-row">
-          <span className="chapter-progress-label">Progression du chapitre</span>
-          <span className="chapter-progress-value">{progressPercent}%</span>
-        </div>
-        <div className="chapter-progress-track" aria-hidden="true">
-          <span
-            className="chapter-progress-fill"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      </div>
-
-      <p className="chapter-subtitle">
-        ALBUM PRESTIGE | {chaptersCount} CHAPITRES | {completedSteps}/{totalSteps} ETAPES
-      </p>
-
       <ChapterWorkflowLuxe
         key={chapter.id}
         chapter={chapter}
@@ -106,6 +84,11 @@ const ChapterDetailsLuxe = ({
         userEmail={userEmail}
         user={user}
         book={book}
+        bookTitle={bookTitle}
+        chapterTitle={chapterTitle}
+        onBackToStructure={onBackToStructure}
+        onOpenContributors={onOpenContributors}
+        onOpenConfig={onOpenConfig}
         amorceValidated={amorceValidated}
       />
     </>

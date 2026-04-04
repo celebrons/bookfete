@@ -5,34 +5,134 @@ import Step3Invitations from './Step3Invitations';
 import Step4Cloture from './Step4Cloture';
 import '../BookLuxe.css';
 
-const getDefaultActiveStep = ({
-  amorceValidated,
-  hasContributed,
-  contributionsClosed,
-  isClosed,
-  isSoloMode
-}) => {
-  if (!amorceValidated) {
-    return 'step1';
+const hasText = (value) => String(value || '').trim().length > 0;
+const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
+const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
+
+const getVisibleGuestContributions = (chapter, userEmail) => (
+  (Array.isArray(chapter?.contributions) ? chapter.contributions : [])
+    .filter((contribution) =>
+      contribution?.contributor_email !== userEmail &&
+      contribution?.contributor_email !== CHAPTER_STATE_EMAIL &&
+      contribution?.contributor_email !== CHAPTER_DRAFT_EMAIL &&
+      contribution?.is_finalized !== false &&
+      hasText(contribution?.message)
+    )
+    .sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0))
+);
+
+const getContributionDisplayName = (contribution) => (
+  contribution?.contributor_name
+  || contribution?.contributor_email?.split('@')[0]
+  || 'Contributeur'
+);
+
+const getContributionRelation = (contribution) => (
+  contribution?.relation
+  || contribution?.relationship
+  || contribution?.contributor_relation
+  || contribution?.role
+  || ''
+);
+
+const getContributorInitials = (contribution) => {
+  const name = getContributionDisplayName(contribution);
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length === 0) {
+    return 'C';
   }
 
-  if (!hasContributed) {
-    return 'step2';
+  if (parts.length === 1) {
+    return parts[0].slice(0, 1).toUpperCase();
+  }
+
+  return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase();
+};
+
+const getWordCount = (value) => (
+  String(value || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length
+);
+
+const formatContributionDate = (dateValue) => {
+  if (!dateValue) {
+    return '';
+  }
+
+  try {
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: 'numeric',
+      month: 'long'
+    }).format(new Date(dateValue));
+  } catch (error) {
+    return '';
+  }
+};
+
+const getRelativeContributionTime = (dateValue) => {
+  if (!dateValue) {
+    return '';
+  }
+
+  const timestamp = new Date(dateValue).getTime();
+  if (Number.isNaN(timestamp)) {
+    return '';
+  }
+
+  const diffMs = timestamp - Date.now();
+  const diffMinutes = Math.round(diffMs / (1000 * 60));
+  const rtf = new Intl.RelativeTimeFormat('fr-FR', { numeric: 'auto' });
+
+  if (Math.abs(diffMinutes) < 60) {
+    return rtf.format(diffMinutes, 'minute');
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    return rtf.format(diffHours, 'hour');
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  if (Math.abs(diffDays) < 30) {
+    return rtf.format(diffDays, 'day');
+  }
+
+  const diffMonths = Math.round(diffDays / 30);
+  return rtf.format(diffMonths, 'month');
+};
+
+const truncateContribution = (value, maxLength = 260) => {
+  const text = String(value || '').trim().replace(/\s+/g, ' ');
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength).trim()}...`;
+};
+
+const getDefaultActiveStep = ({
+  preparationReady,
+  contributionsClosed,
+  isSoloMode
+}) => {
+  if (!preparationReady) {
+    return 'preparation';
   }
 
   if (isSoloMode) {
-    return 'step4';
+    return 'finalisation';
   }
 
   if (!contributionsClosed) {
-    return 'step3';
+    return 'collecte';
   }
 
-  if (!isClosed) {
-    return 'step4';
-  }
-
-  return 'step4';
+  return 'finalisation';
 };
 
 const ChapterWorkflowLuxe = (props) => {
@@ -42,41 +142,61 @@ const ChapterWorkflowLuxe = (props) => {
     book,
     onUpdateChapter,
     onSaveContribution,
-    onFinalizeContribution
+    onFinalizeContribution,
+    bookTitle,
+    chapterTitle,
+    onBackToStructure
   } = props;
 
+  const amorceExists = hasText(chapter?.amorce_text);
   const amorceValidated = Boolean(chapter?.amorce_validated || chapter?.questions_validated);
-  const hasContributed = chapter?.hasContributed || false;
-  const isFinalized = chapter?.isFinalized || false;
-  const invitationsCount = chapter?.invitationsCount || 0;
+  const isFinalized = Boolean(chapter?.isFinalized || chapter?.currentUserContribution?.is_finalized);
   const contributionsClosed = chapter?.contributionsClosed || false;
   const isClosed = chapter?.isChapterClosed || false;
   const chapterDraftStatus = chapter?.chapterDraft?.status || null;
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
+  const guestContributions = getVisibleGuestContributions(chapter, user?.email);
+  const hasGuestContributions = guestContributions.length > 0;
+  const chapterTriggers = Array.isArray(chapter?.triggers) ? chapter.triggers.filter(Boolean).slice(0, 4) : [];
+  const hasDraftActivity = Boolean(
+    chapterDraftStatus
+    || Number(chapter?.chapterDraft?.generationCount || 0) > 0
+    || hasText(chapter?.chapterDraft?.html)
+  );
+  const preparationReady = Boolean(amorceExists && isFinalized);
+  const preparationNeedsRevision = Boolean(
+    !isClosed
+    && (contributionsClosed || hasDraftActivity)
+    && amorceExists
+    && isFinalized
+    && !amorceValidated
+  );
   const completedMarker = '\u2713';
+  const workflowRootRef = useRef(null);
   const [activeStep, setActiveStep] = useState(() =>
     getDefaultActiveStep({
-      amorceValidated,
-      hasContributed,
+      preparationReady,
       contributionsClosed,
-      isClosed,
       isSoloMode
     })
   );
   const previousStateRef = useRef({
-    amorceValidated,
-    hasContributed,
+    preparationReady,
     isFinalized,
     contributionsClosed,
     isClosed,
     isSoloMode
   });
+  const handleOpenModeration = () => {
+    if (typeof props.onLoadContributions === 'function' && chapter?.id) {
+      props.onLoadContributions(chapter.id);
+    }
+  };
 
   useEffect(() => {
     const previousState = previousStateRef.current;
     const progressed =
-      (!previousState.amorceValidated && amorceValidated) ||
-      (!previousState.hasContributed && hasContributed) ||
+      (!previousState.preparationReady && preparationReady) ||
       (!previousState.isFinalized && isFinalized) ||
       (!previousState.contributionsClosed && contributionsClosed) ||
       (!previousState.isClosed && isClosed) ||
@@ -84,126 +204,316 @@ const ChapterWorkflowLuxe = (props) => {
 
     if (progressed) {
       setActiveStep(getDefaultActiveStep({
-        amorceValidated,
-        hasContributed,
+        preparationReady,
         contributionsClosed,
-        isClosed,
         isSoloMode
       }));
     }
 
     previousStateRef.current = {
-      amorceValidated,
-      hasContributed,
+      preparationReady,
       isFinalized,
       contributionsClosed,
       isClosed,
       isSoloMode
     };
-  }, [amorceValidated, hasContributed, isFinalized, contributionsClosed, isClosed, isSoloMode]);
+  }, [preparationReady, isFinalized, contributionsClosed, isClosed, isSoloMode]);
 
   const steps = [
     {
-      key: 'step1',
+      key: 'preparation',
       order: 1,
-      title: 'Amorce du chapitre',
-      completed: amorceValidated,
-      locked: isClosed && !amorceValidated,
+      title: 'Preparation',
+      caption: 'Guide et texte prive',
+      completed: preparationReady,
+      locked: false,
       status: {
-        tone: isClosed && !amorceValidated ? 'is-locked' : (amorceValidated ? 'is-complete' : 'is-todo'),
-        label: isClosed && !amorceValidated ? 'Verrouille' : (amorceValidated ? 'Valide' : 'A faire')
+        tone: preparationNeedsRevision
+          ? 'is-warning'
+          : (preparationReady ? 'is-complete' : 'is-muted'),
+        label: preparationNeedsRevision
+          ? 'A reviser'
+          : (preparationReady ? 'Pret' : 'A faire')
       },
       content: (
-        <Step1Amorce
-          chapter={chapter}
-          user={user}
-          book={book}
-          onUpdateChapter={onUpdateChapter}
-        />
-      )
-    },
-    {
-      key: 'step2',
-      order: 2,
-      title: 'Votre contribution',
-      completed: isFinalized,
-      locked: !amorceValidated || (isClosed && !isFinalized),
-      status: {
-        tone: !amorceValidated
-          ? 'is-locked'
-          : ((isClosed && !isFinalized) ? 'is-locked' : (isFinalized ? 'is-complete' : (hasContributed ? 'is-draft' : 'is-todo'))),
-        label: !amorceValidated
-          ? 'Verrouille'
-          : ((isClosed && !isFinalized) ? 'Verrouille' : (isFinalized ? 'Validee' : (hasContributed ? 'Brouillon' : 'A faire')))
-      },
-      content: amorceValidated ? (
-        <Step2Contribution
-          chapter={chapter}
-          user={user}
-          book={book}
-          onSaveContribution={onSaveContribution}
-          onFinalizeContribution={onFinalizeContribution}
-        />
-      ) : (
-        <div className="workflow-content workflow-empty-state">
-          Validez d abord l amorce du chapitre pour acceder a votre contribution.
+        <div className="workflow-editorial-stage workflow-editorial-stage--spread">
+          <div className="workflow-editorial-spread">
+            <section className="workflow-editorial-page workflow-editorial-page--inspiration">
+              <div className="workflow-editorial-page-head">
+                <span className="workflow-editorial-page-kicker">Page d inspiration</span>
+                <h3 className="workflow-editorial-page-title">Guide d inspiration</h3>
+                <p className="workflow-editorial-page-copy">
+                  Affinez l amorce qui guidera vos invites. Elle donne le ton du chapitre, sans jamais reveler votre texte prive.
+                </p>
+              </div>
+              <Step1Amorce
+                chapter={chapter}
+                user={user}
+                book={book}
+                onUpdateChapter={onUpdateChapter}
+                embedded
+                editorialMode
+              />
+            </section>
+
+            <section className="workflow-editorial-page workflow-editorial-page--creation">
+              <div className="workflow-editorial-page-head">
+                <span className="workflow-editorial-page-kicker">Page de creation</span>
+                <h3 className="workflow-editorial-page-title">Votre texte prive</h3>
+                <p className="workflow-editorial-page-copy">
+                  Ecrivez votre premier regard sur ce chapitre. Cette matiere reste strictement reservee a l organisateur.
+                </p>
+              </div>
+              <Step2Contribution
+                chapter={chapter}
+                user={user}
+                book={book}
+                onSaveContribution={onSaveContribution}
+                onFinalizeContribution={onFinalizeContribution}
+                embedded
+                editorialMode
+              />
+            </section>
+          </div>
         </div>
       )
     },
     ...(!isSoloMode ? [{
-      key: 'step3',
-      order: 3,
-      title: 'Inviter des contributeurs',
+      key: 'collecte',
+      order: 2,
+      title: 'Collecte',
+      caption: 'Invitations et recits',
       completed: contributionsClosed,
-      locked: !hasContributed || (isClosed && !contributionsClosed),
+      locked: !preparationReady,
       status: {
-        tone: !hasContributed
+        tone: !preparationReady
           ? 'is-locked'
-          : ((isClosed && !contributionsClosed) ? 'is-locked' : (contributionsClosed ? 'is-complete' : (invitationsCount > 0 ? 'is-active' : 'is-todo'))),
-        label: !hasContributed
-          ? 'Verrouille'
-          : ((isClosed && !contributionsClosed) ? 'Verrouille' : (contributionsClosed ? 'Clos' : (invitationsCount > 0 ? `${invitationsCount}` : 'A faire')))
+          : (contributionsClosed ? 'is-complete' : 'is-active'),
+        label: !preparationReady
+          ? 'A faire'
+          : (contributionsClosed ? 'Collecte close' : 'Collecte ouverte')
       },
-      content: hasContributed ? (
-        <Step3Invitations
-          {...props}
-          hasContributed={hasContributed}
-        />
+      content: preparationReady ? (
+        <div className="workflow-editorial-stage workflow-editorial-stage--spread">
+          <div className="workflow-editorial-spread workflow-editorial-spread--collecte">
+            <section className="workflow-editorial-page workflow-editorial-page--inspiration workflow-editorial-page--collecte">
+              <div className="workflow-editorial-page-head">
+                <span className="workflow-editorial-page-kicker">Page de collecte</span>
+                <h3 className="workflow-editorial-page-title">Recits et invitations</h3>
+                <p className="workflow-editorial-page-copy">
+                  Ouvrez la collecte une fois votre preparation terminee. Les invites recoivent l inspiration du chapitre, jamais votre texte prive.
+                </p>
+              </div>
+              <Step3Invitations
+                {...props}
+                hasContributed={preparationReady}
+                onOpenModeration={handleOpenModeration}
+                editorialMode
+              />
+            </section>
+            <section className="workflow-editorial-page workflow-editorial-page--creation workflow-editorial-page--collecte-side">
+              <div className="workflow-editorial-page-head">
+                <span className="workflow-editorial-page-kicker">Page de suivi</span>
+                <h3 className="workflow-editorial-page-title">Vie du chapitre</h3>
+                <p className="workflow-editorial-page-copy">
+                  {hasGuestContributions
+                    ? 'Les recits recus prennent place ici au fil de la collecte. Vous voyez le chapitre se remplir a mesure qu il avance.'
+                    : 'Avant les premiers recits, verifiez ici exactement ce que vos invites verront lorsqu ils ouvriront leur page de contribution.'}
+                </p>
+              </div>
+              {hasGuestContributions ? (
+                <div className="workflow-collecte-activity-feed">
+                  <div className="workflow-collecte-activity-head">
+                    <span className="workflow-collecte-activity-kicker">Activite recente</span>
+                    <span className="workflow-collecte-activity-count">
+                      {guestContributions.length} recit{guestContributions.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="workflow-collecte-activity-list">
+                    {guestContributions.map((contribution) => (
+                      <button
+                        key={contribution.id}
+                        type="button"
+                        className="workflow-collecte-activity-card"
+                        onClick={handleOpenModeration}
+                        title="Ouvrir la moderation des recits"
+                      >
+                        <header className="workflow-collecte-activity-card-head">
+                          <span className="workflow-collecte-activity-avatar" aria-hidden="true">
+                            {getContributorInitials(contribution)}
+                          </span>
+                          <div className="workflow-collecte-activity-identity">
+                            <strong>{getContributionDisplayName(contribution)}</strong>
+                            {getContributionRelation(contribution) ? (
+                              <span>({getContributionRelation(contribution)})</span>
+                            ) : null}
+                          </div>
+                        </header>
+                        <p className="workflow-collecte-activity-excerpt">
+                          {truncateContribution(contribution.message)}
+                        </p>
+                        <footer className="workflow-collecte-activity-footer">
+                          <span>{getWordCount(contribution.message)} mots</span>
+                          {getRelativeContributionTime(contribution.created_at) ? (
+                            <span>{getRelativeContributionTime(contribution.created_at)}</span>
+                          ) : (formatContributionDate(contribution.created_at) ? (
+                            <span>{formatContributionDate(contribution.created_at)}</span>
+                          ) : null)}
+                        </footer>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="workflow-collecte-mirror">
+                  <div className="workflow-collecte-mirror-head">
+                    <span className="workflow-collecte-mirror-kicker">Miroir contributeur</span>
+                    <span className="workflow-collecte-mirror-note">Lecture seule</span>
+                  </div>
+                  <div className="amorce-callout contributor-preview-callout is-editorial workflow-collecte-mirror-callout">
+                    <span className="amorce-display-text">
+                      {chapter?.amorce_text || 'Les invites verront ici la phrase d ouverture du chapitre.'}
+                    </span>
+                  </div>
+                  {chapterTriggers.length > 0 ? (
+                    <div className="amorce-trigger-block contributor-preview-trigger-block workflow-collecte-mirror-triggers">
+                      <div className="amorce-trigger-label">Mots-cles</div>
+                      <div className="amorce-trigger-row">
+                        {chapterTriggers.map((trigger) => (
+                          <span key={trigger} className="amorce-trigger-pill is-editorial">
+                            <span>{trigger}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="contributor-preview-field workflow-collecte-mirror-field">
+                    <label className="chapter-prompt-admin-label">Espace de reponse</label>
+                    <textarea
+                      className="input-luxe contributor-preview-textarea"
+                      readOnly
+                      value=""
+                      placeholder="Continuez a votre facon - une phrase, un paragraphe, tout est bienvenu."
+                    />
+                    <div className="contributor-preview-count">Champ vide cote invite</div>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
       ) : (
-        <div className="workflow-content workflow-empty-state">
-          Finalisez d abord votre contribution (etape 2) pour inviter des participants.
+        <div className="workflow-editorial-stage workflow-editorial-stage--single">
+          <div className="workflow-empty-state workflow-editorial-empty">
+            Finalisez d abord la preparation editoriale pour ouvrir la collecte.
+          </div>
         </div>
       )
     }] : []),
     {
-      key: 'step4',
-      order: 4,
-      title: 'Clore le chapitre',
+      key: 'finalisation',
+      order: isSoloMode ? 2 : 3,
+      title: 'Finalisation',
+      caption: 'Rendu et cloture',
       completed: isClosed,
       locked: false,
       status: {
-        tone: isClosed ? 'is-complete' : (chapterDraftStatus === 'draft' ? 'is-draft' : 'is-muted'),
-        label: isClosed ? 'Clotur\u00e9' : (chapterDraftStatus === 'draft' ? 'Brouillon' : '')
+        tone: isClosed
+          ? 'is-complete'
+          : (preparationNeedsRevision ? 'is-warning' : (chapterDraftStatus === 'draft' ? 'is-draft' : 'is-muted')),
+        label: isClosed
+          ? 'Chapitre cloture'
+          : (preparationNeedsRevision ? 'A reviser' : (chapterDraftStatus === 'draft' ? 'En cours' : 'A faire'))
       },
-      content: <Step4Cloture {...props} />
+      content: (
+        <div className="workflow-editorial-stage workflow-editorial-stage--single">
+          <div className="workflow-editorial-stage-intro">
+            <span className="workflow-editorial-stage-kicker">Phase 3</span>
+            <h3 className="workflow-editorial-stage-title">Finalisation</h3>
+            <p className="workflow-editorial-stage-copy">
+              Une fois la collecte close, le chapitre entre en finalisation. L inspiration et le texte prive se figent pour garantir un rendu coherent.
+            </p>
+          </div>
+          <Step4Cloture
+            {...props}
+            amorceExists={amorceExists}
+            amorceValidated={amorceValidated}
+            preparationNeedsRevision={preparationNeedsRevision}
+            organizerContributionReady={isFinalized}
+          />
+        </div>
+      )
     }
   ];
 
   useEffect(() => {
-    if (!isSoloMode || activeStep !== 'step3') {
+    if (!isSoloMode || activeStep !== 'collecte') {
       return;
     }
 
     setActiveStep(getDefaultActiveStep({
-      amorceValidated,
-      hasContributed,
+      preparationReady,
       contributionsClosed,
-      isClosed,
       isSoloMode
     }));
-  }, [activeStep, isSoloMode, amorceValidated, hasContributed, contributionsClosed, isClosed]);
+  }, [activeStep, isSoloMode, preparationReady, contributionsClosed]);
 
   const activeStepConfig = steps.find((step) => step.key === activeStep) || steps[0];
+  const triggerActionInsideWorkflow = (selector) => {
+    const button = workflowRootRef.current?.querySelector(selector);
+    if (button instanceof HTMLButtonElement && !button.disabled) {
+      button.click();
+    }
+  };
+
+  const handlePrimaryTopbarAction = () => {
+    if (activeStep === 'preparation') {
+      const saveButton = workflowRootRef.current?.querySelector('[data-workflow-action="save-contribution"]');
+      if (saveButton instanceof HTMLButtonElement && !saveButton.disabled) {
+        saveButton.click();
+        return;
+      }
+
+      if (!isFinalized) {
+        triggerActionInsideWorkflow('[data-workflow-action="finalize-contribution"]');
+        return;
+      }
+
+      if (!amorceValidated) {
+        triggerActionInsideWorkflow('[data-workflow-action="validate-amorce"]');
+      }
+      return;
+    }
+
+    if (activeStep === 'collecte') {
+      triggerActionInsideWorkflow('[data-workflow-action="close-collection"]');
+      return;
+    }
+
+    triggerActionInsideWorkflow('[data-workflow-action="generate-chapter"]');
+  };
+
+  const primaryAction = (() => {
+    if (activeStep === 'preparation') {
+      return {
+        label: 'Valider →',
+        disabled: isClosed || (isFinalized && amorceValidated)
+      };
+    }
+
+    if (activeStep === 'collecte') {
+      return {
+        label: 'Clore la collecte →',
+        disabled: isClosed || contributionsClosed || !preparationReady
+      };
+    }
+
+    return {
+      label: 'Generer le chapitre →',
+      disabled: isClosed || preparationNeedsRevision
+    };
+  })();
+
   const getStepVisualState = (step) => {
     if (activeStep === step.key) {
       return 'current';
@@ -218,37 +528,67 @@ const ChapterWorkflowLuxe = (props) => {
   };
 
   return (
-    <div className="workflow-layout" style={{ marginBottom: 'var(--space-xl)' }}>
-      <aside className="workflow-steps-nav" aria-label="Etapes du chapitre">
-        <div className="workflow-steps-heading">
-          <h3 className="workflow-steps-heading-title">Etapes</h3>
+    <div ref={workflowRootRef} className="workflow-editorial-shell" style={{ marginBottom: 'var(--space-xl)' }}>
+      <div className="chapter-editor-topbar">
+        <div className="chapter-editor-topbar-left">
+          <button
+            type="button"
+            className="chapter-editor-backlink"
+            onClick={onBackToStructure}
+          >
+            Retour structure
+          </button>
+          <span className="chapter-editor-book-title">{bookTitle || book?.title || 'Livre'}</span>
         </div>
-        <ol className="workflow-steps-stair">
-          {steps.map((step) => (
-            <li
-              key={step.key}
-              className="workflow-steps-stair-item"
-            >
-              <button
-                type="button"
-                className={`workflow-stair-step is-${getStepVisualState(step)}`}
-                onClick={() => setActiveStep(step.key)}
-                aria-current={activeStep === step.key ? 'step' : undefined}
-              >
-                <span className="workflow-stair-marker">{step.completed ? completedMarker : `${step.order}`}</span>
-                <span className="workflow-stair-main">
-                  <span className="workflow-stair-title" title={step.title}>{step.title}</span>
-                </span>
-                <span className={`workflow-stair-status ${step.status.tone}`}>
-                  {step.status.label || 'A faire'}
-                </span>
-              </button>
+        <div className="chapter-editor-topbar-center">
+          <strong className="chapter-editor-chapter-title">{chapterTitle || chapter?.title || 'Chapitre'}</strong>
+        </div>
+        <div className="chapter-editor-topbar-right">
+          <button
+            type="button"
+            className="chapter-editor-primary-action"
+            onClick={handlePrimaryTopbarAction}
+            disabled={primaryAction.disabled}
+          >
+            {primaryAction.label}
+          </button>
+        </div>
+      </div>
+      <div className="workflow-stepper-wrap">
+        <ol className="workflow-stepper" aria-label="Parcours editorial du chapitre">
+          {steps.map((step, index) => (
+            <li key={step.key} className="workflow-stepper-item">
+              {(() => {
+                const visualState = getStepVisualState(step);
+
+                return (
+                  <>
+                    <button
+                      type="button"
+                      className={`workflow-stepper-button is-${visualState}`}
+                      onClick={() => setActiveStep(step.key)}
+                      aria-current={activeStep === step.key ? 'step' : undefined}
+                    >
+                      <span className="workflow-stepper-index">{step.completed ? completedMarker : `${step.order}`}</span>
+                      <span className="workflow-stepper-copy">
+                        <span className="workflow-stepper-label">{step.title}</span>
+                        {step.caption ? (
+                          <span className="workflow-stepper-caption">{step.caption}</span>
+                        ) : null}
+                      </span>
+                    </button>
+                    {index < steps.length - 1 ? (
+                      <span className={`workflow-stepper-rail is-${visualState}`} aria-hidden="true" />
+                    ) : null}
+                  </>
+                );
+              })()}
             </li>
           ))}
         </ol>
-      </aside>
+      </div>
 
-      <section className="workflow-detail-panel">
+      <section className="workflow-editorial-canvas">
         <div key={activeStep} className="workflow-detail-stage">
           {activeStepConfig.content}
         </div>

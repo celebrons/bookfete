@@ -1,10 +1,15 @@
-// C:\Users\USER\bookfete\frontend\src\components\book\chapters\ChapterInvitationsLuxe.js
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import Tooltip from '../../ui/Tooltip';
 import '../BookLuxe.css';
 
-const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshToken = 0 }) => {
+const ChapterInvitationsLuxe = ({
+  chapterId,
+  bookId,
+  isClosed = false,
+  refreshToken = 0,
+  editorialMode = false
+}) => {
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -42,7 +47,7 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
       if (!hasLoadedOnce && !silent) {
         setLoading(true);
       }
-      
+
       const { data, error } = await supabase
         .from('chapter_invites')
         .select(`
@@ -119,22 +124,21 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
 
       setInvitations(invitationsWithContributions || []);
       setHasLoadedOnce(true);
-      
+
       const total = invitationsWithContributions.length;
-      const responded = invitationsWithContributions.filter(i => i.hasSubmittedContribution).length;
+      const responded = invitationsWithContributions.filter((invite) => invite.hasSubmittedContribution).length;
       const approved = invitationsWithContributions.filter(
-        i => i.hasSubmittedContribution && i.contribution && i.contribution[0]?.approved
+        (invite) => invite.hasSubmittedContribution && invite.contribution && invite.contribution[0]?.approved
       ).length;
-      
+
       setStats({
         total,
         responded,
         approved,
         pending: total - responded
       });
-
     } catch (error) {
-      console.error('❌ Erreur chargement invitations:', error);
+      console.error('Error loading invitations:', error);
     } finally {
       setLoading(false);
     }
@@ -173,13 +177,15 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
     setFeedback(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
       const token = session?.access_token;
 
       const response = await fetch(`${apiBaseUrl}/invites/resend/${confirmReminderId}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`
         }
       });
 
@@ -219,7 +225,7 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
   const getStatusBadge = (invite) => {
     if (invite.isRevisionRequested) {
       return {
-        text: 'Modification demandée',
+        text: 'Modification demandee',
         className: 'status-responded'
       };
     }
@@ -227,10 +233,11 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
     if (invite.hasSubmittedContribution) {
       const isApproved = invite.contribution && invite.contribution[0]?.approved;
       return {
-        text: isApproved ? 'Approuvée' : 'En attente de validation',
+        text: isApproved ? 'Approuvee' : 'En attente de validation',
         className: isApproved ? 'status-approved' : 'status-responded'
       };
     }
+
     return {
       text: 'En attente',
       className: 'status-pending'
@@ -240,23 +247,34 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
   if (loading) {
     return (
       <div style={{ marginTop: 'var(--space-xl)', textAlign: 'center' }}>
-        <div className="spinner" style={{
-          border: '2px solid var(--mist)',
-          borderTop: '2px solid var(--gold)',
-          borderRadius: '50%',
-          width: '30px',
-          height: '30px',
-          animation: 'spin 1s linear infinite',
-          margin: '0 auto'
-        }} />
+        <div
+          className="spinner"
+          style={{
+            border: '2px solid var(--mist)',
+            borderTop: '2px solid var(--gold)',
+            borderRadius: '50%',
+            width: '30px',
+            height: '30px',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto'
+          }}
+        />
       </div>
     );
   }
 
   if (invitations.length === 0) {
+    if (editorialMode) {
+      return (
+        <div className="workflow-collecte-list-empty">
+          Aucun invite pour le moment. La collecte commencera des que vous enverrez vos premieres invitations.
+        </div>
+      );
+    }
+
     return (
       <div className="empty-state" style={{ padding: 'var(--space-xl)' }}>
-        <div className="empty-state-icon">📭</div>
+        <div className="empty-state-icon">+</div>
         <h3>Aucune invitation</h3>
         <p>Aucune invitation pour ce chapitre</p>
       </div>
@@ -266,54 +284,62 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
   return (
     <div>
       {feedback?.message && (
-        <div className={`luxe-feedback-banner is-${feedback.type || 'info'}`}>
+        <div className={editorialMode ? 'workflow-collecte-note' : `luxe-feedback-banner is-${feedback.type || 'info'}`}>
           <span>{feedback.message}</span>
-          <button
-            type="button"
-            className="luxe-feedback-close"
-            onClick={() => setFeedback(null)}
-            aria-label="Fermer le message"
-          >
-            x
-          </button>
+          {!editorialMode ? (
+            <button
+              type="button"
+              className="luxe-feedback-close"
+              onClick={() => setFeedback(null)}
+              aria-label="Fermer le message"
+            >
+              x
+            </button>
+          ) : null}
         </div>
       )}
 
-      <div className="invitations-header">
+      <div className={`invitations-header ${editorialMode ? 'is-editorial' : ''}`}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--ink)' }}>
-            Contributeurs invités
+            Invitations en cours
           </h3>
-          <Tooltip text="Total / Répondues / Approuvées / En attente">
-            <span style={{ color: 'var(--gold)', cursor: 'help' }}>ⓘ</span>
+          <Tooltip text="Total / Repondues / Approuvees / En attente">
+            <span style={{ color: 'var(--gold)', cursor: 'help' }}>i</span>
           </Tooltip>
         </div>
-        <div className="invitations-stats">
-          <span style={{ color: 'var(--ink)' }}>
-            <strong>{stats.total}</strong> invités
-          </span>
-          <span style={{ color: 'var(--gold)' }}>
-            <strong>{stats.responded}</strong> répondues
-          </span>
-          <span style={{ color: 'var(--gold)' }}>
-            <strong>{stats.approved}</strong> approuvées
-          </span>
-          {stats.pending > 0 && (
-            <span style={{ color: 'var(--text-light)' }}>
-              <strong>{stats.pending}</strong> en attente
+        {!editorialMode ? (
+          <div className="invitations-stats">
+            <span style={{ color: 'var(--ink)' }}>
+              <strong>{stats.total}</strong> invites
             </span>
-          )}
-        </div>
+            <span style={{ color: 'var(--gold)' }}>
+              <strong>{stats.responded}</strong> repondues
+            </span>
+            <span style={{ color: 'var(--gold)' }}>
+              <strong>{stats.approved}</strong> approuvees
+            </span>
+            {stats.pending > 0 ? (
+              <span style={{ color: 'var(--text-light)' }}>
+                <strong>{stats.pending}</strong> en attente
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <div className="workflow-collecte-inline-summary">
+            {stats.total} invite{stats.total > 1 ? 's' : ''}
+          </div>
+        )}
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className={editorialMode ? 'workflow-collecte-invitation-list' : 'card'} style={{ padding: 0, overflow: 'hidden' }}>
         {invitations.map((invite, index) => {
           const status = getStatusBadge(invite);
-          
+
           return (
             <div
               key={invite.id}
-              className="invitation-item"
+              className={`invitation-item ${editorialMode ? 'is-editorial' : ''}`}
               style={{
                 borderBottom: index < invitations.length - 1 ? 'var(--border-fine)' : 'none',
                 marginBottom: 0,
@@ -326,26 +352,28 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
                     <span className="invitation-name">
-                      {invite.contributor?.name || invite.email?.split('@')[0] || 'Invité'}
+                      {invite.contributor?.name || invite.email?.split('@')[0] || 'Invite'}
                     </span>
-                    <span className={`invitation-status ${status.className}`}>
+                    <span className={`invitation-status ${status.className} ${editorialMode ? 'is-editorial' : ''}`}>
                       {status.text}
                     </span>
                   </div>
-                  <div style={{
-                    fontSize: '12px',
-                    color: 'var(--text-light)',
-                    display: 'flex',
-                    gap: 'var(--space-sm)',
-                    flexWrap: 'wrap'
-                  }}>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: 'var(--text-light)',
+                      display: 'flex',
+                      gap: 'var(--space-sm)',
+                      flexWrap: 'wrap'
+                    }}
+                  >
                     <span>{invite.email}</span>
                     <span>{formatDate(invite.created_at)}</span>
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: 'var(--space-xs)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  {!invite.hasSubmittedContribution && !isClosed && (
+                  {!invite.hasSubmittedContribution && !isClosed ? (
                     <>
                       <button
                         onClick={() => handleCopyInviteLink(invite.token)}
@@ -369,29 +397,31 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
                         {reminding === invite.id ? '...' : 'Relancer'}
                       </button>
                     </>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
-              {invite.last_reminder_sent && (
-                <div style={{
-                  marginTop: 'var(--space-xs)',
-                  fontSize: '11px',
-                  color: 'var(--gold)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+              {invite.last_reminder_sent ? (
+                <div
+                  style={{
+                    marginTop: 'var(--space-xs)',
+                    fontSize: '11px',
+                    color: 'var(--gold)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
                   <span>↻</span>
-                  Dernière relance : {formatDate(invite.last_reminder_sent)}
+                  Derniere relance : {formatDate(invite.last_reminder_sent)}
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}
       </div>
 
-      {confirmReminderId && (
+      {confirmReminderId ? (
         <div
           className="modal-overlay"
           onClick={() => {
@@ -428,7 +458,7 @@ const ChapterInvitationsLuxe = ({ chapterId, bookId, isClosed = false, refreshTo
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

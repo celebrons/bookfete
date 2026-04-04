@@ -209,7 +209,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
   const [validation, setValidation] = useState(null);
   const [missingVariables, setMissingVariables] = useState([]);
   const [compiledPromptText, setCompiledPromptText] = useState('');
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   const requestJson = useCallback(async (path, options = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -344,6 +344,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
   const statusLabel = activeTemplate?.version
     ? `Version active v${activeTemplate.version}`
     : 'Version active';
+  const collapsedCtaLabel = 'Tester le prompt creation chapitre';
 
   const handleTest = async () => {
     if (!chapter?.id) return;
@@ -459,6 +460,20 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
 
   return (
     <div className="chapter-prompt-admin-panel">
+      {!isOpen && (
+        <div className="chapter-prompt-admin-collapsed">
+          <button
+            type="button"
+            className="btn btn-outline chapter-prompt-admin-reveal"
+            onClick={() => setIsOpen(true)}
+          >
+            {collapsedCtaLabel}
+          </button>
+        </div>
+      )}
+
+      {isOpen && (
+        <>
       <div className="chapter-prompt-admin-header">
         <div>
           <h5 className="chapter-prompt-admin-title">Generation du chapitre</h5>
@@ -487,8 +502,6 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
       {error && <div className="luxe-feedback-banner is-error">{error}</div>}
       {notice && <div className="luxe-feedback-banner is-success">{notice}</div>}
 
-      {isOpen && (
-        <>
       <div className="chapter-prompt-admin-section">
         <div className="chapter-prompt-admin-label">Variables utilisees par ce prompt</div>
         <p className="chapter-prompt-admin-helper">

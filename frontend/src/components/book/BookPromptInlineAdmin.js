@@ -209,6 +209,20 @@ const inferPanelSubtitleFromEndpoint = (endpointBase = '') => {
   return 'Testez des directives simples sans quitter cette page, puis activez la version si le rendu convient.';
 };
 
+const inferCollapsedCtaLabel = (title = '') => {
+  const normalized = normalizeText(title).toLowerCase();
+  if (normalized.includes('titres de chapitres')) {
+    return 'Tester le prompt creation titres chapitres';
+  }
+  if (normalized.includes('introduction')) {
+    return 'Tester le prompt creation introduction';
+  }
+  if (normalized.includes('epilogue') || normalized.includes('conclusion')) {
+    return 'Tester le prompt creation epilogue';
+  }
+  return 'Tester le prompt';
+};
+
 const copyTextToClipboard = async (text = '') => {
   const content = String(text || '');
   if (!content.trim()) {
@@ -258,7 +272,7 @@ const BookPromptInlineAdmin = ({
   const [validation, setValidation] = useState(null);
   const [missingVariables, setMissingVariables] = useState([]);
   const [compiledPromptText, setCompiledPromptText] = useState('');
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   const resolvedPanelTitle = useMemo(
     () => normalizeText(panelTitle) || inferPanelTitleFromEndpoint(endpointBase),
@@ -268,6 +282,10 @@ const BookPromptInlineAdmin = ({
   const resolvedPanelSubtitle = useMemo(
     () => normalizeText(panelSubtitle) || inferPanelSubtitleFromEndpoint(endpointBase),
     [panelSubtitle, endpointBase]
+  );
+  const collapsedCtaLabel = useMemo(
+    () => inferCollapsedCtaLabel(resolvedPanelTitle),
+    [resolvedPanelTitle]
   );
 
   const requestJson = useCallback(async (path, options = {}) => {
@@ -527,6 +545,20 @@ const BookPromptInlineAdmin = ({
 
   return (
     <div className={`chapter-prompt-admin-panel ${className}`.trim()}>
+      {!isOpen && (
+        <div className="chapter-prompt-admin-collapsed">
+          <button
+            type="button"
+            className="btn btn-outline chapter-prompt-admin-reveal"
+            onClick={() => setIsOpen(true)}
+          >
+            {collapsedCtaLabel}
+          </button>
+        </div>
+      )}
+
+      {isOpen && (
+        <>
       <div className="chapter-prompt-admin-header">
         <div>
           <h5 className="chapter-prompt-admin-title">{resolvedPanelTitle}</h5>
@@ -550,8 +582,6 @@ const BookPromptInlineAdmin = ({
 
       <PromptTestingGuide currentAreaLabel={resolvedPanelTitle} />
 
-      {isOpen && (
-        <>
       <div className="chapter-prompt-admin-section">
         <div className="chapter-prompt-admin-label">Variables utilisees par ce prompt</div>
         <p className="chapter-prompt-admin-helper">

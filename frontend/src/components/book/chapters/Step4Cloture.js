@@ -207,7 +207,10 @@ const Step4Cloture = ({
   chaptersCount,
   user,
   book,
+  amorceExists,
   amorceValidated,
+  preparationNeedsRevision,
+  organizerContributionReady,
   hasContributed,
   invitations,
   onGenerateChapterDraft,
@@ -231,20 +234,14 @@ const Step4Cloture = ({
   const isSoloMode = Boolean(book?.cover_config?.soloMode);
   const contributionsClosed = chapter?.contributionsClosed || false;
   const chapterLocked = chapter?.isChapterClosed || false;
-  const generationUnlocked = !chapterLocked && (isSoloMode || contributionsClosed);
-  const showContributionsGateWarning = !chapterLocked && !isSoloMode && !contributionsClosed;
   const chapterDraft = chapter?.chapterDraft || null;
   const draftStatus = chapterDraft?.status || 'idle';
   const isDraftValidated = draftStatus === 'validated';
   const generationCount = Number(chapterDraft?.generationCount || 0);
   const maxGenerations = Number(chapterDraft?.maxGenerations || 3);
   const remainingGenerations = Math.max(0, maxGenerations - generationCount);
-  const questionsReady = Boolean(
-    chapter?.amorce_validated
-    || chapter?.questions_validated
-    || amorceValidated
-  );
-  const contributionReady = Boolean(chapter?.hasContributed ?? hasContributed);
+  const questionsReady = Boolean(amorceExists);
+  const contributionReady = Boolean(organizerContributionReady ?? chapter?.isFinalized ?? hasContributed);
   const fallbackVisibleContributions = Array.isArray(chapter?.contributions)
     ? chapter.contributions.filter(
         (contribution) =>
@@ -296,6 +293,13 @@ const Step4Cloture = ({
   const canGoToPreviousPreviewSpread = currentPreviewSpreadIndex > 0;
   const canGoToNextPreviewSpread = currentPreviewSpreadIndex < previewSpreadCount - 1;
   const hasDraftContent = Boolean(previewHtml || normalizedText);
+  const missingGenerationRequirements = [
+    !amorceExists ? 'une inspiration definie' : null,
+    !contributionReady ? 'votre texte prive valide' : null,
+    (!isSoloMode && !contributionsClosed) ? 'une collecte close' : null
+  ].filter(Boolean);
+  const generationUnlocked = !chapterLocked && missingGenerationRequirements.length === 0;
+  const showContributionsGateWarning = !chapterLocked && missingGenerationRequirements.length > 0;
   const canGenerateWithAI = isDraftValidated
     ? true
     : (generationUnlocked && remainingGenerations > 0);
@@ -315,15 +319,15 @@ const Step4Cloture = ({
   const summaryCards = [
     {
       key: 'questions',
-      label: 'Amorce',
-      value: questionsReady ? 'OK' : 'A faire',
+      label: 'Inspiration',
+      value: preparationNeedsRevision ? 'A reviser' : (questionsReady ? 'Prete' : 'A definir'),
       tone: questionsReady ? 'ok' : 'pending',
       icon: 'questions'
     },
     {
       key: 'contribution',
-      label: 'Votre contribution',
-      value: contributionReady ? 'Prete' : 'A faire',
+      label: 'Texte prive',
+      value: contributionReady ? 'Valide' : 'A valider',
       tone: contributionReady ? 'ok' : 'pending',
       icon: 'contribution'
     },
@@ -350,8 +354,8 @@ const Step4Cloture = ({
     } : null,
     !isSoloMode ? {
       key: 'flow',
-      label: 'Flux contributeurs',
-      value: contributionsClosed ? 'Clos' : 'Ouvert',
+      label: 'Collecte',
+      value: contributionsClosed ? 'Close' : 'Ouverte',
       tone: contributionsClosed ? 'ok' : 'pending',
       icon: 'flow'
     } : null
@@ -580,12 +584,12 @@ const Step4Cloture = ({
     }
 
     if (!generationUnlocked && !previewOnlyRegeneration) {
-      setError('Fermez d abord les contributions avant de generer le brouillon de ce chapitre.');
+      setError(`Le rendu ne peut pas etre genere tant que ces points ne sont pas prets : ${missingGenerationRequirements.join(', ')}.`);
       return;
     }
 
     if (typeof onGenerateChapterDraft !== 'function') {
-      setError('La generation du chapitre est indisponible.');
+      setError('La generation du rendu est indisponible.');
       return;
     }
 
@@ -611,11 +615,11 @@ const Step4Cloture = ({
         setNotice('Nouvelle version de comparaison generee. La version finale reste verrouillee.');
         setShowPreviewModal(true);
       } else {
-        setNotice('Chapitre genere. Vous pouvez relire et ajuster le texte avant validation.');
+        setNotice('Rendu genere. Vous pouvez relire et ajuster le texte avant la cloture du chapitre.');
         setShowEditorModal(true);
       }
     } catch (generationError) {
-      setError(generationError.message || 'Erreur lors de la generation du chapitre.');
+      setError(generationError.message || 'Erreur lors de la generation du rendu.');
     } finally {
       setBusyAction('');
     }
@@ -667,17 +671,17 @@ const Step4Cloture = ({
     }
 
     if (!generationUnlocked) {
-      setError('Fermez d abord les contributions avant la validation finale.');
+      setError(`Le chapitre ne peut pas etre cloture tant que ces points ne sont pas prets : ${missingGenerationRequirements.join(', ')}.`);
       return;
     }
 
     if (!htmlToPersist) {
-      setError('Generez ou revisez le brouillon avant la validation finale.');
+      setError('Generez ou revisez le rendu avant de clore le chapitre.');
       return;
     }
 
     if (typeof onFinalizeChapterDraft !== 'function') {
-      setError('La validation finale est indisponible.');
+      setError('La cloture du chapitre est indisponible.');
       return;
     }
 
@@ -690,7 +694,7 @@ const Step4Cloture = ({
     const htmlToPersist = buildHtmlToPersist();
 
     if (!htmlToPersist) {
-      setError('Generez ou revisez le brouillon avant la validation finale.');
+      setError('Generez ou revisez le rendu avant de clore le chapitre.');
       return;
     }
 
@@ -707,9 +711,9 @@ const Step4Cloture = ({
       if (result?.draft?.aiQuality) {
         setDraftQualityForPreview(result.draft.aiQuality);
       }
-      setNotice('Le chapitre a ete valide definitivement et ferme.');
+      setNotice('Le chapitre a ete cloture et verrouille.');
     } catch (finalizeError) {
-      setError(finalizeError.message || 'Erreur lors de la validation finale.');
+      setError(finalizeError.message || 'Erreur lors de la cloture du chapitre.');
     } finally {
       setBusyAction('');
       setShowFinalizeConfirm(false);
@@ -764,41 +768,43 @@ const Step4Cloture = ({
 
       {showContributionsGateWarning && (
         <div className="card chapter-draft-warning-card">
-          Fermez d abord les contributions a l etape 3. Les commentaires non valides ne sont jamais pris en compte
-          dans cette generation.
+          Generation du rendu disponible une fois ces points prets : {missingGenerationRequirements.join(', ')}.
         </div>
       )}
 
       <div className="card chapter-draft-workbench-card">
         <div className="chapter-draft-workbench-header">
           <div>
-            <h4 className="chapter-draft-workbench-title">Atelier du chapitre</h4>
+            <h4 className="chapter-draft-workbench-title">Finalisation editoriale</h4>
             <p className="chapter-draft-workbench-subtitle">
-              8 pages HTML. Regeneration IA limitee a 3 essais, puis revision manuelle et validation finale.
+              Le rendu final se construit a partir d une inspiration prete, de votre texte prive valide et d une collecte close.
             </p>
           </div>
           <div className="chapter-draft-chip-row">
             <span className={`chapter-draft-chip ${isDraftValidated ? 'is-success' : 'is-neutral'}`}>
-              {isDraftValidated ? 'Version finale verrouillee' : (chapterDraft ? 'Brouillon modifiable' : 'A generer')}
+              {isDraftValidated
+                ? 'Chapitre cloture'
+                : (preparationNeedsRevision ? 'A reviser' : (chapterDraft ? 'Version de travail' : 'Pret a generer'))}
             </span>
             <span className="chapter-draft-chip is-gold">
-              IA {generationCount}/{maxGenerations}
+              Essais {generationCount}/{maxGenerations}
             </span>
             {latestDraftTimestamp && (
               <span className="chapter-draft-chip is-muted">
-                Maj {new Date(latestDraftTimestamp).toLocaleString('fr-FR')}
+                Mis a jour {new Date(latestDraftTimestamp).toLocaleString('fr-FR')}
               </span>
             )}
           </div>
         </div>
 
         <div className="chapter-draft-action-row">
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={handleGenerate}
-            disabled={!canGenerateWithAI || busyAction !== ''}
-          >
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={handleGenerate}
+              disabled={!canGenerateWithAI || busyAction !== ''}
+              data-workflow-action="generate-chapter"
+            >
             {busyAction === 'generate'
               ? 'Generation...'
               : (
@@ -806,8 +812,8 @@ const Step4Cloture = ({
                   ? 'Regenerer pour comparer'
                   : (
                     generationCount > 0
-                      ? `Regenerer le chapitre (${remainingGenerations} restant${remainingGenerations > 1 ? 's' : ''})`
-                      : 'Generer le chapitre'
+                      ? `Regenerer le rendu (${remainingGenerations} restant${remainingGenerations > 1 ? 's' : ''})`
+                      : 'Generer le rendu'
                   )
               )}
           </button>
@@ -827,18 +833,18 @@ const Step4Cloture = ({
             <button
               type="button"
               className="btn btn-primary"
-              onClick={requestFinalize}
-              disabled={!canFinalize || busyAction !== ''}
-            >
-              {busyAction === 'finalize' ? 'Validation...' : 'Validation finale'}
-            </button>
-          )}
+            onClick={requestFinalize}
+            disabled={!canFinalize || busyAction !== ''}
+          >
+            {busyAction === 'finalize' ? 'Cloture...' : 'Clore le chapitre'}
+          </button>
+        )}
         </div>
 
         {hasAiQualityScore && (
           <div className="chapter-draft-quality-box">
             <div className="chapter-draft-quality-header">
-              <span>aiQuality</span>
+              <span>Qualite du rendu</span>
               <strong>{Math.max(0, Math.min(100, Math.round(aiQualityScore)))}/100</strong>
             </div>
             {aiQualityIssues.length > 0 && (
@@ -996,7 +1002,7 @@ const Step4Cloture = ({
             className="modal-content modal-content-compact"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 className="modal-title">Validation finale</h3>
+            <h3 className="modal-title">Clore le chapitre</h3>
             <p className="modal-text">
               Cette action verrouille definitivement le chapitre et ferme son edition.
             </p>
@@ -1015,7 +1021,7 @@ const Step4Cloture = ({
                 onClick={handleFinalize}
                 disabled={busyAction === 'finalize'}
               >
-                {busyAction === 'finalize' ? 'Validation...' : 'Confirmer'}
+                {busyAction === 'finalize' ? 'Cloture...' : 'Confirmer la cloture'}
               </button>
             </div>
           </div>

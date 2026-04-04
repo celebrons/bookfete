@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import BookWorkspaceHeader from './BookWorkspaceHeader';
 import './BookLuxe.css';
 import '../../styles/luxe-theme.css';
 
@@ -52,6 +53,8 @@ const formatEuro = (value) => Number(value || 0).toLocaleString('fr-FR', {
 const BookConfigLuxe = ({
   book,
   onUpdateBook,
+  bookTitle = '',
+  onOpenTab,
   chaptersCount = 6,
   onPagesChange,
   onOpenBookPreview,
@@ -112,21 +115,6 @@ const BookConfigLuxe = ({
   const requiresChapterReductionConfirmation = willChaptersChange
     && isChapterReduction
     && formData.pages !== currentBookSnapshot.pages;
-
-  const priceBreakdown = useMemo(() => {
-    const extraPages = Math.max(0, formData.pages - DEFAULT_PRICE_PAGES_BASELINE);
-    const extraPagesAmount = extraPages * EXTRA_PAGE_PRICE;
-    const subtotal = selectedFinition.basePrice + extraPagesAmount;
-    const withPaper = subtotal * selectedPapier.multiplier;
-    const withStyle = withPaper * selectedStyle.multiplier;
-    return {
-      extraPages,
-      extraPagesAmount,
-      subtotal,
-      withPaper,
-      withStyle
-    };
-  }, [formData.pages, selectedFinition.basePrice, selectedPapier.multiplier, selectedStyle.multiplier]);
 
   const hasPendingChanges = useMemo(() => (
     formData.title !== currentBookSnapshot.title
@@ -247,20 +235,15 @@ const BookConfigLuxe = ({
 
   return (
     <div className="book-config-live">
-      <div className="book-config-live-head">
-        <div>
-          <span className="label-gold">Configuration dynamique</span>
-          <h2 className="book-config-live-title">Reglez votre edition en direct</h2>
-          <p className="book-config-live-subtitle">
-            Toutes les selections mettent a jour le prix et l apercu immediatement.
-          </p>
-        </div>
+      <BookWorkspaceHeader
+        sectionLabel="Configuration"
+        bookTitle={bookTitle || book?.title || 'Livre'}
+        activeTab="config"
+        onOpenTab={onOpenTab}
+      />
 
-        <div className="book-config-live-price">
-          <span className="book-config-live-price-label">Prix estime</span>
-          <span className="book-config-live-price-value">{formatEuro(livePrice)} EUR</span>
-          <span className="book-config-live-price-note">TTC</span>
-        </div>
+      <div className="book-config-live-helper">
+        Ajustez les options. Le visuel et le prix se mettent a jour en direct.
       </div>
 
       {saveFeedback?.message && (
@@ -371,6 +354,22 @@ const BookConfigLuxe = ({
               </div>
             )}
           </div>
+
+          <div className="book-config-panel-actions">
+            <span className="book-config-panel-actions-text">
+              {hasPendingChanges
+                ? 'Des changements sont en attente de validation.'
+                : 'Configuration deja synchronisee.'}
+            </span>
+            <button
+              type="button"
+              className="chapter-editor-primary-action book-config-panel-action"
+              onClick={handleValidate}
+              disabled={!hasPendingChanges || isSaving || isPreparingPreview}
+            >
+              {isSaving ? 'Validation...' : 'Valider'}
+            </button>
+          </div>
         </section>
 
         <aside className="book-config-preview">
@@ -383,48 +382,10 @@ const BookConfigLuxe = ({
             </div>
           </div>
 
-          <div className="book-config-preview-grid">
-            <div className="book-config-preview-item">
-              <span>Finition</span>
-              <strong>{selectedFinition.label}</strong>
-            </div>
-            <div className="book-config-preview-item">
-              <span>Papier</span>
-              <strong>{selectedPapier.label}</strong>
-            </div>
-            <div className="book-config-preview-item">
-              <span>Voix</span>
-              <strong>{selectedStyle.label}</strong>
-            </div>
-            <div className="book-config-preview-item">
-              <span>Structure</span>
-              <strong>{calculatedChapters} chapitres</strong>
-            </div>
-          </div>
-
           <div className="book-config-preview-price-card">
             <div className="book-config-preview-price-label">Total estime</div>
             <div className="book-config-preview-price-value">{formatEuro(livePrice)} EUR</div>
             <div className="book-config-preview-price-note">Mise a jour en direct</div>
-          </div>
-
-          <div className="book-config-price-breakdown">
-            <div className="book-config-price-row">
-              <span>Base {selectedFinition.label}</span>
-              <strong>{formatEuro(selectedFinition.basePrice)} EUR</strong>
-            </div>
-            <div className="book-config-price-row">
-              <span>Pages supplementaires ({priceBreakdown.extraPages})</span>
-              <strong>+{formatEuro(priceBreakdown.extraPagesAmount)} EUR</strong>
-            </div>
-            <div className="book-config-price-row">
-              <span>Coef. papier ({selectedPapier.label})</span>
-              <strong>x{selectedPapier.multiplier.toFixed(2)}</strong>
-            </div>
-            <div className="book-config-price-row">
-              <span>Coef. voix ({selectedStyle.label})</span>
-              <strong>x{selectedStyle.multiplier.toFixed(2)}</strong>
-            </div>
           </div>
 
           <div className="book-config-preview-actions">
@@ -462,24 +423,9 @@ const BookConfigLuxe = ({
           </div>
         </aside>
       </div>
-
-      <div className="book-config-live-footer">
-        <span className="book-config-live-footer-text">
-          {hasPendingChanges
-            ? 'Des changements sont en attente de validation.'
-            : 'Configuration deja synchronisee.'}
-        </span>
-        <button
-          type="button"
-          className="btn btn-primary book-config-validate-btn"
-          onClick={handleValidate}
-          disabled={!hasPendingChanges || isSaving || isPreparingPreview}
-        >
-          {isSaving ? 'Validation...' : 'Valider la configuration'}
-        </button>
-      </div>
     </div>
   );
 };
 
 export default BookConfigLuxe;
+

@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
-import Tooltip from '../../ui/Tooltip';
 import '../BookLuxe.css';
 
 const Step2Contribution = ({
   chapter,
   onSaveContribution,
   onFinalizeContribution,
-  user
+  user,
+  embedded = false,
+  editorialMode = false
 }) => {
   const [contributionText, setContributionText] = useState('');
   const [photos, setPhotos] = useState([]);
@@ -20,9 +21,15 @@ const Step2Contribution = ({
   const [notice, setNotice] = useState('');
 
   const existingContribution = chapter?.currentUserContribution || null;
-  const hasContributed = chapter?.hasContributed || false;
-  const isFinalized = chapter?.isFinalized || false;
-  const chapterLocked = chapter?.isChapterClosed || false;
+  const hasContributed = Boolean(chapter?.hasContributed || existingContribution);
+  const isFinalized = Boolean(chapter?.isFinalized || existingContribution?.is_finalized);
+  const collectionClosed = Boolean(chapter?.contributionsClosed);
+  const chapterLocked = Boolean(chapter?.isChapterClosed);
+  const contributionLocked = chapterLocked || collectionClosed;
+
+  const wrapContent = (node) => (
+    embedded ? node : <div className="workflow-content">{node}</div>
+  );
 
   useEffect(() => {
     setError('');
@@ -56,12 +63,12 @@ const Step2Contribution = ({
   }, [chapter?.id, existingContribution, hasContributed]);
 
   useEffect(() => {
-    if (!chapterLocked) {
+    if (!contributionLocked) {
       return;
     }
 
     setIsEditing(false);
-  }, [chapterLocked]);
+  }, [contributionLocked]);
 
   const uploadPhoto = async (file) => {
     try {
@@ -90,13 +97,12 @@ const Step2Contribution = ({
   };
 
   const handlePhotoChange = async (event) => {
-    if (chapterLocked) {
-      setError('Ce chapitre est verrouille apres validation finale.');
+    if (contributionLocked) {
+      setError('Ce chapitre est verrouille pour la finalisation.');
       return;
     }
 
     const files = Array.from(event.target.files || []);
-
     if (photos.length + files.length > 2) {
       setError('Maximum 2 photos.');
       return;
@@ -107,7 +113,6 @@ const Step2Contribution = ({
 
     for (const file of files) {
       const url = await uploadPhoto(file);
-
       if (!url) {
         continue;
       }
@@ -124,7 +129,7 @@ const Step2Contribution = ({
   };
 
   const removePhoto = (index) => {
-    if (chapterLocked) {
+    if (contributionLocked) {
       return;
     }
 
@@ -133,13 +138,13 @@ const Step2Contribution = ({
   };
 
   const handleSave = async () => {
-    if (chapterLocked) {
-      setError('Ce chapitre est verrouille apres validation finale.');
+    if (contributionLocked) {
+      setError('Ce chapitre est verrouille pour la finalisation.');
       return;
     }
 
     if (!contributionText.trim()) {
-      setError('Veuillez ecrire un message.');
+      setError('Veuillez ecrire un texte.');
       return;
     }
 
@@ -160,7 +165,7 @@ const Step2Contribution = ({
       });
 
       setIsEditing(false);
-      setNotice('Brouillon enregistre.');
+      setNotice('Texte prive enregistre.');
     } catch (saveError) {
       console.error('Erreur sauvegarde:', saveError);
       setError(saveError.message);
@@ -170,8 +175,8 @@ const Step2Contribution = ({
   };
 
   const handleFinalize = async () => {
-    if (chapterLocked) {
-      setError('Ce chapitre est verrouille apres validation finale.');
+    if (contributionLocked) {
+      setError('Ce chapitre est verrouille pour la finalisation.');
       return;
     }
 
@@ -184,7 +189,7 @@ const Step2Contribution = ({
       setError('');
       setNotice('');
       await onFinalizeContribution(chapter.id);
-      setNotice('Contribution validee.');
+      setNotice('Texte prive valide.');
     } catch (finalizeError) {
       console.error('Erreur finalisation:', finalizeError);
       setError(finalizeError.message);
@@ -209,117 +214,114 @@ const Step2Contribution = ({
     setIsEditing(false);
   };
 
-  const renderContentCard = () => (
-    <div
-      style={{
-        background: 'rgba(255, 255, 255, 0.72)',
-        padding: 'var(--space-lg)',
-        borderRadius: 'var(--radius)',
-        marginBottom: 'var(--space-md)'
-      }}
-    >
-      <p style={{ fontStyle: 'italic', margin: '0 0 var(--space-md) 0' }}>"{contributionText}"</p>
+  const renderPhotos = () => {
+    if (photos.length === 0) {
+      return null;
+    }
 
-      {photos.length > 0 && (
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          {photos.map((photo, index) => (
+    return (
+      <div className="chapter-private-photo-strip">
+        {photos.map((photo, index) => (
+          <div key={photo.url || index} className="chapter-private-photo-item">
             <img
-              key={index}
-              src={photo.url}
+              src={photoPreviews[index] || photo.preview || photo.url}
               alt=""
-              style={{
-                width: '60px',
-                height: '60px',
-                objectFit: 'cover',
-                borderRadius: '4px',
-                border: '1px solid var(--mist)'
-              }}
+              className="chapter-private-photo-thumb"
             />
-          ))}
-        </div>
-      )}
+            {!contributionLocked ? (
+              <button
+                type="button"
+                className="chapter-private-photo-remove"
+                onClick={() => removePhoto(index)}
+                aria-label="Retirer cette photo"
+              >
+                x
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderPrivacyHeader = () => (
+    <div className={`chapter-private-pill ${editorialMode ? 'is-editorial' : ''}`}>
+      <span className="chapter-private-pill-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M8 10V8.8A4 4 0 0 1 12 5a4 4 0 0 1 4 3.8V10h1a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h1Zm2 0h4V8.9a2 2 0 0 0-4 0V10Z" fill="currentColor" />
+        </svg>
+      </span>
+      <span>Votre contribution restera privee</span>
     </div>
   );
 
-  if (chapterLocked) {
-    const hasLockedContent = Boolean(contributionText.trim()) || photos.length > 0;
+  const renderReadonlyText = () => (
+    <div className={`chapter-private-reading ${editorialMode ? 'is-editorial' : ''}`}>
+      <p>{contributionText}</p>
+      {renderPhotos()}
+    </div>
+  );
 
-    return (
-      <div className="workflow-content">
-        <div className="contribution-section finalized">
-          {notice && (
-            <div className="luxe-feedback-banner is-success">{notice}</div>
-          )}
-          {error && (
-            <div className="luxe-feedback-banner is-error">{error}</div>
-          )}
-          <div className="luxe-feedback-banner is-info">
-            Chapitre verrouille: la validation finale bloque toute modification de votre contribution.
-          </div>
-          {hasLockedContent ? (
-            renderContentCard()
-          ) : (
-            <div className="card" style={{ boxShadow: 'none', background: 'rgba(255, 255, 255, 0.72)' }}>
-              Aucune contribution enregistree sur ce chapitre.
-            </div>
-          )}
+  if (contributionLocked) {
+    return wrapContent(
+      <div className={`contribution-section ${editorialMode ? 'is-editorial' : ''}`}>
+        {renderPrivacyHeader()}
+        {notice ? <div className="luxe-feedback-banner is-success">{notice}</div> : null}
+        {error ? <div className="luxe-feedback-banner is-error">{error}</div> : null}
+        <div className="luxe-feedback-banner is-info">
+          {chapterLocked
+            ? 'Le chapitre est verrouille. Votre texte prive ne peut plus etre modifie.'
+            : 'La collecte est close. Votre texte prive est maintenant fige pour la finalisation.'}
         </div>
+        {contributionText.trim() || photos.length > 0 ? (
+          renderReadonlyText()
+        ) : (
+          <div className="chapter-private-empty">
+            Aucun texte prive n a encore ete enregistre pour ce chapitre.
+          </div>
+        )}
       </div>
     );
   }
 
-  if (isFinalized) {
-    return (
-      <div className="workflow-content">
-        <div className="contribution-section finalized">
-          {notice && (
-            <div className="luxe-feedback-banner is-success">{notice}</div>
-          )}
-          {error && (
-            <div className="luxe-feedback-banner is-error">{error}</div>
-          )}
-          {renderContentCard()}
-        </div>
+  if (isFinalized && !isEditing) {
+    return wrapContent(
+      <div className={`contribution-section ${editorialMode ? 'is-editorial' : ''}`}>
+        {renderPrivacyHeader()}
+        {notice ? <div className="luxe-feedback-banner is-success">{notice}</div> : null}
+        {error ? <div className="luxe-feedback-banner is-error">{error}</div> : null}
+        {renderReadonlyText()}
       </div>
     );
   }
 
   if (hasContributed && !isEditing) {
-    return (
-      <div className="workflow-content">
-        <div className="contribution-section">
-          {notice && (
-            <div className="luxe-feedback-banner is-success">{notice}</div>
-          )}
-          <div className="questions-header">
-            <h3>Brouillon sauvegarde</h3>
-            <Tooltip text="Vous pourrez modifier ce message jusqu'a la validation finale">
-              <span style={{ color: 'var(--gold)', cursor: 'help' }}>i</span>
-            </Tooltip>
-          </div>
-
-          {error && (
-            <div className="luxe-feedback-banner is-error">{error}</div>
-          )}
-
-          {renderContentCard()}
-
-          <div className="questions-actions">
+    return wrapContent(
+      <div className={`contribution-section ${editorialMode ? 'is-editorial' : ''}`}>
+        {renderPrivacyHeader()}
+        {notice ? <div className="luxe-feedback-banner is-success">{notice}</div> : null}
+        {error ? <div className="luxe-feedback-banner is-error">{error}</div> : null}
+        {renderReadonlyText()}
+          <div className="chapter-private-footer">
+            <div className={`questions-actions ${editorialMode ? 'is-editorial is-two' : ''}`}>
             <button
+              type="button"
               onClick={() => setIsEditing(true)}
               className="btn btn-outline"
               style={{ flex: 1 }}
               disabled={finalizing}
             >
-              Modifier
+              Reprendre le texte
             </button>
-            <button
-              onClick={handleFinalize}
-              className="btn btn-primary"
-              style={{ flex: 1 }}
-              disabled={finalizing}
-            >
-              {finalizing ? 'Validation...' : 'Valider'}
+              <button
+                type="button"
+                onClick={handleFinalize}
+                className="btn btn-primary"
+                data-workflow-action="finalize-contribution"
+                style={{ flex: 1 }}
+                disabled={finalizing}
+              >
+              {finalizing ? 'Validation...' : 'Valider mon texte'}
             </button>
           </div>
         </div>
@@ -327,93 +329,50 @@ const Step2Contribution = ({
     );
   }
 
-  return (
-    <div className="workflow-content">
-      <div className="contribution-section">
-        {notice && (
-          <div className="luxe-feedback-banner is-success">{notice}</div>
-        )}
-        {error && (
-          <div className="luxe-feedback-banner is-error">{error}</div>
-        )}
+  return wrapContent(
+    <div className={`contribution-section ${editorialMode ? 'is-editorial' : ''}`}>
+      {renderPrivacyHeader()}
+      {notice ? <div className="luxe-feedback-banner is-success">{notice}</div> : null}
+      {error ? <div className="luxe-feedback-banner is-error">{error}</div> : null}
 
-        <textarea
-          value={contributionText}
-          onChange={(event) => setContributionText(event.target.value)}
-          placeholder="Votre message..."
-          rows="4"
-          className="contribution-textarea"
-          style={{ width: '100%', marginBottom: '15px' }}
+      <textarea
+        value={contributionText}
+        onChange={(event) => setContributionText(event.target.value)}
+        placeholder="Ecrivez ici votre texte prive. Il restera visible uniquement pour vous jusqu a la finalisation."
+        rows="10"
+        className={`contribution-textarea ${editorialMode ? 'is-editorial' : ''}`}
+      />
+
+      {renderPhotos()}
+
+      <div className="chapter-private-tools">
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handlePhotoChange}
+          id="photo-upload"
+          style={{ display: 'none' }}
+          disabled={uploading || photos.length >= 2}
         />
+        <label
+          htmlFor="photo-upload"
+          className="btn btn-outline chapter-private-photo-action"
+          style={{
+            opacity: (uploading || photos.length >= 2) ? 0.5 : 1,
+            cursor: (uploading || photos.length >= 2) ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {uploading ? 'Upload...' : 'Ajouter une photo'}
+        </label>
+        <span className="chapter-private-tools-note">{photos.length}/2 photos</span>
+      </div>
 
-        {photos.length > 0 && (
-          <div style={{ marginBottom: '15px' }}>
-            <p style={{ fontSize: '12px', color: 'var(--text-light)', marginBottom: '5px' }}>Photos :</p>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {photos.map((photo, index) => (
-                <div key={index} style={{ position: 'relative', width: '60px', height: '60px' }}>
-                  <img
-                    src={photoPreviews[index] || photo.preview || photo.url}
-                    alt=""
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      borderRadius: '4px'
-                    }}
-                  />
-                  <button
-                    onClick={() => removePhoto(index)}
-                    style={{
-                      position: 'absolute',
-                      top: '-5px',
-                      right: '-5px',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      background: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    x
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginBottom: '15px' }}>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handlePhotoChange}
-            id="photo-upload"
-            style={{ display: 'none' }}
-            disabled={uploading || photos.length >= 2}
-          />
-          <label
-            htmlFor="photo-upload"
-            className="btn btn-outline"
-            style={{
-              padding: '8px 16px',
-              opacity: (uploading || photos.length >= 2) ? 0.5 : 1,
-              cursor: (uploading || photos.length >= 2) ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {uploading ? 'Upload...' : 'Ajouter des photos'}
-          </label>
-          <span style={{ marginLeft: '10px', fontSize: '12px', color: 'var(--text-light)' }}>
-            {photos.length}/2 photos
-          </span>
-        </div>
-
-        {hasContributed && isEditing ? (
-          <div className="questions-actions">
+        <div className="chapter-private-footer">
+          {hasContributed && isEditing ? (
+            <div className={`questions-actions ${editorialMode ? 'is-editorial is-two' : ''}`}>
             <button
+              type="button"
               onClick={handleCancelEdit}
               className="btn btn-outline"
               style={{ flex: 1 }}
@@ -422,22 +381,25 @@ const Step2Contribution = ({
               Annuler
             </button>
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving || uploading || finalizing || !contributionText.trim()}
               className="btn btn-primary"
+              data-workflow-action="save-contribution"
               style={{ flex: 1 }}
             >
-              {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+              {saving ? 'Enregistrement...' : 'Enregistrer les ajustements'}
             </button>
           </div>
         ) : (
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving || uploading || finalizing || !contributionText.trim()}
-            className="btn btn-primary"
-            style={{ width: '100%' }}
+            className="btn btn-outline chapter-private-save"
+            data-workflow-action="save-contribution"
           >
-            {saving ? 'Enregistrement...' : 'Enregistrer le brouillon'}
+            {saving ? 'Enregistrement...' : 'Enregistrer mon texte'}
           </button>
         )}
       </div>

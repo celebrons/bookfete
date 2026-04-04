@@ -17,7 +17,9 @@ const Step1Amorce = ({
   chapter,
   onUpdateChapter,
   user,
-  book
+  book,
+  embedded = false,
+  editorialMode = false
 }) => {
   const [amorceText, setAmorceText] = useState(chapter?.amorce_text || '');
   const [triggers, setTriggers] = useState(Array.isArray(chapter?.triggers) ? chapter.triggers : []);
@@ -26,10 +28,21 @@ const Step1Amorce = ({
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [showContributorPreview, setShowContributorPreview] = useState(false);
+  const [hasPendingSensitiveEdit, setHasPendingSensitiveEdit] = useState(false);
+  const [showAddTriggerInput, setShowAddTriggerInput] = useState(false);
+  const [newTriggerValue, setNewTriggerValue] = useState('');
 
   const isValidated = Boolean(chapter?.amorce_validated || chapter?.questions_validated);
   const isOrganizer = Boolean(user && book && user.id === book.owner_id);
-  const chapterLocked = Boolean(chapter?.isChapterClosed);
+  const chapterLocked = Boolean(chapter?.isChapterClosed || chapter?.contributionsClosed);
+  const hasEditorialDraft = Boolean(
+    chapter?.contributionsClosed
+    || chapter?.chapterDraft?.status
+    || Number(chapter?.chapterDraft?.generationCount || 0) > 0
+    || String(chapter?.chapterDraft?.html || '').trim()
+  );
 
   useEffect(() => {
     const nextText = chapter?.amorce_text || '';
@@ -37,15 +50,47 @@ const Step1Amorce = ({
     setAmorceText(nextText);
     setDraftText(nextText);
     setTriggers(nextTriggers);
+    setNotice('');
+    setHasPendingSensitiveEdit(false);
+    setShowAddTriggerInput(false);
+    setNewTriggerValue('');
   }, [chapter?.amorce_text, chapter?.triggers]);
 
   useEffect(() => {
-    if (!chapterLocked) return;
+    if (!chapterLocked) {
+      return;
+    }
+
     setIsEditing(false);
+    setHasPendingSensitiveEdit(false);
+    setShowAddTriggerInput(false);
   }, [chapterLocked]);
 
+  const confirmSensitiveEdit = ({ forEditingSession = false } = {}) => {
+    if (!hasEditorialDraft || chapterLocked) {
+      return true;
+    }
+
+    if (forEditingSession && hasPendingSensitiveEdit) {
+      return true;
+    }
+
+    const confirmed = window.confirm(
+      "Modifier l inspiration peut impacter la coherence des recits deja recus. Voulez-vous continuer ?"
+    );
+
+    if (confirmed && forEditingSession) {
+      setHasPendingSensitiveEdit(true);
+    }
+
+    return confirmed;
+  };
+
   const persistAmorce = async (nextText, nextTriggers, extraUpdates = {}) => {
-    if (typeof onUpdateChapter !== 'function') return;
+    if (typeof onUpdateChapter !== 'function') {
+      return;
+    }
+
     const cleanText = String(nextText || '').trim();
     const cleanTriggers = Array.isArray(nextTriggers)
       ? [...new Set(nextTriggers.map((trigger) => normalizeTrigger(trigger)).filter(Boolean))].slice(0, 4)
@@ -53,6 +98,8 @@ const Step1Amorce = ({
 
     setSaving(true);
     setError('');
+    setNotice('');
+
     try {
       await onUpdateChapter(chapter.id, {
         amorce_text: cleanText || null,
@@ -66,8 +113,13 @@ const Step1Amorce = ({
       setDraftText(cleanText);
       setTriggers(cleanTriggers);
       setIsEditing(false);
+      setHasPendingSensitiveEdit(false);
+
+      if (hasEditorialDraft) {
+        setNotice('Inspiration mise a jour. Le chapitre repasse en revision avant la finalisation.');
+      }
     } catch (saveError) {
-      setError(saveError.message || 'Erreur lors de la mise a jour de l amorce.');
+      setError(saveError.message || "Erreur lors de la mise a jour de l amorce.");
       throw saveError;
     } finally {
       setSaving(false);
@@ -79,16 +131,26 @@ const Step1Amorce = ({
       setError('Ce chapitre est verrouille apres validation finale.');
       return;
     }
+
+    if (!confirmSensitiveEdit()) {
+      return;
+    }
+
     if (isValidated) {
-      const confirmed = window.confirm('Cette amorce est deja validee. La regenerer remplacera le texte actuel. Continuer ?');
-      if (!confirmed) return;
+      const confirmed = window.confirm('Cette amorce est deja marquee comme prete. La regenerer remplacera le texte actuel. Continuer ?');
+      if (!confirmed) {
+        return;
+      }
     }
 
     setGenerating(true);
     setError('');
+    setNotice('');
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+
       if (!token) {
         throw new Error('Session introuvable');
       }
@@ -101,9 +163,10 @@ const Step1Amorce = ({
         },
         body: JSON.stringify({ force: isValidated })
       });
+
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.error || 'Erreur lors de la generation de l amorce.');
+        throw new Error(payload?.error || "Erreur lors de la generation de l amorce.");
       }
 
       const nextText = payload?.chapter?.amorce_text || payload?.amorce || '';
@@ -114,6 +177,7 @@ const Step1Amorce = ({
       setAmorceText(nextText);
       setDraftText(nextText);
       setTriggers(nextTriggers);
+
       if (typeof onUpdateChapter === 'function') {
         await onUpdateChapter(chapter.id, {
           amorce_text: nextText || null,
@@ -123,8 +187,12 @@ const Step1Amorce = ({
           questions_validated: false
         });
       }
+
+      if (hasEditorialDraft) {
+        setNotice('Nouvelle inspiration enregistree. Pensez a la marquer de nouveau comme prete.');
+      }
     } catch (generationError) {
-      setError(generationError.message || 'Erreur lors de la generation de l amorce.');
+      setError(generationError.message || "Erreur lors de la generation de l amorce.");
     } finally {
       setGenerating(false);
     }
@@ -135,10 +203,12 @@ const Step1Amorce = ({
       setError('Ce chapitre est verrouille apres validation finale.');
       return;
     }
+
     if (!amorceText.trim()) {
       setError('Generez ou saisissez d abord une amorce.');
       return;
     }
+
     if (triggers.length < 3) {
       setError('Ajoutez au moins 3 mots declencheurs.');
       return;
@@ -146,11 +216,14 @@ const Step1Amorce = ({
 
     setSaving(true);
     setError('');
+    setNotice('');
+
     try {
       await onUpdateChapter(chapter.id, {
         amorce_validated: true,
         questions_validated: true
       });
+      setNotice('Inspiration marquee comme prete.');
     } catch (validationError) {
       setError(validationError.message || 'Erreur lors de la validation.');
     } finally {
@@ -159,51 +232,108 @@ const Step1Amorce = ({
   };
 
   const handleRemoveTrigger = async (triggerToRemove) => {
-    if (chapterLocked) return;
+    if (chapterLocked) {
+      return;
+    }
+
+    if (!confirmSensitiveEdit()) {
+      return;
+    }
+
     const nextTriggers = triggers.filter((trigger) => trigger !== triggerToRemove);
     await persistAmorce(amorceText, nextTriggers);
   };
 
   const handleAddTrigger = async () => {
-    if (chapterLocked) return;
+    if (chapterLocked) {
+      return;
+    }
+
+    if (!confirmSensitiveEdit()) {
+      return;
+    }
+
     if (triggers.length >= 4) {
       setError('Maximum 4 mots declencheurs.');
       return;
     }
-    const nextValue = window.prompt('Ajouter un mot-declencheur', '');
-    const normalized = normalizeTrigger(nextValue);
-    if (!normalized) return;
-    await persistAmorce(amorceText, [...triggers, normalized]);
+    setError('');
+    setShowAddTriggerInput(true);
+    setNewTriggerValue('');
+  };
+
+  const handleTriggerContextMenu = async (event, trigger) => {
+    if (!editorialMode || chapterLocked) {
+      return;
+    }
+
+    event.preventDefault();
+    await handleRemoveTrigger(trigger);
   };
 
   const handleEditBlur = async () => {
     const normalizedDraft = String(draftText || '').trim();
     if (normalizedDraft === String(amorceText || '').trim()) {
       setIsEditing(false);
+      setHasPendingSensitiveEdit(false);
       return;
     }
+
+    if (!confirmSensitiveEdit()) {
+      setDraftText(amorceText);
+      setIsEditing(false);
+      setHasPendingSensitiveEdit(false);
+      return;
+    }
+
     await persistAmorce(normalizedDraft, triggers);
   };
 
-  return (
-    <div className="workflow-content">
-      <div className={`amorce-section ${isValidated ? 'validated' : ''}`}>
-        <div className="questions-header">
-          <h3>Amorce du chapitre</h3>
-        </div>
+  const handleConfirmAddTrigger = async () => {
+    const normalized = normalizeTrigger(newTriggerValue);
+    if (!normalized) {
+      setError('Saisissez un mot-cle avant de valider.');
+      return;
+    }
+
+    await persistAmorce(amorceText, [...triggers, normalized]);
+    setShowAddTriggerInput(false);
+    setNewTriggerValue('');
+  };
+
+  const handleCancelAddTrigger = () => {
+    setShowAddTriggerInput(false);
+    setNewTriggerValue('');
+    setError('');
+  };
+
+  const content = (
+    <>
+      <div className={`amorce-section ${isValidated ? 'validated' : ''} ${editorialMode ? 'is-editorial' : ''}`}>
+        {!editorialMode ? (
+          <div className="questions-header">
+            <h3>Amorce du chapitre</h3>
+          </div>
+        ) : null}
+
+        {notice ? (
+          <div className="luxe-feedback-banner is-success">{notice}</div>
+        ) : null}
 
         {error ? (
-          <div className="validated-message" style={{ background: '#fff4f2', borderColor: '#efc8bf', color: '#9d3d2f', marginBottom: 'var(--space-md)' }}>
+          <div
+            className="validated-message"
+            style={{ background: '#fff4f2', borderColor: '#efc8bf', color: '#9d3d2f', marginBottom: 'var(--space-md)' }}
+          >
             {error}
           </div>
         ) : null}
 
-        <div className="amorce-meta-copy">
-          <span className="label-gold">Amorce generee</span>
-          <p className="amorce-subcopy">Cette phrase s affiche aux contributeurs a la place des questions.</p>
+        <div className={`amorce-meta-copy ${editorialMode ? 'is-editorial' : ''}`}>
+          <span className="label-gold">{editorialMode ? 'Amorce' : 'Amorce generee'}</span>
         </div>
 
-        <div className="amorce-callout">
+        <div className={`amorce-callout ${editorialMode ? 'is-editorial' : ''}`}>
           {isEditing ? (
             <textarea
               value={draftText}
@@ -219,6 +349,7 @@ const Step1Amorce = ({
               className="amorce-inline-button"
               onClick={() => {
                 if (chapterLocked) return;
+                if (!confirmSensitiveEdit({ forEditingSession: true })) return;
                 setDraftText(amorceText);
                 setIsEditing(true);
               }}
@@ -230,48 +361,105 @@ const Step1Amorce = ({
           )}
         </div>
 
+        <button
+          type="button"
+          className="amorce-preview-launcher"
+          onClick={() => setShowContributorPreview(true)}
+        >
+          <span className="amorce-preview-launcher-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 5c5.4 0 9.6 5.1 10.5 6.4a1 1 0 0 1 0 1.2C21.6 13.9 17.4 19 12 19S2.4 13.9 1.5 12.6a1 1 0 0 1 0-1.2C2.4 10.1 6.6 5 12 5Zm0 2c-3.8 0-7 3.4-8.3 5 1.3 1.6 4.5 5 8.3 5s7-3.4 8.3-5C19 10.4 15.8 7 12 7Zm0 1.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4Zm0 2a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z" fill="currentColor" />
+            </svg>
+          </span>
+          <span>Voir l apercu contributeur</span>
+        </button>
+
         <div className="amorce-trigger-block">
-          <div className="amorce-trigger-label">Mots-declencheurs affiches aux contributeurs</div>
+          <div className="amorce-trigger-label">Mots-cles de guidage</div>
           <div className="amorce-trigger-row">
             {triggers.map((trigger) => (
-              <span key={trigger} className="amorce-trigger-pill">
-                <span>{trigger}</span>
-                {!chapterLocked ? (
-                  <button
-                    type="button"
-                    className="amorce-trigger-remove"
-                    onClick={() => handleRemoveTrigger(trigger)}
-                    aria-label={`Supprimer ${trigger}`}
-                  >
-                    ×
-                  </button>
-                ) : null}
-              </span>
+              editorialMode ? (
+                <button
+                  key={trigger}
+                  type="button"
+                  className="amorce-trigger-pill is-editorial"
+                  onClick={() => handleRemoveTrigger(trigger)}
+                  onContextMenu={(event) => handleTriggerContextMenu(event, trigger)}
+                  disabled={chapterLocked}
+                  title={chapterLocked ? trigger : `${trigger} - cliquer pour retirer`}
+                >
+                  <span>{trigger}</span>
+                </button>
+              ) : (
+                <span key={trigger} className="amorce-trigger-pill">
+                  <span>{trigger}</span>
+                  {!chapterLocked ? (
+                    <button
+                      type="button"
+                      className="amorce-trigger-remove"
+                      onClick={() => handleRemoveTrigger(trigger)}
+                      aria-label={`Supprimer ${trigger}`}
+                    >
+                      x
+                    </button>
+                  ) : null}
+                </span>
+              )
             ))}
             {!chapterLocked && triggers.length < 4 ? (
               <button
                 type="button"
-                className="amorce-trigger-pill amorce-trigger-pill-add"
+                className={`amorce-trigger-pill amorce-trigger-pill-add ${editorialMode ? 'is-editorial' : ''}`}
                 onClick={handleAddTrigger}
               >
                 + Ajouter
               </button>
             ) : null}
           </div>
-        </div>
-
-        <div className="amorce-info-card">
-          Ce que voient les contributeurs : la phrase ci-dessus en italique, un champ texte libre, les mots-declencheurs en bas, et la possibilite d ajouter une photo. Aucune question numerotee.
+          {showAddTriggerInput && !chapterLocked ? (
+            <div className="amorce-trigger-inline-editor">
+              <input
+                type="text"
+                value={newTriggerValue}
+                onChange={(event) => setNewTriggerValue(event.target.value)}
+                className="input-luxe amorce-trigger-inline-input"
+                placeholder="Ajouter un mot-cle"
+                autoFocus
+                maxLength={60}
+              />
+              <div className="amorce-trigger-inline-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={handleCancelAddTrigger}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleConfirmAddTrigger}
+                >
+                  Ajouter
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {!chapterLocked ? (
+            <div className="amorce-trigger-helper">
+              Cliquez sur un mot-cle pour le retirer, ou ajoutez-en un nouveau.
+            </div>
+          ) : null}
         </div>
 
         {chapterLocked ? (
           <div className="validated-message" style={{ background: 'rgba(255, 255, 255, 0.72)', color: 'var(--text-light)' }}>
-            Chapitre verrouille: la validation finale bloque toute modification des etapes.
+            L inspiration est maintenant figee pour la finalisation.
           </div>
         ) : null}
 
         {isOrganizer && !chapterLocked ? (
-          <div className="questions-actions">
+          <div className={`questions-actions ${editorialMode ? 'is-editorial is-two' : ''}`}>
             <button
               type="button"
               onClick={handleGenerate}
@@ -284,6 +472,7 @@ const Step1Amorce = ({
             <button
               type="button"
               onClick={() => {
+                if (!confirmSensitiveEdit({ forEditingSession: true })) return;
                 setDraftText(amorceText);
                 setIsEditing(true);
               }}
@@ -293,24 +482,115 @@ const Step1Amorce = ({
             >
               Modifier
             </button>
-            <button
-              type="button"
-              onClick={handleValidate}
-              disabled={saving || generating}
-              className="btn btn-primary"
-              style={{ flex: 1 }}
-            >
-              Valider
-            </button>
+            {editorialMode ? (
+              <button
+                type="button"
+                onClick={handleValidate}
+                disabled={saving || generating}
+                className="chapter-editor-hidden-action"
+                data-workflow-action="validate-amorce"
+                aria-hidden="true"
+                tabIndex={-1}
+              >
+                Marquer comme pret
+              </button>
+            ) : null}
+            {!editorialMode ? (
+              <button
+                type="button"
+                onClick={handleValidate}
+                disabled={saving || generating}
+                className="btn btn-primary"
+                data-workflow-action="validate-amorce"
+                style={{ flex: 1 }}
+              >
+                Marquer comme pret
+              </button>
+            ) : null}
           </div>
         ) : null}
 
         {!isOrganizer && !chapterLocked ? (
           <div className="validated-message" style={{ background: 'rgba(255, 255, 255, 0.72)', color: 'var(--text-light)' }}>
-            Seul l organisateur peut modifier l amorce.
+            Seul l organisateur peut modifier l inspiration.
           </div>
         ) : null}
       </div>
+
+      {showContributorPreview ? (
+        <div className="modal-overlay" onClick={() => setShowContributorPreview(false)}>
+          <div
+            className="modal-content contributor-preview-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="contributor-preview-modal-header">
+              <div>
+                <div className="label-gold">Apercu contributeur</div>
+                <h3 className="contributor-preview-modal-title">
+                  {chapter?.order_index === 0 ? 'Introduction' : (chapter?.title || 'Chapitre')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setShowContributorPreview(false)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="contributor-preview-modal-body">
+              <div className="amorce-callout contributor-preview-callout is-editorial">
+                <span className="amorce-display-text">
+                  {amorceText || 'Aucune amorce pour le moment. Les contributeurs verront ici la phrase d ouverture du chapitre.'}
+                </span>
+              </div>
+
+              {triggers.length > 0 ? (
+                <div className="amorce-trigger-block contributor-preview-trigger-block">
+                  <div className="amorce-trigger-label">Mots-cles</div>
+                  <div className="amorce-trigger-row">
+                    {triggers.map((trigger) => (
+                      <span key={trigger} className="amorce-trigger-pill is-editorial">
+                        <span>{trigger}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="contributor-preview-field">
+                <label className="chapter-prompt-admin-label">Espace de reponse</label>
+                <textarea
+                  className="input-luxe contributor-preview-textarea"
+                  readOnly
+                  value=""
+                  placeholder="Continuez a votre facon - une phrase, un paragraphe, tout est bienvenu."
+                />
+                <div className="contributor-preview-count">0 caractere</div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-outline contributor-preview-photo-btn"
+                disabled
+              >
+                Ajouter une photo
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div className="workflow-content">
+      {content}
     </div>
   );
 };

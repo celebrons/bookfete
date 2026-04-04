@@ -7,6 +7,7 @@ import ChapterListLuxe from './ChapterListLuxe';
 import BookConfigLuxe from './BookConfigLuxe';
 import ContributorsTabLuxe from './contributors/ContributorsTabLuxe';
 import Loading from '../common/Loading';
+import BookWorkspaceHeader from './BookWorkspaceHeader';
 import {
   BOOK_LIFECYCLE_ORDER,
   getBookLifecycleConfig,
@@ -14,10 +15,6 @@ import {
   isBookLifecycleAtLeast,
   normalizeBookLifecycleStatus
 } from '../../utils/bookLifecycle';
-import {
-  getJourneyStatusConfig,
-  resolveBookJourneyStatus
-} from '../../utils/clientJourney';
 import '../../styles/luxe-theme.css';
 import './BookLuxe.css';
 
@@ -59,6 +56,11 @@ const TAB_HELP = {
 
 const getSoloMode = (book) => Boolean(book?.cover_config?.soloMode);
 const normalizeText = (value) => (value === null || value === undefined ? '' : String(value).trim());
+const getDisplayBookTitle = (value) => {
+  const normalized = normalizeText(value);
+  if (!normalized) return '';
+  return normalized.replace(/^(?:\[[^\]]+\]\s*)+/g, '').trim() || normalized;
+};
 const INVALID_CHAPTER_TITLE_PATTERNS = [
   /system settings/i,
   /user management/i,
@@ -347,6 +349,7 @@ const BookPageLuxe = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('chapitres');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isChapterWorkspaceActive, setIsChapterWorkspaceActive] = useState(false);
   const [selectedPreviewFormat, setSelectedPreviewFormat] = useState('standard');
   const [draftReadingMode, setDraftReadingMode] = useState('horizontal');
   const [draftLayoutSettings, setDraftLayoutSettings] = useState(DEFAULT_DRAFT_LAYOUT_SETTINGS);
@@ -427,6 +430,18 @@ const BookPageLuxe = () => {
       }
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'auto'
+    });
+  }, [activeTab, location.pathname]);
 
   useEffect(() => {
     if (bookId && user) {
@@ -1343,7 +1358,9 @@ const BookPageLuxe = () => {
         return {
           ...chapter,
           contributions,
-          currentUserContribution: savedContribution
+          currentUserContribution: savedContribution,
+          hasContributed: true,
+          isFinalized: Boolean(savedContribution?.is_finalized)
         };
       });
 
@@ -1387,7 +1404,9 @@ const BookPageLuxe = () => {
         return {
           ...chapter,
           contributions,
-          currentUserContribution: data
+          currentUserContribution: data,
+          hasContributed: true,
+          isFinalized: true
         };
       });
 
@@ -2062,27 +2081,6 @@ const BookPageLuxe = () => {
     ? WRITING_GUIDE_STEPS.filter((step) => step.title !== 'Invitations')
     : WRITING_GUIDE_STEPS;
   const bookLifecycleStatus = getAutomaticLifecycleStatus();
-  const bookLifecycleConfig = getBookLifecycleConfig(bookLifecycleStatus);
-  const journeyStatus = resolveBookJourneyStatus({
-    book,
-    latestOrder: latestBookOrder
-  });
-  const journeyStatusConfig = getJourneyStatusConfig(journeyStatus);
-  const isOrderDrivenJourney = [
-    'awaiting_payment',
-    'paid',
-    'pdf_generating',
-    'pdf_ready',
-    'print_queued',
-    'sent_to_printer',
-    'printed',
-    'shipped',
-    'delivered',
-    'cancelled',
-    'failed'
-  ].includes(journeyStatus);
-  const displayedLifecycleLabel = isOrderDrivenJourney ? journeyStatusConfig.label : bookLifecycleConfig.label;
-  const displayedLifecycleTone = isOrderDrivenJourney ? journeyStatusConfig.tone : bookLifecycleConfig.tone;
   const hasPreviewBeenGenerated = isBookLifecycleAtLeast(bookLifecycleStatus, 'preview_available');
   const canGenerateBookPreview = isBookReadyForPreview;
   const previewUnavailableReason = canGenerateBookPreview
@@ -2105,37 +2103,6 @@ const BookPageLuxe = () => {
   const selectedLineSpacingMeta = PREVIEW_LINE_SPACING_OPTIONS.find(
     (option) => option.id === draftLayoutSettings.lineSpacing
   ) || PREVIEW_LINE_SPACING_OPTIONS[1];
-  const readinessItems = [
-    {
-      key: 'chapters',
-      label: `Chapitres ${validatedChapterCount}/${chapters.length || 0}`,
-      done: areAllChaptersValidated
-    },
-    {
-      key: 'cover',
-      label: 'Couverture',
-      done: isFrontCoverValidated
-    },
-    {
-      key: 'back_cover',
-      label: '4e de couverture',
-      done: isBackCoverValidated
-    },
-    {
-      key: 'preview',
-      label: 'Apercu genere',
-      done: hasPreviewBeenGenerated
-    }
-  ];
-  const lifecycleUpdatedAt = book?.cover_config?.lifecycleUpdatedAt;
-  const lifecycleUpdatedLabel = lifecycleUpdatedAt
-    ? new Date(lifecycleUpdatedAt).toLocaleString('fr-FR')
-    : '';
-  const bookMetaItems = [
-    { label: 'Finition', value: book.finition || 'Classique' },
-    { label: 'Papier', value: book.papier || 'Mat' },
-    { label: 'Voix', value: book.style_narratif || 'Factuel' }
-  ];
   const pdfExportStatusLabel = (() => {
     switch (pdfExportJob?.status) {
       case 'queued':
@@ -2201,352 +2168,68 @@ const BookPageLuxe = () => {
       window.setTimeout(scrollToMainContent, 120);
     }
   };
-  const openCheckout = () => {
-    navigate(`/book/${bookId}/checkout`);
-  };
-  const openOrdersPage = () => {
-    navigate('/orders');
-  };
-  const currentLifecycleAction = (() => {
-    const normalizedOrderType = String(latestBookOrder?.type || '').toLowerCase();
-    if (journeyStatus === 'awaiting_payment') {
-      return {
-        key: 'pay_pending_order',
-        label: 'Payer',
-        note: 'Finaliser la commande en attente',
-        onClick: openCheckout,
-        disabled: false
-      };
-    }
-
-    if (journeyStatus === 'paid') {
-      if (normalizedOrderType === 'print') {
-        return {
-          key: 'follow_order',
-          label: 'Suivre la commande',
-          note: 'Paiement valide. Production a suivre.',
-          onClick: openOrdersPage,
-          disabled: false
-        };
-      }
-      return {
-        key: 'follow_pdf_generation',
-        label: 'Suivre la generation',
-        note: 'Paiement valide. Le PDF final se prepare.',
-        onClick: openCheckout,
-        disabled: false
-      };
-    }
-
-    if (journeyStatus === 'pdf_generating') {
-      return {
-        key: 'follow_pdf_generation',
-        label: 'Suivre la generation',
-        note: 'Le PDF final se prepare.',
-        onClick: openCheckout,
-        disabled: false
-      };
-    }
-
-    if (journeyStatus === 'pdf_ready') {
-      return {
-        key: 'download_pdf',
-        label: 'Telecharger le PDF',
-        note: 'Interieur et couverture disponibles',
-        onClick: openCheckout,
-        disabled: false
-      };
-    }
-
-    if (['print_queued', 'sent_to_printer', 'printed', 'shipped', 'delivered'].includes(journeyStatus)) {
-      return {
-        key: 'follow_order',
-        label: 'Suivre la commande',
-        note: 'Production et livraison',
-        onClick: openOrdersPage,
-        disabled: false
-      };
-    }
-
-    if (journeyStatus === 'cancelled' || journeyStatus === 'failed') {
-      return {
-        key: 'relaunch_order',
-        label: 'Relancer la commande',
-        note: 'Revenir au checkout',
-        onClick: openCheckout,
-        disabled: false
-      };
-    }
-
-    if (bookLifecycleStatus === 'editing') {
-      if (canGenerateBookPreview) {
-        return {
-          key: 'generate_preview',
-          label: generatingDraft ? 'Generation...' : 'Generer l apercu livre',
-          note: 'Apercu non contractuel. Modifications toujours possibles.',
-          onClick: handleGenerateDraft,
-          disabled: generatingDraft
-        };
-      }
-
-      return {
-        key: 'continue_editing',
-        label: 'Continuer l edition',
-        note: 'Aller aux chapitres et finaliser les contenus',
-        onClick: openEditionGallery,
-        disabled: false
-      };
-    }
-
-    if (bookLifecycleStatus === 'preview_available') {
-      return {
-        key: 'validate_book',
-        label: updatingLifecycleStatus === 'finalized'
-          ? 'Validation...'
-          : 'Valider definitivement le livre',
-        note: 'Action irreversible: contenu verrouille puis commande',
-        onClick: handleFinalizeBook,
-        disabled: !canFinalizeBook || Boolean(updatingLifecycleStatus)
-      };
-    }
-
-    if (bookLifecycleStatus === 'finalized') {
-      return {
-        key: 'open_checkout',
-        label: 'Commander le livre',
-        note: 'Choisir PDF, impression ou pack',
-        onClick: openCheckout,
-        disabled: false
-      };
-    }
-
-    if (bookLifecycleStatus === 'sent_to_printer') {
-      return {
-        key: 'mark_printed',
-        label: updatingLifecycleStatus === 'printed' ? 'Mise a jour...' : 'Marquer imprime',
-        note: 'Suivi de production',
-        onClick: () => setBookLifecycleStatus('printed'),
-        disabled: Boolean(updatingLifecycleStatus)
-      };
-    }
-
-    if (bookLifecycleStatus === 'printed') {
-      return {
-        key: 'mark_shipped',
-        label: updatingLifecycleStatus === 'shipped' ? 'Mise a jour...' : 'Marquer envoye',
-        note: 'Suivi de livraison',
-        onClick: () => setBookLifecycleStatus('shipped'),
-        disabled: Boolean(updatingLifecycleStatus)
-      };
-    }
-
-    return {
-      key: 'workflow_done',
-      label: 'Livre envoye',
-      note: 'Workflow termine',
-      onClick: () => {},
-      disabled: true
-    };
-  })();
-  const showSecondaryPreviewAction = (
-    canGenerateBookPreview
-    && currentLifecycleAction.key !== 'generate_preview'
+  const displayBookTitle = getDisplayBookTitle(book?.title || '');
+  const useFocusedWorkspaceTopbar = (
+    (activeTab === 'chapitres' && isChapterWorkspaceActive)
+    || activeTab === 'contributeurs'
+    || activeTab === 'config'
   );
 
   return (
     <div className="book-container">
-      <div className="book-header">
-        <div className="book-header-content">
-          <div className="book-title">
-            <div className="book-header-identity">
-            <div className="book-eyebrow">{displayedLifecycleLabel}</div>
-            <h1>{book.title}</h1>
-            <div className="book-meta">
-              <div className="book-meta-grid">
-                {bookMetaItems.map((item) => (
-                  <div key={item.label} className="book-meta-pill">
-                    <span className="book-meta-label">{item.label}</span>
-                    <span className="book-meta-value">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-              <span>📖 {book.finition || 'Classique'}</span>
-              <span>📄 {book.papier || 'Mat'}</span>
-              <span>✍️ {book.style_narratif || 'Factuel'}</span>
+      {!useFocusedWorkspaceTopbar && (
+        <div className="tabs-container book-tabs-legacy">
+          <div className="tabs-toolbar">
+            <div className="tabs">
+              <button
+                data-tab="chapitres"
+                onClick={() => setActiveTab('chapitres')}
+                className={`tab ${activeTab === 'chapitres' ? 'active' : ''}`}
+                title={TAB_HELP.chapitres}
+                aria-label={`Edition du livre. ${TAB_HELP.chapitres}`}
+              >
+                Edition du livre
+                <span className="tab-icon-luxe tab-icon-book" aria-hidden="true" />
+                <span className="tab-help" aria-hidden="true">?</span>
+              </button>
+              <button
+                data-tab="contributeurs"
+                onClick={() => setActiveTab('contributeurs')}
+                className={`tab ${activeTab === 'contributeurs' ? 'active' : ''}`}
+                title={TAB_HELP.contributeurs}
+                aria-label={`Contributeurs. ${TAB_HELP.contributeurs}`}
+              >
+                Contributeurs
+                <span className="tab-icon-luxe tab-icon-contributors" aria-hidden="true" />
+                <span className="tab-help" aria-hidden="true">?</span>
+              </button>
+              <button
+                data-tab="config"
+                onClick={() => setActiveTab('config')}
+                className={`tab ${activeTab === 'config' ? 'active' : ''}`}
+                title={TAB_HELP.config}
+                aria-label={`Configuration. ${TAB_HELP.config}`}
+              >
+                Configuration
+                <span className="tab-icon-luxe tab-icon-config" aria-hidden="true" />
+                <span className="tab-help" aria-hidden="true">?</span>
+              </button>
             </div>
-            </div>
-            <div className={`book-progress-shell ${showSecondaryPreviewAction ? '' : 'is-single-panel'}`.trim()}>
-            <div className="book-lifecycle-panel">
-              <div className="book-lifecycle-top">
-                <span className={`book-lifecycle-chip ${displayedLifecycleTone}`}>
-                  {displayedLifecycleLabel}
-                </span>
-                {lifecycleUpdatedLabel && (
-                  <span className="book-lifecycle-updated">
-                    Mis a jour: {lifecycleUpdatedLabel}
-                  </span>
-                )}
-                {!showSecondaryPreviewAction && (
-                  <button
-                    type="button"
-                    className="book-dashboard-mini book-dashboard-mini-inline"
-                    onClick={() => navigate('/dashboard')}
-                    aria-label="Retour au tableau de bord"
-                    title="Retour au tableau de bord"
-                  >
-                    <span className="book-dashboard-mini-icon" aria-hidden="true" />
-                    <span className="book-dashboard-mini-label">Tableau de bord</span>
-                  </button>
-                )}
-              </div>
-              <div className="book-lifecycle-line">
-                {BOOK_LIFECYCLE_ORDER.map((statusKey, index) => {
-                  const config = getBookLifecycleConfig(statusKey);
-                  const isCurrent = statusKey === bookLifecycleStatus;
-                  const isDone = !isCurrent && isBookLifecycleAtLeast(bookLifecycleStatus, statusKey);
-                  const isUpcoming = !isCurrent && !isDone;
-                  const nextStatusKey = BOOK_LIFECYCLE_ORDER[index + 1] || null;
-                  const isConnectorDone = Boolean(
-                    nextStatusKey && isBookLifecycleAtLeast(bookLifecycleStatus, nextStatusKey)
-                  );
-                  const isConnectorCurrent = Boolean(nextStatusKey && isCurrent && !isConnectorDone);
-                  const lifecycleStepClick = isCurrent ? currentLifecycleAction.onClick : undefined;
-                  return (
-                    <React.Fragment key={statusKey}>
-                      <div
-                      className={`book-lifecycle-step ${isCurrent ? 'is-current' : ''} ${isDone ? 'is-done' : ''} ${isUpcoming ? 'is-upcoming' : ''}`}
-                      title={isCurrent ? `${config.label} - ${currentLifecycleAction.note}` : config.label}
-                    >
-                      <span className="book-lifecycle-marker">{isDone ? '✓' : index + 1}</span>
-                      <span className="book-lifecycle-label">{config.shortLabel}</span>
-                      {isCurrent && currentLifecycleAction.key !== 'workflow_done' && (
-                        <button
-                          type="button"
-                          className="book-lifecycle-inline-action"
-                          onClick={lifecycleStepClick}
-                          disabled={currentLifecycleAction.disabled}
-                        >
-                          <span className="book-lifecycle-inline-action-label">{currentLifecycleAction.label}</span>
-                          <span className="book-lifecycle-inline-action-note">{currentLifecycleAction.note}</span>
-                        </button>
-                      )}
-                    </div>
-                    {nextStatusKey && (
-                      <span className={`book-lifecycle-connector ${isConnectorDone ? 'is-done' : ''} ${isConnectorCurrent ? 'is-current' : ''}`} />
-                    )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-              <div className="book-readiness-strip" aria-label="Etat de preparation du livre">
-                {readinessItems.map((item) => (
-                  <span
-                    key={item.key}
-                    className={`book-readiness-item ${item.done ? 'is-done' : 'is-pending'}`}
-                  >
-                    {item.done ? 'OK' : '-'} {item.label}
-                  </span>
-                ))}
-              </div>
-              {bookLifecycleStatus === 'preview_available' && (
-                <div className="book-finalize-warning">
-                  La validation definitive verrouille le livre. Verifiez l apercu avant de continuer.
-                </div>
-              )}
-            </div>
-          {showSecondaryPreviewAction && (
-            <div className="book-header-actions">
-              <div className="book-header-actions-top">
-                <button
-                  type="button"
-                  className="book-dashboard-mini"
-                  onClick={() => navigate('/dashboard')}
-                  aria-label="Retour au tableau de bord"
-                  title="Retour au tableau de bord"
-                >
-                  <span className="book-dashboard-mini-icon" aria-hidden="true" />
-                  <span className="book-dashboard-mini-label">Tableau de bord</span>
-                </button>
-              </div>
-              <div className="book-header-actions-row is-primary">
-                <button
-                  type="button"
-                  className="book-header-btn book-header-btn-primary book-generate-btn"
-                  onClick={handleGenerateDraft}
-                  disabled={generatingDraft || !canGenerateBookPreview}
-                  title={canGenerateBookPreview
-                    ? 'Afficher l apercu assemble du livre'
-                    : 'Validez chapitres + couverture + 4e avant l apercu'}
-                >
-                  <span className="book-action-label">
-                    {generatingDraft
-                      ? 'Generation...'
-                      : 'Ouvrir l apercu livre'}
-                  </span>
-                  <span className="book-action-note">
-                    Rendu livre assemble
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
-          </div>
-        </div>
-      </div>
-      </div>
 
-      <div className="tabs-container">
-        <div className="tabs-toolbar">
-          <div className="tabs">
-            <button
-              data-tab="chapitres"
-              onClick={() => setActiveTab('chapitres')}
-              className={`tab ${activeTab === 'chapitres' ? 'active' : ''}`}
-              title={TAB_HELP.chapitres}
-              aria-label={`Edition du livre. ${TAB_HELP.chapitres}`}
-            >
-              Edition du livre
-              <span className="tab-icon-luxe tab-icon-book" aria-hidden="true" />
-              <span className="tab-help" aria-hidden="true">?</span>
-            </button>
-            <button
-              data-tab="contributeurs"
-              onClick={() => setActiveTab('contributeurs')}
-              className={`tab ${activeTab === 'contributeurs' ? 'active' : ''}`}
-              title={TAB_HELP.contributeurs}
-              aria-label={`Contributeurs. ${TAB_HELP.contributeurs}`}
-            >
-              Contributeurs
-              <span className="tab-icon-luxe tab-icon-contributors" aria-hidden="true" />
-              <span className="tab-help" aria-hidden="true">?</span>
-            </button>
-            <button
-              data-tab="config"
-              onClick={() => setActiveTab('config')}
-              className={`tab ${activeTab === 'config' ? 'active' : ''}`}
-              title={TAB_HELP.config}
-              aria-label={`Configuration. ${TAB_HELP.config}`}
-            >
-              Configuration
-              <span className="tab-icon-luxe tab-icon-config" aria-hidden="true" />
-              <span className="tab-help" aria-hidden="true">?</span>
-            </button>
+            <div className="guide-toggle-wrap">
+              <button
+                type="button"
+                className={`guide-toggle-btn ${isGuideOpen ? 'active' : ''}`}
+                onClick={() => setIsGuideOpen((prev) => !prev)}
+                aria-expanded={isGuideOpen}
+                aria-controls="book-writing-guide"
+                title="Guide rapide"
+              >
+                <span className="guide-toggle-question" aria-hidden="true">?</span>
+                <span className="guide-toggle-label">Guide rapide</span>
+              </button>
+            </div>
           </div>
-
-          <div className="guide-toggle-wrap">
-            <button
-              type="button"
-              className={`guide-toggle-btn ${isGuideOpen ? 'active' : ''}`}
-              onClick={() => setIsGuideOpen((prev) => !prev)}
-              aria-expanded={isGuideOpen}
-              aria-controls="book-writing-guide"
-              title="Guide rapide"
-            >
-              <span className="guide-toggle-question" aria-hidden="true">?</span>
-              <span className="guide-toggle-label">Guide rapide</span>
-            </button>
-          </div>
-        </div>
 
         {isGuideOpen && (
           <div id="book-writing-guide" className="writing-guide-popover is-expanded">
@@ -2581,6 +2264,7 @@ const BookPageLuxe = () => {
           </div>
         )}
       </div>
+      )}
 
       <div ref={mainContentRef} className="book-main-content">
         {pageNotice?.message && (
@@ -2645,35 +2329,71 @@ const BookPageLuxe = () => {
         )}
 
         {activeTab === 'chapitres' && (
-          <ChapterListLuxe
-            key={`edition-gallery-${editionGalleryRequest}`}
-            chapters={chapters}
-            bookId={bookId}
-            book={book}
-            onUpdateChapter={handleUpdateChapter}
-            onSaveContribution={handleSaveContribution}
-            onFinalizeContribution={handleFinalizeContribution}
-            onGenerateChapterDraft={handleGenerateChapterDraft}
-            onSaveChapterDraft={handleSaveChapterDraft}
-            onFinalizeChapterDraft={handleFinalizeChapterDraft}
-            onDeleteChapter={handleDeleteChapter}
-            onUpdateBook={handleUpdateBook}
-            editionGalleryRequest={editionGalleryRequest}
-          />
+          <div className={`book-edition-live ${isChapterWorkspaceActive ? 'is-workspace-active' : ''}`}>
+            {!isChapterWorkspaceActive && (
+              <>
+                <BookWorkspaceHeader
+                  sectionLabel="Edition"
+                  bookTitle={displayBookTitle || book?.title || ''}
+                  activeTab={activeTab}
+                  onOpenTab={setActiveTab}
+                />
+
+                {canGenerateBookPreview && (
+                  <div className="book-edition-actions">
+                    <button
+                      type="button"
+                      className="chapter-editor-primary-action"
+                      onClick={handleGenerateDraft}
+                      disabled={generatingDraft || !canGenerateBookPreview}
+                      title={canGenerateBookPreview
+                        ? 'Afficher l apercu assemble du livre'
+                        : 'Validez chapitres + couverture + 4e avant l apercu'}
+                    >
+                      {generatingDraft ? 'Generation...' : 'Apercu livre'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            <ChapterListLuxe
+              key={`edition-gallery-${editionGalleryRequest}`}
+              chapters={chapters}
+              bookId={bookId}
+              book={book}
+              bookTitle={displayBookTitle || book?.title || ''}
+              onWorkspaceModeChange={setIsChapterWorkspaceActive}
+              onOpenTab={setActiveTab}
+              onUpdateChapter={handleUpdateChapter}
+              onSaveContribution={handleSaveContribution}
+              onFinalizeContribution={handleFinalizeContribution}
+              onGenerateChapterDraft={handleGenerateChapterDraft}
+              onSaveChapterDraft={handleSaveChapterDraft}
+              onFinalizeChapterDraft={handleFinalizeChapterDraft}
+              onDeleteChapter={handleDeleteChapter}
+              onUpdateBook={handleUpdateBook}
+              editionGalleryRequest={editionGalleryRequest}
+            />
+          </div>
         )}
         
         {activeTab === 'contributeurs' && (
           <ContributorsTabLuxe
             bookId={bookId}
             book={book}
+            bookTitle={displayBookTitle || book?.title || ''}
+            onOpenTab={setActiveTab}
             onUpdateBook={handleUpdateBook}
           />
         )}
         
         {activeTab === 'config' && (
           <BookConfigLuxe 
-            book={book} 
-            onUpdateBook={handleUpdateBook}
+              book={book} 
+              bookTitle={displayBookTitle || book?.title || ''}
+              onOpenTab={setActiveTab}
+              onUpdateBook={handleUpdateBook}
             chaptersCount={chapters.length}
             onPagesChange={handleUpdateChaptersFromPages}
             onOpenBookPreview={handleGenerateDraft}
@@ -3004,3 +2724,4 @@ const BookPageLuxe = () => {
 };
 
 export default BookPageLuxe;
+

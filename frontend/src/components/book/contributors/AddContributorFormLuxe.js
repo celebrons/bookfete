@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import '../BookLuxe.css';
 
-const AddContributorFormLuxe = ({ onAdd }) => {
+const AddContributorFormLuxe = ({ onAdd, containerRef = null, emailInputRef = null }) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
 
@@ -25,7 +25,7 @@ const AddContributorFormLuxe = ({ onAdd }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="contributors-add-form">
+    <form ref={containerRef} onSubmit={handleSubmit} className="contributors-add-form">
       <div className="contributors-add-head">
         <h3 className="contributors-add-title">Ajouter un contributeur</h3>
         <p className="contributors-add-note">
@@ -37,6 +37,7 @@ const AddContributorFormLuxe = ({ onAdd }) => {
         <label className="contributors-field" htmlFor="contributor-email">
           <span className="label-gold">Email *</span>
           <input
+            ref={emailInputRef}
             id="contributor-email"
             type="email"
             value={email}

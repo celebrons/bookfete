@@ -11,9 +11,10 @@ const Step3Invitations = ({
   chapter,
   user,
   book,
-  onLoadContributions,
   hasContributed,
-  onUpdateChapter
+  onUpdateChapter,
+  onOpenModeration,
+  editorialMode = false
 }) => {
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -269,7 +270,7 @@ const Step3Invitations = ({
       }));
       await loadSnapshot();
       setShowCloseModal(false);
-      setNotice('Contributions cloturees pour ce chapitre.');
+      setNotice('Collecte close pour ce chapitre.');
     } catch (loadError) {
       console.error('Error closing contributions:', loadError);
       setError(loadError.message);
@@ -316,10 +317,19 @@ const Step3Invitations = ({
     }
   };
 
+  const handleOpenModeration = async () => {
+    if (typeof onOpenModeration !== 'function' || !chapter?.id) {
+      return;
+    }
+
+    await loadSnapshot();
+    onOpenModeration(chapter.id);
+  };
+
   if (!hasContributed) {
     return (
       <div className="workflow-content" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-        <p>Completez d'abord votre contribution personnelle</p>
+        <p>La preparation doit etre prete avant d ouvrir la collecte.</p>
       </div>
     );
   }
@@ -335,72 +345,107 @@ const Step3Invitations = ({
   if (error) {
     return (
       <div className="workflow-content">
-        <div className="luxe-feedback-banner is-error">{error}</div>
+        <div className={editorialMode ? 'workflow-collecte-note is-error' : 'luxe-feedback-banner is-error'}>
+          {error}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="workflow-content">
+    <div className={`workflow-content ${editorialMode ? 'workflow-content-editorial' : ''}`}>
       {notice && (
-        <div className="luxe-feedback-banner is-success">{notice}</div>
+        <div className={editorialMode ? 'workflow-collecte-note' : 'luxe-feedback-banner is-success'}>
+          {notice}
+        </div>
       )}
 
       {chapterLocked && (
-        <div className="luxe-feedback-banner is-info">
+        <div className={editorialMode ? 'workflow-collecte-note' : 'luxe-feedback-banner is-info'}>
           Chapitre verrouille: les invitations et contributions ne sont plus modifiables.
         </div>
       )}
 
+      {!chapterLocked && contributionsClosed && (
+        <div className={editorialMode ? 'workflow-collecte-note' : 'luxe-feedback-banner is-success'}>
+          Collecte close: les recits sont figes pour la finalisation du chapitre.
+        </div>
+      )}
+
       {isOrganizer && (
-        <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: '15px', flexWrap: 'wrap' }}>
+        <div className={`step3-actions ${editorialMode ? 'is-editorial' : ''}`}>
           <button
             onClick={handleOpenInviteSelector}
             disabled={chapterLocked || contributionsClosed || !book?.id || checkingInviteList}
-            className="btn btn-outline"
-            style={{ flex: 1, minWidth: '190px' }}
+            className={editorialMode ? 'chapter-editor-primary-action workflow-collecte-invite-cta' : 'btn btn-outline'}
           >
             {checkingInviteList ? 'Verification...' : 'Inviter des contributeurs'}
           </button>
           <button
-            onClick={async () => {
-              await loadSnapshot();
-              onLoadContributions(chapter.id);
-            }}
-            className="btn btn-outline"
-            style={{ flex: 1, minWidth: '170px' }}
+            onClick={handleOpenModeration}
+            disabled={contributionsReceivedCount < 1}
+            className={editorialMode ? 'btn btn-outline workflow-collecte-review-cta' : 'btn btn-outline'}
           >
-            Voir les contributions ({contributionsReceivedCount})
+            {pendingValidationCount > 0
+              ? `Relire les recits (${pendingValidationCount})`
+              : `Voir les recits (${contributionsReceivedCount})`}
           </button>
           <button
             onClick={openCloseModal}
             disabled={chapterLocked || closing || contributionsClosed}
-            className="btn btn-primary"
+            className={editorialMode ? 'chapter-editor-hidden-action' : 'btn btn-primary'}
+            data-workflow-action="close-collection"
+            aria-hidden={editorialMode ? 'true' : undefined}
+            tabIndex={editorialMode ? -1 : undefined}
             style={{
-              flex: 1,
-              minWidth: '190px',
               background: contributionsClosed ? '#1f7a3d' : '#dc3545',
               opacity: (chapterLocked || closing || contributionsClosed) ? 0.8 : 1
             }}
           >
-            {closing ? 'Cloture...' : (contributionsClosed ? 'Contributions cloturees' : 'Clore les contributions')}
+            {closing ? 'Cloture...' : (contributionsClosed ? 'Collecte close' : 'Clore la collecte')}
           </button>
         </div>
       )}
 
-      <ChapterInvitationsLuxe
-        chapterId={chapter.id}
-        bookId={book?.id}
-        isClosed={contributionsClosed}
-        refreshToken={inviteRefreshToken}
-      />
+      {editorialMode ? (
+        <div className="workflow-collecte-panel">
+          <div className="workflow-collecte-stats">
+            <div className="workflow-collecte-stat">
+              <span className="workflow-collecte-stat-value">{invitations.length}</span>
+              <span className="workflow-collecte-stat-label">Invites</span>
+            </div>
+            <div className="workflow-collecte-stat">
+              <span className="workflow-collecte-stat-value">{contributionsReceivedCount}</span>
+              <span className="workflow-collecte-stat-label">Recits recus</span>
+            </div>
+            <div className="workflow-collecte-stat">
+              <span className="workflow-collecte-stat-value">{pendingValidationCount}</span>
+              <span className="workflow-collecte-stat-label">A relire</span>
+            </div>
+          </div>
+          <ChapterInvitationsLuxe
+            chapterId={chapter.id}
+            bookId={book?.id}
+            isClosed={contributionsClosed}
+            refreshToken={inviteRefreshToken}
+            editorialMode
+          />
+        </div>
+      ) : (
+        <ChapterInvitationsLuxe
+          chapterId={chapter.id}
+          bookId={book?.id}
+          isClosed={contributionsClosed}
+          refreshToken={inviteRefreshToken}
+        />
+      )}
 
       {showCloseModal && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '520px' }}>
-            <h3 className="modal-title">Clore les contributions</h3>
+            <h3 className="modal-title">Clore la collecte</h3>
             <p className="modal-text" style={{ marginBottom: 'var(--space-lg)' }}>
-              Voici le recapitulatif avant fermeture des contributions de ce chapitre.
+              Voici le recapitulatif avant de fermer la collecte de ce chapitre.
             </p>
 
             <div
@@ -456,7 +501,7 @@ const Step3Invitations = ({
               }}
             >
               <p style={{ margin: 0, color: '#8a6d00' }}>
-                Voulez-vous valider quand meme ?
+                Voulez-vous fermer la collecte quand meme ?
               </p>
             </div>
 
@@ -473,7 +518,7 @@ const Step3Invitations = ({
                 className="modal-btn modal-btn-primary"
                 disabled={closing}
               >
-                {closing ? 'Cloture...' : 'Confirmer la cloture'}
+                {closing ? 'Cloture...' : 'Confirmer la cloture de la collecte'}
               </button>
             </div>
           </div>
