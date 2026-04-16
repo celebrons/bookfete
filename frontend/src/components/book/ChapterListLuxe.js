@@ -632,6 +632,7 @@ const ChapterListLuxe = ({
           ) : (
             <ChapterDetailsLuxe
               chapter={selectedChapter}
+              chapters={chapters}
               chaptersCount={chapters.length}
               onUpdateChapter={onUpdateChapter}
               onSaveContribution={onSaveContribution}

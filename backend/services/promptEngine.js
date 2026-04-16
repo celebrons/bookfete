@@ -31,6 +31,66 @@ class PromptEngineError extends Error {
   }
 }
 
+function getProviderErrorStatus(error) {
+  const candidates = [
+    error?.raw_status_code,
+    error?.statusCode,
+    error?.status,
+    error?.response?.status
+  ];
+
+  for (const candidate of candidates) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+  }
+
+  return null;
+}
+
+function toPromptModelError(error) {
+  if (error instanceof PromptEngineError) {
+    return error;
+  }
+
+  const status = getProviderErrorStatus(error);
+  const rawMessage = normalizeText(
+    error?.body?.message
+    || error?.response?.data?.message
+    || error?.message
+  );
+  const lowered = rawMessage.toLowerCase();
+  const isCapacityExceeded = status === 429
+    || lowered.includes('service_tier_capacity_exceeded')
+    || lowered.includes('capacity exceeded')
+    || lowered.includes('too many requests')
+    || lowered.includes('"code":"3505"')
+    || lowered.includes('code 3505');
+
+  if (isCapacityExceeded) {
+    return new PromptEngineError(
+      'Le service de generation est temporairement surcharge. Reessayez dans quelques instants.',
+      'PROMPT_MODEL_CAPACITY_EXCEEDED',
+      429,
+      {
+        providerStatus: status || 429,
+        providerMessage: rawMessage
+      }
+    );
+  }
+
+  return new PromptEngineError(
+    rawMessage || 'Erreur temporaire lors de la generation du contenu.',
+    'PROMPT_MODEL_REQUEST_FAILED',
+    status && status >= 400 ? status : 502,
+    {
+      providerStatus: status || null,
+      providerMessage: rawMessage
+    }
+  );
+}
+
 function normalizeText(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
   const normalized = String(value).trim();
@@ -519,23 +579,28 @@ async function runPromptGeneration({
         template
       });
 
-    const response = await mistralClient.chat.complete({
-      model: normalizeText(model, 'mistral-small-latest'),
-      messages: [
-        ...(normalizeText(template.system_prompt)
-          ? [{
-              role: 'system',
-              content: String(template.system_prompt || '')
-            }]
-          : []),
-        {
-          role: 'user',
-          content: promptForAttempt
-        }
-      ],
-      ...(Number.isFinite(Number(temperature)) ? { temperature: Number(temperature) } : {}),
-      ...(Number.isFinite(Number(maxTokens)) ? { maxTokens: Number(maxTokens) } : {})
-    });
+    let response;
+    try {
+      response = await mistralClient.chat.complete({
+        model: normalizeText(model, 'mistral-small-latest'),
+        messages: [
+          ...(normalizeText(template.system_prompt)
+            ? [{
+                role: 'system',
+                content: String(template.system_prompt || '')
+              }]
+            : []),
+          {
+            role: 'user',
+            content: promptForAttempt
+          }
+        ],
+        ...(Number.isFinite(Number(temperature)) ? { temperature: Number(temperature) } : {}),
+        ...(Number.isFinite(Number(maxTokens)) ? { maxTokens: Number(maxTokens) } : {})
+      });
+    } catch (error) {
+      throw toPromptModelError(error);
+    }
 
     finalOutput = String(response?.choices?.[0]?.message?.content || '').trim();
     finalValidation = validateOutputAgainstTemplate(template, finalOutput);
@@ -950,23 +1015,28 @@ async function testPromptTemplate({
     );
   }
 
-  const response = await mistralClient.chat.complete({
-    model: normalizeText(model, 'mistral-small-latest'),
-    messages: [
-      ...(normalizeText(template.system_prompt)
-        ? [{
-            role: 'system',
-            content: template.system_prompt
-          }]
-        : []),
-      {
-        role: 'user',
-        content: userPrompt
-      }
-    ],
-    ...(Number.isFinite(Number(temperature)) ? { temperature: Number(temperature) } : {}),
-    ...(Number.isFinite(Number(maxTokens)) ? { maxTokens: Number(maxTokens) } : {})
-  });
+  let response;
+  try {
+    response = await mistralClient.chat.complete({
+      model: normalizeText(model, 'mistral-small-latest'),
+      messages: [
+        ...(normalizeText(template.system_prompt)
+          ? [{
+              role: 'system',
+              content: template.system_prompt
+            }]
+          : []),
+        {
+          role: 'user',
+          content: userPrompt
+        }
+      ],
+      ...(Number.isFinite(Number(temperature)) ? { temperature: Number(temperature) } : {}),
+      ...(Number.isFinite(Number(maxTokens)) ? { maxTokens: Number(maxTokens) } : {})
+    });
+  } catch (error) {
+    throw toPromptModelError(error);
+  }
 
   const output = String(response?.choices?.[0]?.message?.content || '').trim();
   const validation = validateOutputAgainstTemplate(template, output);

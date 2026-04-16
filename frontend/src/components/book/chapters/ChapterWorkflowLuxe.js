@@ -8,6 +8,58 @@ import '../BookLuxe.css';
 const hasText = (value) => String(value || '').trim().length > 0;
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
+const normalizeText = (value) => (value === null || value === undefined ? '' : String(value).trim());
+const getDisplayBookTitle = (value) => {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return 'Livre';
+  }
+
+  return normalized.replace(/^(?:\[[^\]]+\]\s*)+/g, '').trim() || normalized;
+};
+
+const getChapterOrderNumber = (chapter) => {
+  const orderIndex = Number(chapter?.order_index);
+
+  if (Number.isFinite(orderIndex)) {
+    return orderIndex + 1;
+  }
+
+  const position = Number(chapter?.position);
+
+  if (Number.isFinite(position) && position > 0) {
+    return position;
+  }
+
+  return null;
+};
+
+const StepCheckIcon = () => (
+  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    <path
+      d="M3.2 8.3 6.6 11.4 12.8 4.9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const BackChevronIcon = () => (
+  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <path
+      d="M11.8 4.5 6.2 10l5.6 5.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 const getVisibleGuestContributions = (chapter, userEmail) => (
   (Array.isArray(chapter?.contributions) ? chapter.contributions : [])
@@ -135,9 +187,45 @@ const getDefaultActiveStep = ({
   return 'finalisation';
 };
 
+const getBookCreativeProgress = (chapters, isSoloMode) => {
+  const chapterList = Array.isArray(chapters) ? chapters : [];
+
+  if (!chapterList.length) {
+    return 0;
+  }
+
+  const totalPhases = chapterList.length * (isSoloMode ? 2 : 3);
+
+  if (!totalPhases) {
+    return 0;
+  }
+
+  const completedPhases = chapterList.reduce((total, item) => {
+    const preparationDone = Boolean(
+      hasText(item?.amorce_text)
+      && (item?.amorce_validated || item?.questions_validated)
+      && item?.isFinalized
+    );
+    const collecteDone = isSoloMode ? true : Boolean(item?.contributionsClosed);
+    const finalisationDone = Boolean(
+      item?.isChapterClosed
+      || item?.chapterDraft?.status === 'validated'
+    );
+
+    return total + [
+      preparationDone,
+      ...(isSoloMode ? [] : [collecteDone]),
+      finalisationDone
+    ].filter(Boolean).length;
+  }, 0);
+
+  return Math.max(0, Math.min(100, Math.round((completedPhases / totalPhases) * 100)));
+};
+
 const ChapterWorkflowLuxe = (props) => {
   const {
     chapter,
+    chapters,
     user,
     book,
     onUpdateChapter,
@@ -171,7 +259,10 @@ const ChapterWorkflowLuxe = (props) => {
     && isFinalized
     && !amorceValidated
   );
-  const completedMarker = '\u2713';
+  const displayBookTitle = getDisplayBookTitle(bookTitle || book?.title || 'Livre');
+  const chapterNumber = getChapterOrderNumber(chapter);
+  const chapterContext = chapterNumber ? `Chapitre ${chapterNumber}` : 'Chapitre';
+  const creativeProgressPercent = getBookCreativeProgress(chapters, isSoloMode);
   const workflowRootRef = useRef(null);
   const [activeStep, setActiveStep] = useState(() =>
     getDefaultActiveStep({
@@ -514,6 +605,15 @@ const ChapterWorkflowLuxe = (props) => {
     };
   })();
 
+  const primaryActionDisplay = {
+    ...primaryAction,
+    label: activeStep === 'preparation'
+      ? 'Valider'
+      : activeStep === 'collecte'
+        ? 'Clore la collecte'
+        : 'Generer le chapitre'
+  };
+
   const getStepVisualState = (step) => {
     if (activeStep === step.key) {
       return 'current';
@@ -529,63 +629,87 @@ const ChapterWorkflowLuxe = (props) => {
 
   return (
     <div ref={workflowRootRef} className="workflow-editorial-shell" style={{ marginBottom: 'var(--space-xl)' }}>
-      <div className="chapter-editor-topbar">
-        <div className="chapter-editor-topbar-left">
-          <button
-            type="button"
-            className="chapter-editor-backlink"
-            onClick={onBackToStructure}
-          >
-            Retour structure
-          </button>
-          <span className="chapter-editor-book-title">{bookTitle || book?.title || 'Livre'}</span>
+      <div className="chapter-editor-pilot">
+        <div className="chapter-editor-pilot-topline">
+          <div className="chapter-editor-heading">
+            <button
+              type="button"
+              className="chapter-editor-return-icon"
+              onClick={onBackToStructure}
+              aria-label="Retour a la structure du livre"
+            >
+              <BackChevronIcon />
+            </button>
+            <div className="chapter-editor-heading-copy">
+              <div className="chapter-editor-breadcrumb">
+                <span>{displayBookTitle}</span>
+                <span className="chapter-editor-breadcrumb-separator" aria-hidden="true">›</span>
+                <span>{chapterContext}</span>
+              </div>
+              <strong className="chapter-editor-title">
+                {chapterTitle || chapter?.title || 'Chapitre'}
+              </strong>
+            </div>
+          </div>
+          <div className="chapter-editor-controls">
+            <button
+              type="button"
+              className="chapter-editor-primary-action"
+              onClick={handlePrimaryTopbarAction}
+              disabled={primaryActionDisplay.disabled}
+            >
+              {primaryActionDisplay.label}
+            </button>
+          </div>
         </div>
-        <div className="chapter-editor-topbar-center">
-          <strong className="chapter-editor-chapter-title">{chapterTitle || chapter?.title || 'Chapitre'}</strong>
-        </div>
-        <div className="chapter-editor-topbar-right">
-          <button
-            type="button"
-            className="chapter-editor-primary-action"
-            onClick={handlePrimaryTopbarAction}
-            disabled={primaryAction.disabled}
-          >
-            {primaryAction.label}
-          </button>
-        </div>
-      </div>
-      <div className="workflow-stepper-wrap">
-        <ol className="workflow-stepper" aria-label="Parcours editorial du chapitre">
-          {steps.map((step, index) => (
-            <li key={step.key} className="workflow-stepper-item">
-              {(() => {
-                const visualState = getStepVisualState(step);
+        <div className="chapter-editor-pilot-subline">
+          <div className="workflow-stepper-wrap">
+            <ol className="workflow-stepper workflow-stepper--compact" aria-label="Parcours editorial du chapitre">
+              {steps.map((step, index) => (
+                <li key={step.key} className="workflow-stepper-item">
+                  {(() => {
+                    const visualState = getStepVisualState(step);
 
-                return (
-                  <>
-                    <button
-                      type="button"
-                      className={`workflow-stepper-button is-${visualState}`}
-                      onClick={() => setActiveStep(step.key)}
-                      aria-current={activeStep === step.key ? 'step' : undefined}
-                    >
-                      <span className="workflow-stepper-index">{step.completed ? completedMarker : `${step.order}`}</span>
-                      <span className="workflow-stepper-copy">
-                        <span className="workflow-stepper-label">{step.title}</span>
-                        {step.caption ? (
-                          <span className="workflow-stepper-caption">{step.caption}</span>
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          className={`workflow-stepper-button is-${visualState}`}
+                          onClick={() => setActiveStep(step.key)}
+                          aria-current={activeStep === step.key ? 'step' : undefined}
+                        >
+                          <span className="workflow-stepper-index">
+                            {step.completed ? <StepCheckIcon /> : `${step.order}`}
+                          </span>
+                          <span className="workflow-stepper-copy">
+                            <span className="workflow-stepper-label">{step.title}</span>
+                            {step.caption ? (
+                              <span className="workflow-stepper-caption">{step.caption}</span>
+                            ) : null}
+                          </span>
+                        </button>
+                        {index < steps.length - 1 ? (
+                          <span className={`workflow-stepper-rail is-${visualState}`} aria-hidden="true" />
                         ) : null}
-                      </span>
-                    </button>
-                    {index < steps.length - 1 ? (
-                      <span className={`workflow-stepper-rail is-${visualState}`} aria-hidden="true" />
-                    ) : null}
-                  </>
-                );
-              })()}
-            </li>
-          ))}
-        </ol>
+                      </>
+                    );
+                  })()}
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div
+            className="chapter-editor-book-progress"
+            aria-label={`Progression globale du livre : ${creativeProgressPercent}%`}
+          >
+            <div className="chapter-editor-book-progress-track">
+              <span
+                className="chapter-editor-book-progress-value"
+                style={{ width: `${creativeProgressPercent}%` }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <section className="workflow-editorial-canvas">

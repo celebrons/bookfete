@@ -13,6 +13,11 @@ const {
   testInlineChapterBodyPrompt,
   publishInlineChapterBodyPrompt
 } = require('../services/chapterBodyPromptAdminService');
+const {
+  getChapterAmorcePromptAdminContext,
+  testInlineChapterAmorcePrompt,
+  publishInlineChapterAmorcePrompt
+} = require('../services/chapterAmorcePromptAdminService');
 
 function ensurePromptAdmin(req, res, next) {
   const allowListRaw = process.env.AI_PROMPT_ADMIN_EMAILS || '';
@@ -201,6 +206,116 @@ router.post('/:id/prompt-admin/chapter-body/publish', authenticate, ensurePrompt
     const status = Number(error?.status) || 500;
     return res.status(status).json({
       error: error.message || 'Erreur validation prompt chapitre.',
+      missingVariables: Array.isArray(error?.details?.missingVariables)
+        ? error.details.missingVariables
+        : []
+    });
+  }
+});
+
+router.get('/:id/prompt-admin/chapter-amorce', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const context = await getChapterAmorcePromptAdminContext(
+      req.params.id,
+      req.user?.id
+    );
+
+    return res.json({
+      ok: true,
+      activeTemplate: context.activeTemplate
+        ? {
+            id: context.activeTemplate.id,
+            label: context.activeTemplate.label,
+            version: context.activeTemplate.version,
+            status: context.activeTemplate.status
+          }
+        : null,
+      directives: context.directives || '',
+      contextSummary: context.contextSummary,
+      variables: context.variables,
+      templateVariables: context.templateVariables || [],
+      availableVariables: Object.keys(context.variables || {}),
+      availableVariableMeta: context.availableVariableMeta || []
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    return res.status(status).json({
+      error: error.message || 'Erreur chargement administration prompt amorce.',
+      missingVariables: Array.isArray(error?.details?.missingVariables)
+        ? error.details.missingVariables
+        : []
+    });
+  }
+});
+
+router.post('/:id/prompt-admin/chapter-amorce/test', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const tested = await testInlineChapterAmorcePrompt({
+      chapterId: req.params.id,
+      ownerId: req.user?.id,
+      directives: req.body?.directives || '',
+      model: req.body?.model || process.env.MISTRAL_MODEL || 'mistral-small-latest'
+    });
+
+    return res.json({
+      ok: true,
+      activeTemplate: tested.activeTemplate
+        ? {
+            id: tested.activeTemplate.id,
+            label: tested.activeTemplate.label,
+            version: tested.activeTemplate.version,
+            status: tested.activeTemplate.status
+          }
+        : null,
+      directives: req.body?.directives || '',
+      contextSummary: tested.contextSummary,
+      variables: tested.variables,
+      templateVariables: tested.templateVariables || [],
+      availableVariables: Object.keys(tested.variables || {}),
+      availableVariableMeta: tested.availableVariableMeta || [],
+      result: tested.result
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    return res.status(status).json({
+      error: error.message || 'Erreur test prompt amorce.',
+      missingVariables: Array.isArray(error?.details?.missingVariables)
+        ? error.details.missingVariables
+        : []
+    });
+  }
+});
+
+router.post('/:id/prompt-admin/chapter-amorce/publish', authenticate, ensurePromptAdmin, async (req, res) => {
+  try {
+    const published = await publishInlineChapterAmorcePrompt({
+      chapterId: req.params.id,
+      ownerId: req.user?.id,
+      directives: req.body?.directives || '',
+      createdBy: req.user?.email || req.user?.id || 'inline-admin'
+    });
+
+    return res.json({
+      ok: true,
+      activeTemplate: published.template
+        ? {
+            id: published.template.id,
+            label: published.template.label,
+            version: published.template.version,
+            status: published.template.status
+          }
+        : null,
+      directives: published.directives || '',
+      contextSummary: published.contextSummary,
+      variables: published.variables,
+      templateVariables: published.templateVariables || [],
+      availableVariables: Object.keys(published.variables || {}),
+      availableVariableMeta: published.availableVariableMeta || []
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    return res.status(status).json({
+      error: error.message || 'Erreur validation prompt amorce.',
       missingVariables: Array.isArray(error?.details?.missingVariables)
         ? error.details.missingVariables
         : []

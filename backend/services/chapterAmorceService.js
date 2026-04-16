@@ -505,6 +505,7 @@ async function persistChapterAmorce(chapterId, amorcePayload, options = {}) {
 
 module.exports = {
   parseChapterAmorceOutput,
+  validateRoleScopedAmorce,
   buildChapterAmorceVariables,
   getChapterAmorceContext,
   runChapterAmorceGeneration,

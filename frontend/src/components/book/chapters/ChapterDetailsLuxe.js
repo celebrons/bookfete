@@ -4,6 +4,7 @@ import '../BookLuxe.css';
 
 const ChapterDetailsLuxe = ({
   chapter,
+  chapters,
   chaptersCount,
   onUpdateChapter,
   onSaveContribution,
@@ -65,6 +66,7 @@ const ChapterDetailsLuxe = ({
       <ChapterWorkflowLuxe
         key={chapter.id}
         chapter={chapter}
+        chapters={chapters}
         chaptersCount={chaptersCount}
         onUpdateChapter={onUpdateChapter}
         onSaveContribution={onSaveContribution}

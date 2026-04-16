@@ -51,6 +51,17 @@
   min-height: 52px;
 }
 
+.book-workspace-nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 30px -28px rgba(70, 54, 24, 0.18);
+}
+
 .book-workspace-lifecycle {
   font-size: 10px;
   color: rgba(123, 114, 101, 0.44);
@@ -62,27 +73,49 @@
 .book-workspace-topbar .chapter-editor-backlink,
 .book-workspace-topbar .chapter-editor-link,
 .book-workspace-topbar .book-header-inline-btn {
-  color: rgba(107, 91, 62, 0.52);
+  color: rgba(43, 37, 28, 0.92);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.42;
+  opacity: 1;
 }
 
 .book-topbar-icon-link {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
+  position: relative;
   transition: color 0.25s ease, opacity 0.25s ease, background 0.25s ease, transform 0.25s ease;
+}
+
+.book-workspace-nav-group .book-topbar-icon-link {
+  color: rgba(57, 48, 35, 0.34);
+  opacity: 1;
+}
+
+.book-workspace-nav-group .book-topbar-icon-link:hover {
+  color: rgba(108, 82, 40, 0.86);
 }
 
 .book-topbar-icon-link svg {
   width: 16px;
   height: 16px;
+}
+
+.book-topbar-icon-link::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background 0.25s ease, opacity 0.25s ease;
 }
 
 .book-workspace-topbar .chapter-editor-backlink:hover,
@@ -97,7 +130,7 @@
 .book-workspace-topbar .book-header-inline-btn[aria-expanded='true'] {
   color: #6c5228;
   opacity: 1;
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .book-workspace-topbar .chapter-editor-chapter-title {
@@ -142,14 +175,15 @@
 
 .book-workspace-topbar .book-topbar-icon-link.is-active::after,
 .book-workspace-topbar .book-header-inline-btn.book-topbar-icon-link::after {
-  display: none;
+  display: block;
+  background: rgba(184, 146, 74, 0.88);
 }
 
 .chapter-editor-link.is-active {
   color: #6c5228;
 }
 
-.chapter-editor-link.is-active::after {
+.chapter-editor-link.is-active:not(.book-topbar-icon-link)::after {
   content: '';
   display: block;
   width: 100%;
@@ -4315,13 +4349,160 @@
   gap: 14px;
 }
 
+.chapter-editor-pilot {
+  display: grid;
+  gap: 10px;
+  padding: 0 clamp(8px, 1.6vw, 16px) 14px;
+  margin-bottom: 12px;
+  border-bottom: 0.5px solid rgba(223, 216, 201, 0.9);
+}
+
+.chapter-editor-pilot-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.chapter-editor-heading {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.chapter-editor-return-icon {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgba(217, 208, 191, 0.92);
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(133, 118, 91, 0.9);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.chapter-editor-return-icon:hover {
+  color: #6c5228;
+  border-color: rgba(184, 146, 74, 0.42);
+}
+
+.chapter-editor-return-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chapter-editor-heading-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.chapter-editor-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.2;
+  color: rgba(123, 114, 101, 0.68);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chapter-editor-breadcrumb-separator {
+  font-size: 0;
+  line-height: 0;
+  color: rgba(184, 146, 74, 0.66);
+}
+
+.chapter-editor-breadcrumb-separator::before {
+  content: '>';
+  font-size: 11px;
+  line-height: 1;
+}
+
+.chapter-editor-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 2.8vw, 42px);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  color: #1f1812;
+}
+
+.chapter-editor-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chapter-editor-secondary-link {
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(205, 193, 171, 0.92);
+  background: rgba(255, 255, 255, 0.9);
+  color: #2f281f;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.chapter-editor-secondary-link:hover {
+  border-color: rgba(184, 146, 74, 0.48);
+  color: #6c5228;
+}
+
+.chapter-editor-pilot-subline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 36px;
+}
+
+.chapter-editor-book-progress {
+  width: clamp(100px, 12vw, 132px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chapter-editor-book-progress-track {
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(219, 210, 196, 0.65);
+  overflow: hidden;
+}
+
+.chapter-editor-book-progress-value {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(184, 146, 74, 0.92) 0%, rgba(184, 146, 74, 0.38) 100%);
+}
+
 .chapter-editor-topbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, auto) minmax(0, 1fr);
   align-items: center;
-  gap: 14px 20px;
+  gap: 10px 20px;
   min-height: 40px;
-  padding: 0 clamp(8px, 1.6vw, 16px);
+  padding: 0;
 }
 
 .chapter-editor-topbar-left {
@@ -4369,7 +4550,7 @@
   font-family: var(--font-display);
   font-size: clamp(22px, 2vw, 28px);
   font-weight: 400;
-  line-height: 1.1;
+  line-height: 1.04;
   letter-spacing: -0.02em;
 }
 
@@ -4408,7 +4589,7 @@
 }
 
 .workflow-stepper-wrap {
-  padding-inline: clamp(8px, 1.6vw, 16px);
+  padding-inline: 0;
 }
 
 .workflow-stepper {
@@ -4416,7 +4597,8 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, auto);
+  justify-content: flex-start;
   gap: 0;
   align-items: center;
   min-height: 36px;
@@ -4424,19 +4606,18 @@
 
 .workflow-stepper-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto auto;
   align-items: center;
-  column-gap: 10px;
-  min-width: 0;
+  column-gap: 12px;
 }
 
 .workflow-stepper-button {
-  width: 100%;
+  width: auto;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  min-height: 30px;
+  gap: 8px;
+  min-height: 24px;
   padding: 0;
   border: none;
   background: transparent;
@@ -4446,8 +4627,8 @@
 }
 
 .workflow-stepper-index {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4458,19 +4639,25 @@
   font-size: 10px;
   font-weight: 700;
   flex-shrink: 0;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.workflow-stepper-index svg {
+  width: 12px;
+  height: 12px;
 }
 
 .workflow-stepper-copy {
   min-width: 0;
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
 }
 
 .workflow-stepper-label {
   display: block;
-  font-size: 14px;
-  font-weight: 400;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1.1;
   color: inherit;
   font-family: var(--font-primary, inherit);
@@ -4482,18 +4669,20 @@
 }
 
 .workflow-stepper-button.is-current .workflow-stepper-index {
-  border-color: rgba(184, 146, 74, 0.42);
-  background: rgba(184, 146, 74, 0.14);
-  color: #8b6a2f;
+  border-color: rgba(184, 146, 74, 0.84);
+  background: linear-gradient(180deg, #caa24f 0%, #b78e3f 100%);
+  color: #fffdf7;
+  box-shadow: 0 16px 22px -20px rgba(92, 67, 22, 0.48);
 }
 
 .workflow-stepper-button.is-current .workflow-stepper-label {
-  color: #6c5228;
+  color: #241d14;
+  font-weight: 700;
 }
 
 .workflow-stepper-button.is-upcoming,
 .workflow-stepper-button.is-locked {
-  opacity: 0.52;
+  opacity: 0.46;
 }
 
 .workflow-stepper-button.is-current,
@@ -4502,7 +4691,7 @@
 }
 
 .workflow-stepper-button.is-done .workflow-stepper-index {
-  border-color: rgba(31, 122, 61, 0.24);
+  border-color: rgba(31, 122, 61, 0.26);
   background: rgba(31, 122, 61, 0.08);
   color: #1f7a3d;
 }
@@ -4512,7 +4701,7 @@
 }
 
 .workflow-stepper-rail {
-  width: clamp(16px, 2.6vw, 32px);
+  width: clamp(20px, 2.6vw, 34px);
   height: 0.5px;
   margin: 0;
   background: linear-gradient(90deg, rgba(211, 197, 170, 0.72) 0%, rgba(211, 197, 170, 0.16) 100%);
@@ -5987,6 +6176,25 @@
 
 .amorce-section.is-editorial {
   grid-template-rows: auto auto auto auto auto 1fr auto;
+}
+
+.amorce-feedback-slot {
+  display: grid;
+  gap: 0;
+}
+
+.amorce-feedback-slot.is-editorial {
+  min-height: 56px;
+  align-content: start;
+}
+
+.amorce-feedback-slot .luxe-feedback-banner,
+.amorce-feedback-slot .amorce-feedback-banner {
+  width: 100%;
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: left;
 }
 
 .amorce-meta-copy {
@@ -8451,6 +8659,37 @@
   .chapter-editor-topbar {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .chapter-editor-pilot-topline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chapter-editor-heading {
+    width: 100%;
+  }
+
+  .chapter-editor-heading-copy {
+    width: 100%;
+  }
+
+  .chapter-editor-breadcrumb {
+    white-space: normal;
+  }
+
+  .chapter-editor-controls {
+    justify-content: flex-start;
+  }
+
+  .chapter-editor-pilot-subline {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .chapter-editor-book-progress {
+    width: min(180px, 100%);
+    justify-content: flex-start;
   }
 
   .chapter-editor-topbar-center {

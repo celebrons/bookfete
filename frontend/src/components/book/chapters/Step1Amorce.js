@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import ChapterPromptInlineAdmin from './ChapterPromptInlineAdmin';
 import '../BookLuxe.css';
 
 const getApiBaseUrl = () => {
@@ -12,6 +13,26 @@ const getApiBaseUrl = () => {
 };
 
 const normalizeTrigger = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+const getFriendlyAmorceError = (error) => {
+  const rawMessage = String(error?.message || error || '').trim();
+  const normalized = rawMessage.toLowerCase();
+
+  if (
+    normalized.includes('service_tier_capacity_exceeded')
+    || normalized.includes('capacity exceeded')
+    || normalized.includes('status 429')
+    || normalized.includes('"code":"3505"')
+    || normalized.includes('code 3505')
+  ) {
+    return 'Le service de generation est temporairement surcharge. Reessayez dans quelques instants.';
+  }
+
+  if (normalized.includes('session introuvable')) {
+    return 'Votre session semble expiree. Rechargez la page puis reconnectez-vous.';
+  }
+
+  return rawMessage || "Erreur lors de la generation de l amorce.";
+};
 
 const Step1Amorce = ({
   chapter,
@@ -192,7 +213,7 @@ const Step1Amorce = ({
         setNotice('Nouvelle inspiration enregistree. Pensez a la marquer de nouveau comme prete.');
       }
     } catch (generationError) {
-      setError(generationError.message || "Erreur lors de la generation de l amorce.");
+      setError(getFriendlyAmorceError(generationError));
     } finally {
       setGenerating(false);
     }
@@ -316,18 +337,17 @@ const Step1Amorce = ({
           </div>
         ) : null}
 
-        {notice ? (
-          <div className="luxe-feedback-banner is-success">{notice}</div>
-        ) : null}
+        <div className={`amorce-feedback-slot ${editorialMode ? 'is-editorial' : ''}`} aria-live="polite">
+          {notice ? (
+            <div className="luxe-feedback-banner is-success">{notice}</div>
+          ) : null}
 
-        {error ? (
-          <div
-            className="validated-message"
-            style={{ background: '#fff4f2', borderColor: '#efc8bf', color: '#9d3d2f', marginBottom: 'var(--space-md)' }}
-          >
-            {error}
-          </div>
-        ) : null}
+          {!notice && error ? (
+            <div className="luxe-feedback-banner is-error amorce-feedback-banner">
+              {error}
+            </div>
+          ) : null}
+        </div>
 
         <div className={`amorce-meta-copy ${editorialMode ? 'is-editorial' : ''}`}>
           <span className="label-gold">{editorialMode ? 'Amorce' : 'Amorce generee'}</span>
@@ -508,6 +528,23 @@ const Step1Amorce = ({
               </button>
             ) : null}
           </div>
+        ) : null}
+
+        {editorialMode ? (
+          <ChapterPromptInlineAdmin
+            chapter={chapter}
+            endpointBase={`/chapters/${chapter.id}/prompt-admin/chapter-amorce`}
+            panelTitle="Generation de l amorce"
+            panelSubtitle="Testez ici la phrase d amorce et les mots-cles du chapitre, puis activez la version si le rendu convient."
+            currentAreaLabel="Generation de l amorce"
+            collapsedCtaLabel="Tester le prompt d amorce"
+            emptyResultLabel={'Cliquez sur "Tester" pour voir une proposition d amorce ici.'}
+            loadErrorLabel="Erreur chargement panneau prompt amorce."
+            testErrorLabel="Erreur test prompt amorce."
+            publishErrorLabel="Erreur validation prompt amorce."
+            testSuccessLabel="Resultat mis a jour avec les donnees reelles de l amorce."
+            publishSuccessLabel="Cette version est maintenant active pour la creation de l amorce."
+          />
         ) : null}
 
         {!isOrganizer && !chapterLocked ? (

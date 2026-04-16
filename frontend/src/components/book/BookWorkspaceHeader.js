@@ -83,21 +83,23 @@ const BookWorkspaceHeader = ({
         </div>
 
         <div className="chapter-editor-topbar-right">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Tooltip key={item.key} text={item.label} position="bottom">
-                <button
-                  type="button"
-                  className={`chapter-editor-link book-topbar-icon-link ${activeTab === item.key ? 'is-active' : ''}`}
-                  onClick={() => onOpenTab?.(item.key)}
-                  aria-label={item.label}
-                >
-                  <Icon />
-                </button>
-              </Tooltip>
-            );
-          })}
+          <div className="book-workspace-nav-group" aria-label="Navigation du livre">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Tooltip key={item.key} text={item.label} position="bottom">
+                  <button
+                    type="button"
+                    className={`chapter-editor-link book-topbar-icon-link ${activeTab === item.key ? 'is-active' : ''}`}
+                    onClick={() => onOpenTab?.(item.key)}
+                    aria-label={item.label}
+                  >
+                    <Icon />
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </div>
         </div>
       </div>
 

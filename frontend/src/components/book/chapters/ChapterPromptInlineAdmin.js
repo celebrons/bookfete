@@ -191,7 +191,20 @@ const copyTextToClipboard = async (text = '') => {
   document.body.removeChild(textarea);
 };
 
-const ChapterPromptInlineAdmin = ({ chapter }) => {
+const ChapterPromptInlineAdmin = ({
+  chapter,
+  endpointBase = '',
+  panelTitle = 'Generation du chapitre',
+  panelSubtitle = 'Testez des directives simples sans quitter cette page, puis activez la version si le rendu convient.',
+  currentAreaLabel = 'Generation du chapitre',
+  collapsedCtaLabel = 'Tester le prompt creation chapitre',
+  emptyResultLabel = 'Cliquez sur "Tester" pour voir le resultat ici.',
+  loadErrorLabel = 'Erreur chargement panneau prompt.',
+  testErrorLabel = 'Erreur test prompt chapitre.',
+  publishErrorLabel = 'Erreur validation prompt chapitre.',
+  testSuccessLabel = 'Resultat mis a jour avec les donnees reelles du chapitre.',
+  publishSuccessLabel = 'Cette version est maintenant active pour la creation du chapitre.'
+}) => {
   const [available, setAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
@@ -210,6 +223,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
   const [missingVariables, setMissingVariables] = useState([]);
   const [compiledPromptText, setCompiledPromptText] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const resolvedEndpointBase = endpointBase || `/chapters/${chapter?.id}/prompt-admin/chapter-body`;
 
   const requestJson = useCallback(async (path, options = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -253,7 +267,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     setError('');
 
     try {
-      const payload = await requestJson(`/chapters/${chapter.id}/prompt-admin/chapter-body`, {
+      const payload = await requestJson(resolvedEndpointBase, {
         method: 'GET'
       });
 
@@ -277,11 +291,11 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
       }
       const missing = Array.isArray(loadError?.missingVariables) ? loadError.missingVariables : [];
       setMissingVariables(missing);
-      setError(buildPromptErrorMessage(loadError.message || 'Erreur chargement panneau prompt.', missing));
+      setError(buildPromptErrorMessage(loadError.message || loadErrorLabel, missing));
     } finally {
       setLoading(false);
     }
-  }, [chapter?.id, requestJson]);
+  }, [chapter?.id, requestJson, resolvedEndpointBase, loadErrorLabel]);
 
   useEffect(() => {
     setNotice('');
@@ -344,9 +358,8 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
   const statusLabel = activeTemplate?.version
     ? `Version active v${activeTemplate.version}`
     : 'Version active';
-  const collapsedCtaLabel = 'Tester le prompt creation chapitre';
 
-  const handleTest = async () => {
+  const handleTest = useCallback(async () => {
     if (!chapter?.id) return;
 
     setBusyAction('test');
@@ -355,7 +368,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     setMissingVariables([]);
 
     try {
-      const payload = await requestJson(`/chapters/${chapter.id}/prompt-admin/chapter-body/test`, {
+      const payload = await requestJson(`${resolvedEndpointBase}/test`, {
         method: 'POST',
         body: JSON.stringify({ directives })
       });
@@ -370,17 +383,17 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
       setValidation(payload?.result?.validation || null);
       setTestedDirectives(directives);
       setMissingVariables([]);
-      setNotice('Resultat mis a jour avec les donnees reelles du chapitre.');
+      setNotice(testSuccessLabel);
     } catch (testError) {
       const missing = Array.isArray(testError?.missingVariables) ? testError.missingVariables : [];
       setMissingVariables(missing);
-      setError(buildPromptErrorMessage(testError.message || 'Erreur test prompt chapitre.', missing));
+      setError(buildPromptErrorMessage(testError.message || testErrorLabel, missing));
     } finally {
       setBusyAction('');
     }
-  };
+  }, [chapter?.id, directives, requestJson, resolvedEndpointBase, testErrorLabel, testSuccessLabel]);
 
-  const handlePublish = async () => {
+  const handlePublish = useCallback(async () => {
     if (!chapter?.id || !canPublish) return;
 
     setBusyAction('publish');
@@ -389,7 +402,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
     setMissingVariables([]);
 
     try {
-      const payload = await requestJson(`/chapters/${chapter.id}/prompt-admin/chapter-body/publish`, {
+      const payload = await requestJson(`${resolvedEndpointBase}/publish`, {
         method: 'POST',
         body: JSON.stringify({ directives })
       });
@@ -405,15 +418,27 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
       setTestedDirectives(nextDirectives);
       setCompiledPromptText('');
       setMissingVariables([]);
-      setNotice('Cette version est maintenant active pour la creation du chapitre.');
+      setNotice(publishSuccessLabel);
     } catch (publishError) {
       const missing = Array.isArray(publishError?.missingVariables) ? publishError.missingVariables : [];
       setMissingVariables(missing);
-      setError(buildPromptErrorMessage(publishError.message || 'Erreur validation prompt chapitre.', missing));
+      setError(buildPromptErrorMessage(publishError.message || publishErrorLabel, missing));
     } finally {
       setBusyAction('');
     }
-  };
+  }, [
+    chapter?.id,
+    canPublish,
+    directives,
+    requestJson,
+    resolvedEndpointBase,
+    contextSummary,
+    availableVariables,
+    availableVariableMeta,
+    templateVariables,
+    publishErrorLabel,
+    publishSuccessLabel
+  ]);
 
   const handleReset = () => {
     setDirectives(initialDirectives);
@@ -476,10 +501,8 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
         <>
       <div className="chapter-prompt-admin-header">
         <div>
-          <h5 className="chapter-prompt-admin-title">Generation du chapitre</h5>
-          <p className="chapter-prompt-admin-subtitle">
-            Testez des directives simples sans quitter cette page, puis activez la version si le rendu convient.
-          </p>
+          <h5 className="chapter-prompt-admin-title">{panelTitle}</h5>
+          <p className="chapter-prompt-admin-subtitle">{panelSubtitle}</p>
         </div>
         <div className="chapter-prompt-admin-header-actions">
           <span className="chapter-prompt-admin-status">{statusLabel}</span>
@@ -497,7 +520,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
         {formatContextLine(contextSummary) || `Chapitre : ${chapter?.title || 'Chapitre en cours'}`}
       </div>
 
-      <PromptTestingGuide currentAreaLabel="Generation du chapitre" />
+      <PromptTestingGuide currentAreaLabel={currentAreaLabel} />
 
       {error && <div className="luxe-feedback-banner is-error">{error}</div>}
       {notice && <div className="luxe-feedback-banner is-success">{notice}</div>}
@@ -580,7 +603,7 @@ const ChapterPromptInlineAdmin = ({ chapter }) => {
           </div>
         )}
         <div className={`chapter-prompt-admin-result ${hasResult ? '' : 'is-empty'}`}>
-          {hasResult ? resultText : 'Cliquez sur "Tester" pour voir le resultat ici.'}
+          {hasResult ? resultText : emptyResultLabel}
         </div>
         <div className="chapter-prompt-admin-copy-actions">
           <button
