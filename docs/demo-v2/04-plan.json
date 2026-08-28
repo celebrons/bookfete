@@ -1,0 +1,164 @@
+{
+  "_readme": "ETAPE D - Plan du livre. Produit par le prompt 'book_plan' a partir de la MEMOIRE EDITORIALE seule (jamais des textes bruts). 1 appel Mistral. Chaque anecdote est assignee a UN SEUL chapitre : c'est ce qui elimine mecaniquement les repetitions entre chapitres.",
+  "book_id": "demo-pot-depart-1",
+  "version": 1,
+  "status": "proposed",
+  "model": "mistral-large-latest",
+  "prompt_version": 1,
+  "ai_calls": 1,
+
+  "book_title_proposals": [
+    "Trente-deux ans au standard",
+    "On va s'arranger",
+    "Ce qu'aucun logiciel ne contient"
+  ],
+  "book_title_retained": "Trente-deux ans au standard",
+  "narrative_arc": "D'une jeune femme derrière deux lignes téléphoniques à la mémoire vivante d'une entreprise de cent quarante personnes. Le fil rouge est le carnet à spirale : un objet dérisoire qui contient ce qu'aucun système d'information n'a jamais su retenir. Le livre progresse du métier (I-II) vers les gestes quotidiens (III), puis vers ce qu'elle a protégé (IV), ce qu'elle a traversé (V), et ceux qu'elle a vus quand personne ne les regardait (VI).",
+  "tone": "intime, sobre, sans emphase. Le registre doit rester celui des témoignages : des gens du Nord qui ne se paient pas de mots.",
+  "narrative_person": "third_person",
+
+  "chapters": [
+    {
+      "order_index": 1,
+      "title": "Deux lignes et un carnet",
+      "objective": "Poser le décor des débuts et la nature de son talent : une mémoire des personnes, pas des dossiers. Montrer qu'elle a été immédiatement à sa place et qu'elle a inventé sa propre méthode.",
+      "themes": ["t-memoire-gens", "t-role-informel"],
+      "assigned_contributions": ["c01", "c06", "c24"],
+      "assigned_anecdotes": ["a-c24-1", "a-c06-1", "a-c01-1"],
+      "assigned_facts": [
+        "Le standard comptait deux lignes et un carnet à son arrivée",
+        "Elle a connu quatre directeurs et trois déménagements de bureaux",
+        "Elle reconnaissait les voix au téléphone, y compris de clients absents six mois",
+        "Christine Dupire l'a formée ; elle a maîtrisé le poste en deux jours"
+      ],
+      "assigned_quotes": [],
+      "date_constraints": { "arrivee": "1993 ou « au début des années quatre-vingt-dix » — JAMAIS 1994", "promotion": "2004" },
+      "target_words": 900,
+      "must_not_contain": ["1994", "l'âge de Martine", "la signification de la fiche jaune"]
+    },
+    {
+      "order_index": 2,
+      "title": "Ce qu'aucun logiciel ne contient",
+      "objective": "Faire du carnet à spirale le personnage secondaire du livre, et montrer que sa méthode a survécu à l'informatisation puis s'est transmise à deux personnes. Chapitre de la transmission volontaire.",
+      "themes": ["t-memoire-gens", "t-transmission", "t-fiabilite"],
+      "assigned_contributions": ["c02", "c10", "c15", "c20", "c25"],
+      "assigned_anecdotes": ["a-c02-1", "a-c25-1", "a-c10-1", "a-c20-2", "a-c20-1"],
+      "assigned_facts": [
+        "Le carnet rouge contenait numéros, anniversaires, congés, enfants malades",
+        "Aucune pièce comptable réclamée deux fois en vingt-cinq ans",
+        "Le carnet offert à Émilie Ravet était noir — objet distinct"
+      ],
+      "assigned_quotes": ["q-ordinateur", "q-mauvais-numero"],
+      "date_constraints": { "migration_crm": "2017", "succession_standard": "2019" },
+      "target_words": 1000,
+      "must_not_contain": ["une confusion entre le carnet rouge et le carnet noir"]
+    },
+    {
+      "order_index": 3,
+      "title": "La tournée de seize heures trente",
+      "objective": "Décrire les rituels comme un système de soin délibéré, pas comme de la gentillesse décorative. Le lecteur doit comprendre que la corbeille de courrier était un prétexte.",
+      "themes": ["t-rituels", "t-invisibles"],
+      "assigned_contributions": ["c02", "c05", "c18", "c19", "c22"],
+      "assigned_anecdotes": ["a-c22-1", "a-c02-2", "a-c05-1", "a-c19-2", "a-c18-1"],
+      "assigned_facts": [
+        "Elle disait aux caristes qu'ils travaillaient plus dur que les bureaux",
+        "Le géranium était sur son bureau au moins depuis 2010, sauvé trois fois"
+      ],
+      "assigned_quotes": [],
+      "date_constraints": {},
+      "target_words": 900,
+      "must_not_contain": ["une fusion de la tarte au sucre et des gaufres en une seule pâtisserie"]
+    },
+    {
+      "order_index": 4,
+      "title": "Mon grand, ma grande",
+      "objective": "Le chapitre le plus fort du livre : elle prenait la faute des débutants à sa place. Deux récits parallèles à douze ans d'écart, strictement distincts, qui montrent une constance.",
+      "themes": ["t-protection-jeunes"],
+      "assigned_contributions": ["c03", "c07", "c12", "c16", "c19"],
+      "assigned_anecdotes": ["a-c03-1", "a-c16-1", "a-c07-1", "a-c19-1"],
+      "assigned_facts": [
+        "Elle savait signaler une erreur en commençant par une question, jamais par un reproche",
+        "Elle pouvait présenter quarante personnes de mémoire en resituant chaque fonction"
+      ],
+      "assigned_quotes": ["q-arranger", "q-relis", "q-mon-grand"],
+      "date_constraints": { "kevin": "2011", "laura": "2022-2024", "thomas": "2019" },
+      "must_not_contain": [
+        "Kevin associé au devis au mauvais tarif",
+        "Laura associée à la plaque offset",
+        "« mon grand » adressé à Laura",
+        "« ma grande » adressé à Kevin"
+      ],
+      "attribution_locks": [
+        { "anecdote": "a-c03-1", "exclusive_to": "Kevin Dubois", "object": "plaque offset", "year": "2011" },
+        { "anecdote": "a-c16-1", "exclusive_to": "Laura Petit", "object": "devis au mauvais tarif", "year": "2023" }
+      ],
+      "target_words": 1100
+    },
+    {
+      "order_index": 5,
+      "title": "Les années où il a fallu tenir",
+      "objective": "Sortir de l'hagiographie. Montrer une femme dans des situations réellement difficiles, y compris en désaccord avec des collègues. Le témoignage du délégué syndical est indispensable : il doit apparaître sans être lissé.",
+      "themes": ["t-crise", "t-nuance", "t-fiabilite"],
+      "assigned_contributions": ["c09", "c11", "c14", "c17", "c21"],
+      "assigned_anecdotes": ["a-c09-1", "a-c11-1", "a-c17-1", "a-c21-1", "a-c14-1"],
+      "assigned_facts": [
+        "L'incendie a détruit le stock de papier en une nuit",
+        "Le plan social de 2014 a supprimé onze postes",
+        "Le DRH était initialement opposé à sa démarche",
+        "Elle était la seule à ne pas paraître secouée, ou le dissimulait"
+      ],
+      "assigned_quotes": [],
+      "date_constraints": {
+        "incendie": "2009 — les récits de Bernard Wattel (lendemain 6h30) et Patrick Nowak (soir, 23h) décrivent le MÊME événement, à combiner chronologiquement",
+        "plan_social": "2014",
+        "noel": "24 décembre, ANNÉE INCONNUE — ne jamais dater"
+      },
+      "target_words": 1200,
+      "must_not_contain": ["2011 pour l'incendie", "une année pour l'épisode du 24 décembre", "un lissage du désaccord avec Serge Dhaene"]
+    },
+    {
+      "order_index": 6,
+      "title": "Personne ne connaît mon prénom",
+      "objective": "Clore sur ce qui la définit le mieux : elle voyait les gens que l'organigramme ne voit pas. Chapitre le plus émouvant, à traiter avec la plus grande sobriété — l'émotion est dans les faits, pas dans les adjectifs.",
+      "themes": ["t-invisibles", "t-role-informel"],
+      "assigned_contributions": ["c04", "c05", "c08", "c23"],
+      "assigned_anecdotes": ["a-c08-1", "a-c08-2", "a-c23-1"],
+      "assigned_facts": [
+        "Elle n'a jamais appartenu aux RH mais en assumait une part informelle",
+        "Les salariés la consultaient avant de saisir les RH",
+        "Elle savait que la fille d'Ahmed Benali faisait de la danse",
+        "C'est la seule occasion où un collègue rapporte l'avoir vue pleurer"
+      ],
+      "assigned_quotes": [],
+      "date_constraints": { "naturalisation": "AUCUNE DATE DISPONIBLE — ne pas situer dans le temps" },
+      "target_words": 900,
+      "must_not_contain": ["une date pour la naturalisation", "le prénom du fils de Fatou Diallo", "un ton apitoyé"]
+    }
+  ],
+
+  "frame_texts": {
+    "introduction": {
+      "objective": "Situer le livre : vingt-cinq personnes, trente-deux ans, une imprimerie. Annoncer le motif du carnet sans le déflorer.",
+      "allowed_sources": ["registre global"],
+      "target_words": 300
+    },
+    "conclusion": {
+      "objective": "Le passage de relais et l'après. Seul endroit du livre où le petit-fils Malo et le jardin peuvent apparaître, car ils viennent de la configuration et non des témoignages.",
+      "allowed_sources": ["book_configs.retirement_project", "a-c20-1"],
+      "target_words": 300
+    }
+  },
+
+  "coverage_check": {
+    "contributions_utilisables": 24,
+    "contributions_assignees": 24,
+    "contributions_non_assignees": [],
+    "contribution_ecartee": { "id": "c13", "raison": "richness=thin, usable_for_narrative=false", "traitement": "Mohamed Saidi figure dans la page des signataires, pas dans le récit" },
+    "anecdotes_totales": 25,
+    "anecdotes_assignees": 25,
+    "anecdotes_assignees_deux_fois": 0,
+    "verdict": "COMPLET — chaque témoignage exploitable nourrit au moins un chapitre, chaque anecdote sert exactement une fois"
+  },
+
+  "_note_pour_le_createur": "Ce plan est editable avant generation. Deplacer une anecdote d'un chapitre a l'autre, retirer un temoignage, renommer un chapitre : le pipeline regenere uniquement les chapitres touches."
+}

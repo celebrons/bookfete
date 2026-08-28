@@ -1,0 +1,238 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`POST /:id/chapters/:chapterId/generate-draft — chemin IA correspond au rendu de reference (snapshot) 1`] = `
+"
+    <section class="draft-book-chapter" lang="fr">
+      <div class="draft-book-chapter-shell">
+        
+          <section class="draft-book-page draft-book-page-opening">
+            
+                  <header class="chapter-opening">
+                    <p class="chapter-num">Chapitre III</p>
+                    <h3 class="chapter-title">Ouverture</h3>
+                    <p class="chapter-sub">Le rituel des repas de famille, les odeurs, les disputes et les rires.</p>
+                    <hr class="chapter-rule" />
+                  </header>
+                
+            <p class="draft-book-intro">Le rituel des repas de famille, les odeurs, les disputes et les rires.</p>
+            <div class="draft-book-body">
+              <p>La cuisine sentait le cumin et le pain chaud bien avant que quiconque descende l&#39;escalier. Marguerite y regnait sans jamais elever la voix, le grand plat bleu deja pose au centre de la table.</p>
+            </div>
+            
+    <div class="draft-book-question-block">
+      <p class="draft-book-amorce-text">« Quel plat de Marguerite vous revient immediatement en memoire ? »</p>
+      
+        <ul class="draft-book-question-list">
+          <li><span>le grand plat bleu</span></li><li><span>la radio dans la cuisine</span></li>
+        </ul>
+      
+    </div>
+  
+            
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">01</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Mouvement 2</h3>
+            
+            <div class="draft-book-body">
+              <p>Le dimanche, la radio restait allumee sur la meme station. Personne n&#39;avait choisi cette habitude, elle s&#39;etait installee toute seule, comme les places autour de la table.</p>
+            </div>
+            
+            
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">02</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Mouvement 3</h3>
+            
+            <div class="draft-book-body">
+              <p>Sophie se souvient des feuilles de brick ratees, douze avant la premiere reussie, et du rire de Marguerite qui remplissait la piece. Karim, lui, n&#39;a jamais eu droit a son prenom. Il etait le grand, et il l&#39;est reste trente ans plus tard.</p>
+            </div>
+            
+            
+            
+    <div class="draft-book-contribution-spotlight">
+      <div class="draft-book-mini-title">Votre contribution en lumiere</div>
+      
+      <div class="draft-book-callout">
+        <p class="draft-book-callout-text">« C&#39;est dans la cuisine de Marguerite que tout se passait. Le dimanche matin, elle sortait le grand plat bleu et nous appelait un par un. On savait qu&#39;il fallait venir, sinon elle montait le son de la radio jusqu&#39;a ce qu&#39;on cede. »</p>
+      </div>
+    
+      <div class="draft-book-contributor-list">
+        
+          <div class="draft-book-contributor-item">
+            <strong>Sophie Berger</strong>
+            <p>Je me souviens du jour ou elle m&#39;a appris a plier les feuilles de brick. J&#39;en ai rate douze avant la premiere reussie, et elle riait tellement qu&#39;elle en avait les larmes...</p>
+          </div>
+        
+      </div>
+    
+    </div>
+  
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">03</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Mouvement 4</h3>
+            
+            <div class="draft-book-body">
+              <p>Ces surnoms tenaient lieu de tendresse chez elle, une facon de dire les choses sans les dire. Il y avait aussi les disputes, courtes et bruyantes, qui s&#39;achevaient toujours par une assiette supplementaire tendue a celui qui boudait.</p>
+            </div>
+            
+            
+    <figure class="draft-book-media-block">
+      <img src="https://cdn.test.local/photos/cuisine.jpg" alt="Illustration La cuisine du dimanche" loading="lazy" />
+    </figure>
+  
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">04</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Mouvement 5</h3>
+            
+            <div class="draft-book-body">
+              <p>Elle ne s&#39;excusait jamais avec des mots, seulement avec du pain trempe dans la sauce. Les etes changeaient le rythme sans changer le rituel. On mangeait dehors, la radio passait par la fenetre, et le grand plat bleu suivait sur la table de jardin.</p>
+            </div>
+            
+            
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">05</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page draft-book-page-gallery">
+            <h3 class="chapter-title">Mouvement 6</h3>
+            
+            <div class="draft-book-body">
+              <p>Aujourd&#39;hui encore, quand la radio joue cette station, quelqu&#39;un dans la famille se leve pour mettre la table sans qu&#39;on le lui demande.</p>
+            </div>
+            
+            
+            
+            
+    <div class="draft-book-gallery-wrap">
+      <div class="draft-book-mini-title">Instants en images</div>
+      <div class="draft-book-gallery is-duo">
+        
+          <figure class="draft-book-photo">
+            <img src="https://cdn.test.local/photos/brick.jpg" alt="Photo du chapitre 1" loading="lazy" />
+          </figure>
+        
+          <figure class="draft-book-photo">
+            <img src="https://cdn.test.local/photos/table.jpg" alt="Photo du chapitre 2" loading="lazy" />
+          </figure>
+        
+      </div>
+    </div>
+  
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">06</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Mouvement 7</h3>
+            
+            <div class="draft-book-body">
+              <p>Aujourd&#39;hui encore, quand la radio joue cette station, quelqu&#39;un dans la famille se leve pour mettre la table sans qu&#39;on le lui demande.</p>
+            </div>
+            
+            
+            
+            
+            
+    <div class="draft-book-contribution-spotlight">
+      <div class="draft-book-mini-title">Vos proches ont dit...</div>
+      
+      <div class="draft-book-contributor-list">
+        
+          <div class="draft-book-contributor-item">
+            <strong>Sophie Berger</strong>
+            <p>Je me souviens du jour ou elle m&#39;a appris a plier les feuilles de brick. J&#39;en ai rate douze avant la premiere reussie, et elle riait tellement qu&#39;elle en avait les larmes...</p>
+          </div>
+        
+      </div>
+    
+    </div>
+  
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">07</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Cloture</h3>
+            
+            <div class="draft-book-body">
+              <p>La cuisine sentait le cumin et le pain chaud bien avant que quiconque descende l&#39;escalier. Marguerite y regnait sans jamais elever la voix, le grand plat bleu deja pose au centre de la table. Le dimanche, la radio restait allumee sur la meme station. Personne n&#39;avait choisi cette habitude, elle s&#39;etait installee toute seule, comme les places autour de la table. Sophie se souvient des feuilles de brick ratees, douze avant la premiere reussie, et du rire de Marguerite qui remplissait la piece. Karim, lui, n&#39;a jamais eu droit a son prenom. Il etait le grand, et il l&#39;est reste trente ans plus tard. Ces surnoms tenaient lieu de tendresse chez elle, une facon de dire les choses sans les dire. Il y avait aussi les disputes, courtes et bruyantes, qui s&#39;achevaient toujours par une assiette supplementaire tendue a celui qui boudait. Elle ne s&#39;excusait jamais...</p>
+            </div>
+            
+            
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">08</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+      </div>
+    </section>
+  "
+`;

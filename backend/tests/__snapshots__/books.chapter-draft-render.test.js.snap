@@ -1,0 +1,238 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`POST /:id/chapters/:chapterId/generate-draft — rendu deterministe contenu du HTML genere correspond au rendu de reference (snapshot) 1`] = `
+"
+    <section class="draft-book-chapter" lang="fr">
+      <div class="draft-book-chapter-shell">
+        
+          <section class="draft-book-page draft-book-page-opening">
+            
+                  <header class="chapter-opening">
+                    <p class="chapter-num">Chapitre III</p>
+                    <h3 class="chapter-title">La cuisine du dimanche</h3>
+                    <p class="chapter-sub">Le rituel des repas de famille, les odeurs, les disputes et les rires.</p>
+                    <hr class="chapter-rule" />
+                  </header>
+                
+            <p class="draft-book-intro">Le rituel des repas de famille, les odeurs, les disputes et les rires.</p>
+            <div class="draft-book-body">
+              <p>Le rituel des repas de famille, les odeurs, les disputes et les rires. Fil narratif precedent : Le village, la maison aux volets bleus et les etes qui ne finissaient jamais. Intention editoriale : Un livre tendre et lumineux pour les 60 ans de Marguerite, entre rires et souvenirs de famille. Amorce du chapitre : Quel plat de Marguerite vous revient immediatement en memoire ? Mots declencheurs : le grand plat bleu | la radio dans la cuisine | les feuilles de brick Details a faire vivre : Le rituel des repas de famille, les odeurs, les disputes et les rires. | C&#39;est dans la cuisine de Marguerite que tout se passait</p>
+            </div>
+            
+    <div class="draft-book-question-block">
+      <p class="draft-book-amorce-text">« Quel plat de Marguerite vous revient immediatement en memoire ? »</p>
+      
+        <ul class="draft-book-question-list">
+          <li><span>le grand plat bleu</span></li><li><span>la radio dans la cuisine</span></li>
+        </ul>
+      
+    </div>
+  
+            
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">01</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Le moment qui lance tout</h3>
+            
+            <div class="draft-book-body">
+              <p>C&#39;est dans la cuisine de Marguerite que tout se passait. Le dimanche matin, elle sortait le grand plat bleu et nous appelait un par un. On savait qu&#39;il fallait venir, sinon elle montait le son de la radio jusqu&#39;a ce qu&#39;on cede.</p>
+            </div>
+            
+            
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">02</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">La voix de l organisateur</h3>
+            
+            <div class="draft-book-body">
+              <p>C&#39;est dans la cuisine de Marguerite que tout se passait. Le dimanche matin, elle sortait le grand plat bleu et nous appelait un par un. On savait qu&#39;il fallait venir, sinon elle montait le son de la radio jusqu&#39;a ce qu&#39;on cede.</p>
+            </div>
+            
+            
+            
+    <div class="draft-book-contribution-spotlight">
+      <div class="draft-book-mini-title">Votre contribution en lumiere</div>
+      
+      <div class="draft-book-callout">
+        <p class="draft-book-callout-text">« C&#39;est dans la cuisine de Marguerite que tout se passait. Le dimanche matin, elle sortait le grand plat bleu et nous appelait un par un. On savait qu&#39;il fallait venir, sinon elle montait le son de la radio jusqu&#39;a ce qu&#39;on cede. »</p>
+      </div>
+    
+      <div class="draft-book-contributor-list">
+        
+          <div class="draft-book-contributor-item">
+            <strong>Sophie Berger</strong>
+            <p>Je me souviens du jour ou elle m&#39;a appris a plier les feuilles de brick. J&#39;en ai rate douze avant la premiere reussie, et elle riait tellement qu&#39;elle en avait les larmes...</p>
+          </div>
+        
+      </div>
+    
+    </div>
+  
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">03</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Vos proches ont dit...</h3>
+            
+            <div class="draft-book-body">
+              <p>Sophie Berger : Je me souviens du jour ou elle m&#39;a appris a plier les feuilles de brick. J&#39;en ai rate douze avant la premiere reussie, et elle riait tellement qu&#39;elle en avait les larmes aux yeux. Karim Haddad : Marguerite ne m&#39;a jamais appele par mon prenom. Pour elle j&#39;etais &#39;le grand&#39;. Trente ans plus tard, elle continue, et honnetement ca me manquerait si elle arretait.</p>
+            </div>
+            
+            
+    <figure class="draft-book-media-block">
+      <img src="https://cdn.test.local/photos/cuisine.jpg" alt="Illustration La cuisine du dimanche" loading="lazy" />
+    </figure>
+  
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">04</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Les details qui restent</h3>
+            
+            <div class="draft-book-body">
+              <p>Details saillants : Le rituel des repas de famille, les odeurs, les disputes et les rires. | C&#39;est dans la cuisine de Marguerite que tout se passait | Le dimanche matin, elle sortait le grand plat bleu et nous appelait un par un Le rituel des repas de famille, les odeurs, les disputes et les rires. La narration doit rester concrete, situee et sensorielle, sans generalites.</p>
+            </div>
+            
+            
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">05</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page draft-book-page-gallery">
+            <h3 class="chapter-title">Galerie narrative</h3>
+            
+            <div class="draft-book-body">
+              <p>C&#39;est dans la cuisine de Marguerite que tout se passait. Le dimanche matin, elle sortait le grand plat bleu et nous appelait un par un. On savait qu&#39;il fallait venir, sinon elle montait le son de la radio jusqu&#39;a ce qu&#39;on cede. A prolonger avec : On savait qu&#39;il fallait venir, sinon elle montait le son de la radio jusqu&#39;a ce qu&#39;on cede. | Je me souviens du jour ou elle m&#39;a appris a plier les feuilles de brick | J&#39;en ai rate douze avant la premiere reussie, et elle riait tellement qu&#39;elle en avait les larmes aux yeux.</p>
+            </div>
+            
+            
+            
+            
+    <div class="draft-book-gallery-wrap">
+      <div class="draft-book-mini-title">Instants en images</div>
+      <div class="draft-book-gallery is-duo">
+        
+          <figure class="draft-book-photo">
+            <img src="https://cdn.test.local/photos/brick.jpg" alt="Photo du chapitre 1" loading="lazy" />
+          </figure>
+        
+          <figure class="draft-book-photo">
+            <img src="https://cdn.test.local/photos/table.jpg" alt="Photo du chapitre 2" loading="lazy" />
+          </figure>
+        
+      </div>
+    </div>
+  
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">06</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Vos proches ont dit... (suite)</h3>
+            
+            <div class="draft-book-body">
+              <p>Les retours complementaires des proches sont integres ici pour enrichir le regard croise.</p>
+            </div>
+            
+            
+            
+            
+            
+    <div class="draft-book-contribution-spotlight">
+      <div class="draft-book-mini-title">Vos proches ont dit...</div>
+      
+      <div class="draft-book-contributor-list">
+        
+          <div class="draft-book-contributor-item">
+            <strong>Sophie Berger</strong>
+            <p>Je me souviens du jour ou elle m&#39;a appris a plier les feuilles de brick. J&#39;en ai rate douze avant la premiere reussie, et elle riait tellement qu&#39;elle en avait les larmes...</p>
+          </div>
+        
+      </div>
+    
+    </div>
+  
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">07</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+          <section class="draft-book-page">
+            <h3 class="chapter-title">Clore la sequence</h3>
+            
+            <div class="draft-book-body">
+              <p>La cloture doit laisser une image nette et memorisable, dans une tonalite intime. Derniers rappels concrets : Le dimanche matin, elle sortait le grand plat bleu et nous appelait un par un | On savait qu&#39;il fallait venir, sinon elle montait le son de la radio jusqu&#39;a ce qu&#39;on cede. 3 contribution(s) validee(s) nourrissent deja ce brouillon.</p>
+            </div>
+            
+            
+            
+            
+            
+            
+    <div class="draft-book-folio" aria-hidden="true">
+      <span class="draft-book-folio-value">08</span>
+      <span class="draft-book-folio-dot"></span>
+      <span class="draft-book-folio-value">08</span>
+    </div>
+  
+          </section>
+        
+      </div>
+    </section>
+  "
+`;

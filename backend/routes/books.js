@@ -25,7 +25,6 @@ const MAX_CHAPTER_AI_GENERATIONS = 3;
 const CHAPTER_DRAFT_PAGE_COUNT = 8;
 const CHAPTER_DRAFT_MIN_TOTAL_CHARS = 3800;
 const CHAPTER_DRAFT_MIN_PAGE_CHARS = 300;
-const CHAPTER_DRAFT_QUALITY_THRESHOLD = 72;
 const CHAPTER_DRAFT_FILLER_PATTERNS = [
   /dans ce chapitre/gi,
   /ce chapitre (?:montre|raconte|presente|met en lumiere|se referme|ouvre)/gi,
@@ -205,9 +204,13 @@ router.get('/:id', authenticate, async (req, res) => {
       .from('books')
       .select('*')
       .eq('id', req.params.id)
+      .eq('owner_id', req.user.id)
       .single();
 
     if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Livre introuvable.' });
+      }
       throw error;
     }
 
@@ -730,34 +733,6 @@ function buildPreviewLayoutClassName(layoutSettings, previewFormat = '') {
 function buildPreviewLayoutInlineStyle(layoutSettings, previewFormat = '') {
   const normalized = normalizePreviewLayoutSettings(layoutSettings, previewFormat);
   return `--layout-font-scale:${normalized.fontScale};`;
-}
-
-function extractBearerToken(req) {
-  const authHeader = req.headers?.authorization || '';
-  const [scheme, token] = authHeader.split(' ');
-  if (scheme !== 'Bearer' || !token) {
-    return '';
-  }
-  return token;
-}
-
-function createUserScopedClient(req) {
-  const token = extractBearerToken(req);
-  if (!token) {
-    return null;
-  }
-
-  return createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    }
-  );
 }
 
 function normalizeIdentifier(value) {
@@ -1731,47 +1706,6 @@ function extractDetailAnchorsFromSourcePayload(sourcePayload, maxItems = 8) {
   return results;
 }
 
-function buildChapterGenerationSourceSnapshot(sourcePayload, detailAnchors = [], maxGuest = 4) {
-  const chapter = sourcePayload?.chapter || {};
-  const guestContributions = Array.isArray(chapter?.guestContributions)
-    ? chapter.guestContributions
-    : [];
-
-  return {
-    book: sourcePayload?.book || {},
-    chapter: {
-      id: chapter.id,
-      orderIndex: chapter.orderIndex,
-      title: chapter.title,
-      description: chapter.description,
-      amorceText: cleanText(chapter.amorceText, 320),
-      triggers: Array.isArray(chapter.triggers) ? chapter.triggers : [],
-      organizerContribution: chapter.organizerContribution
-        ? {
-            message: cleanText(chapter.organizerContribution.message, 2200),
-            photoCount: Array.isArray(chapter.organizerContribution.photoUrls)
-              ? chapter.organizerContribution.photoUrls.length
-              : 0
-          }
-        : null,
-      guestContributions: guestContributions
-        .slice(0, Math.max(1, maxGuest))
-        .map((contribution) => ({
-          contributorName: cleanText(contribution.contributorName, 180) || 'Contributeur',
-          message: cleanText(contribution.message, 1700),
-          photoCount: Array.isArray(contribution.photoUrls) ? contribution.photoUrls.length : 0
-        })),
-      stats: chapter.stats || {}
-    },
-    previousChapterSummaries: Array.isArray(sourcePayload?.previousChapterSummaries)
-      ? sourcePayload.previousChapterSummaries.slice(-4)
-      : [],
-    detailAnchors: Array.isArray(detailAnchors)
-      ? detailAnchors.slice(0, 8)
-      : []
-  };
-}
-
 function buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors = []) {
   const chapterTitle = cleanText(sourcePayload?.chapter?.title, 180)
     || cleanText(fallbackDraft?.title, 180)
@@ -1802,38 +1736,6 @@ function buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors = 
       'Generalites vagues sans details concrets.',
       'Repetition du meme angle narratif sur toutes les pages.'
     ]
-  };
-}
-
-function normalizeChapterPlan(candidatePlan, sourcePayload, fallbackDraft, detailAnchors = []) {
-  const fallbackPlan = buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors);
-  if (!candidatePlan || typeof candidatePlan !== 'object') {
-    return fallbackPlan;
-  }
-
-  const pagePlans = Array.from({ length: CHAPTER_DRAFT_PAGE_COUNT }, (_, index) => {
-    const page = Array.isArray(candidatePlan.pagePlans) ? candidatePlan.pagePlans[index] : null;
-    const fallbackPage = fallbackPlan.pagePlans[index];
-    return {
-      title: sanitizeDraftHeadingStrict(
-        cleanText(page?.title, 180) || fallbackPage.title,
-        fallbackPage.title
-      ),
-      focus: cleanText(page?.focus, 320) || fallbackPage.focus,
-      anchors: Array.isArray(page?.anchors)
-        ? page.anchors.map((anchor) => cleanText(anchor, 160)).filter(Boolean).slice(0, 3)
-        : fallbackPage.anchors
-    };
-  });
-
-  const forbidden = Array.isArray(candidatePlan.forbidden)
-    ? candidatePlan.forbidden.map((item) => cleanText(item, 140)).filter(Boolean).slice(0, 5)
-    : fallbackPlan.forbidden;
-
-  return {
-    narrativePromise: cleanText(candidatePlan.narrativePromise, 320) || fallbackPlan.narrativePromise,
-    pagePlans,
-    forbidden: forbidden.length > 0 ? forbidden : fallbackPlan.forbidden
   };
 }
 
@@ -3837,88 +3739,13 @@ function execFilePromise(command, args, options = {}) {
   });
 }
 
-function renderValidatedBookInteriorHtml({
-  book,
-  chaptersWithDrafts,
-  frameTexts = null,
-  previewFormat,
-  previewLayoutSettings
-}) {
-  const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
-  const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
-  const layoutClass = buildPreviewLayoutClassName(previewLayoutSettings, resolvedPreviewFormat);
-  const layoutStyle = buildPreviewLayoutInlineStyle(previewLayoutSettings, resolvedPreviewFormat);
-  const normalizedLayoutSettings = normalizePreviewLayoutSettings(previewLayoutSettings, resolvedPreviewFormat);
-  const chapterBlocks = (chaptersWithDrafts || [])
-    .map(({ chapter, draft }, index) => {
-      const sourceChapter = buildPreviewSourceChapter(chapter);
-      const chapterNarrative = buildChapterNarrativeForPreview({
-        chapter,
-        draft,
-        sourceChapter
-      });
-
-      return renderDraftChapterPages({
-        chapter: chapterNarrative,
-        sourceChapter,
-        index,
-        layoutSettings: normalizedLayoutSettings,
-        previewFormat: resolvedPreviewFormat
-      });
-    })
-    .join('');
-  const chaptersContent = chapterBlocks
-    || '<section class="draft-book-section"><p class="draft-book-empty">Aucun chapitre valide.</p></section>';
-
-  return `
-    <article class="draft-book ${previewFormatClass} ${layoutClass}" data-preview-format="${resolvedPreviewFormat}" style="${escapeHtml(layoutStyle)}">
-      <header class="draft-book-header">
-        <div class="draft-book-eyebrow">Version finale</div>
-        <h1>${escapeHtml(cleanText(book.title, 180) || 'Livre souvenir')}</h1>
-        <div class="draft-book-meta">
-          ${escapeHtml([
-            book.recipient_name ? `Destinataire : ${book.recipient_name}` : '',
-            book.style_narratif ? `Style : ${book.style_narratif}` : '',
-            book.event_type ? `Evenement : ${book.event_type}` : ''
-          ].filter(Boolean).join(' | '))}
-        </div>
-      </header>
-      ${renderBookFramePreviewSection({
-        title: 'Introduction',
-        content: frameTexts?.introduction || ''
-      })}
-      ${chaptersContent}
-      ${renderBookFramePreviewSection({
-        title: 'Conclusion',
-        content: frameTexts?.conclusion || ''
-      })}
-    </article>
-  `;
-}
-
-function renderValidatedBookCoverHtml({ book, previewFormat }) {
-  const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
-  const previewFormatClass = `draft-book-format-${resolvedPreviewFormat}`;
-  const frontCard = extractCoverCardMarkup(renderAssembledFrontCover(book));
-  const backCard = extractCoverCardMarkup(renderAssembledBackCover(book));
-
-  return `
-    <article class="draft-book draft-book-cover-print ${previewFormatClass}" data-preview-format="${resolvedPreviewFormat}">
-      <section class="cover-print-spread">
-        ${backCard}
-        ${frontCard}
-      </section>
-    </article>
-  `;
-}
-
 function buildBookFrameFallbackText({ book = {}, chaptersWithDrafts = [], outputType = 'introduction' }) {
   const recipientName = cleanText(book?.recipient_name, 180) || 'la personne celebree';
   const chapterTitles = (Array.isArray(chaptersWithDrafts) ? chaptersWithDrafts : [])
     .map(({ chapter }, index) => cleanText(index === 0 ? 'Introduction' : chapter?.title, 160))
     .filter(Boolean);
 
-  if (normalizeText(outputType).toLowerCase() === 'conclusion') {
+  if (cleanText(outputType, 40).toLowerCase() === 'conclusion') {
     return `Ce livre trace deja une ligne claire autour de ${recipientName}, entre ${chapterTitles.slice(0, 3).join(', ') || 'ses moments forts'} et ce que chacun choisit d en retenir pour la suite.`;
   }
 
@@ -3993,11 +3820,6 @@ async function generateBookFrameTextsForPreview({
     introduction,
     conclusion
   };
-}
-
-function extractCoverCardMarkup(sectionHtml) {
-  const match = String(sectionHtml || '').match(/<article[\s\S]*?<\/article>/i);
-  return match ? match[0] : '';
 }
 
 function buildPrintableBookHtmlDocument({ title, bodyHtml, mode, previewFormat }) {
@@ -5134,73 +4956,6 @@ function getPrintableBookStyles({ isCoverMode, previewFormat }) {
   `;
 }
 
-async function generateInteriorPdfFile({ filePath, book, chaptersWithDrafts, previewFormat }) {
-  const formatSpec = getPreviewFormatSpec(resolveBookPreviewFormat(book, previewFormat));
-  const pageWidth = mmToPt(formatSpec.trimWidthMm);
-  const pageHeight = mmToPt(formatSpec.trimHeightMm);
-  const margins = {
-    top: mmToPt(16),
-    right: mmToPt(14),
-    bottom: mmToPt(16),
-    left: mmToPt(14)
-  };
-
-  await writePdfFile({
-    filePath,
-    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Interieur`,
-    draw: (doc) => {
-      const addPage = () => {
-        doc.addPage({
-          size: [pageWidth, pageHeight],
-          margins
-        });
-      };
-
-      addPage();
-      doc.fillColor('#8b6a2f').font('Helvetica-Bold').fontSize(10).text('Version finale imprimeur');
-      doc.moveDown(0.6);
-      doc.fillColor('#1f2228').font('Helvetica-Bold').fontSize(22).text(
-        cleanText(book?.title, 180) || 'Livre souvenir',
-        { align: 'left' }
-      );
-      doc.moveDown(0.35);
-      doc.font('Helvetica').fontSize(11).fillColor('#4b5563').text(
-        [
-          cleanText(book?.event_type, 80),
-          cleanText(book?.recipient_name, 120),
-          cleanText(book?.style_narratif, 80)
-        ].filter(Boolean).join(' | ') || 'Edition personnalisee'
-      );
-      doc.moveDown(0.7);
-      doc.fontSize(10).fillColor('#6b7280').text(
-        `Genere le ${new Date().toLocaleString('fr-FR')} | Format ${formatSpec.label}: ${formatSpec.trimWidthMm} x ${formatSpec.trimHeightMm} mm`,
-        { align: 'left' }
-      );
-
-      chaptersWithDrafts.forEach(({ chapter, draft }, chapterIndex) => {
-        addPage();
-        doc.fillColor('#8b6a2f').font('Helvetica-Bold').fontSize(10).text(`Volet ${chapterIndex + 1}`);
-        doc.moveDown(0.3);
-        doc.fillColor('#1f2228').font('Helvetica-Bold').fontSize(18).text(
-          sanitizeDraftHeadingStrict(
-            cleanText(draft?.title, 180) || cleanText(chapter?.title, 180) || `Volet ${chapterIndex + 1}`,
-            cleanText(chapter?.title, 180) || `Volet ${chapterIndex + 1}`
-          )
-        );
-        doc.moveDown(0.45);
-        doc.fillColor('#1f2228').font('Helvetica').fontSize(11);
-        doc.text(
-          buildInteriorChapterText({ chapter, draft }),
-          {
-            align: 'left',
-            lineGap: 3
-          }
-        );
-      });
-    }
-  });
-}
-
 async function generateFinalBookPdfFileLegacy({ filePath, book, chaptersWithDrafts, previewFormat }) {
   const formatSpec = getPreviewFormatSpec(resolveBookPreviewFormat(book, previewFormat));
   const pageWidth = mmToPt(formatSpec.trimWidthMm);
@@ -5301,200 +5056,6 @@ async function generateFinalBookPdfFileLegacy({ filePath, book, chaptersWithDraf
       }
       doc.moveDown(0.8);
       doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(11).text(backSignature, { align: 'left' });
-    }
-  });
-}
-
-async function generateCoverPdfFile({ filePath, book, chaptersWithDrafts, previewFormat }) {
-  const formatSpec = getPreviewFormatSpec(resolveBookPreviewFormat(book, previewFormat));
-  const trimWidthMm = formatSpec.trimWidthMm;
-  const trimHeightMm = formatSpec.trimHeightMm;
-  const bleedMm = 3;
-  const estimatedPages = Math.max(
-    32,
-    Number(book?.pages || chaptersWithDrafts.length * 8 + 8) || 32
-  );
-  const spineMm = estimateSpineWidthMm(estimatedPages, cleanText(book?.papier, 80));
-  const spreadWidthMm = trimWidthMm * 2 + spineMm + bleedMm * 2;
-  const spreadHeightMm = trimHeightMm + bleedMm * 2;
-
-  const spreadWidthPt = mmToPt(spreadWidthMm);
-  const spreadHeightPt = mmToPt(spreadHeightMm);
-  const bleedPt = mmToPt(bleedMm);
-  const trimWidthPt = mmToPt(trimWidthMm);
-  const trimHeightPt = mmToPt(trimHeightMm);
-  const spinePt = mmToPt(spineMm);
-  const safeMarginPt = mmToPt(9);
-
-  const {
-    coverConfig,
-    backCoverConfig,
-    frontBg,
-    backBg,
-    textColor,
-    accentColor
-  } = resolveCoverPreviewConfig(book);
-
-  const frontTitle = cleanText(coverConfig?.title, 180) || cleanText(book?.title, 180) || 'Livre souvenir';
-  const frontSubtitle = cleanText(coverConfig?.subtitle, 220);
-  const frontRecipient = cleanText(coverConfig?.recipientLine, 180) || cleanText(book?.recipient_name, 180);
-  const frontEventLine = cleanText(coverConfig?.eventLine, 180)
-    || [cleanText(book?.event_type, 120), book?.recipient_age ? `${book.recipient_age} ans` : '']
-      .filter(Boolean)
-      .join(' | ');
-  const backBlurb = cleanText(backCoverConfig?.blurb, 1800) || 'Texte de quatrieme de couverture a finaliser.';
-  const backQuote = cleanText(backCoverConfig?.quote, 360);
-  const backOrganizerLine = cleanText(backCoverConfig?.organizerLine, 220);
-  const backDateLocation = cleanText(backCoverConfig?.dateLocation, 180);
-  const backIsbn = cleanText(backCoverConfig?.isbnCode, 60);
-  const backSignature = cleanText(backCoverConfig?.signature, 180)
-    || (book?.recipient_name ? `Les proches de ${book.recipient_name}` : 'Les proches');
-
-  const resolvedFrontBg = normalizePdfColor(frontBg, '#f6f1e7');
-  const resolvedBackBg = normalizePdfColor(backBg, '#efe7da');
-  const resolvedTextColor = normalizePdfColor(textColor, '#1f2228');
-  const resolvedAccentColor = normalizePdfColor(accentColor, '#b8924a');
-  const backX = bleedPt;
-  const spineX = backX + trimWidthPt;
-  const frontX = spineX + spinePt;
-  const trimY = bleedPt;
-
-  await writePdfFile({
-    filePath,
-    title: `${cleanText(book?.title, 180) || 'Livre souvenir'} - Couverture`,
-    draw: (doc) => {
-      doc.addPage({
-        size: [spreadWidthPt, spreadHeightPt],
-        margins: { top: 0, right: 0, bottom: 0, left: 0 }
-      });
-
-      doc.rect(0, 0, spreadWidthPt, spreadHeightPt).fill('#ffffff');
-      doc.rect(backX, trimY, trimWidthPt, trimHeightPt).fill(resolvedBackBg);
-      doc.rect(spineX, trimY, spinePt, trimHeightPt).fill('#f3ecdd');
-      doc.rect(frontX, trimY, trimWidthPt, trimHeightPt).fill(resolvedFrontBg);
-
-      doc.save();
-      doc.dash(3, { space: 3 });
-      doc.lineWidth(0.45).strokeColor('#adb5bd');
-      doc.rect(backX + safeMarginPt, trimY + safeMarginPt, trimWidthPt - safeMarginPt * 2, trimHeightPt - safeMarginPt * 2).stroke();
-      doc.rect(frontX + safeMarginPt, trimY + safeMarginPt, trimWidthPt - safeMarginPt * 2, trimHeightPt - safeMarginPt * 2).stroke();
-      doc.undash();
-      doc.restore();
-
-      doc.lineWidth(0.8).strokeColor('#9aa0a6');
-      doc.rect(backX, trimY, trimWidthPt, trimHeightPt).stroke();
-      doc.rect(spineX, trimY, spinePt, trimHeightPt).stroke();
-      doc.rect(frontX, trimY, trimWidthPt, trimHeightPt).stroke();
-
-      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(9).text(
-        'COUVERTURE',
-        frontX + safeMarginPt,
-        trimY + mmToPt(12),
-        { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-      );
-      if (frontEventLine) {
-        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(9).text(
-          frontEventLine,
-          frontX + safeMarginPt,
-          trimY + mmToPt(22),
-          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-        );
-      }
-      doc.fillColor(resolvedTextColor).font('Helvetica-Bold').fontSize(24).text(
-        frontTitle,
-        frontX + safeMarginPt,
-        trimY + mmToPt(56),
-        { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-      );
-      if (frontSubtitle) {
-        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(11).text(
-          frontSubtitle,
-          frontX + safeMarginPt,
-          trimY + mmToPt(95),
-          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-        );
-      }
-      if (frontRecipient) {
-        doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(12).text(
-          frontRecipient,
-          frontX + safeMarginPt,
-          trimY + trimHeightPt - mmToPt(22),
-          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-        );
-      }
-
-      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(9).text(
-        '4E DE COUVERTURE',
-        backX + safeMarginPt,
-        trimY + mmToPt(12),
-        { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-      );
-      doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(10).text(
-        backBlurb,
-        backX + safeMarginPt,
-        trimY + mmToPt(26),
-        { width: trimWidthPt - safeMarginPt * 2, align: 'left', lineGap: 2 }
-      );
-      if (backQuote) {
-        doc.fillColor(resolvedTextColor).font('Helvetica-Oblique').fontSize(10).text(
-          `"${backQuote}"`,
-          backX + safeMarginPt,
-          trimY + trimHeightPt - mmToPt(48),
-          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-        );
-      }
-      if (backOrganizerLine) {
-        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(9).text(
-          backOrganizerLine,
-          backX + safeMarginPt,
-          trimY + trimHeightPt - mmToPt(34),
-          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-        );
-      }
-      if (backDateLocation) {
-        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(8).text(
-          backDateLocation,
-          backX + safeMarginPt,
-          trimY + trimHeightPt - mmToPt(26),
-          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-        );
-      }
-      if (backIsbn) {
-        doc.fillColor(resolvedTextColor).font('Helvetica').fontSize(7).text(
-          backIsbn,
-          backX + safeMarginPt,
-          trimY + trimHeightPt - mmToPt(22),
-          { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-        );
-      }
-      doc.fillColor(resolvedAccentColor).font('Helvetica-Bold').fontSize(10).text(
-        backSignature,
-        backX + safeMarginPt,
-        trimY + trimHeightPt - mmToPt(18),
-        { width: trimWidthPt - safeMarginPt * 2, align: 'left' }
-      );
-
-      if (spinePt > mmToPt(4)) {
-        doc.save();
-        doc.fillColor(resolvedTextColor).font('Helvetica-Bold').fontSize(10);
-        doc.rotate(-90, {
-          origin: [spineX + spinePt / 2, trimY + trimHeightPt / 2]
-        });
-        doc.text(
-          frontTitle,
-          spineX + mmToPt(1),
-          trimY + trimHeightPt / 2 - mmToPt(45),
-          { width: trimHeightPt - mmToPt(2), align: 'center' }
-        );
-        doc.restore();
-      }
-
-      doc.fillColor('#6b7280').font('Helvetica').fontSize(8).text(
-        `Fond perdu: ${bleedMm} mm | Dos estime: ${spineMm.toFixed(1)} mm | Pages estimees: ${estimatedPages}`,
-        mmToPt(6),
-        spreadHeightPt - mmToPt(8),
-        { width: spreadWidthPt - mmToPt(12), align: 'left' }
-      );
     }
   });
 }
@@ -5607,37 +5168,6 @@ function htmlToPlainText(value, maxLength = 30000) {
     : normalized;
 }
 
-function decodeHtmlEntities(value) {
-  if (!value) {
-    return '';
-  }
-
-  return value
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, '\'')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>');
-}
-
-function estimateSpineWidthMm(totalPages, paperType) {
-  const pages = Math.max(32, Number(totalPages) || 32);
-  const normalizedPaper = cleanText(paperType, 80).toLowerCase();
-  let sheetCaliperMm = 0.1;
-
-  if (normalizedPaper.includes('premium') || normalizedPaper.includes('luxe')) {
-    sheetCaliperMm = 0.12;
-  } else if (normalizedPaper.includes('satine')) {
-    sheetCaliperMm = 0.11;
-  }
-
-  const sheetCount = Math.ceil(pages / 2);
-  const spineMm = Math.max(4, sheetCount * sheetCaliperMm);
-
-  return Number(spineMm.toFixed(2));
-}
-
 function mmToPt(valueMm) {
   return Number(valueMm || 0) * MM_TO_PT;
 }
@@ -5719,161 +5249,6 @@ function normalizeEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
-function buildBookDraftSourcePayload({ book, chapters, organizerEmail, contributorNamesByEmail }) {
-  const organizerEmailKey = organizerEmail ? organizerEmail.trim().toLowerCase() : '';
-
-  return {
-    book: {
-      id: book.id,
-      title: cleanText(book.title) || 'Livre souvenir',
-      eventType: cleanText(book.event_type) || 'evenement',
-      recipientName: cleanText(book.recipient_name) || 'la personne celebree',
-      recipientAge: book.recipient_age || null,
-      recipientGender: cleanText(book.recipient_gender) || '',
-      finition: cleanText(book.finition) || '',
-      papier: cleanText(book.papier) || '',
-      styleNarratif: cleanText(book.style_narratif) || 'intime',
-      aiProjectBrief: cleanText(book?.cover_config?.aiProjectBrief, 900),
-      pages: book.pages || null,
-      minPagesPerChapter: 4
-    },
-    chapters: (chapters || []).map((chapter) => {
-      const chapterContributions = Array.isArray(chapter.contributions) ? chapter.contributions : [];
-      const chapterInvites = Array.isArray(chapter.chapter_invites) ? chapter.chapter_invites : [];
-      const organizerContributions = chapterContributions
-        .filter((contribution) => {
-          const email = (contribution.contributor_email || '').trim().toLowerCase();
-          return organizerEmailKey && email === organizerEmailKey;
-        })
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      const organizerContribution = organizerContributions[0] || null;
-      const guestContributions = chapterContributions
-        .filter((contribution) => {
-          const email = (contribution.contributor_email || '').trim().toLowerCase();
-          return (
-            email !== organizerEmailKey &&
-            email !== CHAPTER_STATE_EMAIL &&
-            contribution.is_finalized !== false &&
-            !contribution.needs_revision
-          );
-        })
-        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-        .map((contribution) => {
-          const normalizedEmail = (contribution.contributor_email || '').trim().toLowerCase();
-          const resolvedName =
-            cleanText(contribution.contributor_name) ||
-            contributorNamesByEmail[normalizedEmail] ||
-            cleanText(normalizedEmail.split('@')[0]) ||
-            'Contributeur';
-
-          return {
-            contributorName: resolvedName,
-            contributorEmail: normalizedEmail,
-            approved: Boolean(contribution.approved),
-            message: cleanText(contribution.message, 2400),
-            photoCount: Array.isArray(contribution.photo_urls) ? contribution.photo_urls.length : 0,
-            photoUrls: normalizePhotoUrls(contribution.photo_urls)
-          };
-        });
-
-      return {
-        id: chapter.id,
-        title: cleanText(chapter.title) || 'Chapitre',
-        description: cleanText(chapter.description, 600),
-        amorceText: cleanText(chapter.amorce_text, 320),
-        triggers: Array.isArray(chapter.triggers)
-          ? chapter.triggers.map((trigger) => cleanText(trigger, 80)).filter(Boolean)
-          : [],
-        organizerContribution: organizerContribution
-          ? {
-              message: cleanText(organizerContribution.message, 3000),
-              photoCount: Array.isArray(organizerContribution.photo_urls) ? organizerContribution.photo_urls.length : 0,
-              photoUrls: normalizePhotoUrls(organizerContribution.photo_urls)
-            }
-          : null,
-        guestContributions,
-        stats: {
-          invitedCount: chapterInvites.length,
-          respondedCount: chapterInvites.filter((invite) => invite.accepted || invite.contributed).length
-        }
-      };
-    })
-  };
-}
-
-async function generateBookDraftFromAI(sourcePayload) {
-  // DB-first prompt policy: no hardcoded prompt flows here.
-  // Full-book narrative generation can be added later via dedicated DB template type.
-  return buildFallbackDraft(sourcePayload);
-}
-
-function buildAIPromptPayload(sourcePayload) {
-  return {
-    book: sourcePayload.book,
-    chapters: (sourcePayload.chapters || []).map((chapter) => ({
-      id: chapter.id,
-      title: chapter.title,
-      description: chapter.description,
-      amorceText: chapter.amorceText,
-      triggers: chapter.triggers,
-      organizerContribution: chapter.organizerContribution
-        ? {
-            message: chapter.organizerContribution.message,
-            photoCount: chapter.organizerContribution.photoCount
-          }
-        : null,
-      guestContributions: (chapter.guestContributions || []).map((contribution) => ({
-        contributorName: contribution.contributorName,
-        message: contribution.message,
-        photoCount: contribution.photoCount
-      })),
-      stats: chapter.stats
-    }))
-  };
-}
-
-function parseDraftJson(content) {
-  if (!content) {
-    return null;
-  }
-
-  const cleaned = content.replace(/```json|```/gi, '').trim();
-
-  try {
-    return JSON.parse(cleaned);
-  } catch (firstError) {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (!match) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(match[0]);
-    } catch (secondError) {
-      return null;
-    }
-  }
-}
-
-function buildFallbackDraft(sourcePayload) {
-  const { book, chapters } = sourcePayload;
-
-  return {
-    title: book.title,
-    subtitle: [book.eventType, book.styleNarratif].filter(Boolean).join(' | '),
-    introduction: `Ce brouillon rassemble les souvenirs, messages et attentions prepares pour ${book.recipientName}. Il constitue une premiere base narrative, inspiree par le style ${book.styleNarratif || 'choisi'} et organisee autour des chapitres deja renseignes.`,
-    chapters: chapters.map((chapter) => ({
-      title: chapter.title,
-      intro: chapter.description || `Ce chapitre met en lumiere ${chapter.title.toLowerCase()}.`,
-      body: buildChapterBodyFallback(chapter),
-      closing: chapter.guestContributions.length > 0
-        ? `Ce chapitre montre combien ${book.recipientName} est entoure(e) et inspire des souvenirs sinceres.`
-        : ''
-    })),
-    conclusion: `Ce premier brouillon peut encore etre enrichi, mais il pose deja une base solide pour raconter l'histoire de ${book.recipientName} avec justesse, chaleur et coherence.`
-  };
-}
-
 function buildChapterBodyFallback(chapter) {
   const sections = [];
   const guestContributions = Array.isArray(chapter?.guestContributions) ? chapter.guestContributions : [];
@@ -5910,52 +5285,6 @@ function buildChapterBodyFallback(chapter) {
   }
 
   return sections.join('\n\n');
-}
-
-function renderBookDraftHtml({ book, draft, sourcePayload }) {
-  const subtitle = draft.subtitle || [book.event_type, book.style_narratif].filter(Boolean).join(' | ');
-  const resolvedPreviewFormat = resolveBookPreviewFormat(book);
-  const normalizedLayoutSettings = normalizePreviewLayoutSettings(
-    book?.cover_config?.previewLayoutSettings,
-    resolvedPreviewFormat
-  );
-  const chapterBlocks = draft.chapters.map((chapter, index) => {
-    const sourceChapter = sourcePayload.chapters[index];
-    return renderDraftChapterPages({
-      chapter,
-      sourceChapter,
-      index,
-      layoutSettings: normalizedLayoutSettings,
-      previewFormat: resolvedPreviewFormat
-    });
-  }).join('');
-
-  return `
-    <article class="draft-book" lang="fr">
-      <header class="draft-book-header">
-        <div class="draft-book-eyebrow">Brouillon genere</div>
-        <h1>${escapeHtml(draft.title || book.title || 'Livre souvenir')}</h1>
-        ${subtitle ? `<p class="draft-book-subtitle">${escapeHtml(subtitle)}</p>` : ''}
-        <div class="draft-book-meta">
-          ${escapeHtml([
-            book.recipient_name ? `Destinataire : ${book.recipient_name}` : '',
-            book.style_narratif ? `Style : ${book.style_narratif}` : '',
-            book.event_type ? `Evenement : ${book.event_type}` : '',
-            'Couverture et quatrieme de couverture non traitees dans ce brouillon'
-          ].filter(Boolean).join(' | '))}
-        </div>
-      </header>
-      <section class="draft-book-section">
-        <h2>Introduction</h2>
-        ${formatParagraphs(draft.introduction || '')}
-      </section>
-      ${chapterBlocks}
-      <section class="draft-book-section draft-book-section-final">
-        <h2>Conclusion</h2>
-        ${formatParagraphs(draft.conclusion || '')}
-      </section>
-    </article>
-  `;
 }
 
 function renderDraftChapterPages({

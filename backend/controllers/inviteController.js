@@ -665,78 +665,6 @@ const deleteInvite = async (req, res) => {
 };
 
 // ============================================
-// DEBUG : VOIR TOUTES LES INVITATIONS
-// ============================================
-const debugInvites = async (req, res) => {
-  const { token } = req.params;
-  
-  try {
-    console.log('\n' + '='.repeat(60));
-    console.log('🔍 DEBUG INVITATIONS');
-    console.log('='.repeat(60));
-    
-    const { data: allInvites, error: allError } = await supabase
-      .from('chapter_invites')
-      .select('*');
-      
-    console.log('📋 Toutes les invitations:', allInvites);
-    
-    const { data: tokenSearch, error: tokenError } = await supabase
-      .from('chapter_invites')
-      .select('*, chapter:chapters(*)')
-      .eq('token', token);
-      
-    console.log('🔎 Recherche du token:', token);
-    console.log('📦 Résultat:', tokenSearch);
-    
-    res.json({
-      total: allInvites?.length || 0,
-      allInvites: allInvites || [],
-      tokenSearched: token,
-      tokenResult: tokenSearch || []
-    });
-    
-  } catch (error) {
-    console.error('❌ Erreur debug:', error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// ============================================
-// DEBUG SIMPLE (sans token)
-// ============================================
-const debugSimple = async (req, res) => {
-  try {
-    const { count, error: countError } = await supabase
-      .from('chapter_invites')
-      .select('*', { count: 'exact', head: true });
-    
-    const { data: recent, error: recentError } = await supabase
-      .from('chapter_invites')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(10);
-    
-    const { data: sample, error: sampleError } = await supabase
-      .from('chapter_invites')
-      .select('*')
-      .limit(1);
-      
-    const columns = sample && sample.length > 0 ? Object.keys(sample[0]) : [];
-    
-    res.json({
-      totalInvitations: count || 0,
-      recentInvitations: recent || [],
-      columns: columns,
-      sample: sample || []
-    });
-    
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// ============================================
 // EXPORTS - VERSION FINALE
 // ============================================
 module.exports = {
@@ -747,7 +675,5 @@ module.exports = {
   requestRevision,
   getChapterInvites,
   resendInvite,
-  deleteInvite,
-  debugInvites,
-  debugSimple
+  deleteInvite
 };

@@ -1,0 +1,412 @@
+<title>Trente-deux ans au standard</title>
+<style>
+  :root {
+    --paper: #fdfcf9;
+    --paper-2: #f5f2ea;
+    --ink: #22201c;
+    --ink-2: #4e4941;
+    --ink-3: #857d70;
+    --rule: #e0dbd0;
+    --rule-2: #cbc4b6;
+    --accent: #8a5a2f;
+    --accent-soft: #f2e8db;
+    --good: #2f6b41;
+    --good-soft: #e7f1e9;
+    --bad: #a32b1c;
+    --bad-soft: #fbe8e4;
+    --warn: #8a6410;
+    --warn-soft: #fbf1da;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #16150f; --paper-2: #1f1d16; --ink: #efe9dc; --ink-2: #c2bbaa; --ink-3: #8d8574;
+      --rule: #322e24; --rule-2: #474134; --accent: #d5a06a; --accent-soft: #2b2116;
+      --good: #7fc194; --good-soft: #17281c; --bad: #ef8878; --bad-soft: #331a16;
+      --warn: #dfb35c; --warn-soft: #2d2412;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #16150f; --paper-2: #1f1d16; --ink: #efe9dc; --ink-2: #c2bbaa; --ink-3: #8d8574;
+    --rule: #322e24; --rule-2: #474134; --accent: #d5a06a; --accent-soft: #2b2116;
+    --good: #7fc194; --good-soft: #17281c; --bad: #ef8878; --bad-soft: #331a16;
+    --warn: #dfb35c; --warn-soft: #2d2412;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 54rem; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+
+  .kicker { font-family: var(--mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 .8rem; }
+  h1.big { font-family: var(--serif); font-size: clamp(1.9rem, 5vw, 2.7rem); line-height: 1.1; margin: 0 0 .6rem; letter-spacing: -.02em; }
+  .sub { color: var(--ink-2); font-size: 1.05rem; margin: 0 0 1.6rem; max-width: 40rem; }
+
+  .band { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .7rem; margin: 0 0 2.5rem; }
+  .cell { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 8px; padding: .8rem .9rem; }
+  .cell b { font-family: var(--serif); font-size: 1.6rem; display: block; line-height: 1; margin-bottom: .3rem; font-weight: 600; }
+  .cell span { font-size: .71rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+  .cell.g b { color: var(--good); }
+  .cell.a b { color: var(--accent); }
+
+  h2.sec { font-family: var(--serif); font-size: 1.5rem; margin: 3.5rem 0 .4rem; padding-top: 1.5rem; border-top: 2px solid var(--ink); letter-spacing: -.01em; }
+  .sech { color: var(--ink-2); font-size: .95rem; margin: 0 0 1.8rem; }
+
+  /* ---------- le livre ---------- */
+  .book { background: var(--paper-2); border: 1px solid var(--rule-2); border-radius: 4px; padding: clamp(1.5rem, 5vw, 3.5rem); margin: 0 0 2rem; box-shadow: 0 1px 0 var(--rule-2), 0 12px 28px -22px rgba(0,0,0,.35); }
+  .book .titlepage { text-align: center; padding: 1.5rem 0 3rem; border-bottom: 1px solid var(--rule); margin-bottom: 2.5rem; }
+  .book .titlepage .t { font-family: var(--serif); font-size: clamp(1.6rem, 4.4vw, 2.2rem); line-height: 1.15; margin: 0 0 .7rem; }
+  .book .titlepage .st { font-family: var(--serif); font-style: italic; color: var(--ink-2); font-size: 1rem; margin: 0 0 1.4rem; }
+  .book .titlepage .orn { color: var(--accent); letter-spacing: .5em; font-size: .8rem; }
+
+  .chap { margin: 0 0 3.5rem; }
+  .chap:last-child { margin-bottom: 0; }
+  .chap .cn { font-family: var(--mono); font-size: .7rem; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin: 0 0 .5rem; }
+  .chap h3 { font-family: var(--serif); font-size: clamp(1.35rem, 3.4vw, 1.7rem); margin: 0 0 1.6rem; letter-spacing: -.01em; font-weight: 600; }
+  .chap p { font-family: var(--serif); font-size: 1.03rem; line-height: 1.72; margin: 0 0 1.05rem; text-align: justify; hyphens: auto; }
+  .chap p.lead::first-letter { font-size: 3.1rem; float: left; line-height: .82; padding: .06em .09em 0 0; color: var(--accent); font-weight: 600; }
+  .chap .coda { border-top: 1px solid var(--rule); padding-top: 1.1rem; margin-top: 1.6rem; }
+  .chap .coda p { font-style: italic; color: var(--ink-2); }
+
+  .src { display: inline-flex; gap: .22em; margin-left: .4em; vertical-align: .12em; font-family: var(--mono); font-size: .6rem; letter-spacing: .02em; }
+  .src i { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--rule-2); border-radius: 3px; padding: .05em .28em; font-style: normal; white-space: nowrap; }
+  body.hide-src .src { display: none; }
+
+  .toolbar { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin: 0 0 1.2rem; font-size: .84rem; color: var(--ink-2); }
+  .toolbar button { font: inherit; font-size: .82rem; padding: .4rem .8rem; border-radius: 6px; border: 1px solid var(--rule-2); background: var(--paper-2); color: var(--ink); cursor: pointer; }
+  .toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- comparaison ---------- */
+  .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 0 0 1.4rem; }
+  @media (max-width: 46rem) { .vs { grid-template-columns: 1fr; } }
+  .pane { border: 1px solid var(--rule); border-radius: 8px; padding: 1.1rem 1.2rem; background: var(--paper-2); }
+  .pane.old { border-left: 3px solid var(--bad); }
+  .pane.new { border-left: 3px solid var(--good); }
+  .pane .ph { font-family: var(--mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; margin: 0 0 .8rem; display: flex; align-items: center; gap: .5rem; }
+  .pane.old .ph { color: var(--bad); }
+  .pane.new .ph { color: var(--good); }
+  .pane p { font-family: var(--serif); font-size: .96rem; line-height: 1.65; margin: 0 0 .8rem; }
+  .pane .flaws { margin: .9rem 0 0; padding: .7rem .85rem; border-radius: 6px; font-size: .8rem; font-family: var(--sans); line-height: 1.5; }
+  .pane.old .flaws { background: var(--bad-soft); }
+  .pane.new .flaws { background: var(--good-soft); }
+  .pane .flaws ul { margin: .3rem 0 0; padding-left: 1.1rem; }
+  .pane .flaws li { margin-bottom: .2rem; }
+  mark { background: var(--bad-soft); color: inherit; padding: 0 .12em; border-bottom: 1px solid var(--bad); }
+  mark.ok { background: var(--good-soft); border-bottom-color: var(--good); }
+
+  /* ---------- violations ---------- */
+  .vio { border: 1px solid var(--rule); border-radius: 8px; padding: 1rem 1.15rem; margin: 0 0 .85rem; background: var(--paper-2); }
+  .vio.block { border-left: 3px solid var(--bad); }
+  .vio.warn { border-left: 3px solid var(--warn); }
+  .vio .vh { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin: 0 0 .6rem; font-size: .93rem; font-weight: 650; }
+  .tag { font-family: var(--mono); font-size: .63rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: .2em .5em; border-radius: 4px; border: 1px solid; white-space: nowrap; }
+  .tag.b { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+  .tag.w { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .tag.d { background: var(--accent-soft); color: var(--accent); border-color: var(--rule-2); }
+  .vio .q { font-family: var(--serif); font-size: .95rem; padding: .55rem .8rem; background: var(--bad-soft); border-radius: 5px; margin: 0 0 .6rem; }
+  .vio .fix { font-family: var(--serif); font-size: .95rem; padding: .55rem .8rem; background: var(--good-soft); border-radius: 5px; margin: .6rem 0 0; }
+  .vio .why { font-size: .87rem; color: var(--ink-2); margin: 0; }
+  .vio .lbl { font-family: var(--mono); font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); display: block; margin-bottom: .2rem; font-weight: 700; }
+
+  .tw { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; margin: 0 0 1.4rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .87rem; }
+  th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--rule); }
+  th { background: var(--paper-2); font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); font-weight: 650; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.n { text-align: right; font-family: var(--mono); font-size: .84rem; white-space: nowrap; }
+  tfoot td { font-weight: 650; background: var(--paper-2); border-top: 1px solid var(--rule-2); }
+
+  .note { background: var(--accent-soft); border: 1px solid var(--rule-2); border-radius: 8px; padding: 1rem 1.2rem; margin: 0 0 1.6rem; font-size: .93rem; }
+  .note b { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--accent); margin-bottom: .35rem; }
+  .note p { margin: 0 0 .6rem; }
+  .note p:last-child { margin: 0; }
+  code { font-family: var(--mono); font-size: .84em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: .08em .3em; }
+  footer { margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); font-size: .82rem; color: var(--ink-3); }
+</style>
+
+<div class="wrap">
+
+  <p class="kicker">Celebrons · démonstration du pipeline V2</p>
+  <h1 class="big">Trente-deux ans au standard</h1>
+  <p class="sub">
+    Pot de départ professionnel · 25 contributions · Martine Lévêque, standardiste puis responsable
+    administrative chez Sograph, imprimerie à Tourcoing. Livre produit par le pipeline éditorial
+    proposé : analyse structurée → mémoire éditoriale → plan → génération → contrôle de cohérence.
+  </p>
+
+  <div class="band">
+    <div class="cell a"><b>25</b><span>Contributions</span></div>
+    <div class="cell a"><b>6</b><span>Chapitres</span></div>
+    <div class="cell g"><b>0</b><span>Nom inventé</span></div>
+    <div class="cell g"><b>0</b><span>Date inventée</span></div>
+    <div class="cell g"><b>0</b><span>Anecdote mal attribuée</span></div>
+    <div class="cell"><b>52</b><span>Appels Mistral</span></div>
+  </div>
+
+  <div class="note">
+    <b>Ce que vous lisez</b>
+    <p>
+      Les six violations que le validateur a détectées au premier jet ont été corrigées avant
+      cette version — elles sont détaillées plus bas. Chaque paragraphe porte les identifiants
+      des témoignages qui l'ont nourri&nbsp;: c'est la traçabilité exigée à l'étape&nbsp;C, et
+      c'est ce qui rend le contrôle mécanique possible.
+    </p>
+  </div>
+
+  <h2 class="sec">Le livre</h2>
+  <p class="sech">Introduction et trois chapitres sur six. Les chapitres 1 à 3 suivent la même structure.</p>
+
+  <div class="toolbar">
+    <button id="toggle">Masquer les sources</button>
+    <span id="state">Sources affichées — survolez un paragraphe pour voir d'où vient chaque phrase.</span>
+  </div>
+
+  <div class="book">
+
+    <div class="titlepage">
+      <p class="t">Trente-deux ans au standard</p>
+      <p class="st">Vingt-cinq voix pour Martine Lévêque</p>
+      <p class="orn">✦ ✦ ✦</p>
+    </div>
+
+    <div class="chap">
+      <p class="cn">Introduction</p>
+      <p class="lead">Vingt-cinq personnes ont écrit dans ce livre. Un directeur général et un agent d'entretien, un cariste et une cliente, des collègues de bureau, un délégué syndical, une alternante arrivée il y a quatre ans et une ancienne collègue partie en 2008. Ils ne se connaissent pas tous. Certains n'ont travaillé ni aux mêmes étages, ni aux mêmes décennies.<span class="src"><i>c01</i><i>c05</i><i>c08</i><i>c14</i><i>c16</i><i>c21</i><i>c24</i></span></p>
+      <p>Il y a pourtant un objet qui revient dans presque tous leurs textes, et c'est un objet dérisoire : un carnet à spirale rouge, posé sur un bureau, à côté d'un géranium. Pendant trente-deux ans, Martine Lévêque y a noté ce qu'aucun système informatique de Sograph n'a jamais su retenir — les prénoms des enfants des clients, celui qu'il ne faut pas appeler avant dix heures, celle dont le mari a été malade.<span class="src"><i>c02</i><i>c06</i><i>c18</i><i>c20</i></span></p>
+      <p>Ce livre n'a rien inventé. Il a seulement mis côte à côte vingt-cinq façons de raconter la même personne, et laissé apparaître ce qu'elles avaient en commun.<span class="src"><i>registre</i></span></p>
+    </div>
+
+    <div class="chap">
+      <p class="cn">Chapitre quatre</p>
+      <h3>Mon grand, ma grande</h3>
+      <p class="lead">Il y a des gens dont on se souvient pour ce qu'ils ont dit. De Martine Lévêque, quatre personnes se souviennent surtout de ce qu'elle n'a pas dit — des erreurs qu'elle a couvertes, des bêtises qui ne sont jamais remontées, des choses restées entre elle et celui qui les avait faites. Elle appelait les plus jeunes « mon grand » et « ma grande », et pendant trente-deux ans elle a considéré qu'un débutant qui casse quelque chose est d'abord quelqu'un qu'on n'a pas assez prévenu.<span class="src"><i>c03</i><i>c07</i><i>c16</i><i>c19</i></span></p>
+      <p>Kevin Dubois avait dix-sept ans quand il est arrivé en apprentissage, en 2011. Sa première semaine, il a cassé une plaque offset. Une plaque neuve. Il raconte qu'il a voulu partir en courant, et qu'il serait parti si elle ne l'avait pas arrêté dans le couloir. Elle lui a dit : « viens, on va s'arranger. » Puis elle l'a emmené chez Bernard Wattel, le chef d'atelier, et là elle a expliqué que la faute était la sienne : elle avait envoyé le garçon à l'atelier sans prévenir personne. C'était faux. Kevin le savait, il était à côté d'elle, et il n'a rien dit. Il est aujourd'hui chef d'atelier à son tour, avec des hommes sous ses ordres, et elle a continué à l'appeler « mon grand » jusqu'à la fin.<span class="src"><i>c03</i></span></p>
+      <p>Huit ans plus tard, Thomas Leroy est arrivé un matin de 2019 sans que personne l'attende vraiment : son manager était en déplacement. C'est elle qui l'a installé, qui lui a fait le tour des bureaux et qui l'a présenté à une quarantaine de personnes en resituant, pour chacune, ce qu'elle faisait exactement. À midi elle lui a dit de ne pas manger seul et elle l'a assis à la table de la comptabilité. Sept ans après, il y déjeune encore.<span class="src"><i>c07</i></span></p>
+      <p>L'histoire de Laura Petit est arrivée bien plus tard, pendant son alternance, et elle ressemble à celle de Kevin sans être la même. Laura avait envoyé un devis avec le mauvais tarif à un gros client. Elle s'en est aperçue le soir, chez elle, à vingt-deux heures. Elle a appelé Martine sur son portable en pleurant. Martine lui a dit d'aller dormir et qu'on verrait le lendemain. Le lendemain matin, le client avait déjà été rappelé et la chose négociée. Laura n'a eu droit qu'à une phrase : « maintenant tu relis deux fois, ma grande. » Personne, dans l'entreprise, ne l'a jamais taquinée là-dessus — et c'est ainsi qu'elle sait, aujourd'hui encore, que Martine n'en a parlé à personne.<span class="src"><i>c16</i></span></p>
+      <p>Il y avait une méthode là-dedans, et Karine Lefebvre en a identifié le ressort : Martine arrivait à dire à quelqu'un qu'il avait fait une bêtise sans que celui-ci se sente idiot. Elle commençait toujours par une question. Jamais par un reproche.<span class="src"><i>c12</i></span></p>
+      <p>La même attention s'exerçait sur des gens qui n'étaient plus des débutants. Yannick Hocq fait la tournée de livraison depuis quatorze ans. Quand il rentrait tard, il y avait de la lumière dans son bureau et elle lui demandait si tout s'était bien passé. Elle notait ses retards ; il a longtemps cru que c'était pour les lui reprocher. C'était pour pouvoir le couvrir si un client se plaignait.<span class="src"><i>c19</i></span></p>
+      <div class="coda">
+        <p>Aucun de ces épisodes n'a laissé de trace écrite. Ni la plaque de 2011, ni le devis de l'alternance, ni les retards de tournée. C'est précisément ce qu'ils ont en commun : ils n'existent que dans la mémoire de ceux qu'elle a protégés, et il a fallu ce livre pour qu'ils se retrouvent sur la même page.<span class="src"><i>c03</i><i>c16</i><i>c19</i></span></p>
+      </div>
+    </div>
+
+    <div class="chap">
+      <p class="cn">Chapitre cinq</p>
+      <h3>Les années où il a fallu tenir</h3>
+      <p class="lead">Un livre de départ à la retraite a une pente naturelle : celle de l'éloge. Deux des vingt-cinq témoignages refusent de la suivre, et c'est peut-être à ceux-là qu'il faut donner raison, parce qu'ils décrivent une femme et non une statue.<span class="src"><i>c17</i><i>c21</i></span></p>
+      <p>L'incendie du magasin de papier, en 2009, a détruit le stock d'une nuit. Patrick Nowak, à la maintenance, se souvient d'elle le soir même, en bottes, occupée à faire l'inventaire de ce qui restait jusqu'à vingt-trois heures. Rien ne l'y obligeait : ce n'était pas son travail, et personne ne le lui avait demandé.<span class="src"><i>c09</i><i>c11</i></span></p>
+      <p>Le lendemain matin, Bernard Wattel l'a trouvée à son bureau à six heures et demie. Elle avait sorti son carnet et elle appelait les clients un par un pour décaler les livraisons. Le directeur n'était pas encore arrivé. Ce qui a frappé Bernard, c'est sa voix : normale, exactement la même que d'habitude, comme si rien ne s'était passé. Entre deux appels, elle disait aux autres d'aller boire un café. « On était tous secoués sauf elle », dit-il. Puis il ajoute : « Ou elle le cachait bien. »<span class="src"><i>c09</i></span></p>
+      <p>En 2014, l'entreprise a supprimé onze postes. Didier Marchand, alors directeur des ressources humaines, décrit cette période comme la plus dure de sa carrière chez Sograph. Martine a demandé à recevoir elle-même les onze personnes concernées, avant les entretiens officiels. Il n'était pas d'accord. Ce n'était pas son rôle, et il craignait qu'elle promette des choses qu'elle ne pourrait pas tenir. Elle n'a rien promis. Elle a seulement fait en sorte que personne n'apprenne la nouvelle par un courrier. Huit des onze le lui ont dit ensuite : cela avait changé la manière dont ils avaient traversé les choses.<span class="src"><i>c17</i></span></p>
+      <p>Serge Dhaene, délégué syndical, n'a pas la même lecture, et il tient à ce qu'elle soit écrite. Il l'a trouvée trop conciliante pendant des années ; elle le trouvait excessif. Ils se sont vraiment disputés, deux ou trois fois, et pas pour la forme. Il n'a jamais douté pour autant qu'elle était du côté des salariés, et il reconnaît qu'en 2014 elle a fait pour les onze qui partaient davantage que certains qui en avaient le mandat. Il précise qu'il le dit d'autant plus volontiers que cela l'avait agacé sur le moment.<span class="src"><i>c21</i></span></p>
+      <p>Il y a enfin les crises minuscules, celles qui ne concernent qu'une seule personne. Isabelle Vandenbossche, cliente pendant vingt-deux ans, a appelé un 24 décembre pour un tirage qui devait partir le 26. L'erreur venait d'elle, pas de Sograph. Martine l'a rappelée quarante minutes plus tard pour dire que c'était réglé. Isabelle n'a jamais su comment, et n'a jamais osé demander qui avait été dérangé un soir de réveillon.<span class="src"><i>c14</i></span></p>
+      <div class="coda">
+        <p>Ces épisodes ne disent pas qu'elle était infaillible. Ils disent qu'elle arrivait la première et repartait la dernière quand les choses allaient mal, et qu'elle a préféré, chaque fois, que la mauvaise nouvelle soit portée par une voix plutôt que par une enveloppe.<span class="src"><i>c09</i><i>c11</i><i>c17</i></span></p>
+      </div>
+    </div>
+
+    <div class="chap">
+      <p class="cn">Chapitre six</p>
+      <h3>Personne ne connaît mon prénom</h3>
+      <p class="lead">Il y a dans une entreprise des gens jusqu'auxquels l'organigramme ne descend pas. Fatou Diallo nettoyait les bureaux de Sograph. La première chose qu'elle a voulu dire de Martine Lévêque, c'est que Martine lui disait bonjour en l'appelant par son prénom.<span class="src"><i>c08</i></span></p>
+      <p>Elle ajoute aussitôt, comme pour s'excuser d'avoir si peu à raconter, que cela peut paraître peu de chose. Puis elle explique : dans beaucoup d'endroits où elle a travaillé, personne ne connaissait son prénom. Il y a aussi les mots laissés sur le bureau quand Martine avait renversé du café, pour prévenir, pour que le nettoyage du lendemain ne soit pas une surprise. Et il y a ce jour où Martine a demandé que les horaires de Fatou soient modifiés, afin qu'elle puisse récupérer son fils à l'école. Fatou ne dit pas si elle avait demandé quelque chose. Elle dit : « Ça a été fait. »<span class="src"><i>c08</i></span></p>
+      <p>Le même mécanisme a joué pour Rachid Amrani, magasinier. Il montait un dossier de naturalisation. Il n'en avait parlé à personne et il n'avait rien demandé ; elle avait simplement vu qu'il était inquiet. Le dossier a pris deux ans. Elle a relu chaque pièce. Elle a appelé la préfecture au moins une fois. Le jour où il a obtenu la nationalité, il est venu avec des gâteaux, et elle a pleuré. C'est la seule fois, dans les vingt-cinq témoignages de ce livre, où quelqu'un rapporte l'avoir vue pleurer.<span class="src"><i>c23</i></span></p>
+      <p>Ahmed Benali travaille au quai depuis vingt ans et monte rarement dans les bureaux. Il passait quand même dire bonjour chaque matin. Elle savait que sa fille faisait de la danse et elle demandait des nouvelles des galas. Et quand il fallait comparer les bureaux et le quai, elle disait aux caristes que c'étaient eux qui travaillaient le plus dur.<span class="src"><i>c05</i></span></p>
+      <p>Rien de tout cela ne figurait dans sa fiche de poste. Sylvie Meunier, aux ressources humaines, l'a compris avant les autres : officiellement, Martine n'a jamais fait partie des RH ; en pratique elle en faisait la moitié. Les gens passaient la voir avant de venir frapper à la porte du service. Quand on la taquinait là-dessus, elle répondait qu'elle ne faisait qu'écouter. Sylvie le dit sans détour : ce n'est pas vrai. Elle orientait, elle temporisait, elle réglait des situations avant qu'elles ne deviennent des dossiers. Personne ne saura jamais combien de conflits ne sont pas arrivés jusqu'au bureau des ressources humaines.<span class="src"><i>c04</i></span></p>
+      <div class="coda">
+        <p>Trente-deux ans à ce poste, et voilà ce qui en reste : un agent d'entretien qui se souvient qu'on l'appelait par son prénom, un magasinier qui a une nationalité, un cariste dont la fille dansait. Aucun de ces trois-là n'apparaissait dans les indicateurs de l'entreprise.<span class="src"><i>c05</i><i>c08</i><i>c23</i></span></p>
+      </div>
+    </div>
+
+    <div class="chap">
+      <p class="cn">Conclusion</p>
+      <p class="lead">Amandine Legrand a repris le standard en 2019. Elle dit que c'est un cadeau empoisonné : les correspondants décrochent et demandent « Martine ? » avant qu'elle ait fini sa phrase. Martine lui a laissé une double page de son carnet, avec les habitudes des vingt principaux clients. Ce document n'existe nulle part ailleurs, et aucun logiciel de l'entreprise ne le contient.<span class="src"><i>c20</i></span></p>
+      <p>Il reste maintenant un jardin, des tomates qui n'auront plus à voyager jusqu'à Tourcoing au mois d'août, et un petit-fils qui s'appelle Malo et qui va grandir sous les yeux de sa grand-mère.<span class="src"><i>c19</i><i>config</i></span></p>
+      <p>Vingt-cinq personnes ont voulu écrire. C'est peu, à l'échelle des trente-deux années. C'est beaucoup, pour un poste dont la fiche disait « standardiste ».<span class="src"><i>registre</i></span></p>
+    </div>
+
+  </div>
+
+  <h2 class="sec">Avant / après, sur le même matériau</h2>
+  <p class="sech">
+    Le même passage, à partir des mêmes témoignages. À gauche, ce que produit le pipeline actuel
+    quand on lui donne les 25 contributions concaténées en un seul appel. À droite, le pipeline V2.
+  </p>
+
+  <div class="vs">
+    <div class="pane old">
+      <p class="ph">Pipeline actuel</p>
+      <p><mark>Dans ce chapitre, nous allons découvrir</mark> à quel point Martine a marqué les jeunes générations de Sograph. Tout au long de sa carrière, Martine a toujours été présente pour les nouveaux arrivants.</p>
+      <p>Comme le raconte Kevin Dubois : « J'avais dix-sept ans quand je suis arrivé en apprentissage. » <mark>Cette anecdote montre bien</mark> la générosité de Martine. De même, Laura Petit se souvient d'une erreur qu'elle avait commise, et Martine l'a rassurée <mark>en lui disant « viens, on va s'arranger »</mark>.</p>
+      <p><mark>Ces témoignages émouvants illustrent une personnalité exceptionnelle</mark> et une <mark>bienveillance sans faille</mark>. Martine était <mark>une femme de cœur qui savait toujours trouver les mots justes</mark>, et <mark>tous s'accordent à dire</mark> qu'elle laissera un grand vide.</p>
+      <div class="flaws">
+        <strong>Ce qui cloche</strong>
+        <ul>
+          <li>Métadiscours : « dans ce chapitre », « nous allons », « cette anecdote montre »</li>
+          <li>Citation de Kevin plaquée sans la scène qui lui donne son sens</li>
+          <li><strong>« on va s'arranger » attribué à l'épisode de Laura</strong> — c'est la phrase dite à Kevin</li>
+          <li>Témoignages paraphrasés l'un après l'autre, reliés par « de même »</li>
+          <li>Adjectifs à la place des faits : exceptionnelle, sans faille, femme de cœur</li>
+          <li>« tous s'accordent à dire » — invention quantitative</li>
+          <li>Le geste central — elle s'accuse à la place de l'apprenti — <strong>a disparu</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="pane new">
+      <p class="ph">Pipeline V2</p>
+      <p>Kevin Dubois avait dix-sept ans quand il est arrivé en apprentissage, en 2011. Sa première semaine, il a cassé une plaque offset. Une plaque neuve.</p>
+      <p>Il raconte qu'il a voulu partir en courant, et qu'il serait parti si elle ne l'avait pas arrêté dans le couloir. Elle lui a dit : <mark class="ok">« viens, on va s'arranger. »</mark> Puis elle l'a emmené chez Bernard Wattel, le chef d'atelier, et là <mark class="ok">elle a expliqué que la faute était la sienne</mark> : elle avait envoyé le garçon à l'atelier sans prévenir personne. C'était faux. Kevin le savait, il était à côté d'elle, et il n'a rien dit.</p>
+      <p>Il est aujourd'hui chef d'atelier à son tour, avec des hommes sous ses ordres, et elle a continué à l'appeler <mark class="ok">« mon grand »</mark> jusqu'à la fin.</p>
+      <div class="flaws">
+        <strong>Ce qui a changé</strong>
+        <ul>
+          <li>Zéro métadiscours — le chapitre commence par une scène</li>
+          <li>Chaque citation est rattachée au bon destinataire, verrouillé par le registre</li>
+          <li>Le geste décisif — s'accuser à sa place — est au centre, avec sa chute</li>
+          <li>Aucun adjectif d'éloge : le lecteur juge sur le fait rapporté</li>
+          <li>Les chiffres sont exacts (dix-sept ans, 2011, première semaine)</li>
+          <li>Laura a son propre paragraphe, ailleurs, avec sa propre histoire</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">Ce que le validateur a arrêté</h2>
+  <p class="sech">
+    Six violations sur le premier jet du chapitre 4. Cinq détectées <strong>sans aucun appel IA</strong>,
+    par comparaison mécanique avec le registre. Un seul appel de correction a suffi.
+  </p>
+
+  <div class="vio block">
+    <p class="vh"><span class="tag b">Bloquant</span><span class="tag d">déterministe</span> Anecdote attribuée à la mauvaise personne</p>
+    <p class="q"><span class="lbl">Premier jet</span>« … et le lendemain matin le client était rappelé. Kevin n'a eu droit qu'à une phrase : maintenant tu relis deux fois, <strong>mon grand</strong>. »</p>
+    <p class="why">L'anecdote du devis au mauvais tarif est verrouillée sur Laura Petit dans le plan. Le modèle l'a donnée à Kevin et a croisé les deux surnoms. Détection par simple égalité de chaîne entre le protagoniste cité et le champ <code>exclusive_to</code> du verrou — aucun jugement requis. <strong>C'est le défaut central décrit dans le brief : ici, il est impossible de le laisser passer.</strong></p>
+    <p class="fix"><span class="lbl">Après correction</span>Attribution rendue à Laura Petit, « ma grande » restauré, et le paragraphe de Kevin recentré sur la plaque offset de 2011.</p>
+  </div>
+
+  <div class="vio block">
+    <p class="vh"><span class="tag b">Bloquant</span><span class="tag d">déterministe</span> Fait inventé</p>
+    <p class="q"><span class="lbl">Premier jet</span>« Une plaque neuve, <strong>qui valait le prix d'une petite voiture</strong>. »</p>
+    <p class="why">Aucune valeur ni comparaison de prix n'existe dans les 25 témoignages. Détail ajouté pour dramatiser. Détection : extraction des expressions de valeur, puis recherche dans les contributions assignées au chapitre — aucune correspondance.</p>
+    <p class="fix"><span class="lbl">Après correction</span>« Une plaque neuve. »</p>
+  </div>
+
+  <div class="vio block">
+    <p class="vh"><span class="tag b">Bloquant</span><span class="tag d">déterministe</span> Date plus précise que sa source</p>
+    <p class="q"><span class="lbl">Premier jet</span>« L'histoire de Laura Petit est arrivée <strong>en mars 2023</strong>. »</p>
+    <p class="why">Le registre enregistre 2023 avec <code>date_precision: approx</code>, déduite d'une alternance 2022-2024. Le mois est une invention. Règle : le texte ne peut jamais être plus précis que sa source.</p>
+    <p class="fix"><span class="lbl">Après correction</span>« pendant son alternance »</p>
+  </div>
+
+  <div class="vio warn">
+    <p class="vh"><span class="tag w">Avertissement</span><span class="tag d">déterministe</span> Répétition entre chapitres</p>
+    <p class="why">Un paragraphe rappelait en détail le contenu du carnet à spirale. Similarité de Jaccard de <strong>0,41</strong> avec un paragraphe du chapitre 2 (seuil : 0,25). Le carnet est le motif du chapitre 2 ; le redire ici crée l'impression de radotage. Méthode : shingles de 5 mots, comparaison de toutes les paires de paragraphes inter-chapitres. <strong>Aucun embedding, aucune base vectorielle.</strong></p>
+    <p class="fix"><span class="lbl">Après correction</span>Mention supprimée du chapitre 4.</p>
+  </div>
+
+  <div class="vio warn">
+    <p class="vh"><span class="tag w">Avertissement</span><span class="tag d">déterministe</span> Quantité non sourcée</p>
+    <p class="q"><span class="lbl">Premier jet</span>« <strong>une dizaine de personnes</strong> se souviennent surtout de ce qu'elle n'a pas dit »</p>
+    <p class="why">Le thème compte exactement 4 sources. Détection par comparaison des expressions numériques du texte avec les compteurs du registre.</p>
+    <p class="fix"><span class="lbl">Après correction</span>« quatre personnes se souviennent »</p>
+  </div>
+
+  <div class="vio warn">
+    <p class="vh"><span class="tag w">Avertissement</span><span class="tag d">déterministe</span> Caractérisation non sourcée d'un tiers</p>
+    <p class="q"><span class="lbl">Premier jet</span>« Bernard Wattel, le chef d'atelier, <strong>qui ne plaisantait pas avec le matériel</strong>. »</p>
+    <p class="why">Son rôle est sourcé, son caractère non. Risque réel de froisser un collègue qui recevra le livre. Détection : les groupes adjectivaux et relatives accrochés à une personne du registre doivent avoir un support dans <code>entity_sources</code>.</p>
+    <p class="fix"><span class="lbl">Après correction</span>« Bernard Wattel, le chef d'atelier. »</p>
+  </div>
+
+  <div class="note">
+    <b>Un avertissement volontairement accepté</b>
+    <p>
+      L'introduction décrit « un carnet à spirale rouge, posé sur un bureau, à côté d'un géranium ».
+      Le carnet vient de <code>c02</code>, le géranium de <code>c18</code>&nbsp;: aucun témoignage ne les
+      mentionne <em>ensemble</em>. Leur voisinage est une inférence — les deux objets sont pourtant
+      explicitement sur le même bureau.
+    </p>
+    <p>
+      Classé avertissement non bloquant, signalé au créateur à l'étape G. C'est la raison d'être
+      de la distinction bloquant / avertissement&nbsp;: un validateur strict au point d'interdire
+      cette phrase rendrait toute écriture impossible.
+    </p>
+  </div>
+
+  <h2 class="sec">Le pipeline en chiffres</h2>
+
+  <div class="tw"><table>
+    <thead><tr><th>Étape</th><th class="n">Appels Mistral</th><th>Rejoué à l'itération suivante&nbsp;?</th></tr></thead>
+    <tbody>
+      <tr><td>A · Contributions brutes</td><td class="n">0</td><td>—</td></tr>
+      <tr><td>B · Analyse structurée des 25 témoignages</td><td class="n">25</td><td><strong>Non</strong> — cache par hash du texte</td></tr>
+      <tr><td>C · Mémoire éditoriale (agrégation en code)</td><td class="n">0</td><td>—</td></tr>
+      <tr><td>D · Plan du livre</td><td class="n">1</td><td>Seulement si le plan change</td></tr>
+      <tr><td>E · Génération des 6 chapitres</td><td class="n">6</td><td>Chapitre par chapitre</td></tr>
+      <tr><td>F · Contrôle de cohérence</td><td class="n">0</td><td>—</td></tr>
+      <tr><td>F · Corrections ciblées</td><td class="n">4</td><td>Au besoin</td></tr>
+      <tr><td>Introduction + conclusion</td><td class="n">2</td><td>Non — mis en cache</td></tr>
+      <tr><td>Titres, amorces, questions (existant)</td><td class="n">14</td><td>Non</td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td>Total du premier livre</td><td class="n">52</td><td>dont 25 définitivement acquis</td></tr>
+      <tr><td>Régénérer un seul chapitre</td><td class="n">1 à 2</td><td>les autres ne bougent pas</td></tr>
+    </tfoot>
+  </table></div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Critère du cahier des charges</th><th>Résultat</th><th>Vérifié par</th></tr></thead>
+    <tbody>
+      <tr><td>Chaque souvenir correctement attribué</td><td>0 erreur après contrôle (1 détectée, corrigée)</td><td>Verrous d'attribution</td></tr>
+      <tr><td>Les personnes ne sont pas mélangées</td><td>29 personnes au registre, 0 inventée</td><td>Registre des entités</td></tr>
+      <tr><td>Les faits ne sont pas inventés</td><td>1 détecté au premier jet, 0 restant</td><td>Faits sourcés obligatoires</td></tr>
+      <tr><td>Pas de paraphrase en série</td><td>Recouvrement lexical 0,31 (fenêtre 0,15–0,55)</td><td>Taux de recouvrement</td></tr>
+      <tr><td>Chaque chapitre a son identité</td><td>Similarité inter-chapitres max. 0,09 (seuil 0,25)</td><td>Jaccard n-grammes</td></tr>
+      <tr><td>Texte naturel, pas de remplissage IA</td><td>0 motif générique détecté</td><td><code>FILLER_PATTERNS</code> (déjà écrit)</td></tr>
+      <tr><td>Contributions originales reconnaissables</td><td>17 témoignages cités ou repris littéralement</td><td>Sources par paragraphe</td></tr>
+      <tr><td>Contributions originales préservées</td><td>Aucune modification de <code>contributions.message</code></td><td>Étape A intacte</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <b>Ce qui fait la différence, en une phrase</b>
+    <p>
+      Le pipeline actuel demande au modèle de <em>bien se comporter</em> avec 25 témoignages en vrac.
+      Le pipeline V2 lui donne six témoignages pertinents, la liste de ce qu'il a le droit de dire,
+      la liste de ce qu'il n'a pas le droit d'inventer — puis <strong>vérifie mécaniquement</strong>
+      qu'il a obéi. La garantie ne repose plus sur la bonne volonté du modèle.
+    </p>
+  </div>
+
+  <footer>
+    <p>
+      Démonstration produite à la main pour valider l'architecture avant implémentation&nbsp;:
+      le pipeline V2 n'existe pas encore dans le code. Les 25 témoignages sont fictifs mais
+      construits pour reproduire les difficultés réelles d'un pot de départ — contradictions de
+      dates, surnoms variables, même événement raconté par deux personnes, deux sauvetages
+      similaires à douze ans d'écart.
+    </p>
+    <p>
+      Données complètes&nbsp;: <code>01-contributions.json</code>, <code>02-analyses.json</code>,
+      <code>03-memoire-editoriale.json</code>, <code>04-plan.json</code>,
+      <code>05-chapitres-generes.json</code>, <code>06-controle-coherence.json</code>.
+      Ces fichiers servent de fixture de test hors ligne pour les étapes 04 à 06 du plan de migration.
+    </p>
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('toggle');
+    var state = document.getElementById('state');
+    btn.addEventListener('click', function () {
+      var hidden = document.body.classList.toggle('hide-src');
+      btn.textContent = hidden ? 'Afficher les sources' : 'Masquer les sources';
+      state.textContent = hidden
+        ? 'Sources masquées — lecture continue, comme dans le livre imprimé.'
+        : 'Sources affichées — chaque paragraphe indique les témoignages qui l’ont nourri.';
+    });
+  })();
+</script>

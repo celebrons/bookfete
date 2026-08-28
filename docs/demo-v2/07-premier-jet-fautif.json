@@ -1,0 +1,82 @@
+{
+  "_readme": "TEST NEGATIF du validateur. Reconstitue le PREMIER JET du chapitre 4 avec ses 6 violations reelles, plus deux fautes supplementaires (nom de collegue invente, annee 1994). Sert a prouver que les controles mordent : un validateur qui ne detecte rien ne vaut rien. Usage: node docs/demo-v2/valider.js ./07-premier-jet-fautif.json",
+
+  "introduction": {
+    "paragraphs": [
+      {
+        "text": "Vingt-cinq personnes ont écrit dans ce livre. Martine Lévêque est entrée chez Sograph en 1994, et elle y est restée trente-deux ans.",
+        "sources": ["c01", "c06"],
+        "_faute": "C2 — annee 1994 : le conflit cf-1 a tranche pour 1993"
+      }
+    ]
+  },
+
+  "chapters": [
+    {
+      "order_index": 4,
+      "title": "Mon grand, ma grande",
+      "sections": {
+        "ouverture": [
+          {
+            "text": "Il y a des gens dont on se souvient pour ce qu'ils ont dit. De Martine Lévêque, une dizaine de personnes se souviennent surtout de ce qu'elle n'a pas dit. Tous s'accordent à dire qu'elle était d'une bienveillance sans faille.",
+            "sources": ["c03", "c07", "c16", "c19"],
+            "_faute": "C6 — « tous s'accordent », « sans faille ». Quantite non sourcee : 4 sources, pas dix."
+          }
+        ],
+        "corps": [
+          {
+            "text": "Kevin Dubois avait dix-sept ans quand il est arrivé en apprentissage, en 2011. Sa première semaine, il a cassé une plaque offset, une plaque neuve qui valait le prix d'une petite voiture. Bernard Wattel, le chef d'atelier, qui ne plaisantait pas avec le matériel, aurait pu le renvoyer. C'est Sandrine Delporte, à l'accueil, qui est allée chercher Martine.",
+            "sources": ["c03"],
+            "anecdote": "a-c03-1",
+            "_faute": "C1 — « Sandrine Delporte » n'existe dans aucun temoignage. C2/facts — la valeur de la plaque est inventee. Caracterisation non sourcee de Bernard Wattel."
+          },
+          {
+            "text": "L'histoire de Laura Petit est arrivée en mars 2023. Elle avait envoyé un devis avec le mauvais tarif à un gros client, et elle a appelé Martine en pleurant à vingt-deux heures. Le lendemain matin, le client avait déjà été rappelé. Kevin n'a eu droit qu'à une phrase : « maintenant tu relis deux fois, mon grand. »",
+            "sources": ["c16"],
+            "anecdote": "a-c16-1",
+            "_faute": "C3 — le devis (verrouille sur Laura Petit) est attribue a Kevin, et « ma grande » devient « mon grand ». C2 — « mars 2023 » plus precis que la source."
+          },
+          {
+            "text": "Elle avait sorti son carnet à spirale rouge, celui où elle notait tout, les numéros, les anniversaires, qui était en congé, qui avait un enfant malade. Le carnet était plus fiable que l'informatique.",
+            "sources": ["c02"],
+            "_faute": "C4 — repetition du motif du chapitre 2, ou cette anecdote est assignee."
+          }
+        ],
+        "coda": [
+          {
+            "text": "Martine restera dans les mémoires comme une personnalité exceptionnelle.",
+            "sources": [],
+            "_faute": "C5 — aucune source declaree. C6 — « exceptionnelle »."
+          }
+        ]
+      },
+      "anecdotes_used": ["a-c03-1", "a-c16-1", "a-c02-1"],
+      "_faute": "C7 — a-c02-1 appartient au chapitre 2"
+    },
+    {
+      "order_index": 2,
+      "title": "Ce qu'aucun logiciel ne contient",
+      "sections": {
+        "ouverture": [],
+        "corps": [
+          {
+            "text": "Elle avait sorti son carnet à spirale rouge, celui où elle notait tout, les numéros, les anniversaires, qui était en congé, qui avait un enfant malade. Le carnet était plus fiable que l'informatique.",
+            "sources": ["c02"],
+            "_faute": "Paragraphe identique a celui du chapitre 4 : c'est la paire que le controle C4 doit reperer."
+          }
+        ],
+        "coda": []
+      },
+      "anecdotes_used": ["a-c02-1"]
+    }
+  ],
+
+  "conclusion": {
+    "paragraphs": [
+      {
+        "text": "Amandine Legrand a repris le standard en 2019. Il reste un jardin et un petit-fils qui s'appelle Malo.",
+        "sources": ["c20", "config"]
+      }
+    ]
+  }
+}

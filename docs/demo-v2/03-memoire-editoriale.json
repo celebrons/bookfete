@@ -1,0 +1,171 @@
+{
+  "_readme": "ETAPE C - Memoire editoriale du livre. Construite par AGREGATION EN CODE des 25 analyses : zero appel IA. C'est le registre de reference du validateur : tout nom, date ou lieu absent d'ici et present dans un chapitre genere est une INVENTION.",
+  "book_id": "demo-pot-depart-1",
+  "built_at": "2026-05-15T08:00:00.000Z",
+  "source_analyses": 25,
+  "ai_calls": 0,
+
+  "persons": [
+    { "id": "p-martine", "canonical_key": "martine leveque", "label": "Martine Lévêque", "kind": "person", "role": "sujet du livre", "variants": ["Martine", "Madame Lévêque", "Mme Lévêque"], "mention_count": 25, "sources": ["c01","c02","c03","c04","c05","c06","c07","c08","c09","c10","c11","c12","c13","c14","c15","c16","c17","c18","c19","c20","c21","c22","c23","c24","c25"] },
+    { "id": "p-jmvasseur", "canonical_key": "jean marc vasseur", "label": "Jean-Marc Vasseur", "kind": "person", "role": "Directeur général", "mention_count": 1, "sources": ["c01"] },
+    { "id": "p-ncrombez", "canonical_key": "nathalie crombez", "label": "Nathalie Crombez", "kind": "person", "role": "Comptabilité, binôme 18 ans", "mention_count": 1, "sources": ["c02"] },
+    { "id": "p-kdubois", "canonical_key": "kevin dubois", "label": "Kevin Dubois", "kind": "person", "role": "Chef d'atelier, ex-apprenti", "mention_count": 1, "sources": ["c03"] },
+    { "id": "p-smeunier", "canonical_key": "sylvie meunier", "label": "Sylvie Meunier", "kind": "person", "role": "Ressources humaines", "mention_count": 1, "sources": ["c04"] },
+    { "id": "p-abenali", "canonical_key": "ahmed benali", "label": "Ahmed Benali", "kind": "person", "role": "Cariste", "mention_count": 1, "sources": ["c05"] },
+    { "id": "p-cdupire", "canonical_key": "christine dupire", "label": "Christine Dupire", "kind": "person", "role": "Ancienne standardiste", "mention_count": 1, "sources": ["c06"] },
+    { "id": "p-tleroy", "canonical_key": "thomas leroy", "label": "Thomas Leroy", "kind": "person", "role": "Commercial", "mention_count": 1, "sources": ["c07"] },
+    { "id": "p-fdiallo", "canonical_key": "fatou diallo", "label": "Fatou Diallo", "kind": "person", "role": "Agent d'entretien", "mention_count": 1, "sources": ["c08"] },
+    { "id": "p-bwattel", "canonical_key": "bernard wattel", "label": "Bernard Wattel", "kind": "person", "role": "Ancien chef d'atelier", "mention_count": 2, "sources": ["c03","c09"], "_note": "Cite par Kevin ET auteur de c09 : verifier la coherence des deux mentions" },
+    { "id": "p-eravet", "canonical_key": "emilie ravet", "label": "Émilie Ravet", "kind": "person", "role": "Assistante administrative", "mention_count": 1, "sources": ["c10"] },
+    { "id": "p-pnowak", "canonical_key": "patrick nowak", "label": "Patrick Nowak", "kind": "person", "role": "Maintenance", "mention_count": 1, "sources": ["c11"] },
+    { "id": "p-klefebvre", "canonical_key": "karine lefebvre", "label": "Karine Lefebvre", "kind": "person", "role": "Administration des ventes", "mention_count": 1, "sources": ["c12"] },
+    { "id": "p-msaidi", "canonical_key": "mohamed saidi", "label": "Mohamed Saidi", "kind": "person", "role": "Conducteur offset", "mention_count": 1, "sources": ["c13"], "narrative_usable": false },
+    { "id": "p-ivandenbossche", "canonical_key": "isabelle vandenbossche", "label": "Isabelle Vandenbossche", "kind": "person", "role": "Cliente, directrice d'agence", "mention_count": 1, "sources": ["c14"] },
+    { "id": "p-gsix", "canonical_key": "gerard six", "label": "Gérard Six", "kind": "person", "role": "Expert-comptable externe", "mention_count": 1, "sources": ["c15"] },
+    { "id": "p-lpetit", "canonical_key": "laura petit", "label": "Laura Petit", "kind": "person", "role": "Ancienne alternante", "mention_count": 1, "sources": ["c16"] },
+    { "id": "p-dmarchand", "canonical_key": "didier marchand", "label": "Didier Marchand", "kind": "person", "role": "Ancien DRH (1998-2016)", "mention_count": 1, "sources": ["c17"] },
+    { "id": "p-sdelattre", "canonical_key": "sophie delattre", "label": "Sophie Delattre", "kind": "person", "role": "Marketing", "mention_count": 1, "sources": ["c18"] },
+    { "id": "p-yhocq", "canonical_key": "yannick hocq", "label": "Yannick Hocq", "kind": "person", "role": "Chauffeur-livreur", "mention_count": 1, "sources": ["c19"] },
+    { "id": "p-alegrand", "canonical_key": "amandine legrand", "label": "Amandine Legrand", "kind": "person", "role": "Accueil, successeure au standard", "mention_count": 1, "sources": ["c20"] },
+    { "id": "p-sdhaene", "canonical_key": "serge dhaene", "label": "Serge Dhaene", "kind": "person", "role": "Délégué syndical", "mention_count": 1, "sources": ["c21"] },
+    { "id": "p-cbonnet", "canonical_key": "celine bonnet", "label": "Céline Bonnet", "kind": "person", "role": "Comptabilité", "mention_count": 1, "sources": ["c22"] },
+    { "id": "p-ramrani", "canonical_key": "rachid amrani", "label": "Rachid Amrani", "kind": "person", "role": "Magasinier", "mention_count": 1, "sources": ["c23"] },
+    { "id": "p-vtop", "canonical_key": "valerie top", "label": "Valérie Top", "kind": "person", "role": "Ancienne collègue (partie 2008)", "mention_count": 1, "sources": ["c24"] },
+    { "id": "p-pycaron", "canonical_key": "pierre yves caron", "label": "Pierre-Yves Caron", "kind": "person", "role": "Informatique", "mention_count": 1, "sources": ["c25"] },
+
+    { "id": "p-mere-martine", "canonical_key": "mere de martine", "label": "la mère de Martine", "kind": "person", "role": "famille, non nommée", "mention_count": 1, "sources": ["c02"], "_constraint": "JAMAIS de prenom : aucun temoignage ne le donne" },
+    { "id": "p-fille-ahmed", "canonical_key": "fille de ahmed benali", "label": "la fille d'Ahmed Benali", "kind": "person", "role": "famille d'un contributeur, non nommée", "mention_count": 1, "sources": ["c05"], "_constraint": "JAMAIS de prenom" },
+    { "id": "p-fils-fatou", "canonical_key": "fils de fatou diallo", "label": "le fils de Fatou Diallo", "kind": "person", "role": "famille d'une contributrice, non nommé", "mention_count": 1, "sources": ["c08"], "_constraint": "JAMAIS de prenom" }
+  ],
+
+  "persons_hors_temoignages": [
+    { "label": "Malo", "role": "petit-fils de Martine", "source": "book_configs.retirement_project", "_constraint": "Present dans la CONFIG mais dans AUCUN temoignage. Utilisable uniquement dans la conclusion, jamais dans un chapitre nourri par les contributions." }
+  ],
+
+  "places_hors_temoignages": [
+    { "label": "Tourcoing", "kind": "place", "source": "book.company_context", "_constraint": "Issu de la configuration du livre, jamais d'un temoignage. Utilisable pour situer l'entreprise, mais aucun fait ne peut y etre rattache." }
+  ],
+
+  "places": [
+    { "id": "l-sograph", "canonical_key": "sograph", "label": "Sograph", "kind": "place", "detail": "Imprimerie industrielle, Tourcoing, 140 salariés", "mention_count": 8, "sources": ["c01","c06","c09","c14","c15","c17","c18","c25"] },
+    { "id": "l-standard", "canonical_key": "standard", "label": "le standard", "kind": "place", "mention_count": 5, "sources": ["c01","c06","c20","c24"] },
+    { "id": "l-quai", "canonical_key": "quai de chargement", "label": "le quai de chargement", "kind": "place", "mention_count": 1, "sources": ["c05"] },
+    { "id": "l-magasin-papier", "canonical_key": "magasin de papier", "label": "le magasin de papier", "kind": "place", "mention_count": 1, "sources": ["c09"] },
+    { "id": "l-bureau-partage", "canonical_key": "bureau partage", "label": "le bureau partagé avec Nathalie Crombez", "kind": "place", "mention_count": 1, "sources": ["c02"] },
+    { "id": "l-jardin", "canonical_key": "jardin de martine", "label": "son jardin", "kind": "place", "mention_count": 1, "sources": ["c19"] },
+    { "id": "l-prefecture", "canonical_key": "prefecture", "label": "la préfecture", "kind": "place", "mention_count": 1, "sources": ["c23"] },
+    { "id": "l-atelier", "canonical_key": "atelier", "label": "l'atelier", "kind": "place", "mention_count": 1, "sources": ["c03"] }
+  ],
+
+  "events": [
+    { "id": "e-arrivee", "label": "Arrivée de Martine chez Sograph", "date_candidates": [{ "value": "1993", "sources": ["c01"] }, { "value": "1994", "sources": ["c06"] }, { "value": "199X", "sources": ["c24"] }], "resolution": "CONFLIT", "resolution_rule": "Date la plus precise issue de la source la plus autorisee (DG, dossier RH) = 1993. La formulation du livre doit rester non datee OU citer 1993 sans contradiction.", "narrative_instruction": "Ecrire « au début des années quatre-vingt-dix » ou « en 1993 ». NE JAMAIS ecrire 1994." },
+    { "id": "e-promotion", "label": "Promotion au poste de responsable administrative", "date_candidates": [{ "value": "2004", "sources": ["c01"] }], "resolution": "CERTAIN" },
+    { "id": "e-incendie", "label": "Incendie du magasin de papier", "date_candidates": [{ "value": "2009", "sources": ["c09"] }, { "value": "~2011", "sources": ["c11"] }], "resolution": "CONFLIT", "resolution_rule": "Date explicite (2009, c09) prime sur approximation (« une quinzaine d'années », c11).", "narrative_instruction": "Ecrire 2009. Les deux temoignages decrivent le MEME evenement a deux moments : le soir (c11, inventaire jusqu'a 23h) et le lendemain matin (c09, appels des 6h30). Les combiner en une seule sequence chronologique." },
+    { "id": "e-plan-social", "label": "Plan social — onze postes supprimés", "date_candidates": [{ "value": "2014", "sources": ["c17","c21"] }], "resolution": "CERTAIN", "corroborated_by": 2 },
+    { "id": "e-migration-crm", "label": "Migration du CRM", "date_candidates": [{ "value": "2017", "sources": ["c25"] }], "resolution": "CERTAIN" },
+    { "id": "e-succession-standard", "label": "Reprise du standard par Amandine Legrand", "date_candidates": [{ "value": "2019", "sources": ["c20"] }], "resolution": "CERTAIN" },
+    { "id": "e-naturalisation", "label": "Naturalisation de Rachid Amrani", "date_candidates": [], "resolution": "SANS_DATE", "narrative_instruction": "Aucune date disponible. NE PAS en inventer, ne pas situer dans le temps." },
+    { "id": "e-noel", "label": "Tirage sauvé un 24 décembre", "date_candidates": [{ "value": "--12-24", "sources": ["c14"] }], "resolution": "JOUR_SANS_ANNEE", "narrative_instruction": "Le 24 decembre est certain, l'ANNEE est inconnue. Ne jamais ecrire « en 2012 » ou tout millesime." }
+  ],
+
+  "objects": [
+    { "id": "o-carnet-rouge", "canonical_key": "carnet a spirale rouge", "label": "le carnet à spirale rouge de Martine", "kind": "object", "mention_count": 6, "sources": ["c02","c09","c20","c25"], "attributes": { "couleur": "rouge", "contenu": ["numéros", "anniversaires", "congés", "enfants malades", "prénoms des enfants des clients", "habitudes des clients", "retards de livraison"] }, "narrative_weight": "motif central du livre" },
+    { "id": "o-carnet-noir", "canonical_key": "carnet noir de emilie", "label": "le carnet noir offert à Émilie Ravet", "kind": "object", "mention_count": 1, "sources": ["c10"], "attributes": { "couleur": "noir" }, "_constraint": "OBJET DISTINCT du carnet rouge. Ne pas fusionner : ce n'est pas une contradiction de couleur mais deux carnets." },
+    { "id": "o-geranium", "canonical_key": "geranium", "label": "le géranium sur le coin du bureau", "kind": "object", "mention_count": 1, "sources": ["c18"], "attributes": { "present_depuis": "au moins 2010", "sauve": "trois fois" } },
+    { "id": "o-fiches-couleur", "canonical_key": "fiches cartonnees code couleur", "label": "les fiches cartonnées et leur code couleur", "kind": "object", "mention_count": 1, "sources": ["c24"], "attributes": { "rouge": "urgents", "vert": "habitués", "jaune": "INCONNU — la contributrice ne se souvient pas" }, "_constraint": "NE JAMAIS completer la signification du jaune." }
+  ],
+
+  "rituals": [
+    { "id": "r-tarte-vendredi", "label": "La pâtisserie du vendredi", "forms": [{ "detail": "tarte au sucre, recette de sa mère, jusqu'à douze personnes autour de sa table", "sources": ["c02"] }, { "detail": "assiette de gaufres descendue au quai pour les caristes", "sources": ["c05"] }], "resolution": "COMPLEMENTAIRE", "_note": "Deux patisseries differentes, pas une contradiction. Le livre peut mentionner les deux." },
+    { "id": "r-tournee", "label": "« La tournée » de 16h30 avec la corbeille du courrier", "sources": ["c22"], "resolution": "CERTAIN" },
+    { "id": "r-tomates", "label": "Les cageots de tomates du jardin, en août", "sources": ["c19"], "resolution": "CERTAIN" },
+    { "id": "r-bonjour-matin", "label": "Le bonjour du matin, y compris au quai", "sources": ["c05","c08"], "resolution": "CERTAIN" }
+  ],
+
+  "quotes": [
+    { "id": "q-arranger", "text": "on va s'arranger", "speaker": "p-martine", "sources": ["c02","c03"], "corroborated_by": 2, "narrative_weight": "phrase signature du livre" },
+    { "id": "q-ordinateur", "text": "un ordinateur ne se souvient pas des gens, il se souvient des données", "speaker": "p-martine", "sources": ["c10"] },
+    { "id": "q-relis", "text": "maintenant tu relis deux fois, ma grande", "speaker": "p-martine", "addressee": "p-lpetit", "sources": ["c16"] },
+    { "id": "q-mauvais-numero", "text": "un client qui tombe sur un mauvais numéro ne rappelle pas", "speaker": "p-martine", "sources": ["c25"] },
+    { "id": "q-mon-grand", "text": "mon grand", "speaker": "p-martine", "addressee": "p-kdubois", "sources": ["c03"], "_constraint": "Adresse a Kevin Dubois. « ma grande » est adresse a Laura Petit. Ne pas croiser." }
+  ],
+
+  "themes": [
+    { "id": "t-memoire-gens", "label": "La mémoire des gens contre la mémoire des machines", "weight": 9, "sources": ["c01","c02","c06","c10","c20","c25"] },
+    { "id": "t-protection-jeunes", "label": "Protéger les débutants, prendre la faute à leur place", "weight": 8, "sources": ["c03","c07","c16","c19"] },
+    { "id": "t-invisibles", "label": "Voir ceux que personne ne regarde", "weight": 8, "sources": ["c05","c08","c19","c23"] },
+    { "id": "t-crise", "label": "Tenir dans les moments durs", "weight": 8, "sources": ["c09","c11","c17","c21"] },
+    { "id": "t-rituels", "label": "Les rituels comme façon de prendre soin", "weight": 7, "sources": ["c02","c05","c19","c22"] },
+    { "id": "t-role-informel", "label": "Le pouvoir sans le titre", "weight": 7, "sources": ["c04","c17","c21"] },
+    { "id": "t-transmission", "label": "Ce qui se transmet et ce qui ne se transmet pas", "weight": 8, "sources": ["c10","c20","c24","c25"] },
+    { "id": "t-fiabilite", "label": "La fiabilité comme forme de respect", "weight": 6, "sources": ["c14","c15","c25"] },
+    { "id": "t-nuance", "label": "Le désaccord et les angles arrondis", "weight": 5, "sources": ["c12","c21"] }
+  ],
+
+  "anecdotes_index": [
+    { "id": "a-c03-1", "label": "La plaque offset cassée de Kevin", "protagonists": ["p-kdubois","p-martine","p-bwattel"], "date": "2011", "theme": "t-protection-jeunes", "intensity": 5, "exclusive_to_person": "p-kdubois" },
+    { "id": "a-c16-1", "label": "Le devis au mauvais tarif de Laura", "protagonists": ["p-lpetit","p-martine"], "date": "2023", "theme": "t-protection-jeunes", "intensity": 5, "exclusive_to_person": "p-lpetit" },
+    { "id": "a-c09-1", "label": "Les appels du lendemain d'incendie, 6h30", "protagonists": ["p-martine","p-bwattel"], "date": "2009", "theme": "t-crise", "intensity": 4 },
+    { "id": "a-c11-1", "label": "L'inventaire en bottes jusqu'à 23h", "protagonists": ["p-martine","p-pnowak"], "date": "2009", "theme": "t-crise", "intensity": 3, "same_event_as": "a-c09-1" },
+    { "id": "a-c17-1", "label": "Les onze du plan social reçus avant l'officiel", "protagonists": ["p-martine","p-dmarchand"], "date": "2014", "theme": "t-crise", "intensity": 5 },
+    { "id": "a-c23-1", "label": "Deux ans de dossier de naturalisation", "protagonists": ["p-ramrani","p-martine"], "date": null, "theme": "t-invisibles", "intensity": 5 },
+    { "id": "a-c14-1", "label": "Le tirage du 24 décembre", "protagonists": ["p-martine","p-ivandenbossche"], "date": null, "theme": "t-fiabilite", "intensity": 4 },
+    { "id": "a-c20-2", "label": "La double page de carnet laissée en héritage", "protagonists": ["p-martine","p-alegrand"], "date": "2019", "theme": "t-transmission", "intensity": 4 },
+    { "id": "a-c10-1", "label": "Le carnet noir offert à Émilie", "protagonists": ["p-martine","p-eravet"], "date": null, "theme": "t-transmission", "intensity": 4 },
+    { "id": "a-c22-1", "label": "« La tournée » de 16h30", "protagonists": ["p-martine","p-cbonnet"], "date": null, "theme": "t-rituels", "intensity": 4 },
+    { "id": "a-c05-1", "label": "Les gaufres descendues au quai", "protagonists": ["p-martine","p-abenali"], "date": null, "theme": "t-invisibles", "intensity": 4 },
+    { "id": "a-c08-1", "label": "Le mot laissé pour le café renversé", "protagonists": ["p-martine","p-fdiallo"], "date": null, "theme": "t-invisibles", "intensity": 4 },
+    { "id": "a-c08-2", "label": "Les horaires aménagés pour Fatou", "protagonists": ["p-martine","p-fdiallo"], "date": null, "theme": "t-invisibles", "intensity": 5 },
+    { "id": "a-c07-1", "label": "Le premier jour de Thomas, table de la compta", "protagonists": ["p-tleroy","p-martine"], "date": "2019", "theme": "t-protection-jeunes", "intensity": 4 },
+    { "id": "a-c18-1", "label": "Le géranium arrosé un dimanche d'août", "protagonists": ["p-martine","p-sdelattre"], "date": null, "theme": "t-rituels", "intensity": 3 },
+    { "id": "a-c24-1", "label": "Le code couleur des fiches cartonnées", "protagonists": ["p-martine","p-vtop"], "date": null, "theme": "t-transmission", "intensity": 3 },
+    { "id": "a-c25-1", "label": "Les cent fiches corrigées à la main", "protagonists": ["p-martine","p-pycaron"], "date": "2017", "theme": "t-memoire-gens", "intensity": 3 },
+    { "id": "a-c21-1", "label": "Les disputes avec le délégué syndical", "protagonists": ["p-sdhaene","p-martine"], "date": null, "theme": "t-nuance", "intensity": 4 },
+    { "id": "a-c01-1", "label": "Trois semaines pour accepter la promotion", "protagonists": ["p-martine","p-jmvasseur"], "date": "2004", "theme": "t-role-informel", "intensity": 3 },
+    { "id": "a-c02-1", "label": "Le carnet maintenu en parallèle de l'informatique", "protagonists": ["p-martine"], "date": null, "theme": "t-memoire-gens", "intensity": 3 },
+    { "id": "a-c02-2", "label": "La tarte au sucre du vendredi", "protagonists": ["p-martine","p-ncrombez"], "date": null, "theme": "t-rituels", "intensity": 4 },
+    { "id": "a-c06-1", "label": "Les prénoms des enfants des clients notés", "protagonists": ["p-martine","p-cdupire"], "date": null, "theme": "t-memoire-gens", "intensity": 4 },
+    { "id": "a-c19-1", "label": "Les retards notés pour couvrir le chauffeur", "protagonists": ["p-martine","p-yhocq"], "date": null, "theme": "t-protection-jeunes", "intensity": 4 },
+    { "id": "a-c19-2", "label": "Les cageots de tomates d'août", "protagonists": ["p-martine"], "date": null, "theme": "t-rituels", "intensity": 2 },
+    { "id": "a-c20-1", "label": "« Martine ? » avant la fin de la phrase", "protagonists": ["p-alegrand","p-martine"], "date": null, "theme": "t-transmission", "intensity": 3 }
+  ],
+
+  "conflicts_detected": [
+    { "id": "cf-1", "type": "date_conflict", "entity": "e-arrivee", "detail": "1993 (c01, DG) vs 1994 (c06, formatrice) vs « début des années 90 » (c24)", "resolution": "1993 retenu", "action": "Instruction de generation : ne jamais ecrire 1994." },
+    { "id": "cf-2", "type": "date_conflict", "entity": "e-incendie", "detail": "2009 (c09, explicite) vs ~2011 (c11, approximatif)", "resolution": "2009 retenu", "action": "Fusionner c09 et c11 comme deux moments du meme evenement." },
+    { "id": "cf-3", "type": "false_conflict", "entity": "carnets", "detail": "rouge (c02) vs noir (c10)", "resolution": "Deux objets distincts", "action": "Ne pas fusionner, ne pas signaler comme contradiction." },
+    { "id": "cf-4", "type": "false_conflict", "entity": "r-tarte-vendredi", "detail": "tarte au sucre (c02) vs gaufres (c05)", "resolution": "Complementaires", "action": "Les deux peuvent apparaitre." },
+    { "id": "cf-5", "type": "attribution_risk", "entity": "t-protection-jeunes", "detail": "Deux recits de sauvetage tres proches : Kevin/plaque offset/2011 et Laura/devis/2023", "resolution": "Strictement separes", "action": "Verrou : a-c03-1 exclusif a Kevin Dubois, a-c16-1 exclusif a Laura Petit. Toute permutation = violation bloquante." },
+    { "id": "cf-6", "type": "unknown_detail", "entity": "o-fiches-couleur", "detail": "La signification du jaune est explicitement oubliee par la contributrice", "resolution": "Reste inconnue", "action": "Liste des interdits : ne pas completer." }
+  ],
+
+  "forbidden_elements": [
+    "Toute date pour la naturalisation de Rachid Amrani",
+    "Toute année pour l'épisode du 24 décembre",
+    "La signification de la fiche jaune",
+    "Le prénom de la mère de Martine",
+    "Le prénom de la fille d'Ahmed Benali",
+    "Le prénom du fils de Fatou Diallo",
+    "L'année 1994 pour l'arrivée de Martine",
+    "Le prénom Malo dans un chapitre nourri par les témoignages (config uniquement)",
+    "Tout collègue, client ou lieu absent de ce registre",
+    "L'âge de Martine (aucun témoignage ne le donne)",
+    "Le nom de son conjoint (jamais mentionné)",
+    "Le nombre exact de personnes présentes au pot de départ"
+  ],
+
+  "_stats": {
+    "personnes": 29,
+    "lieux": 8,
+    "evenements": 9,
+    "objets": 4,
+    "rituels": 4,
+    "citations": 5,
+    "themes": 9,
+    "anecdotes": 25,
+    "conflits_reels": 2,
+    "faux_conflits_ecartes": 2,
+    "risques_attribution": 1,
+    "elements_interdits": 12
+  }
+}

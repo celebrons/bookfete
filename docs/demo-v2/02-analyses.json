@@ -1,0 +1,588 @@
+{
+  "_readme": "ETAPE B - Une analyse structuree par contribution. Produite par le prompt 'contribution_analysis' en mode response_format=json_object, modele mistral-small-latest. Idempotent : indexee sur source_hash, jamais rejouee si le message n'a pas change.",
+  "_schema": {
+    "author": "{ name, role, relationship: colleague|manager|client|external|subordinate, tenure_years }",
+    "persons_mentioned": "[{ name, role, certainty: explicit|implied }]",
+    "events": "[{ label, date, date_precision: year|approx|none, location }]",
+    "time_markers": "[{ raw, normalized, precision }]",
+    "places": "[string]",
+    "themes": "[string] - vocabulaire libre, consolide a l'etape C",
+    "anecdotes": "[{ id, summary, protagonists, date, verbatim_support }]",
+    "facts": "[{ statement, type: biographical|behavioral|organizational, support }]",
+    "quotes": "[{ text, speaker }]",
+    "tone": "string",
+    "emotional_intensity": "0-5",
+    "richness": "rich|standard|thin",
+    "usable_for_narrative": "boolean"
+  },
+  "analyses": [
+    {
+      "contribution_id": "c01",
+      "source_hash": "sha256:8f2a…",
+      "author": { "name": "Jean-Marc Vasseur", "role": "Directeur général", "relationship": "manager", "tenure_years": 31 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [
+        { "label": "Arrivée de Martine chez Sograph", "date": "1993", "date_precision": "year", "location": "Sograph" },
+        { "label": "Promotion au poste de responsable administrative", "date": "2004", "date_precision": "year", "location": "Sograph" }
+      ],
+      "time_markers": [{ "raw": "en 1993", "normalized": "1993", "precision": "year" }, { "raw": "en 2004", "normalized": "2004", "precision": "year" }],
+      "places": ["Sograph"],
+      "themes": ["longévité", "mémoire des gens", "évolution de l'entreprise", "attachement au contact humain"],
+      "anecdotes": [
+        { "id": "a-c01-1", "summary": "Elle a mis trois semaines à accepter sa promotion par peur de perdre le contact avec les gens, puis a cumulé le standard pendant deux ans", "protagonists": ["Martine Lévêque", "Jean-Marc Vasseur"], "date": "2004", "verbatim_support": "elle a mis trois semaines à accepter parce qu'elle avait peur de perdre le contact" }
+      ],
+      "facts": [
+        { "statement": "Le standard comptait deux lignes et un carnet à son arrivée", "type": "organizational", "support": "le standard c'était deux lignes et un carnet" },
+        { "statement": "Elle a connu quatre directeurs et trois déménagements de bureaux", "type": "organizational", "support": "Elle a vu passer quatre directeurs, trois déménagements" },
+        { "statement": "Elle reconnaissait les voix au téléphone, y compris de clients absents six mois", "type": "behavioral", "support": "elle savait qui appelait avant de décrocher" }
+      ],
+      "quotes": [],
+      "tone": "admiratif, factuel",
+      "emotional_intensity": 3,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c02",
+      "source_hash": "sha256:1b90…",
+      "author": { "name": "Nathalie Crombez", "role": "Comptabilité", "relationship": "colleague", "tenure_years": 18 },
+      "persons_mentioned": [
+        { "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" },
+        { "name": "la mère de Martine", "role": "famille", "certainty": "explicit" }
+      ],
+      "events": [{ "label": "Arrivée de l'informatique au bureau", "date": null, "date_precision": "none", "location": "Sograph" }],
+      "time_markers": [{ "raw": "dix-huit ans", "normalized": "P18Y", "precision": "duration" }],
+      "places": ["bureau partagé", "Sograph"],
+      "themes": ["carnet à spirale", "rituel du vendredi", "fiabilité", "solidarité", "transmission familiale"],
+      "anecdotes": [
+        { "id": "a-c02-1", "summary": "Elle a maintenu son carnet papier en parallèle de l'informatique, et le carnet restait plus fiable", "protagonists": ["Martine Lévêque"], "date": null, "verbatim_support": "elle a continué le carnet en parallèle, et franchement le carnet était plus fiable" },
+        { "id": "a-c02-2", "summary": "Chaque vendredi elle apportait une tarte au sucre, recette de sa mère ; jusqu'à douze personnes autour de sa table", "protagonists": ["Martine Lévêque", "Nathalie Crombez"], "date": null, "verbatim_support": "le vendredi elle apportait une tarte au sucre, toujours la même recette, celle de sa mère" }
+      ],
+      "facts": [
+        { "statement": "Le carnet à spirale de Martine était rouge", "type": "biographical", "support": "Le carnet à spirale rouge, c'est ma madeleine" },
+        { "statement": "Elle y notait numéros, anniversaires, congés, enfants malades", "type": "behavioral", "support": "les numéros, les anniversaires, qui était en congé" },
+        { "statement": "Elles ont partagé le même bureau pendant dix-huit ans", "type": "biographical", "support": "On a partagé le même bureau pendant dix-huit ans" }
+      ],
+      "quotes": [{ "text": "on va s'arranger", "speaker": "Martine Lévêque" }],
+      "tone": "tendre, nostalgique",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c03",
+      "source_hash": "sha256:4c11…",
+      "author": { "name": "Kevin Dubois", "role": "Chef d'atelier", "relationship": "subordinate", "tenure_years": 15 },
+      "persons_mentioned": [
+        { "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" },
+        { "name": "Bernard Wattel", "role": "chef d'atelier de l'époque", "certainty": "explicit" }
+      ],
+      "events": [{ "label": "Arrivée de Kevin en apprentissage à 17 ans", "date": "2011", "date_precision": "year", "location": "atelier Sograph" }],
+      "time_markers": [{ "raw": "en 2011", "normalized": "2011", "precision": "year" }, { "raw": "dix-sept ans", "normalized": "17", "precision": "age" }],
+      "places": ["couloir", "atelier"],
+      "themes": ["protection des jeunes", "prise de responsabilité", "mentorat", "surnoms affectueux"],
+      "anecdotes": [
+        { "id": "a-c03-1", "summary": "Kevin, apprenti de 17 ans, casse une plaque offset neuve sa première semaine et veut fuir ; Martine l'arrête, l'accompagne devant Bernard et s'accuse à sa place — ce qui était faux", "protagonists": ["Kevin Dubois", "Martine Lévêque", "Bernard Wattel"], "date": "2011", "verbatim_support": "elle a expliqué que c'était sa faute à elle parce qu'elle m'avait envoyé à l'atelier sans prévenir personne. C'était complètement faux." }
+      ],
+      "facts": [
+        { "statement": "Elle appelait Kevin « mon grand » depuis ses 17 ans jusqu'à ce qu'il devienne chef d'atelier", "type": "behavioral", "support": "Elle m'a appelé « mon grand » pendant quinze ans" }
+      ],
+      "quotes": [{ "text": "viens, on va s'arranger", "speaker": "Martine Lévêque" }],
+      "tone": "reconnaissant, pudique",
+      "emotional_intensity": 5,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c04",
+      "source_hash": "sha256:77de…",
+      "author": { "name": "Sylvie Meunier", "role": "Ressources humaines", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [],
+      "time_markers": [],
+      "places": ["bureau des RH"],
+      "themes": ["rôle informel", "médiation", "écoute", "conflits désamorcés"],
+      "anecdotes": [],
+      "facts": [
+        { "statement": "Elle n'a jamais appartenu aux RH mais en assumait une part importante de façon informelle", "type": "organizational", "support": "Officiellement Martine n'a jamais fait partie des RH. En pratique elle en faisait la moitié." },
+        { "statement": "Les salariés la consultaient avant de saisir les RH", "type": "behavioral", "support": "Les gens venaient la voir avant de venir me voir" },
+        { "statement": "Elle prétendait ne faire qu'écouter, alors qu'elle orientait et temporisait", "type": "behavioral", "support": "elle répondait qu'elle ne faisait qu'écouter. Ce n'est pas vrai" }
+      ],
+      "quotes": [],
+      "tone": "lucide, admiratif",
+      "emotional_intensity": 3,
+      "richness": "standard",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c05",
+      "source_hash": "sha256:2ea5…",
+      "author": { "name": "Ahmed Benali", "role": "Cariste", "relationship": "colleague", "tenure_years": 20 },
+      "persons_mentioned": [
+        { "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" },
+        { "name": "la fille d'Ahmed Benali", "role": "famille d'un contributeur", "certainty": "explicit" }
+      ],
+      "events": [],
+      "time_markers": [{ "raw": "en août", "normalized": "--08", "precision": "month" }],
+      "places": ["quai de chargement", "bureaux à l'étage"],
+      "themes": ["rituel du vendredi", "franchir les hiérarchies", "attention aux invisibles", "mémoire des familles"],
+      "anecdotes": [
+        { "id": "a-c05-1", "summary": "Le vendredi, elle descendait au quai avec une assiette de gaufres parce que les caristes ne montaient jamais dans les bureaux", "protagonists": ["Martine Lévêque", "Ahmed Benali"], "date": null, "verbatim_support": "elle descendait au quai avec une assiette, parce qu'elle savait qu'on ne montait pas" }
+      ],
+      "facts": [
+        { "statement": "Elle savait que la fille d'Ahmed faisait de la danse et demandait des nouvelles des galas", "type": "behavioral", "support": "Elle savait que ma fille faisait de la danse" },
+        { "statement": "Elle disait aux caristes qu'ils travaillaient plus dur que les bureaux", "type": "behavioral", "support": "Elle disait qu'on travaillait plus dur qu'eux là-haut" }
+      ],
+      "quotes": [],
+      "tone": "chaleureux, simple",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c06",
+      "source_hash": "sha256:9a03…",
+      "author": { "name": "Christine Dupire", "role": "Ancienne standardiste", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [
+        { "label": "Formation de Martine au standard", "date": "1994", "date_precision": "year", "location": "Sograph" },
+        { "label": "Départ de Christine Dupire", "date": "2015", "date_precision": "year", "location": "Sograph" }
+      ],
+      "time_markers": [{ "raw": "en 1994", "normalized": "1994", "precision": "year" }],
+      "places": ["standard"],
+      "themes": ["apprentissage rapide", "attention aux détails", "intérêt sincère pour les gens"],
+      "anecdotes": [
+        { "id": "a-c06-1", "summary": "Elle notait le prénom des enfants des clients ; interrogée, elle a prétendu que c'était pour gagner du temps", "protagonists": ["Martine Lévêque", "Christine Dupire"], "date": null, "verbatim_support": "elle m'a dit que ça faisait gagner du temps. Trente ans plus tard je pense qu'elle m'avait menti" }
+      ],
+      "facts": [
+        { "statement": "Christine Dupire a formé Martine à son arrivée ; Martine a maîtrisé le poste en deux jours", "type": "biographical", "support": "elle a compris en deux jours" }
+      ],
+      "quotes": [],
+      "tone": "affectueux, amusé",
+      "emotional_intensity": 3,
+      "richness": "standard",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c07",
+      "source_hash": "sha256:c5f8…",
+      "author": { "name": "Thomas Leroy", "role": "Commercial", "relationship": "colleague", "tenure_years": 7 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Premier jour de Thomas Leroy", "date": "2019", "date_precision": "year", "location": "Sograph" }],
+      "time_markers": [{ "raw": "en 2019", "normalized": "2019", "precision": "year" }],
+      "places": ["bureaux", "table de la comptabilité"],
+      "themes": ["accueil des nouveaux", "mémoire des rôles", "lutte contre l'isolement"],
+      "anecdotes": [
+        { "id": "a-c07-1", "summary": "Son manager absent le premier jour, c'est Martine qui l'installe, le présente à quarante personnes en resituant le rôle de chacun, puis l'assoit à la table de la compta où il déjeune encore sept ans après", "protagonists": ["Thomas Leroy", "Martine Lévêque"], "date": "2019", "verbatim_support": "À midi elle m'a dit de ne pas manger seul et elle m'a collé à la table de la compta. Sept ans après je déjeune encore avec eux." }
+      ],
+      "facts": [
+        { "statement": "Elle pouvait présenter quarante personnes de mémoire en resituant la fonction de chacune", "type": "behavioral", "support": "m'a présenté à quarante personnes en se souvenant de ce que chacun faisait" }
+      ],
+      "quotes": [],
+      "tone": "reconnaissant",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c08",
+      "source_hash": "sha256:0d64…",
+      "author": { "name": "Fatou Diallo", "role": "Agent d'entretien", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [
+        { "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" },
+        { "name": "le fils de Fatou Diallo", "role": "famille d'une contributrice", "certainty": "explicit" }
+      ],
+      "events": [{ "label": "Changement d'horaires obtenu pour Fatou Diallo", "date": null, "date_precision": "none", "location": "Sograph" }],
+      "time_markers": [],
+      "places": ["bureaux"],
+      "themes": ["reconnaissance des invisibles", "dignité", "égards concrets", "prénoms"],
+      "anecdotes": [
+        { "id": "a-c08-1", "summary": "Elle laissait un mot sur son bureau quand elle avait renversé du café, pour prévenir", "protagonists": ["Martine Lévêque", "Fatou Diallo"], "date": null, "verbatim_support": "Elle laissait un mot sur son bureau quand elle avait renversé du café, pour prévenir" },
+        { "id": "a-c08-2", "summary": "Elle a obtenu un aménagement d'horaires pour que Fatou puisse récupérer son fils à l'école", "protagonists": ["Martine Lévêque", "Fatou Diallo"], "date": null, "verbatim_support": "Elle a demandé une fois qu'on change mes horaires… Ça a été fait." }
+      ],
+      "facts": [
+        { "statement": "Elle appelait Fatou Diallo par son prénom, contrairement à ses expériences précédentes", "type": "behavioral", "support": "dans beaucoup d'endroits où j'ai travaillé, personne ne connaît mon prénom" },
+        { "statement": "Fatou Diallo l'appelait « Madame Lévêque »", "type": "behavioral", "support": "Madame Lévêque me disait bonjour par mon prénom" }
+      ],
+      "quotes": [],
+      "tone": "pudique, grave",
+      "emotional_intensity": 5,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c09",
+      "source_hash": "sha256:b3aa…",
+      "author": { "name": "Bernard Wattel", "role": "Ancien chef d'atelier", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [
+        { "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" },
+        { "name": "le directeur", "role": "direction", "certainty": "implied" }
+      ],
+      "events": [{ "label": "Incendie du magasin de papier", "date": "2009", "date_precision": "year", "location": "magasin de papier, Sograph" }],
+      "time_markers": [{ "raw": "en 2009", "normalized": "2009", "precision": "year" }, { "raw": "six heures et demie", "normalized": "06:30", "precision": "time" }],
+      "places": ["magasin de papier"],
+      "themes": ["crise", "sang-froid", "initiative sans mandat", "protection des autres"],
+      "anecdotes": [
+        { "id": "a-c09-1", "summary": "Au lendemain de l'incendie, présente à 6h30 avant le directeur, elle rappelle les clients un par un avec son carnet pour décaler les livraisons, d'une voix normale, et envoie les autres boire un café", "protagonists": ["Martine Lévêque", "Bernard Wattel"], "date": "2009", "verbatim_support": "elle avait sorti son carnet et elle appelait les clients un par un pour décaler les livraisons. Sans qu'on le lui demande." }
+      ],
+      "facts": [
+        { "statement": "L'incendie a détruit le stock de papier en une nuit", "type": "organizational", "support": "On a perdu le stock d'une nuit" },
+        { "statement": "Elle était la seule à ne pas paraître secouée, ou le dissimulait", "type": "behavioral", "support": "On était tous secoués sauf elle. Ou elle le cachait bien." }
+      ],
+      "quotes": [],
+      "tone": "admiratif, sobre",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c10",
+      "source_hash": "sha256:e7c2…",
+      "author": { "name": "Émilie Ravet", "role": "Assistante administrative", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Titularisation d'Émilie Ravet", "date": null, "date_precision": "none", "location": "Sograph" }],
+      "time_markers": [],
+      "places": [],
+      "themes": ["transmission", "carnet à spirale", "mémoire humaine contre données", "héritage de méthode"],
+      "anecdotes": [
+        { "id": "a-c10-1", "summary": "Elle offre un carnet noir à Émilie lors de sa titularisation en lui disant qu'un ordinateur se souvient des données, pas des gens ; Émilie tient ce carnet depuis", "protagonists": ["Martine Lévêque", "Émilie Ravet"], "date": null, "verbatim_support": "Elle m'a dit qu'un ordinateur ne se souvient pas des gens, il se souvient des données." }
+      ],
+      "facts": [
+        { "statement": "Le carnet offert à Émilie Ravet était noir — objet distinct du carnet rouge de Martine", "type": "biographical", "support": "Le mien était noir, parce qu'elle m'en a offert un" }
+      ],
+      "quotes": [{ "text": "un ordinateur ne se souvient pas des gens, il se souvient des données", "speaker": "Martine Lévêque" }],
+      "tone": "reconnaissant, réflexif",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c11",
+      "source_hash": "sha256:5f19…",
+      "author": { "name": "Patrick Nowak", "role": "Maintenance", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Incendie (inventaire nocturne)", "date": null, "date_precision": "approx", "location": "Sograph" }],
+      "time_markers": [
+        { "raw": "il y a une quinzaine d'années", "normalized": "~2011", "precision": "approx" },
+        { "raw": "vingt-trois heures", "normalized": "23:00", "precision": "time" }
+      ],
+      "places": [],
+      "themes": ["crise", "présence au-delà du rôle"],
+      "anecdotes": [
+        { "id": "a-c11-1", "summary": "Le soir de l'incendie, elle reste jusqu'à 23 h à faire l'inventaire de ce qui restait, en bottes, alors que ce n'était pas son travail", "protagonists": ["Martine Lévêque", "Patrick Nowak"], "date": null, "verbatim_support": "Elle n'avait rien à faire là, ce n'était pas son travail. Elle avait mis des bottes." }
+      ],
+      "facts": [],
+      "quotes": [],
+      "tone": "factuel, admiratif",
+      "emotional_intensity": 3,
+      "richness": "standard",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c12",
+      "source_hash": "sha256:aa41…",
+      "author": { "name": "Karine Lefebvre", "role": "Administration des ventes", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [],
+      "time_markers": [],
+      "places": [],
+      "themes": ["art du reproche", "bienveillance exigeante", "pédagogie"],
+      "anecdotes": [],
+      "facts": [
+        { "statement": "Elle savait signaler une erreur sans humilier, en commençant toujours par une question et jamais par un reproche", "type": "behavioral", "support": "Elle commençait toujours par une question, jamais par un reproche." }
+      ],
+      "quotes": [],
+      "tone": "admiratif",
+      "emotional_intensity": 3,
+      "richness": "standard",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c13",
+      "source_hash": "sha256:31b7…",
+      "author": { "name": "Mohamed Saidi", "role": "Conducteur offset", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [],
+      "time_markers": [],
+      "places": [],
+      "themes": ["vœux de départ"],
+      "anecdotes": [],
+      "facts": [],
+      "quotes": [],
+      "tone": "cordial",
+      "emotional_intensity": 1,
+      "richness": "thin",
+      "usable_for_narrative": false,
+      "_note": "Aucun fait exploitable. Le nom doit figurer dans les signataires du livre, mais cette contribution ne doit alimenter aucun chapitre."
+    },
+    {
+      "contribution_id": "c14",
+      "source_hash": "sha256:6cd0…",
+      "author": { "name": "Isabelle Vandenbossche", "role": "Cliente, directrice d'agence", "relationship": "client", "tenure_years": 22 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [
+        { "label": "Début de la collaboration", "date": "2004", "date_precision": "year", "location": null },
+        { "label": "Tirage sauvé un 24 décembre", "date": null, "date_precision": "none", "location": null }
+      ],
+      "time_markers": [{ "raw": "un 24 décembre", "normalized": "--12-24", "precision": "day" }, { "raw": "quarante minutes", "normalized": "PT40M", "precision": "duration" }],
+      "places": [],
+      "themes": ["fiabilité", "dévouement hors cadre", "relation client", "discrétion"],
+      "anecdotes": [
+        { "id": "a-c14-1", "summary": "Appelée en catastrophe un 24 décembre pour une erreur de la cliente, elle rappelle réglé quarante minutes plus tard sans jamais dire qui elle avait dérangé pendant son réveillon", "protagonists": ["Martine Lévêque", "Isabelle Vandenbossche"], "date": null, "verbatim_support": "Elle m'a rappelée quarante minutes plus tard en me disant que c'était réglé. Je n'ai jamais su comment" }
+      ],
+      "facts": [
+        { "statement": "Elle connaissait les délais de la cliente mieux que la cliente elle-même", "type": "behavioral", "support": "Elle connaissait mes délais mieux que moi" }
+      ],
+      "quotes": [],
+      "tone": "reconnaissant, un peu coupable",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c15",
+      "source_hash": "sha256:f209…",
+      "author": { "name": "Gérard Six", "role": "Expert-comptable externe", "relationship": "external", "tenure_years": 25 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Début de la mission comptable", "date": "2001", "date_precision": "year", "location": "Sograph" }],
+      "time_markers": [{ "raw": "quatre fois par an depuis 2001", "normalized": "2001", "precision": "year" }],
+      "places": ["Sograph"],
+      "themes": ["rigueur", "anticipation", "professionnalisme"],
+      "anecdotes": [],
+      "facts": [
+        { "statement": "Elle préparait les dossiers avant qu'ils soient demandés ; aucune pièce réclamée deux fois en vingt-cinq ans", "type": "behavioral", "support": "je n'ai jamais eu à réclamer une pièce deux fois en vingt-cinq ans" }
+      ],
+      "quotes": [],
+      "tone": "factuel, sobre",
+      "emotional_intensity": 2,
+      "richness": "standard",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c16",
+      "source_hash": "sha256:88e5…",
+      "author": { "name": "Laura Petit", "role": "Ancienne alternante, aujourd'hui en poste", "relationship": "subordinate", "tenure_years": 4 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Erreur de tarif sur un devis client", "date": "2023", "date_precision": "approx", "location": null }],
+      "time_markers": [{ "raw": "vingt-deux heures", "normalized": "22:00", "precision": "time" }, { "raw": "alternance 2022-2024", "normalized": "2022/2024", "precision": "range" }],
+      "places": [],
+      "themes": ["protection des jeunes", "discrétion", "réparation silencieuse", "exigence bienveillante"],
+      "anecdotes": [
+        { "id": "a-c16-1", "summary": "Laura, alternante, envoie un devis au mauvais tarif à un gros client ; elle appelle Martine en pleurant à 22 h, qui lui dit de dormir, rappelle le client le matin, négocie, et n'en parle jamais à personne", "protagonists": ["Laura Petit", "Martine Lévêque"], "date": "2023", "verbatim_support": "Elle m'a dit de dormir et qu'on verrait le lendemain. Le matin elle avait déjà rappelé le client et négocié." }
+      ],
+      "facts": [
+        { "statement": "Elle appelait Laura Petit « ma grande »", "type": "behavioral", "support": "maintenant tu relis deux fois, ma grande" },
+        { "statement": "Personne n'a jamais taquiné Laura sur cette erreur, signe que Martine s'est tue", "type": "behavioral", "support": "personne ne m'a jamais taquinée là-dessus" }
+      ],
+      "quotes": [{ "text": "maintenant tu relis deux fois, ma grande", "speaker": "Martine Lévêque" }],
+      "tone": "émouvant, reconnaissant",
+      "emotional_intensity": 5,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c17",
+      "source_hash": "sha256:47ba…",
+      "author": { "name": "Didier Marchand", "role": "Ancien DRH (1998-2016)", "relationship": "colleague", "tenure_years": 18 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Plan social, onze postes supprimés", "date": "2014", "date_precision": "year", "location": "Sograph" }],
+      "time_markers": [{ "raw": "en 2014", "normalized": "2014", "precision": "year" }],
+      "places": ["bureau du DRH"],
+      "themes": ["crise sociale", "annoncer une mauvaise nouvelle", "dépassement de fonction", "dignité"],
+      "anecdotes": [
+        { "id": "a-c17-1", "summary": "Lors du plan social de 2014, elle demande à recevoir elle-même les onze salariés concernés avant les entretiens officiels, contre l'avis initial du DRH ; elle ne promet rien mais évite que quiconque l'apprenne par courrier. Huit des onze ont dit après coup que cela avait changé leur façon de vivre l'épreuve.", "protagonists": ["Martine Lévêque", "Didier Marchand"], "date": "2014", "verbatim_support": "Elle a juste fait en sorte que personne n'apprenne la nouvelle par un courrier. Sur les onze, huit m'ont dit après coup que ça avait changé la façon dont ils avaient vécu les choses." }
+      ],
+      "facts": [
+        { "statement": "Le plan social de 2014 a supprimé onze postes", "type": "organizational", "support": "on a eu un plan social, onze postes supprimés" },
+        { "statement": "Le DRH était initialement opposé à sa démarche, craignant qu'elle promette des choses", "type": "organizational", "support": "Je n'étais pas d'accord au début" }
+      ],
+      "quotes": [],
+      "tone": "grave, respectueux",
+      "emotional_intensity": 5,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c18",
+      "source_hash": "sha256:d3f6…",
+      "author": { "name": "Sophie Delattre", "role": "Marketing", "relationship": "colleague", "tenure_years": 16 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Arrivée de Sophie Delattre", "date": "2010", "date_precision": "year", "location": "Sograph" }],
+      "time_markers": [{ "raw": "en 2010", "normalized": "2010", "precision": "year" }, { "raw": "congés d'août", "normalized": "--08", "precision": "month" }],
+      "places": ["coin de son bureau"],
+      "themes": ["le géranium", "constance", "attachement aux petites choses", "présence discrète"],
+      "anecdotes": [
+        { "id": "a-c18-1", "summary": "Le géranium posé sur le coin de son bureau depuis au moins 2010, sauvé trois fois, dont un dimanche d'août où elle est venue exprès l'arroser — révélé par les enregistrements de badge", "protagonists": ["Martine Lévêque", "Sophie Delattre"], "date": null, "verbatim_support": "elle est venue exprès un dimanche. Je l'ai su parce que le badge enregistre les entrées." }
+      ],
+      "facts": [
+        { "statement": "Le géranium était présent sur son bureau au moins depuis 2010", "type": "biographical", "support": "Il est sur le coin de son bureau depuis que je suis arrivée en 2010" }
+      ],
+      "quotes": [],
+      "tone": "tendre, amusé",
+      "emotional_intensity": 3,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c19",
+      "source_hash": "sha256:1e88…",
+      "author": { "name": "Yannick Hocq", "role": "Chauffeur-livreur", "relationship": "colleague", "tenure_years": 14 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [],
+      "time_markers": [{ "raw": "quatorze ans", "normalized": "P14Y", "precision": "duration" }, { "raw": "en août", "normalized": "--08", "precision": "month" }],
+      "places": ["son bureau", "son jardin"],
+      "themes": ["veille bienveillante", "protection face aux clients", "générosité du jardin"],
+      "anecdotes": [
+        { "id": "a-c19-1", "summary": "Il y avait toujours de la lumière dans son bureau quand il rentrait tard ; elle notait ses retards non pour les lui reprocher mais pour le couvrir si un client se plaignait", "protagonists": ["Martine Lévêque", "Yannick Hocq"], "date": null, "verbatim_support": "elle notait mes retards mais pas pour me les reprocher, pour me couvrir" },
+        { "id": "a-c19-2", "summary": "En août elle apportait des cageots de tomates de son jardin", "protagonists": ["Martine Lévêque"], "date": null, "verbatim_support": "Elle avait des tomates dans son jardin, elle en apportait des cageots en août." }
+      ],
+      "facts": [
+        { "statement": "Elle possède un jardin où elle cultive des tomates", "type": "biographical", "support": "Elle avait des tomates dans son jardin" }
+      ],
+      "quotes": [],
+      "tone": "simple, chaleureux",
+      "emotional_intensity": 3,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c20",
+      "source_hash": "sha256:7b45…",
+      "author": { "name": "Amandine Legrand", "role": "Accueil, a repris le standard en 2019", "relationship": "subordinate", "tenure_years": 7 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Reprise du standard par Amandine Legrand", "date": "2019", "date_precision": "year", "location": "Sograph" }],
+      "time_markers": [{ "raw": "en 2019", "normalized": "2019", "precision": "year" }, { "raw": "avant dix heures", "normalized": "10:00", "precision": "time" }],
+      "places": ["standard"],
+      "themes": ["succession impossible", "transmission écrite", "savoir non formalisable", "carnet à spirale"],
+      "anecdotes": [
+        { "id": "a-c20-1", "summary": "Les correspondants disent encore « Martine ? » avant qu'Amandine ait fini sa phrase", "protagonists": ["Amandine Legrand", "Martine Lévêque"], "date": null, "verbatim_support": "Les gens décrochent et disent « Martine ? » avant que j'aie fini ma phrase." },
+        { "id": "a-c20-2", "summary": "Elle lui a laissé une double page de carnet avec les habitudes des vingt principaux clients — celui qui déteste être appelé avant dix heures, celle dont le mari a été malade, celui qu'il faut vouvoyer — un savoir qui n'existe dans aucun logiciel", "protagonists": ["Martine Lévêque", "Amandine Legrand"], "date": null, "verbatim_support": "Ce n'est écrit nulle part ailleurs. Aucun logiciel ne contient ça." }
+      ],
+      "facts": [],
+      "quotes": [],
+      "tone": "admiratif, un peu accablé",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c21",
+      "source_hash": "sha256:c902…",
+      "author": { "name": "Serge Dhaene", "role": "Délégué syndical", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Plan social", "date": "2014", "date_precision": "year", "location": "Sograph" }],
+      "time_markers": [{ "raw": "En 2014", "normalized": "2014", "precision": "year" }],
+      "places": [],
+      "themes": ["désaccord respectueux", "loyauté envers les salariés", "nuance", "conflit assumé"],
+      "anecdotes": [
+        { "id": "a-c21-1", "summary": "Ils se sont vraiment disputés deux ou trois fois — il la trouvait trop conciliante, elle le trouvait excessif — sans qu'il doute jamais qu'elle était du côté des salariés", "protagonists": ["Serge Dhaene", "Martine Lévêque"], "date": null, "verbatim_support": "Elle trouvait que je montais les choses en épingle, je trouvais qu'elle arrondissait trop les angles." }
+      ],
+      "facts": [
+        { "statement": "Selon le délégué syndical, elle a fait plus pour les onze salariés du plan social que certains détenteurs de mandat", "type": "organizational", "support": "elle a fait plus pour les onze qui partaient que certains qui avaient des mandats" }
+      ],
+      "quotes": [],
+      "tone": "franc, nuancé",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true,
+      "_note": "Contribution precieuse : seul temoignage introduisant un desaccord. Indispensable pour eviter l'hagiographie."
+    },
+    {
+      "contribution_id": "c22",
+      "source_hash": "sha256:2fd1…",
+      "author": { "name": "Céline Bonnet", "role": "Comptabilité", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [],
+      "time_markers": [{ "raw": "16h30", "normalized": "16:30", "precision": "time" }],
+      "places": ["les bureaux"],
+      "themes": ["la tournée", "rituel", "veille sur les autres", "prétexte assumé"],
+      "anecdotes": [
+        { "id": "a-c22-1", "summary": "À 16h30 elle faisait « la tournée » des bureaux avec la corbeille du courrier alors que chacun avait une bannette : un prétexte pour voir tout le monde une fois par jour et repérer qui n'allait pas bien. Le jour où elle ne l'a pas faite, tous ont compris qu'elle avait quelque chose.", "protagonists": ["Martine Lévêque", "Céline Bonnet"], "date": null, "verbatim_support": "C'était un prétexte, évidemment. […] Le jour où elle ne l'a pas faite, on a tous compris qu'elle avait quelque chose." }
+      ],
+      "facts": [
+        { "statement": "Ce rituel quotidien de 16h30 était surnommé « la tournée »", "type": "behavioral", "support": "On appelait ça « la tournée »" }
+      ],
+      "quotes": [],
+      "tone": "tendre, perspicace",
+      "emotional_intensity": 4,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c23",
+      "source_hash": "sha256:9c37…",
+      "author": { "name": "Rachid Amrani", "role": "Magasinier", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Naturalisation de Rachid Amrani", "date": null, "date_precision": "none", "location": "préfecture" }],
+      "time_markers": [{ "raw": "deux ans", "normalized": "P2Y", "precision": "duration" }],
+      "places": ["préfecture"],
+      "themes": ["aide hors du travail", "initiative non sollicitée", "persévérance", "émotion rare"],
+      "anecdotes": [
+        { "id": "a-c23-1", "summary": "Sans qu'il ait rien demandé, elle l'accompagne deux ans dans son dossier de naturalisation, relit chaque pièce, appelle même la préfecture ; le jour de l'obtention il apporte des gâteaux et elle pleure — la seule fois où il l'a vue pleurer", "protagonists": ["Rachid Amrani", "Martine Lévêque"], "date": null, "verbatim_support": "Je ne lui avais rien demandé, elle avait vu que j'étais inquiet. […] C'est la seule fois où je l'ai vue pleurer." }
+      ],
+      "facts": [
+        { "statement": "C'est la seule occasion où un collègue rapporte l'avoir vue pleurer", "type": "behavioral", "support": "C'est la seule fois où je l'ai vue pleurer." }
+      ],
+      "quotes": [],
+      "tone": "grave, profondément reconnaissant",
+      "emotional_intensity": 5,
+      "richness": "rich",
+      "usable_for_narrative": true
+    },
+    {
+      "contribution_id": "c24",
+      "source_hash": "sha256:5a70…",
+      "author": { "name": "Valérie Top", "role": "Ancienne collègue, partie en 2008", "relationship": "colleague", "tenure_years": 6 },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Période des fiches cartonnées au standard", "date": null, "date_precision": "approx", "location": "standard" }],
+      "time_markers": [{ "raw": "le début des années 90", "normalized": "199X", "precision": "approx" }, { "raw": "partie en 2008", "normalized": "2008", "precision": "year" }],
+      "places": ["standard"],
+      "themes": ["système de couleurs", "méthode personnelle", "savoir-faire non transmissible", "amitié durable"],
+      "anecdotes": [
+        { "id": "a-c24-1", "summary": "À l'époque des fiches cartonnées, elle avait inventé un code couleur — rouge pour les urgents, vert pour les habitués — que personne n'a réussi à reproduire après elle", "protagonists": ["Martine Lévêque", "Valérie Top"], "date": null, "verbatim_support": "Elle avait inventé un système de couleurs que personne n'a jamais réussi à reproduire après elle. Rouge pour les urgents, vert pour les habitués, jaune je ne sais plus." }
+      ],
+      "facts": [
+        { "statement": "Elles se téléphonent encore, dix-huit ans après le départ de Valérie Top", "type": "biographical", "support": "on s'appelle encore" }
+      ],
+      "quotes": [],
+      "tone": "nostalgique, complice",
+      "emotional_intensity": 3,
+      "richness": "rich",
+      "usable_for_narrative": true,
+      "_note": "La couleur du jaune est explicitement oubliee par la contributrice. Le texte genere NE DOIT PAS la completer."
+    },
+    {
+      "contribution_id": "c25",
+      "source_hash": "sha256:ba18…",
+      "author": { "name": "Pierre-Yves Caron", "role": "Informatique", "relationship": "colleague", "tenure_years": null },
+      "persons_mentioned": [{ "name": "Martine Lévêque", "role": "sujet", "certainty": "explicit" }],
+      "events": [{ "label": "Migration du CRM", "date": "2017", "date_precision": "year", "location": "Sograph" }],
+      "time_markers": [{ "raw": "En 2017", "normalized": "2017", "precision": "year" }, { "raw": "trois jours", "normalized": "P3D", "precision": "duration" }],
+      "places": [],
+      "themes": ["carnet contre logiciel", "exigence de qualité", "leçon transmise"],
+      "anecdotes": [
+        { "id": "a-c25-1", "summary": "Lors de la migration du CRM en 2017, elle corrige à la main une centaine de fiches clients depuis son carnet parce que les numéros de l'ancien système étaient faux, en expliquant qu'un client tombant sur un mauvais numéro ne rappelle pas", "protagonists": ["Martine Lévêque", "Pierre-Yves Caron"], "date": "2017", "verbatim_support": "elle m'a répondu qu'un client qui tombe sur un mauvais numéro ne rappelle pas. Elle avait raison" }
+      ],
+      "facts": [
+        { "statement": "Elle a corrigé une centaine de fiches clients à la main lors de la migration", "type": "organizational", "support": "elle a corrigé une centaine de fiches clients à la main" }
+      ],
+      "quotes": [{ "text": "un client qui tombe sur un mauvais numéro ne rappelle pas", "speaker": "Martine Lévêque" }],
+      "tone": "respectueux, un peu penaud",
+      "emotional_intensity": 3,
+      "richness": "rich",
+      "usable_for_narrative": true
+    }
+  ],
+  "_stats": {
+    "contributions_analysees": 25,
+    "appels_mistral": 25,
+    "appels_rejoues_a_l_iteration_suivante": 0,
+    "riches": 18,
+    "standard": 6,
+    "pauvres": 1,
+    "inutilisables_pour_le_recit": 1,
+    "anecdotes_extraites": 27,
+    "faits_extraits": 31,
+    "citations_extraites": 6
+  }
+}

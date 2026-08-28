@@ -1,0 +1,1324 @@
+<title>Audit Celebrons</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --surface: #ffffff;
+    --surface-2: #f4f2ee;
+    --border: #e2ded6;
+    --border-strong: #cec8bc;
+    --ink: #1d1a15;
+    --ink-2: #4a453c;
+    --ink-3: #7a7366;
+    --accent: #8c5a2b;
+    --accent-soft: #f3e9dd;
+    --crit: #a32b1c;
+    --crit-soft: #fbe8e5;
+    --warn: #8a6410;
+    --warn-soft: #fbf1da;
+    --ok: #2f6b41;
+    --ok-soft: #e6f1e8;
+    --info: #2a5578;
+    --info-soft: #e6eef5;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14120f;
+      --surface: #1c1a16;
+      --surface-2: #24211c;
+      --border: #322e27;
+      --border-strong: #46413800;
+      --border-strong: #464138;
+      --ink: #f0ece4;
+      --ink-2: #c3bcaf;
+      --ink-3: #918a7c;
+      --accent: #d69f6a;
+      --accent-soft: #2e2418;
+      --crit: #f0897a;
+      --crit-soft: #331b17;
+      --warn: #e0b45c;
+      --warn-soft: #2e2513;
+      --ok: #7fc194;
+      --ok-soft: #17281c;
+      --info: #8fbcdd;
+      --info-soft: #17242e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #14120f;
+    --surface: #1c1a16;
+    --surface-2: #24211c;
+    --border: #322e27;
+    --border-strong: #464138;
+    --ink: #f0ece4;
+    --ink-2: #c3bcaf;
+    --ink-3: #918a7c;
+    --accent: #d69f6a;
+    --accent-soft: #2e2418;
+    --crit: #f0897a;
+    --crit-soft: #331b17;
+    --warn: #e0b45c;
+    --warn-soft: #2e2513;
+    --ok: #7fc194;
+    --ok-soft: #17281c;
+    --info: #8fbcdd;
+    --info-soft: #17242e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 60rem; margin: 0 auto; padding: 3rem 1.5rem 6rem; }
+
+  header.masthead {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+  .eyebrow {
+    font-size: .74rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    margin: 0 0 .6rem;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.1;
+    margin: 0 0 .7rem;
+    letter-spacing: -.02em;
+  }
+  .lede { font-size: 1.08rem; color: var(--ink-2); margin: 0; max-width: 44rem; }
+  .meta {
+    margin-top: 1.2rem;
+    font-size: .82rem;
+    color: var(--ink-3);
+    font-family: var(--mono);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.4rem;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 1.62rem;
+    letter-spacing: -.01em;
+    margin: 3.4rem 0 1rem;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: .7rem;
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: .8rem;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: .04em;
+    flex-shrink: 0;
+  }
+  h3 {
+    font-size: 1.06rem;
+    margin: 2rem 0 .6rem;
+    letter-spacing: -.005em;
+  }
+  h4 {
+    font-size: .93rem;
+    margin: 1.4rem 0 .4rem;
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+  }
+  p { margin: 0 0 1rem; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+  li { margin-bottom: .38rem; }
+  li > ul, li > ol { margin-top: .38rem; margin-bottom: .2rem; }
+  strong { font-weight: 650; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: .855em;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .1em .34em;
+    word-break: break-word;
+  }
+  pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: .9rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+    font-size: .84rem;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: 1em; }
+
+  .tw { overflow-x: auto; margin: 0 0 1.4rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; }
+  th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th {
+    background: var(--surface-2);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--ink-2);
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td code { font-size: .82em; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.1rem 1.3rem;
+    margin: 0 0 1.3rem;
+  }
+  .card > :last-child { margin-bottom: 0; }
+  .card-title {
+    font-weight: 650;
+    font-size: .96rem;
+    margin: 0 0 .5rem;
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    flex-wrap: wrap;
+  }
+
+  .finding { border-left: 4px solid var(--border-strong); }
+  .finding.crit { border-left-color: var(--crit); background: linear-gradient(90deg, var(--crit-soft) 0%, var(--surface) 22%); }
+  .finding.warn { border-left-color: var(--warn); background: linear-gradient(90deg, var(--warn-soft) 0%, var(--surface) 22%); }
+  .finding.info { border-left-color: var(--info); }
+  .finding.ok { border-left-color: var(--ok); background: linear-gradient(90deg, var(--ok-soft) 0%, var(--surface) 22%); }
+
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: .67rem;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .2em .5em;
+    border-radius: 4px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .b-crit { background: var(--crit-soft); color: var(--crit); border-color: var(--crit); }
+  .b-warn { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .b-ok   { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+  .b-info { background: var(--info-soft); color: var(--info); border-color: var(--info); }
+  .b-mute { background: var(--surface-2); color: var(--ink-3); border-color: var(--border-strong); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .8rem; margin: 0 0 1.6rem; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: .85rem .95rem; }
+  .stat .v { font-family: var(--serif); font-size: 1.75rem; line-height: 1; font-weight: 600; display: block; margin-bottom: .3rem; letter-spacing: -.02em; }
+  .stat .l { font-size: .73rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); font-weight: 600; }
+  .stat.is-crit .v { color: var(--crit); }
+  .stat.is-warn .v { color: var(--warn); }
+  .stat.is-ok .v { color: var(--ok); }
+
+  .callout {
+    background: var(--accent-soft);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .k {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    font-weight: 700;
+    color: var(--accent);
+    display: block;
+    margin-bottom: .4rem;
+  }
+
+  .flow {
+    font-family: var(--mono);
+    font-size: .8rem;
+    line-height: 1.75;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0 0 1.4rem;
+    white-space: pre;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 3.1rem 1fr;
+    gap: 0 1rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 1rem 1.2rem;
+    margin: 0 0 .85rem;
+  }
+  .step .sn {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: .78rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: start;
+    padding: .35rem 0;
+    letter-spacing: .02em;
+  }
+  .step .st { font-weight: 650; margin: 0 0 .35rem; font-size: .98rem; }
+  .step .sb { margin: 0; font-size: .9rem; color: var(--ink-2); }
+  .step .sb + .sb { margin-top: .5rem; }
+  .step .sm {
+    margin-top: .55rem;
+    font-family: var(--mono);
+    font-size: .75rem;
+    color: var(--ink-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem .9rem;
+  }
+  .step.urgent { border-color: var(--crit); border-width: 1.5px; }
+
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.1rem; font-size: .89rem; margin: 0 0 1.2rem; }
+  .kv dt { font-family: var(--mono); font-size: .82rem; color: var(--ink-3); }
+  .kv dd { margin: 0; }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--border);
+    font-size: .84rem;
+    color: var(--ink-3);
+  }
+
+  @media (max-width: 34rem) {
+    .wrap { padding: 2rem 1rem 4rem; }
+    h2 { flex-direction: column; gap: .2rem; }
+    .step { grid-template-columns: 1fr; }
+    .step .sn { justify-self: start; padding: .25rem .6rem; margin-bottom: .5rem; }
+    .kv { grid-template-columns: 1fr; gap: .1rem .5rem; }
+    .kv dd { margin-bottom: .6rem; }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Audit technique &middot; sans modification du code</p>
+  <h1>Celebrons&nbsp;: diagnostic et plan de refonte éditoriale</h1>
+  <p class="lede">
+    État des lieux du dépôt, analyse du pipeline de génération IA, et plan de migration
+    par étapes vers une architecture éditoriale structurée — sans réécriture globale.
+  </p>
+  <div class="meta">
+    <span>18 août 2026</span>
+    <span>branche <code>main</code> @ <code>e204ef0</code></span>
+    <span>backend 15 800 l. &middot; frontend 16 700 l.</span>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat is-crit"><span class="v">1</span><span class="l">Faille critique ouverte</span></div>
+  <div class="stat is-crit"><span class="v">2</span><span class="l">Bugs bloquants</span></div>
+  <div class="stat is-warn"><span class="v">2</span><span class="l">Étapes stubbées</span></div>
+  <div class="stat is-warn"><span class="v">6 550</span><span class="l">Lignes dans books.js</span></div>
+  <div class="stat is-ok"><span class="v">1</span><span class="l">Moteur réutilisable</span></div>
+</div>
+
+<div class="callout">
+  <span class="k">Conclusion en une phrase</span>
+  <p>
+    Le problème de cohérence des livres <strong>n'est pas un problème de prompts</strong>&nbsp;:
+    c'est l'absence des étapes intermédiaires. Le plan de chapitre et le contrôle qualité
+    existent sous forme de fonctions vides, et la génération reçoit les témoignages bruts
+    concaténés. La bonne nouvelle&nbsp;: le moteur de prompts versionnés
+    (<code>promptEngine.js</code>) est solide et constitue une base saine — la refonte
+    consiste à <em>remplir</em> l'architecture, pas à la remplacer.
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">01</span> Architecture actuelle</h2>
+
+<p>
+  Monolithe classique en trois blocs, déployé sur Render. Aucune infrastructure superflue —
+  c'est un point positif à préserver.
+</p>
+
+<div class="flow">┌─────────────────────────────────────────────────────────────────┐
+│  FRONTEND — React 18 + CRA/craco  (bookfete-front.onrender.com) │
+│  Thème « Luxe » maison, React Router 6, pas de state manager     │
+└───────────────┬─────────────────────────────┬───────────────────┘
+                │  fetch REST                 │  supabase-js (clé anon)
+                │  (~10 bases URL dupliquées) │  ÉCRITURES DIRECTES
+                ▼                             ▼
+┌───────────────────────────────┐   ┌─────────────────────────────┐
+│  BACKEND — Express (:5001)    │   │  SUPABASE                   │
+│  service_role key → RLS       │──▶│  PostgreSQL · Auth · Storage│
+│  contournée                   │   │  11 tables                  │
+└───────┬───────────────────────┘   └─────────────────────────────┘
+        │
+        ├──▶ Mistral API      (mistral-small-latest, 100 % des appels)
+        ├──▶ Stripe           (webhook + machine à états commandes)
+        ├──▶ SendGrid/Nodemailer
+        └──▶ PDF : Chrome headless (execFile) ── fallback ──▶ PDFKit</div>
+
+<div class="card finding warn">
+  <p class="card-title"><span class="badge b-warn">Architecture</span> Double chemin d'écriture</p>
+  <p>
+    Le frontend écrit <strong>directement</strong> dans Supabase avec la clé anon
+    (<code>contributions</code>, <code>chapters</code>, <code>books</code>,
+    <code>chapter_invites</code>, <code>book_contributors</code>) pour une trentaine
+    d'opérations, en parallèle du backend qui utilise la <code>service_role</code> et
+    contourne donc RLS. Deux chemins d'écriture pour les mêmes données&nbsp;: la cohérence
+    métier ne peut être garantie côté serveur, et la sécurité repose entièrement sur des
+    policies RLS que le backend ignore.
+  </p>
+  <p>
+    <strong>Recommandation&nbsp;:</strong> ne pas traiter ce point dans la refonte éditoriale
+    (hors périmètre), mais figer la règle&nbsp;: <em>toute nouvelle écriture passe par le
+    backend</em>. Les lectures directes peuvent rester.
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">02</span> Principaux fichiers</h2>
+
+<h4>Backend — les fichiers qui portent la génération</h4>
+<div class="tw"><table>
+  <thead><tr><th>Fichier</th><th>L.</th><th>Rôle</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td><code>routes/books.js</code></td><td>6 550</td><td>CRUD livres, brouillons de chapitre, aperçu livre, export PDF, rendu HTML, styles d'impression</td><td><span class="badge b-crit">À découper</span></td></tr>
+    <tr><td><code>services/promptEngine.js</code></td><td>1 066</td><td>Templates versionnés en base, moteur de rendu type Handlebars, validation de sortie, retry, logs</td><td><span class="badge b-ok">À conserver</span></td></tr>
+    <tr><td><code>services/bookPromptInlineAdminService.js</code></td><td>1 093</td><td>Édition inline des prompts au niveau livre</td><td><span class="badge b-mute">Stable</span></td></tr>
+    <tr><td><code>routes/bookCreation.js</code></td><td>1 087</td><td>Parcours de création (types/sous-types d'événement, config)</td><td><span class="badge b-ok">À conserver</span></td></tr>
+    <tr><td><code>routes/orders.js</code></td><td>905</td><td>Commandes, Stripe, webhook, machine à états</td><td><span class="badge b-ok">À conserver</span></td></tr>
+    <tr><td><code>services/chapterBodyPromptAdminService.js</code></td><td>888</td><td>Édition inline du prompt de corps de chapitre</td><td><span class="badge b-mute">Stable</span></td></tr>
+    <tr><td><code>routes/ai.js</code></td><td>797</td><td>Endpoints IA + administration des templates</td><td><span class="badge b-mute">Stable</span></td></tr>
+    <tr><td><code>controllers/inviteController.js</code></td><td>753</td><td>Invitations par token, soumission des contributions, modération</td><td><span class="badge b-crit">Faille</span></td></tr>
+    <tr><td><code>services/chapterAmorceService.js</code></td><td>513</td><td>Génération des amorces de chapitre (modes A/B)</td><td><span class="badge b-ok">À conserver</span></td></tr>
+    <tr><td><code>services/aiService.js</code></td><td>320</td><td>Façade Mistral&nbsp;: questions, textes de cadre</td><td><span class="badge b-warn">À simplifier</span></td></tr>
+    <tr><td><code>services/aiOutputContracts.js</code></td><td>283</td><td>Parsing tolérant + validation des sorties structurées</td><td><span class="badge b-ok">À étendre</span></td></tr>
+  </tbody>
+</table></div>
+
+<h4>Frontend — les écrans du parcours</h4>
+<div class="tw"><table>
+  <thead><tr><th>Fichier</th><th>L.</th><th>Rôle</th></tr></thead>
+  <tbody>
+    <tr><td><code>components/book/BookPageLuxe.js</code></td><td>2 727</td><td>Espace de travail du livre&nbsp;: chapitres, brouillons, aperçu, export. <strong>Point d'entrée de l'étape G.</strong></td></tr>
+    <tr><td><code>components/create-book/CreateBookLuxe.js</code></td><td>1 673</td><td>Assistant de création (type d'événement → config → chapitres)</td></tr>
+    <tr><td><code>components/admin/PromptAdminLuxe.js</code></td><td>1 637</td><td>Console d'administration des prompts</td></tr>
+    <tr><td><code>components/orders/BookCheckoutLuxe.js</code></td><td>1 032</td><td>Tunnel de commande Stripe</td></tr>
+    <tr><td><code>components/book/chapters/Step1…Step4</code></td><td>~1 200</td><td>Workflow chapitre&nbsp;: amorce → contribution → invitations → clôture</td></tr>
+  </tbody>
+</table></div>
+
+<h4>Code mort identifié (analyse AST du graphe d'appel)</h4>
+<ul>
+  <li><strong>Backend&nbsp;: 644 lignes</strong> dans <code>routes/books.js</code> — 16 fonctions jamais atteignables depuis une route, dont <code>generateCoverPdfFile</code> (193 l.), <code>buildBookDraftSourcePayload</code> (81 l.), <code>generateInteriorPdfFile</code> (66 l.), <code>renderValidatedBookInteriorHtml</code> (58 l.), et toute la chaîne <code>generateBookDraftFromAI</code> → <code>buildAIPromptPayload</code> → <code>parseDraftJson</code> → <code>buildFallbackDraft</code>.</li>
+  <li><strong>Frontend&nbsp;:</strong> <code>services/api.js</code> (204 l., client ngrok truffé de <code>console.log</code>, importé par personne)&nbsp;; <code>components/organisateur/</code> (Dashboard + CreateProject, 627 l., interrogent des tables <code>projects</code> et <code>invites</code> <strong>qui n'existent pas</strong>)&nbsp;; <code>XXXX_Header.js</code>, <code>XXXX_Footer.js</code>, <code>supp_OffresSection.js</code>, <code>editor_supp/</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2><span class="num">03</span> Fonctionnement actuel de la génération IA</h2>
+
+<h3>Le moteur de prompts</h3>
+<p>
+  Tous les appels passent par <code>promptEngine.runPromptGeneration()</code>. Le contenu des
+  prompts n'est pas dans le code&nbsp;: il est stocké dans la table <code>prompt_templates</code>,
+  versionné, avec un seul enregistrement <code>status='active'</code> par type (contrainte
+  d'unicité partielle en base). Le moteur&nbsp;:
+</p>
+<ol>
+  <li>charge le template actif (cache mémoire, TTL 30&nbsp;s)&nbsp;;</li>
+  <li>compile <code>context_block</code> + <code>data_block</code> avec un mini-moteur de
+      templates maison (<code>{{var}}</code>, <code>{{#each}}</code>, <code>{{#if}}</code>,
+      <code>{{#if (eq a "b")}}</code>)&nbsp;;</li>
+  <li><strong>refuse de partir</strong> s'il reste un placeholder non résolu — bonne pratique&nbsp;;</li>
+  <li>appelle Mistral, puis valide la sortie&nbsp;: nombre de mots min/max, phrases interdites,
+      absence de placeholders, sortie non vide&nbsp;;</li>
+  <li>en cas d'échec, relance jusqu'à 2 fois avec un <em>prompt de correction</em> listant
+      les règles violées&nbsp;;</li>
+  <li>journalise chaque tentative dans <code>prompt_generation_logs</code>.</li>
+</ol>
+
+<div class="card finding ok">
+  <p class="card-title"><span class="badge b-ok">À conserver</span> Ce moteur est un vrai actif</p>
+  <p>
+    Prompts hors du code, versionnés, avec validation automatique, retry auto-correctif et
+    journalisation&nbsp;: c'est exactement l'infrastructure dont la V2 a besoin. Il ne faut
+    surtout pas le remplacer — il faut y ajouter deux types de prompts et le mode JSON.
+  </p>
+</div>
+
+<h3>Les 8 types de prompts et leur consommation</h3>
+<div class="tw"><table>
+  <thead><tr><th>Type</th><th>Déclencheur</th><th>Appels / livre (8 ch.)</th></tr></thead>
+  <tbody>
+    <tr><td><code>book_title</code></td><td>Création du livre</td><td>1</td></tr>
+    <tr><td><code>chapter_titles</code></td><td>Création du livre</td><td>1</td></tr>
+    <tr><td><code>chapter_amorce</code></td><td>Étape 1 de chaque chapitre</td><td>8</td></tr>
+    <tr><td><code>contributor_questions</code></td><td>Questions posées aux invités</td><td>8</td></tr>
+    <tr><td><code>chapter_body</code></td><td>Génération du texte du chapitre (max 3 par chapitre)</td><td>8 à 24</td></tr>
+    <tr><td><code>book_introduction</code> + <code>book_conclusion</code></td><td><strong>Chaque</strong> aperçu livre et <strong>chaque</strong> export PDF</td><td>2 × N clics</td></tr>
+    <tr><td><code>frame_texts</code></td><td>Type historique, sert de source au bootstrap des deux précédents</td><td>0</td></tr>
+  </tbody>
+</table></div>
+
+<dl class="kv">
+  <dt>Modèle</dt><dd><code>mistral-small-latest</code> — 23 occurrences, <strong>aucun autre modèle</strong> dans tout le dépôt.</dd>
+  <dt>Sorties JSON</dt><dd><strong>Aucun</strong> <code>response_format: json_object</code>, aucun tool-calling. Le JSON est extrait par <code>JSON.parse</code> tolérant + regex de repli (<code>aiOutputContracts.js</code>).</dd>
+  <dt>Température</dt><dd>Non transmise par défaut&nbsp;; <code>0.52</code> uniquement pour <code>chapter_body</code>.</dd>
+  <dt>Coût nominal</dt><dd>~26 appels pour un livre de 8 chapitres, <strong>rejoués intégralement à chaque itération</strong>.</dd>
+  <dt>Pire cas</dt><dd>~90 appels (chaque appel pouvant être tenté 3 fois).</dd>
+  <dt>Suivi de coût</dt><dd><strong>Inexistant</strong>&nbsp;: les logs stockent <code>word_count</code> mais aucun compteur de tokens ni de latence.</dd>
+</dl>
+
+<h3>Comment les témoignages arrivent au modèle</h3>
+<p>
+  C'est ici que se situe la cause racine. <code>buildChapterBodyPromptVariables()</code>
+  (<code>books.js:1990</code>) construit les variables du prompt <code>chapter_body</code>&nbsp;:
+</p>
+<pre><code>// books.js — les contributions partent brutes, en double format
+contributions:      promptContributions,   // [{name, role, response_text}] — 5 000 car. chacune
+contributions_text: contributionsText,     // "Nom (rôle) : message…" concaténé, 700 car. chacune
+contributions_count: 25,
+contributions_richness: "…"</code></pre>
+
+<p>Ce qui est transmis&nbsp;: <strong>tous</strong> les témoignages approuvés du chapitre, tronqués, concaténés. Ce qui n'est <strong>pas</strong> transmis&nbsp;:</p>
+<ul>
+  <li>aucune extraction structurée (personnes, dates, lieux, anecdotes, faits)&nbsp;;</li>
+  <li>aucune sélection par pertinence — chaque chapitre reçoit tout ce qui lui est rattaché&nbsp;;</li>
+  <li>aucun registre partagé entre chapitres&nbsp;: le seul lien inter-chapitres est
+      <code>previousChapterSummaries</code> (résumés des chapitres déjà validés) et les titres
+      voisins&nbsp;;</li>
+  <li>aucune liste de faits <em>interdits</em> ou d'éléments inconnus.</li>
+</ul>
+<p>
+  Le modèle doit donc, en un seul appel, lire 25 témoignages, décider quoi retenir, à qui
+  l'attribuer, comment l'articuler, et rédiger 8 pages. Les répétitions, mélanges d'anecdotes
+  et attributions erronées en découlent mécaniquement.
+</p>
+
+<div class="card finding warn">
+  <p class="card-title"><span class="badge b-warn">Dette</span> Variables dupliquées en trois conventions</p>
+  <p>
+    La fonction renvoie chaque valeur en <code>snake_case</code>, en <code>camelCase</code>, et
+    parfois en tout-minuscule&nbsp;: <code>contributions_text</code>,
+    <code>contributionstext</code>, <code>contributionsText</code> — soit ~60 clés pour
+    ~30 valeurs. Symptôme d'une incertitude sur la convention utilisée par les templates en
+    base. À unifier lors de l'extraction (une seule convention, <code>snake_case</code>, alignée
+    sur les templates existants).
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">04</span> Ce qui est bon et doit être conservé</h2>
+
+<div class="card finding ok">
+  <p class="card-title"><span class="badge b-ok">01</span> Le moteur de prompts versionnés</p>
+  <p>
+    <code>promptEngine.js</code> — prompts en base, versionnés, un seul actif par type,
+    validation de sortie, retry auto-correctif, journalisation. Fondation de la V2.
+  </p>
+</div>
+
+<div class="card finding ok">
+  <p class="card-title"><span class="badge b-ok">02</span> Le workflow de chapitre en 4 étapes</p>
+  <p>
+    Amorce → Contribution → Invitations → Clôture, avec état de chapitre, modération des
+    contributions (<code>approved</code>, <code>needs_revision</code>,
+    <code>moderation_feedback</code>) et demande de révision adressée au contributeur.
+    L'étape G de la cible <strong>existe déjà en grande partie</strong>.
+  </p>
+</div>
+
+<div class="card finding ok">
+  <p class="card-title"><span class="badge b-ok">03</span> La configuration par type d'événement</p>
+  <p>
+    <code>book_configs</code> couvre déjà 7 familles d'événements avec des champs dédiés. Pour
+    le cas de référence « pot de départ », tout est en place&nbsp;: <code>years_in_role</code>,
+    <code>job_description_plain</code>, <code>will_be_missed_for</code>,
+    <code>contributor_circle</code>, <code>retirement_project</code>,
+    <code>departure_context</code>, <code>time_together</code>,
+    <code>next_destination</code>. <strong>Aucune migration de schéma nécessaire</strong> pour
+    l'étape 9 de ta feuille de route.
+  </p>
+</div>
+
+<div class="card finding ok">
+  <p class="card-title"><span class="badge b-ok">04</span> Les contributions originales sont préservées</p>
+  <p>
+    L'exigence « ne jamais remplacer le texte original » est <strong>déjà respectée</strong>&nbsp;:
+    le texte brut reste dans <code>contributions.message</code> et les brouillons IA sont
+    stockés séparément. Le principe est acquis, seul le mécanisme de stockage est à corriger
+    (§05).
+  </p>
+</div>
+
+<div class="card finding ok">
+  <p class="card-title"><span class="badge b-ok">05</span> Le repli déterministe sans IA</p>
+  <p>
+    <code>buildFallbackChapterDraft()</code> produit un chapitre complet et structuré sans
+    aucun appel modèle. Précieux pour les tests, les démonstrations et la résilience — c'est ce
+    qui a permis de figer des snapshots de rendu aujourd'hui.
+  </p>
+</div>
+
+<div class="card finding ok">
+  <p class="card-title"><span class="badge b-ok">06</span> La chaîne commande &amp; paiement</p>
+  <p>
+    <code>orders</code> avec machine à états à 10 positions
+    (<code>draft → awaiting_payment → paid → pdf_generating → pdf_ready → print_queued →
+    sent_to_printer → printed → shipped → delivered</code>), webhook Stripe sur route brute
+    avant <code>express.json()</code>, contrôle d'accès au PDF selon le statut de commande.
+    Hors périmètre de la refonte, à ne pas toucher.
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">05</span> Ce qui pose problème</h2>
+
+<h3>Bloquants — à traiter avant toute refonte</h3>
+
+<div class="card finding crit">
+  <p class="card-title"><span class="badge b-crit">Sécurité</span> Tous les tokens d'invitation sont exposés publiquement</p>
+  <p>
+    <code>routes/invites.js:16-22</code> monte deux endpoints <strong>sans
+    <code>authenticate</code></strong>. <code>debugInvites</code>
+    (<code>inviteController.js:678</code>) exécute
+    <code>.from('chapter_invites').select('*')</code> <em>sans aucun filtre</em> et renvoie le
+    résultat complet dans la réponse HTTP — le champ <code>token</code> inclus.
+  </p>
+  <pre><code>GET https://bookfete.onrender.com/api/invites/debug
+→ { totalInvitations: N, recentInvitations: [ { token, email, chapter_id, … } ] }</code></pre>
+  <p>
+    <strong>Impact&nbsp;:</strong> quiconque connaît l'URL peut énumérer les invitations de tous
+    les livres, lire les adresses e-mail des invités, et déposer ou modifier des contributions
+    à leur place via <code>POST /api/invites/token/:token</code>.
+    <strong>Correctif&nbsp;:</strong> supprimer les deux routes et les deux fonctions.
+    Aucune dépendance frontend — vérifié.
+  </p>
+</div>
+
+<div class="card finding crit">
+  <p class="card-title"><span class="badge b-crit">Bug</span> Le rendu PDF fidèle échoue systématiquement</p>
+  <p>
+    <code>books.js:3673</code> passe <code>frameTexts</code> à
+    <code>generateFinalBookPdfFileFromHtml()</code>, mais <code>frameTexts</code> n'est
+    <strong>ni un paramètre ni une variable locale</strong> de la fonction englobante
+    <code>generateFinalBookPdfFiles()</code> — la variable n'existe qu'aux lignes 963 et 1014,
+    dans deux handlers de route, et n'est jamais propagée jusqu'ici via
+    <code>processPdfExportJob()</code>.
+  </p>
+  <pre><code>async function generateFinalBookPdfFiles({ book, chaptersWithDrafts, jobId,
+                                           previewFormat, previewLayoutSettings }) {
+  //                                       ^ pas de frameTexts
+  ...
+  await generateFinalBookPdfFileFromHtml({
+    finalPath, book, chaptersWithDrafts,
+    frameTexts,   // ← ligne 3673 : ReferenceError garanti
+    jobId, previewFormat, previewLayoutSettings });</code></pre>
+  <p>
+    <strong>Impact&nbsp;:</strong> le <code>catch</code> ligne 3678 avale l'erreur et retombe
+    toujours sur PDFKit legacy. Le PDF livré est donc <em>toujours</em> le rendu dégradé,
+    <strong>sans introduction ni conclusion</strong>, et les 2 appels Mistral de la ligne 1014
+    sont gaspillés à chaque export. Avec <code>PDF_RENDERER_MODE=browser-strict</code>, l'export
+    échoue en dur. <strong>Correctif&nbsp;:</strong> propager <code>frameTexts</code> à travers
+    <code>processPdfExportJob</code> → <code>generateFinalBookPdfFiles</code> (2 signatures).
+  </p>
+</div>
+
+<div class="card finding ok">
+  <p class="card-title"><span class="badge b-ok">Corrigé le 18/08</span> L'aperçu du livre plantait dès que Mistral échouait</p>
+  <p>
+    <code>books.js:3921</code> appelait <code>normalizeText()</code>, fonction qui existe dans
+    quatre services mais <strong>ni déclarée ni importée dans <code>books.js</code></strong>.
+    Comme cette ligne se trouve dans <code>buildBookFrameFallbackText()</code>, appelée
+    uniquement depuis le chemin de repli, <strong>tout le mécanisme de repli était mort</strong>&nbsp;:
+    dès que <code>generateNarrativeContent</code> échouait (quota, indisponibilité, clé absente),
+    <code>POST /api/books/:id/generate-draft</code> renvoyait 500 au lieu du texte de secours.
+    Remplacé par <code>cleanText()</code>, équivalent local. Couvert par un test de non-régression.
+  </p>
+</div>
+
+<h3>Les étapes de ta cible qui n'existent pas</h3>
+
+<div class="card finding crit">
+  <p class="card-title"><span class="badge b-crit">Vide</span> Étape D — le plan n'est jamais construit par l'IA</p>
+  <pre><code>// books.js:2264
+async function generateChapterPlanFromAI(sourcePayload, fallbackDraft, detailAnchors = []) {
+  return buildChapterPlanFallback(sourcePayload, fallbackDraft, detailAnchors);
+}</code></pre>
+  <p>
+    Le nom promet un appel modèle&nbsp;; le corps renvoie une heuristique locale. Le champ
+    <code>aiPlan</code> stocké sur chaque brouillon est donc toujours un plan fabriqué par du
+    code, jamais un plan raisonné.
+  </p>
+</div>
+
+<div class="card finding crit">
+  <p class="card-title"><span class="badge b-crit">Vide</span> Étape F — le contrôle qualité ne contrôle rien</p>
+  <pre><code>// books.js:2268
+async function maybeRegenerateChapterDraftForQuality({ …, candidateDraft, qualityReport }) {
+  void sourcePayload; void chapterPlan; void detailAnchors; void fallbackDraft;
+  return { draft: candidateDraft, quality: qualityReport, improved: false };
+}</code></pre>
+  <p>
+    Aucune régénération, jamais. Et <code>CHAPTER_DRAFT_QUALITY_THRESHOLD = 72</code>
+    (ligne 28) n'est <strong>lu nulle part</strong> dans le fichier&nbsp;: le score calculé par
+    <code>analyzeChapterDraftQuality()</code> est stocké et affiché, mais ne déclenche aucune
+    action.
+  </p>
+  <p>
+    À noter&nbsp;: <code>analyzeChapterDraftQuality()</code> est en revanche <strong>utile et à
+    garder</strong> — il mesure déjà longueur, pages courtes, expressions génériques,
+    paragraphes dupliqués, réutilisation des détails sources et richesse lexicale. C'est la
+    base du validateur V2, à étendre.
+  </p>
+</div>
+
+<h3>Dette structurelle</h3>
+
+<div class="card finding warn">
+  <p class="card-title"><span class="badge b-warn">Modèle de données</span> Les brouillons sont stockés dans de fausses contributions</p>
+  <p>
+    Il n'existe aucune table de brouillons. L'état d'un chapitre et son texte généré sont
+    écrits dans la table <code>contributions</code>, sous des adresses e-mail sentinelles, avec
+    du JSON dans le champ <code>message</code>&nbsp;:
+  </p>
+  <pre><code>CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local'  // message = JSON.stringify(draftState)
+CHAPTER_STATE_EMAIL = '__chapter_state__@system.local'  // message = 'closed'</code></pre>
+  <p>
+    <strong>Conséquences&nbsp;:</strong> tout code qui lit les contributions doit filtrer ces
+    lignes (le filtre est dupliqué dans <code>buildChapterDraftSourcePayload</code>,
+    <code>inviteController</code>, et côté frontend)&nbsp;; aucun historique de versions&nbsp;;
+    aucune contrainte d'intégrité&nbsp;; les compteurs de contributions sont faussés si un
+    filtre est oublié. C'est le principal obstacle aux étapes B à F, qui ont besoin d'un vrai
+    modèle éditorial.
+  </p>
+</div>
+
+<div class="card finding warn">
+  <p class="card-title"><span class="badge b-warn">Maintenabilité</span> <code>routes/books.js</code>&nbsp;: 6 550 lignes, 128 fonctions</p>
+  <p>
+    Un seul fichier contient le CRUD, la génération de brouillons, l'orchestration IA, la
+    logique de commande, le rendu HTML, la génération PDF et <strong>1 110 lignes de CSS
+    d'impression</strong> dans un template literal (<code>getPrintableBookStyles</code>).
+    Toute modification du pipeline éditorial passe aujourd'hui par ce fichier.
+  </p>
+</div>
+
+<div class="card finding warn">
+  <p class="card-title"><span class="badge b-warn">Sécurité</span> Contrôles de propriété manquants (IDOR)</p>
+  <p>Trois endpoints authentifiés ne vérifient pas que la ressource appartient à l'appelant&nbsp;:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Endpoint</th><th>Filtre appliqué</th><th>Manque</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /api/books/:id</code></td><td><code>.eq('id', …)</code></td><td><code>owner_id</code> — lecture de n'importe quel livre</td></tr>
+      <tr><td><code>PUT /api/chapters/:id</code></td><td><code>.eq('id', …)</code></td><td>jointure vers <code>books.owner_id</code></td></tr>
+      <tr><td><code>DELETE /api/chapters/:id</code></td><td><code>.eq('id', …)</code></td><td>jointure vers <code>books.owner_id</code></td></tr>
+      <tr><td><code>POST /api/chapters</code></td><td>—</td><td>vérification du <code>book_id</code> du corps</td></tr>
+    </tbody>
+  </table></div>
+  <p>
+    Le backend utilisant la <code>service_role</code>, RLS ne rattrape pas ces cas. Exploitation
+    triviale dès qu'un identifiant de livre fuite (ils apparaissent dans les URL du frontend).
+  </p>
+</div>
+
+<div class="card finding warn">
+  <p class="card-title"><span class="badge b-warn">Coût</span> Textes de cadre régénérés à chaque clic</p>
+  <p>
+    <code>generateBookFrameTextsForPreview()</code> est appelée sans cache à chaque aperçu
+    (ligne 963) <em>et</em> à chaque export PDF (ligne 1014) — 2 appels Mistral par clic, jamais
+    persistés. Cumulé au bug <code>frameTexts</code>, ceux de l'export sont même intégralement
+    perdus. Un simple stockage en base (avec invalidation sur changement de chapitres) les
+    ramène à 2 appels par livre.
+  </p>
+</div>
+
+<div class="card finding info">
+  <p class="card-title"><span class="badge b-info">Qualité</span> Aucun test avant le 18/08</p>
+  <p>
+    Aucun test, lint ou build de vérification. Un filet initial a été posé aujourd'hui&nbsp;:
+    59 tests, 3 snapshots HTML (37 Ko de rendu figé), un contrat de routage qui verrouille les
+    15 routes de <code>books.js</code>, et un mock Supabase réutilisable. C'est le prérequis du
+    §8 de ta méthode («&nbsp;vérifier qu'il n'y a pas de régression&nbsp;»).
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">06</span> Tables Supabase concernées</h2>
+
+<p>
+  11 tables. Attention&nbsp;: seules 6 sont décrites dans <code>backend/sql/</code> — les 5
+  tables centrales ont été créées à la main dans Supabase et <strong>leur schéma n'est versionné
+  nulle part</strong>. Les colonnes ci-dessous sont reconstituées depuis le code.
+</p>
+
+<div class="tw"><table>
+  <thead><tr><th>Table</th><th>Schéma versionné</th><th>Rôle &amp; colonnes clés</th><th>Impact V2</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>books</code></td><td><span class="badge b-crit">Non</span></td>
+      <td><code>id</code>, <code>owner_id</code>, <code>title</code>, <code>recipient_name</code>, <code>recipient_age</code>, <code>recipient_gender</code>, <code>event_type</code>, <code>style_narratif</code>, <code>status</code>, <code>cover_config</code> (jsonb), <code>back_cover_config</code> (jsonb)</td>
+      <td>+2 colonnes</td>
+    </tr>
+    <tr>
+      <td><code>chapters</code></td><td><span class="badge b-warn">Partiel</span></td>
+      <td><code>id</code>, <code>book_id</code>, <code>order_index</code>, <code>title</code>, <code>description</code>, <code>amorce_text</code>, <code>triggers</code> (array), <code>amorce_validated</code>, <code>amorce_generated_at</code>, <code>questions_validated</code></td>
+      <td>Inchangée</td>
+    </tr>
+    <tr>
+      <td><code>contributions</code></td><td><span class="badge b-crit">Non</span></td>
+      <td><code>id</code>, <code>chapter_id</code>, <code>contributor_name</code>, <code>contributor_email</code>, <code>message</code>, <code>photo_urls</code> (array), <code>approved</code>, <code>is_finalized</code>, <code>needs_revision</code>, <code>moderation_feedback</code><br><em>Détournée pour stocker brouillons et états.</em></td>
+      <td><span class="badge b-warn">À assainir</span></td>
+    </tr>
+    <tr>
+      <td><code>chapter_invites</code></td><td><span class="badge b-crit">Non</span></td>
+      <td><code>id</code>, <code>chapter_id</code>, <code>email</code>, <code>token</code>, <code>accepted</code>, <code>contributed</code>, <code>contributed_at</code><br><em>Le token est exposé publiquement — voir §05.</em></td>
+      <td>+1 colonne</td>
+    </tr>
+    <tr>
+      <td><code>book_contributors</code></td><td><span class="badge b-crit">Non</span></td>
+      <td><code>id</code>, <code>book_id</code>, <code>name</code>, <code>email</code></td>
+      <td>Inchangée</td>
+    </tr>
+    <tr>
+      <td><code>book_configs</code></td><td><span class="badge b-ok">Oui</span></td>
+      <td>~55 colonnes réparties par type d'événement (retraite, départ, mariage, naissance, voyage, projet, famille) + <code>chapter_count</code>, <code>book_finish</code>, <code>paper_type</code></td>
+      <td>Inchangée</td>
+    </tr>
+    <tr>
+      <td><code>event_types</code></td><td><span class="badge b-ok">Oui</span></td>
+      <td><code>type_slug</code>, <code>subtype_slug</code>, libellés, <code>default_tone</code>, <code>default_chapter_count</code></td>
+      <td>Inchangée</td>
+    </tr>
+    <tr>
+      <td><code>prompt_templates</code></td><td><span class="badge b-ok">Oui</span></td>
+      <td><code>type</code> (8 valeurs contraintes), <code>version</code>, <code>status</code>, <code>system_prompt</code>, <code>context_block</code>, <code>data_block</code>, <code>output_format</code>, <code>forbidden_phrases</code>, <code>min_words</code>, <code>max_words</code></td>
+      <td><span class="badge b-info">+3 types</span></td>
+    </tr>
+    <tr>
+      <td><code>prompt_generation_logs</code></td><td><span class="badge b-ok">Oui</span></td>
+      <td><code>template_id</code>, <code>attempt</code>, <code>word_count</code>, <code>is_valid</code>, <code>errors</code>, <code>warnings</code></td>
+      <td><span class="badge b-info">+tokens</span></td>
+    </tr>
+    <tr>
+      <td><code>orders</code></td><td><span class="badge b-ok">Oui</span></td>
+      <td>Machine à états 10 positions, montants, adresse, <code>snapshot</code>, <code>metadata</code></td>
+      <td>Inchangée</td>
+    </tr>
+    <tr>
+      <td><code>profiles</code></td><td><span class="badge b-crit">Non</span></td>
+      <td>Profils utilisateurs (11 accès dans le code)</td>
+      <td>Inchangée</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<div class="callout">
+  <span class="k">Recommandation transverse</span>
+  <p>
+    Avant toute migration, produire un <code>sql/00_schema_baseline.sql</code> reflétant l'état
+    réel des 5 tables non versionnées (récupérable via l'introspection Supabase). Sans cette
+    référence, aucune migration n'est reproductible et un environnement de test fidèle est
+    impossible à créer.
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">07</span> Flux frontend / backend concernés</h2>
+
+<h3>Parcours de création et de collecte</h3>
+<div class="flow">CRÉATEUR                          BACKEND                        MISTRAL
+────────                          ───────                        ───────
+CreateBookLuxe
+  choix type/sous-type    ──▶  GET  /api/books/create/event-types
+  saisie config           ──▶  POST /api/books/create/…            ──▶ book_title
+  titres de chapitres     ──▶  POST /api/ai/generate-chapters      ──▶ chapter_titles
+
+BookPageLuxe › Step1Amorce
+  génère l'amorce         ──▶  POST /api/chapters/:id/generate-amorce ──▶ chapter_amorce
+
+BookPageLuxe › Step3Invitations
+  sélectionne invités     ──▶  POST /api/invites/batch  ──▶ e-mail + token par chapitre
+
+CONTRIBUTEUR (public, sans compte)
+  /invite/:token          ──▶  GET  /api/invites/token/:token
+  /contribute/:token      ──▶  POST /api/invites/token/:token  → contributions
+
+CRÉATEUR › ContributionsModerationLuxe
+  approuve / demande révision  ──▶  Supabase direct  +  POST /api/invites/request-revision</div>
+
+<h3>Parcours de génération et de livraison</h3>
+<div class="flow">BookPageLuxe › ChapterWorkflowLuxe                                    ÉTAPE CIBLE
+  générer le chapitre  ──▶ POST /api/books/:id/chapters/:cid/generate-draft   E
+                            └─▶ chapter_body ──▶ HTML ──▶ contribution système
+  éditer               ──▶ POST …/save-draft                                  G
+  valider              ──▶ POST …/finalize-draft   (verrou définitif)         G
+
+  aperçu du livre      ──▶ POST /api/books/:id/generate-draft                 H
+                            └─▶ book_introduction + book_conclusion (2 appels,
+                                jamais mis en cache)
+
+  export PDF           ──▶ POST /api/books/:id/export-final-pdf   → job async
+                            ├─▶ 2 appels Mistral … jamais transmis  ⚠ bug §05
+                            ├─▶ Chrome headless  ✗ échoue toujours  ⚠ bug §05
+                            └─▶ PDFKit legacy    ✓ rendu dégradé
+                       ──▶ GET  …/export-final-pdf/:jobId/status  (polling)
+                       ──▶ GET  …/export-final-pdf/:jobId/download/:kind</div>
+
+<div class="card finding warn">
+  <p class="card-title"><span class="badge b-warn">Fragilité</span> Jobs PDF en mémoire de processus</p>
+  <p>
+    <code>const pdfExportJobs = new Map()</code> — les jobs d'export vivent dans la mémoire du
+    processus Node. Sur Render, tout redéploiement ou redémarrage les perd, et le frontend
+    interroge alors un <code>jobId</code> inexistant. Une fonction de récupération
+    (<code>recoverMissingPdfExportJob</code>, 180 l.) a été écrite pour compenser — symptôme
+    plutôt que solution. À terme&nbsp;: persister les jobs en base.
+  </p>
+</div>
+
+<div class="card finding info">
+  <p class="card-title"><span class="badge b-info">Cosmétique</span> Base URL API dupliquée 10 fois</p>
+  <p>
+    Chaque composant redéfinit <code>process.env.REACT_APP_API_URL || 'http://localhost:5001/api'</code>.
+    Deux variantes sont incohérentes&nbsp;: <code>InviteSelectorLuxe.js:122</code> omet le
+    suffixe <code>/api</code> (404 en local), et <code>ContributionsModerationLuxe.js:43</code>
+    n'a aucun repli (<code>undefined/invites/…</code> si la variable manque). Le client
+    centralisé qui existait — <code>services/api.js</code> — est du code mort.
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">08</span> Risques de régression</h2>
+
+<div class="tw"><table>
+  <thead><tr><th>Zone</th><th>Risque</th><th>Grav.</th><th>Parade</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Brouillons stockés en contributions système</td>
+      <td>Migrer vers une table dédiée peut faire perdre les brouillons des livres en cours, ou casser les compteurs de contributions si un filtre est oublié</td>
+      <td><span class="badge b-crit">Élevée</span></td>
+      <td>Double écriture pendant une phase de transition, lecture avec repli sur l'ancien format, bascule seulement après vérification livre par livre</td>
+    </tr>
+    <tr>
+      <td>Chapitres déjà validés</td>
+      <td><code>finalizeDraft</code> pose un verrou définitif. Un changement de format de <code>draftState</code> rendrait ces chapitres illisibles ou les remettrait en brouillon</td>
+      <td><span class="badge b-crit">Élevée</span></td>
+      <td>Versionner l'état (<code>version: 1</code> existe déjà, l'exploiter), et lire les deux formats</td>
+    </tr>
+    <tr>
+      <td>Prompts en base</td>
+      <td>Le déploiement du code et le contenu des prompts sont désynchronisés&nbsp;: un nouveau code attendant des variables absentes du template actif déclenche <code>PROMPT_VARIABLES_MISSING</code> (400) en production</td>
+      <td><span class="badge b-crit">Élevée</span></td>
+      <td>Toute nouvelle variable doit être <em>optionnelle</em> côté template&nbsp;; publier la nouvelle version de template <strong>avant</strong> le déploiement du code&nbsp;; script de vérification de compatibilité au démarrage</td>
+    </tr>
+    <tr>
+      <td>Frontend écrivant directement en base</td>
+      <td>Une règle métier ajoutée côté backend est contournable&nbsp;: le frontend peut écrire une contribution sans passer par la validation</td>
+      <td><span class="badge b-warn">Moyenne</span></td>
+      <td>Nouvelle règle&nbsp;: toute écriture liée au pipeline éditorial passe par le backend&nbsp;; RLS resserrée sur les tables V2</td>
+    </tr>
+    <tr>
+      <td>Rendu HTML / PDF</td>
+      <td>Le rendu est produit par ~15 fonctions imbriquées dans <code>books.js</code>. Toute extraction peut modifier le HTML de façon invisible</td>
+      <td><span class="badge b-warn">Moyenne</span></td>
+      <td>Les 3 snapshots posés aujourd'hui (37 Ko) verrouillent le rendu au caractère près</td>
+    </tr>
+    <tr>
+      <td>Coût API pendant la mise au point</td>
+      <td>L'étape B consomme 1 appel par contribution&nbsp;: itérer sur un livre de 30 témoignages coûte 30 appels par essai</td>
+      <td><span class="badge b-warn">Moyenne</span></td>
+      <td>Analyses idempotentes indexées sur un hash du texte source&nbsp;; jeu de 25 témoignages figés en fixture pour les tests hors ligne</td>
+    </tr>
+    <tr>
+      <td>Limites de débit Mistral</td>
+      <td><code>PROMPT_MODEL_CAPACITY_EXCEEDED</code> est déjà géré, mais analyser 30 contributions en parallèle déclenchera du 429</td>
+      <td><span class="badge b-info">Faible</span></td>
+      <td>File d'attente séquentielle avec petite concurrence (2–3) et back-off exponentiel</td>
+    </tr>
+    <tr>
+      <td>Commandes en cours</td>
+      <td><code>syncOrderWithPdfJobResult</code> fait avancer la machine à états des commandes. Toucher au pipeline PDF peut bloquer une commande payée</td>
+      <td><span class="badge b-warn">Moyenne</span></td>
+      <td>Ne pas modifier <code>orders.js</code>&nbsp;; tester l'export sur des livres sans commande associée</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2><span class="num">09</span> Architecture V2 proposée</h2>
+
+<div class="callout">
+  <span class="k">Principe directeur</span>
+  <p>
+    La garantie «&nbsp;aucun fait inventé&nbsp;» <strong>ne doit pas reposer sur le modèle</strong>.
+    Elle doit être <em>vérifiée mécaniquement</em>&nbsp;: tout nom propre, toute date, tout lieu du
+    texte généré doit se retrouver dans un registre construit à partir des contributions
+    originales. Sinon, c'est une invention — détectée par du code, sans appel IA, de façon
+    déterministe et testable.
+  </p>
+</div>
+
+<h3>Le pipeline</h3>
+<div class="flow">A. CONTRIBUTIONS BRUTES            contributions            (existant, intact)
+   │
+   ├─ 1 appel IA par contribution, une seule fois, mis en cache par hash
+   ▼
+B. ANALYSE STRUCTURÉE             contribution_analyses    (NOUVEAU)
+   │  JSON strict : auteur, personnes, événements, dates, lieux, thèmes,
+   │  anecdotes, faits, ton, citations, importance
+   │
+   ├─ agrégation par code, 0 appel IA
+   ▼
+C. MÉMOIRE ÉDITORIALE            book_entities            (NOUVEAU)
+   │  personnes · lieux · événements · thèmes · anecdotes · faits · citations
+   │                                  entity_sources          (NOUVEAU)
+   │  ── traçabilité : chaque entité ↔ ses contributions d'origine
+   │
+   ├─ 1 appel IA par livre
+   ▼
+D. PLAN DU LIVRE                  book_plans               (NOUVEAU)
+   │  n chapitres · objectif · thèmes · contributions ASSIGNÉES · anecdotes
+   │
+   ├─ 1 appel IA par chapitre — ne reçoit QUE ce que le plan lui assigne
+   ▼
+E. GÉNÉRATION PAR CHAPITRE        chapter_drafts           (NOUVEAU)
+   │  faits autorisés · sources · éléments interdits · style · objectif
+   │
+   ├─ VALIDATION DÉTERMINISTE (0 appel IA)  ──┐
+   ▼                                          │
+F. CONTRÔLE DE COHÉRENCE     chapter_consistency_reports   (NOUVEAU)
+   │  noms hors registre · dates non sourcées · attributions croisées
+   │  · contradictions · répétitions inter-chapitres (Jaccard n-grammes)
+   │                                          │
+   └─ si violations → 1 appel de correction ciblée ──┘  (max 1 boucle)
+   ▼
+G. VALIDATION HUMAINE            (UI existante, à enrichir)
+   │  voir · éditer · accepter · refuser · régénérer + sources par paragraphe
+   ▼
+H. PDF                            (existant, à réparer)</div>
+
+<h3>Nouvelles tables — 5 au total, aucune nouvelle base</h3>
+<div class="tw"><table>
+  <thead><tr><th>Table</th><th>Colonnes essentielles</th><th>Rôle</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>contribution_analyses</code></td>
+      <td><code>contribution_id</code>, <code>source_hash</code>, <code>analysis</code> (jsonb), <code>model</code>, <code>prompt_version</code>, <code>created_at</code></td>
+      <td>Étape B. <code>source_hash</code> rend l'analyse idempotente&nbsp;: pas de réanalyse si le témoignage n'a pas changé.</td>
+    </tr>
+    <tr>
+      <td><code>book_entities</code></td>
+      <td><code>book_id</code>, <code>kind</code> (person·place·event·theme·anecdote·fact·quote), <code>label</code>, <code>canonical_key</code>, <code>attributes</code> (jsonb), <code>mention_count</code></td>
+      <td>Étape C. Une seule table typée plutôt que six&nbsp;: <code>canonical_key</code> normalisée permet de fusionner «&nbsp;Marguerite&nbsp;», «&nbsp;Margot&nbsp;», «&nbsp;Mme&nbsp;Blanc&nbsp;».</td>
+    </tr>
+    <tr>
+      <td><code>entity_sources</code></td>
+      <td><code>entity_id</code>, <code>contribution_id</code>, <code>excerpt</code>, <code>confidence</code></td>
+      <td>Étape C. La traçabilité exigée&nbsp;: tout élément remonte à ses témoignages d'origine.</td>
+    </tr>
+    <tr>
+      <td><code>book_plans</code></td>
+      <td><code>book_id</code>, <code>version</code>, <code>status</code>, <code>plan</code> (jsonb), <code>model</code>, <code>prompt_version</code></td>
+      <td>Étape D. Versionné&nbsp;: on peut comparer deux plans et revenir en arrière.</td>
+    </tr>
+    <tr>
+      <td><code>chapter_drafts</code></td>
+      <td><code>book_id</code>, <code>chapter_id</code>, <code>version</code>, <code>status</code>, <code>title</code>, <code>body_html</code>, <code>sections</code> (jsonb), <code>sources</code> (jsonb), <code>quality</code> (jsonb), <code>model</code>, <code>prompt_version</code></td>
+      <td>Étapes E et G. Remplace le détournement de <code>contributions</code> et apporte l'historique de versions.</td>
+    </tr>
+    <tr>
+      <td><code>chapter_consistency_reports</code></td>
+      <td><code>chapter_draft_id</code>, <code>violations</code> (jsonb), <code>score</code>, <code>resolved</code></td>
+      <td>Étape F. Trace ce qui a été détecté et corrigé — la mesure du progrès.</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<h3>Le validateur déterministe — cœur de la solution</h3>
+<p>
+  Aucun appel modèle, entièrement testable. Étend <code>analyzeChapterDraftQuality()</code>
+  qui existe déjà&nbsp;:
+</p>
+<div class="tw"><table>
+  <thead><tr><th>Contrôle</th><th>Méthode</th><th>Cible ton §10</th></tr></thead>
+  <tbody>
+    <tr><td>Nom inventé</td><td>Tout nom propre du texte doit avoir sa <code>canonical_key</code> dans <code>book_entities</code></td><td>« les personnes ne sont pas mélangées »</td></tr>
+    <tr><td>Fait inventé</td><td>Dates, âges, durées, lieux du texte doivent apparaître dans les contributions assignées au chapitre</td><td>« les faits ne sont pas inventés »</td></tr>
+    <tr><td>Attribution erronée</td><td>Anecdote X attribuée à la personne Y ⇒ vérifier le lien X↔Y via <code>entity_sources</code></td><td>« chaque souvenir correctement attribué »</td></tr>
+    <tr><td>Répétition inter-chapitres</td><td>Similarité de Jaccard sur n-grammes (shingles de 5 mots) entre chapitres — pas d'embeddings, pas de vector DB</td><td>« les chapitres ont chacun une identité »</td></tr>
+    <tr><td>Paraphrase servile</td><td>Taux de recouvrement lexical entre le chapitre et chaque contribution source&nbsp;: trop haut = paraphrase, trop bas = hors-sol</td><td>« pas simplement paraphrasés »</td></tr>
+    <tr><td>Texte artificiel</td><td><code>CHAPTER_DRAFT_FILLER_PATTERNS</code> — <strong>déjà écrit</strong>, à brancher sur le seuil</td><td>« le texte reste naturel »</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Trois nouveaux types de prompts</h3>
+<p>
+  À ajouter dans la contrainte <code>CHECK</code> de <code>prompt_templates.type</code> et dans
+  <code>TEMPLATE_TYPES</code>. Les 8 types existants restent intacts.
+</p>
+<dl class="kv">
+  <dt><code>contribution_analysis</code></dt><dd>Étape B — extraction JSON stricte d'un seul témoignage. Petit prompt, petite sortie, <code>mistral-small</code>.</dd>
+  <dt><code>book_plan</code></dt><dd>Étape D — construction du plan à partir du registre d'entités (jamais des textes bruts). Le seul endroit où le raisonnement compte&nbsp;: candidat à <code>mistral-large-latest</code>.</dd>
+  <dt><code>chapter_correction</code></dt><dd>Étape F — correction ciblée d'un chapitre à partir de la liste des violations détectées.</dd>
+</dl>
+
+<h3>Deux évolutions du moteur existant</h3>
+<ol>
+  <li>
+    <strong>Mode JSON natif.</strong> Ajouter <code>response_format: { type: 'json_object' }</code>
+    dans <code>runPromptGeneration</code> quand le template le demande (nouvelle colonne
+    <code>output_mode</code>). Fiabilise l'étape B et rend <code>aiOutputContracts.js</code>
+    moins acrobatique.
+  </li>
+  <li>
+    <strong>Comptabilité des appels.</strong> Ajouter <code>prompt_tokens</code>,
+    <code>completion_tokens</code>, <code>model</code>, <code>duration_ms</code> à
+    <code>prompt_generation_logs</code>. La réponse Mistral porte déjà l'objet <code>usage</code>.
+    Sans cela, «&nbsp;optimiser le coût API&nbsp;» n'est pas mesurable.
+  </li>
+</ol>
+
+<h3>Budget d'appels — avant / après</h3>
+<div class="tw"><table>
+  <thead><tr><th>Scénario · pot de départ, 25 témoignages, 6 chapitres</th><th>Actuel</th><th>V2</th></tr></thead>
+  <tbody>
+    <tr><td>Titre + titres de chapitres</td><td>2</td><td>2</td></tr>
+    <tr><td>Amorces + questions par chapitre</td><td>12</td><td>12</td></tr>
+    <tr><td>Analyse des contributions <em>(une seule fois, mise en cache)</em></td><td>0</td><td>25</td></tr>
+    <tr><td>Plan du livre</td><td>0</td><td>1</td></tr>
+    <tr><td>Génération des chapitres</td><td>6</td><td>6</td></tr>
+    <tr><td>Corrections de cohérence</td><td>0</td><td>0–6</td></tr>
+    <tr><td>Introduction + conclusion</td><td>2 × chaque clic</td><td>2 <em>(en cache)</em></td></tr>
+    <tr><th>Premier livre complet</th><th>~22 + 2/clic</th><th>~49</th></tr>
+    <tr><th>Régénérer <strong>un</strong> chapitre</th><th>1 <em>(mais sans mémoire ni contrôle)</em></th><th>1 + 0–1</th></tr>
+    <tr><th>Trois itérations de mise au point</th><th>~66 + clics</th><th>~55</th></tr>
+  </tbody>
+</table></div>
+<p>
+  La V2 coûte plus cher au premier passage (+27 appels de <code>mistral-small</code> sur des
+  entrées courtes, soit quelques centimes) et <strong>moins cher dès la deuxième itération</strong>,
+  parce que l'analyse n'est jamais rejouée et que la régénération d'un chapitre n'entraîne plus
+  celle des autres. Le vrai gain reste la qualité&nbsp;: chaque appel reçoit un contexte
+  restreint et pertinent au lieu de 25 témoignages concaténés.
+</p>
+
+<h3>Ce que la V2 ne fait pas</h3>
+<p>
+  Conformément à ton §5 — pas de microservices, pas de Kubernetes, pas de nouvelle base, pas de
+  base vectorielle, pas de RAG, pas de changement de stack frontend, pas de nouvelle
+  infrastructure. Tout tient dans&nbsp;: 6 tables Supabase, 3 templates de prompt, un dossier
+  <code>services/editorial/</code>, et un validateur en JavaScript pur.
+</p>
+
+<!-- ============================================================ -->
+<h2><span class="num">10</span> Plan de migration par étapes</h2>
+
+<p>
+  Chaque étape est indépendamment livrable, vérifiable, et laisse l'application fonctionnelle.
+  L'ordre est délibéré&nbsp;: on construit d'abord la <em>connaissance</em> (B, C), puis la
+  <em>mesure</em> (F), et seulement ensuite on change la <em>génération</em> (D, E) — ce qui
+  permet de chiffrer l'amélioration au lieu de la supposer.
+</p>
+
+<div class="step urgent">
+  <div class="sn">00</div>
+  <div>
+    <p class="st">Colmatage de sécurité — indépendant de la refonte</p>
+    <p class="sb">Supprimer <code>GET /api/invites/debug</code> et <code>/debug/:token</code> ainsi que les deux fonctions du contrôleur. Ajouter le filtre <code>owner_id</code> sur <code>GET /api/books/:id</code> et la vérification de propriété sur les trois routes <code>chapters</code>.</p>
+    <p class="sb"><strong>À faire immédiatement</strong>, avant tout le reste&nbsp;: la faille est exploitable en production aujourd'hui.</p>
+    <div class="sm"><span>~4 fichiers</span><span>½ journée</span><span>Vérif&nbsp;: tests de propriété + appel manuel des URL supprimées → 404</span></div>
+  </div>
+</div>
+
+<div class="step urgent">
+  <div class="sn">01</div>
+  <div>
+    <p class="st">Réparer la chaîne PDF et le gaspillage d'appels</p>
+    <p class="sb">Propager <code>frameTexts</code> dans <code>processPdfExportJob</code> → <code>generateFinalBookPdfFiles</code>. Persister les textes de cadre en base pour supprimer les 2 appels Mistral par clic.</p>
+    <p class="sb">Gain immédiat visible&nbsp;: le PDF final retrouve son rendu fidèle, son introduction et sa conclusion.</p>
+    <div class="sm"><span>1 fichier</span><span>1 journée</span><span>Vérif&nbsp;: export réel en mode <code>browser-strict</code></span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">02</div>
+  <div>
+    <p class="st">Baseline de schéma + extraction du pipeline éditorial</p>
+    <p class="sb">Écrire <code>sql/00_schema_baseline.sql</code> pour les 5 tables non versionnées. Extraire de <code>books.js</code> vers <code>services/editorial/</code> les fonctions du pipeline (payload source, génération, qualité, rendu), <strong>sans changer une ligne de comportement</strong>. Supprimer les 644 lignes de code mort et unifier les variables de prompt sur une seule convention.</p>
+    <p class="sb">Objectif&nbsp;: rendre le pipeline modifiable. Les 3 snapshots garantissent l'absence de dérive du rendu.</p>
+    <div class="sm"><span>~12 nouveaux modules</span><span>2–3 jours</span><span>Vérif&nbsp;: contrat de routage + 3 snapshots inchangés</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">03</div>
+  <div>
+    <p class="st">Table <code>chapter_drafts</code> et fin des contributions système</p>
+    <p class="sb">Créer la table, écrire en double (nouvelle table + ancien format), lire d'abord la nouvelle avec repli sur l'ancien. Script de migration des brouillons existants. Bascule après vérification, puis suppression de l'écriture legacy dans une étape ultérieure.</p>
+    <p class="sb">Prérequis de toutes les étapes suivantes&nbsp;: sans historique de versions, ni le contrôle de cohérence ni la validation humaine ne peuvent fonctionner correctement.</p>
+    <div class="sm"><span>1 migration + 1 service</span><span>2 jours</span><span>Vérif&nbsp;: les chapitres validés existants restent lisibles et verrouillés</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">04</div>
+  <div>
+    <p class="st">Étape B — analyse structurée des contributions</p>
+    <p class="sb">Template <code>contribution_analysis</code> en mode JSON, table <code>contribution_analyses</code> avec cache par <code>source_hash</code>, file d'attente à concurrence 2–3 avec back-off. Déclenchée à l'approbation d'une contribution, rattrapage en lot pour l'existant.</p>
+    <p class="sb"><strong>Aucun impact sur la génération à ce stade</strong> — on ne fait qu'accumuler de la donnée, visible dans la console d'administration.</p>
+    <div class="sm"><span>+ mode JSON dans promptEngine</span><span>3 jours</span><span>Vérif&nbsp;: 25 témoignages de fixture → 25 analyses valides, hors ligne</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">05</div>
+  <div>
+    <p class="st">Étape C — mémoire éditoriale</p>
+    <p class="sb"><code>book_entities</code> + <code>entity_sources</code>, construites <strong>par agrégation en code</strong> des analyses — aucun appel IA. Normalisation des <code>canonical_key</code> pour fusionner les variantes de prénoms, surnoms et graphies.</p>
+    <p class="sb">Livrable visible&nbsp;: un écran «&nbsp;qui et quoi ce livre contient&nbsp;», utile en soi pour le créateur.</p>
+    <div class="sm"><span>1 service + 1 vue admin</span><span>3 jours</span><span>Vérif&nbsp;: sur la fixture, chaque entité pointe vers ≥1 contribution</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">06</div>
+  <div>
+    <p class="st">Étape F d'abord — le validateur, appliqué à l'ancien pipeline</p>
+    <p class="sb">Implémenter le validateur déterministe et le faire tourner sur les chapitres <strong>déjà générés par le pipeline actuel</strong>. Brancher enfin <code>CHAPTER_DRAFT_QUALITY_THRESHOLD</code>.</p>
+    <p class="sb"><strong>L'étape la plus rentable du plan&nbsp;:</strong> elle chiffre le problème avant de le corriger. Tu sauras combien de noms inventés, d'attributions erronées et de répétitions contient réellement un livre actuel — et tu auras la mesure de référence pour prouver que la V2 fait mieux.</p>
+    <div class="sm"><span>1 service, 0 appel IA</span><span>3–4 jours</span><span>Vérif&nbsp;: cas de test avec violations connues injectées</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">07</div>
+  <div>
+    <p class="st">Étape D — le plan du livre</p>
+    <p class="sb">Template <code>book_plan</code> nourri par le registre d'entités (jamais par les textes bruts), table <code>book_plans</code> versionnée. Le plan assigne explicitement à chaque chapitre ses contributions, thèmes et anecdotes. Éditable par le créateur avant génération.</p>
+    <div class="sm"><span>1 template + 1 service + 1 écran</span><span>4 jours</span><span>Vérif&nbsp;: 25 témoignages → 5–8 chapitres, chaque contribution assignée ≥1 fois</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">08</div>
+  <div>
+    <p class="st">Étape E — génération pilotée par le plan, derrière un drapeau</p>
+    <p class="sb">Nouvelle version du template <code>chapter_body</code> recevant&nbsp;: objectif du chapitre, faits autorisés, contributions assignées uniquement, liste explicite des éléments inconnus/interdits, style. Activation par livre via <code>books.editorial_pipeline_version</code>.</p>
+    <p class="sb">Les deux pipelines coexistent&nbsp;: les livres en cours ne bougent pas, les nouveaux utilisent la V2. Comparaison possible sur le même jeu de témoignages.</p>
+    <div class="sm"><span>1 template + 1 colonne</span><span>4 jours</span><span>Vérif&nbsp;: score du validateur V2 &gt; score mesuré à l'étape 06</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">09</div>
+  <div>
+    <p class="st">Boucle de correction F → E</p>
+    <p class="sb">Template <code>chapter_correction</code>&nbsp;: si le validateur détecte des violations, un appel ciblé les corrige. Une seule boucle, puis remontée à l'humain avec la liste de ce qui reste. Traçé dans <code>chapter_consistency_reports</code>.</p>
+    <div class="sm"><span>1 template</span><span>2 jours</span><span>Vérif&nbsp;: un chapitre volontairement fautif est corrigé en 1 passe</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">10</div>
+  <div>
+    <p class="st">Étape G — enrichir la validation humaine</p>
+    <p class="sb">L'interface existe (<code>ChapterWorkflowLuxe</code>, <code>Step1</code>–<code>Step4</code>). Y ajouter&nbsp;: les sources par paragraphe (quel témoignage a nourri quoi), les violations restantes, un bouton de régénération d'un seul chapitre, et l'historique des versions désormais disponible.</p>
+    <div class="sm"><span>Frontend</span><span>4 jours</span><span>Vérif&nbsp;: parcours complet sur le livre de démonstration</span></div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="sn">11</div>
+  <div>
+    <p class="st">Mode collecte libre pour le pot de départ</p>
+    <p class="sb">
+      <strong>Changement de produit à valider avec toi.</strong> Aujourd'hui l'invitation cible
+      un <em>chapitre précis</em> (<code>chapter_invites.chapter_id</code>)&nbsp;: le contributeur
+      répond à un thème décidé d'avance. Ton §9 décrit l'inverse&nbsp;: 20–30 témoignages libres,
+      <em>puis</em> le plan construit les chapitres.
+    </p>
+    <p class="sb">
+      Proposition&nbsp;: ajouter <code>books.collection_mode</code> ∈ <code>by_chapter</code>
+      (existant, conservé) | <code>open</code> (nouveau, un lien unique par livre), et rendre
+      <code>chapter_invites.chapter_id</code> nullable. Le pipeline B→F est identique dans les
+      deux modes&nbsp;; seule l'assignation change — en mode <code>open</code>, c'est le plan qui
+      l'établit.
+    </p>
+    <div class="sm"><span>1 colonne + 1 écran public</span><span>4 jours</span><span>Vérif&nbsp;: cas de référence de bout en bout</span></div>
+  </div>
+</div>
+
+<div class="callout">
+  <span class="k">Question ouverte à trancher avant l'étape 07</span>
+  <p>
+    L'étape 11 n'est pas un détail technique&nbsp;: elle décide si Celebrons demande au créateur
+    de <strong>définir les chapitres avant</strong> la collecte (modèle actuel, qui guide les
+    contributeurs et produit des témoignages plus ciblés) ou de <strong>laisser l'IA les
+    découvrir après</strong> (modèle de ton §9, plus simple pour les invités mais qui repose
+    entièrement sur la qualité du plan). Les deux se défendent, et l'architecture proposée les
+    supporte tous les deux — mais le choix conditionne la forme du template
+    <code>book_plan</code>. À décider avant l'étape 07.
+  </p>
+</div>
+
+<h3>Ordre de grandeur</h3>
+<div class="tw"><table>
+  <thead><tr><th>Lot</th><th>Étapes</th><th>Durée</th><th>Résultat observable</th></tr></thead>
+  <tbody>
+    <tr><td>Urgences</td><td>00 – 01</td><td>~1,5 jour</td><td>Faille fermée, PDF fidèle rétabli</td></tr>
+    <tr><td>Assainissement</td><td>02 – 03</td><td>~5 jours</td><td>Pipeline modifiable, brouillons dans une vraie table</td></tr>
+    <tr><td>Connaissance</td><td>04 – 05</td><td>~6 jours</td><td>Le livre « sait » qui et quoi il contient</td></tr>
+    <tr><td>Mesure</td><td>06</td><td>~4 jours</td><td><strong>Le défaut de cohérence devient chiffré</strong></td></tr>
+    <tr><td>Nouvelle génération</td><td>07 – 09</td><td>~10 jours</td><td>Livres pilotés par plan, avec contrôle</td></tr>
+    <tr><td>Finition</td><td>10 – 11</td><td>~8 jours</td><td>Cas de référence de bout en bout</td></tr>
+  </tbody>
+</table></div>
+
+<footer>
+  <p>
+    Audit réalisé sans modification du code applicatif, à l'exception de trois éléments
+    antérieurs à la demande&nbsp;: la correction du <code>ReferenceError</code> sur
+    <code>normalizeText</code> (<code>books.js:3921</code>), la suppression d'une déclaration
+    dupliquée de <code>decodeHtmlEntities</code>, et l'ajout d'un harnais de tests
+    (<code>tests/</code>, 59 tests, 3 snapshots). Les références de lignes correspondent à
+    <code>e204ef0</code> augmenté de ces changements.
+  </p>
+</footer>
+
+</div>

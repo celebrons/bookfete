@@ -1,0 +1,157 @@
+{
+  "_readme": "ETAPE F - Controle de coherence du chapitre 4, premier jet. 6 violations detectees dont 5 SANS AUCUN APPEL IA (verification mecanique contre le registre de l'etape C). Un seul appel de correction ciblee a ete necessaire.",
+  "chapter_draft_id": "cd-demo-4-v1",
+  "chapter_order_index": 4,
+  "chapter_title": "Mon grand, ma grande",
+  "validated_at": "2026-05-15T09:14:00.000Z",
+  "deterministic_checks_ai_calls": 0,
+  "correction_ai_calls": 1,
+
+  "violations": [
+    {
+      "id": "v1",
+      "severity": "BLOCKING",
+      "type": "attribution_crossed",
+      "check": "attribution_locks",
+      "detection": "deterministe",
+      "found": "« Elle lui a dit d'aller dormir, et le lendemain matin le client était rappelé. Kevin n'a eu droit qu'à une phrase : maintenant tu relis deux fois, mon grand. »",
+      "problem": "L'anecdote a-c16-1 (devis au mauvais tarif) est verrouillee sur Laura Petit. Le premier jet l'a attribuee a Kevin Dubois et a croise la citation q-relis (« ma grande », adressee a Laura) avec q-mon-grand (adressee a Kevin).",
+      "rule_violated": "plan.chapters[4].attribution_locks — a-c16-1 exclusive_to: Laura Petit",
+      "how_detected": "Comparaison de l'entite protagoniste citee dans le paragraphe avec exclusive_to du verrou. Aucun jugement necessaire : egalite de chaine sur canonical_key.",
+      "corrected_to": "Attribution rendue a Laura Petit, citation « ma grande » restauree, paragraphe Kevin recentre sur la plaque offset de 2011.",
+      "_note": "C'est EXACTEMENT le defaut principal decrit dans le brief. Le pipeline actuel n'a aucun moyen de le detecter ; ici il est impossible de le laisser passer."
+    },
+    {
+      "id": "v2",
+      "severity": "BLOCKING",
+      "type": "invented_fact",
+      "check": "facts_must_be_sourced",
+      "detection": "deterministe",
+      "found": "« Une plaque neuve, qui valait le prix d'une petite voiture. »",
+      "problem": "Aucune valeur monetaire ni comparaison de prix n'apparait dans c03 ni dans aucun autre temoignage. Detail ajoute par le modele pour dramatiser.",
+      "rule_violated": "forbidden_elements — tout fait absent du registre",
+      "how_detected": "Extraction des expressions de quantite/valeur du texte genere, puis recherche dans les contributions assignees au chapitre. Aucune correspondance.",
+      "corrected_to": "« Une plaque neuve. » — la sobriete du temoignage original est retablie."
+    },
+    {
+      "id": "v3",
+      "severity": "BLOCKING",
+      "type": "unsourced_date_precision",
+      "check": "date_precision_must_not_exceed_source",
+      "detection": "deterministe",
+      "found": "« L'histoire de Laura Petit est arrivee en mars 2023. »",
+      "problem": "L'analyse de c16 donne date_precision=approx sur l'annee 2023, deduite d'une alternance 2022-2024. Le mois est une invention pure.",
+      "rule_violated": "events[].date_precision — le texte ne peut pas etre plus precis que sa source",
+      "how_detected": "Comparaison du niveau de precision de chaque marqueur temporel du texte avec la precision enregistree dans le registre. mois > annee approximative → violation.",
+      "corrected_to": "« pendant son alternance » — aucune date affirmee."
+    },
+    {
+      "id": "v4",
+      "severity": "WARNING",
+      "type": "unsourced_characterization",
+      "check": "third_party_characterization",
+      "detection": "deterministe",
+      "found": "« Bernard Wattel, le chef d'atelier, qui ne plaisantait pas avec le materiel. »",
+      "problem": "Le role de Bernard Wattel est sourcé (c03, c09). Son caractere ne l'est pas : aucun temoignage ne le decrit ainsi. Risque de froisser un collegue encore en vie.",
+      "rule_violated": "Attributs d'une personne du registre limites a ceux presents dans entity_sources",
+      "how_detected": "Detection des groupes adjectivaux et propositions relatives accroches a une entite person, puis recherche du support dans les sources.",
+      "corrected_to": "« Bernard Wattel, le chef d'atelier. »"
+    },
+    {
+      "id": "v5",
+      "severity": "WARNING",
+      "type": "cross_chapter_repetition",
+      "check": "jaccard_shingles_5",
+      "detection": "deterministe",
+      "found": "« Elle a sorti son carnet a spirale rouge, celui ou elle notait tout, les numeros, les anniversaires, les conges. »",
+      "problem": "Similarite de Jaccard de 0,41 avec un paragraphe du chapitre 2, au-dessus du seuil de 0,25. Le carnet est le motif attribue au chapitre 2 : le rappeler en detail ici cree la sensation de radotage entre chapitres.",
+      "rule_violated": "Une anecdote appartient a un seul chapitre (a-c02-1 est assignee au chapitre 2)",
+      "how_detected": "Shingles de 5 mots, similarite de Jaccard entre chaque paire de paragraphes de chapitres differents. Aucun embedding, aucune base vectorielle.",
+      "corrected_to": "Mention du carnet supprimee du chapitre 4 : elle n'y apportait rien que le chapitre 2 ne dise mieux."
+    },
+    {
+      "id": "v6",
+      "severity": "WARNING",
+      "type": "unsourced_quantity",
+      "check": "quantities_must_be_sourced",
+      "detection": "deterministe",
+      "found": "« une dizaine de personnes se souviennent surtout de ce qu'elle n'a pas dit »",
+      "problem": "Le theme t-protection-jeunes compte exactement 4 sources (c03, c07, c16, c19). « Une dizaine » gonfle le chiffre.",
+      "rule_violated": "quantities_must_be_sourced",
+      "how_detected": "Comparaison des expressions numeriques du texte avec les compteurs du registre (mention_count, nombre de sources par theme).",
+      "corrected_to": "« quatre personnes se souviennent » — chiffre exact et verifiable."
+    }
+  ],
+
+  "warnings_non_bloquants_acceptes": [
+    {
+      "id": "w1",
+      "type": "unsourced_colocation",
+      "found": "Introduction : « un carnet a spirale rouge, pose sur un bureau, a cote d'un geranium »",
+      "problem": "Le carnet (c02) et le geranium (c18) sont tous deux sur son bureau, mais aucun temoignage ne les mentionne ensemble. Leur voisinage physique est une inference.",
+      "decision": "ACCEPTE. Inference geographiquement necessaire — les deux objets sont explicitement sur le meme bureau. Signale au createur pour validation humaine, non bloquant.",
+      "_note": "Illustre l'interet de distinguer BLOCKING et WARNING : un validateur trop strict rendrait toute ecriture impossible."
+    }
+  ],
+
+  "checks_passed": [
+    { "check": "all_person_names_in_registry", "result": "PASS", "detail": "6 noms propres detectes, 6 presents dans book_entities. Aucun collegue invente." },
+    { "check": "no_forbidden_element", "result": "PASS", "detail": "Aucun des 12 elements interdits present. Notamment : ni 1994, ni date de naturalisation, ni signification de la fiche jaune, ni prenom d'enfant." },
+    { "check": "all_assigned_anecdotes_used", "result": "PASS", "detail": "4/4 anecdotes du plan presentes" },
+    { "check": "no_unassigned_anecdote", "result": "PASS", "detail": "Aucune anecdote appartenant a un autre chapitre (apres correction de v5)" },
+    { "check": "paraphrase_ratio", "result": "PASS", "detail": "Recouvrement lexical avec les contributions sources : 0,31 (fenetre acceptee 0,15-0,55). Ni paraphrase servile, ni texte hors-sol." },
+    { "check": "filler_patterns", "result": "PASS", "detail": "0 occurrence de CHAPTER_DRAFT_FILLER_PATTERNS. Aucun « dans ce chapitre », « il est important de », « nous allons »." },
+    { "check": "quotes_attributed_correctly", "result": "PASS", "detail": "3/3 citations rattachees au bon locuteur et au bon destinataire (apres correction de v1)" },
+    { "check": "chapter_identity", "result": "PASS", "detail": "Similarite maximale avec les 5 autres chapitres : 0,09 (seuil 0,25). Chaque chapitre a son territoire." }
+  ],
+
+  "scores": {
+    "premier_jet": {
+      "coherence": 62,
+      "violations_bloquantes": 3,
+      "avertissements": 3,
+      "verdict": "REFUSE — correction requise"
+    },
+    "apres_correction": {
+      "coherence": 96,
+      "violations_bloquantes": 0,
+      "avertissements": 1,
+      "verdict": "ACCEPTE — soumis a validation humaine (etape G)"
+    }
+  },
+
+  "recapitulatif_par_chapitre": [
+    { "chapitre": 1, "violations_bloquantes": 1, "avertissements": 2, "corrections": 1, "score_final": 94, "detail_notable": "Le premier jet datait l'arrivee de Martine en 1994 (source c06). Conflit cf-1 applique : corrige en 1993." },
+    { "chapitre": 2, "violations_bloquantes": 1, "avertissements": 1, "corrections": 1, "score_final": 97, "detail_notable": "Le premier jet avait fusionne le carnet rouge de Martine et le carnet noir d'Emilie en un seul objet. Faux conflit cf-3 : deux objets distincts." },
+    { "chapitre": 3, "violations_bloquantes": 0, "avertissements": 2, "corrections": 0, "score_final": 98, "detail_notable": "Un avertissement sur la tarte au sucre et les gaufres presentees comme une seule patisserie ; accepte apres verification (cf-4, complementaires), reformule par prudence." },
+    { "chapitre": 4, "violations_bloquantes": 3, "avertissements": 3, "corrections": 1, "score_final": 96, "detail_notable": "Le croisement Kevin/Laura, defaut central que le pipeline actuel ne peut pas voir." },
+    { "chapitre": 5, "violations_bloquantes": 1, "avertissements": 1, "corrections": 1, "score_final": 95, "detail_notable": "Le premier jet datait l'episode du 24 decembre (« en 2015 »). Annee inconnue : supprimee." },
+    { "chapitre": 6, "violations_bloquantes": 0, "avertissements": 1, "corrections": 0, "score_final": 99, "detail_notable": "Aucune violation. Chapitre le plus court et le plus dense en faits sourcés." }
+  ],
+
+  "bilan_livre": {
+    "violations_bloquantes_detectees": 6,
+    "violations_bloquantes_restantes": 0,
+    "appels_de_correction": 4,
+    "chapitres_acceptes_du_premier_coup": 2,
+    "score_de_coherence_moyen": 96.5,
+    "noms_inventes": 0,
+    "dates_inventees": 0,
+    "anecdotes_mal_attribuees": 0,
+    "repetitions_inter_chapitres_au_dela_du_seuil": 0
+  },
+
+  "cout_total_du_livre": {
+    "etape_B_analyses": 25,
+    "etape_C_registre": 0,
+    "etape_D_plan": 1,
+    "etape_E_generation_6_chapitres": 6,
+    "etape_F_controle_deterministe": 0,
+    "etape_F_corrections": 4,
+    "textes_de_cadre": 2,
+    "titres_et_amorces_existants": 14,
+    "total_appels_mistral": 52,
+    "dont_non_rejouables_a_l_iteration_suivante": 25,
+    "cout_d_une_regeneration_d_un_chapitre": "1 a 2 appels"
+  }
+}

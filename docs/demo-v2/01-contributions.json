@@ -1,0 +1,235 @@
+{
+  "_readme": "ETAPE A du pipeline V2 - Contributions brutes, jamais modifiees. Cas de reference : pot de depart professionnel, 25 contributions. Contient volontairement des contradictions et des pieges d'attribution pour eprouver l'etape F.",
+  "book": {
+    "id": "demo-pot-depart-1",
+    "title": "Trente-deux ans au standard",
+    "recipient_name": "Martine Lévêque",
+    "event_type": "depart",
+    "event_subtype": "retraite",
+    "company": "Sograph",
+    "company_context": "Imprimerie industrielle, 140 salariés, Tourcoing",
+    "collection_mode": "open",
+    "config": {
+      "years_in_role": 32,
+      "job_description_plain": "Standardiste puis responsable administrative",
+      "will_be_missed_for": "Sa mémoire des gens, sa façon de désamorcer les problèmes",
+      "contributor_circle": "pro",
+      "retirement_project": "Son jardin, et voir grandir son petit-fils Malo",
+      "departure_context": "job",
+      "narrative_style": "intime",
+      "chapter_count": 6
+    }
+  },
+  "contributions": [
+    {
+      "id": "c01",
+      "contributor_name": "Jean-Marc Vasseur",
+      "role": "Directeur général",
+      "message": "Martine est arrivée chez Sograph en 1993, deux ans avant moi. À l'époque le standard c'était deux lignes et un carnet. Elle a vu passer quatre directeurs, trois déménagements de bureaux et l'arrivée de l'informatique, sans jamais avoir l'air débordée. Ce que je retiens, c'est qu'elle savait qui appelait avant de décrocher. Elle reconnaissait les voix, y compris celles des clients qu'on n'avait pas entendus depuis six mois. Je lui ai proposé le poste de responsable administrative en 2004, elle a mis trois semaines à accepter parce qu'elle avait peur de perdre le contact avec les gens. C'était mal la connaître : elle a gardé le standard en plus du reste pendant deux ans.",
+      "photo_urls": ["https://cdn.demo/martine-bureau-2004.jpg"],
+      "created_at": "2026-05-02T09:12:00.000Z"
+    },
+    {
+      "id": "c02",
+      "contributor_name": "Nathalie Crombez",
+      "role": "Comptabilité — binôme de Martine pendant 18 ans",
+      "message": "On a partagé le même bureau pendant dix-huit ans. Le carnet à spirale rouge, c'est ma madeleine. Elle notait tout dedans : les numéros, les anniversaires, qui était en congé, qui avait un enfant malade. Quand l'informatique est arrivée elle a continué le carnet en parallèle, et franchement le carnet était plus fiable. Le vendredi elle apportait une tarte au sucre, toujours la même recette, celle de sa mère. Elle disait que c'était pour finir la semaine correctement. Il y a des vendredis où on était douze autour de sa table. Et quand quelqu'un avait un souci, elle disait « on va s'arranger ». Je ne l'ai jamais entendue dire que ce n'était pas possible.",
+      "photo_urls": ["https://cdn.demo/tarte-au-sucre.jpg", "https://cdn.demo/bureau-partage.jpg"],
+      "created_at": "2026-05-02T14:30:00.000Z"
+    },
+    {
+      "id": "c03",
+      "contributor_name": "Kevin Dubois",
+      "role": "Chef d'atelier — arrivé en apprentissage en 2011",
+      "message": "J'avais dix-sept ans quand je suis arrivé en apprentissage. La première semaine j'ai cassé une plaque offset, une plaque neuve, et j'ai voulu partir en courant. C'est Martine qui m'a arrêté dans le couloir. Elle m'a dit « viens, on va s'arranger ». Elle est allée voir Bernard avec moi, elle a expliqué que c'était sa faute à elle parce qu'elle m'avait envoyé à l'atelier sans prévenir personne. C'était complètement faux. Aujourd'hui je suis chef d'atelier et je n'ai jamais oublié ce qu'elle a fait ce jour-là. Elle m'a appelé « mon grand » pendant quinze ans, même quand j'ai eu des gars sous mes ordres.",
+      "photo_urls": [],
+      "created_at": "2026-05-03T08:05:00.000Z"
+    },
+    {
+      "id": "c04",
+      "contributor_name": "Sylvie Meunier",
+      "role": "Ressources humaines",
+      "message": "Officiellement Martine n'a jamais fait partie des RH. En pratique elle en faisait la moitié. Les gens venaient la voir avant de venir me voir. Je l'ai souvent taquinée là-dessus, elle répondait qu'elle ne faisait qu'écouter. Ce n'est pas vrai : elle orientait, elle temporisait, elle réglait des choses avant qu'elles ne deviennent des dossiers. Je crois qu'on ne mesurera jamais le nombre de conflits qui ne sont pas arrivés jusqu'à mon bureau grâce à elle.",
+      "photo_urls": [],
+      "created_at": "2026-05-03T11:20:00.000Z"
+    },
+    {
+      "id": "c05",
+      "contributor_name": "Ahmed Benali",
+      "role": "Cariste — 20 ans dans l'entreprise",
+      "message": "Moi je travaille au quai, je monte rarement dans les bureaux. Mais je passais toujours dire bonjour à Martine le matin. Elle savait que ma fille faisait de la danse, elle demandait des nouvelles des galas. Le vendredi elle descendait au quai avec une assiette, parce qu'elle savait qu'on ne montait pas. Des gaufres, souvent. Elle disait qu'on travaillait plus dur qu'eux là-haut.",
+      "photo_urls": ["https://cdn.demo/quai-vendredi.jpg"],
+      "created_at": "2026-05-04T07:45:00.000Z"
+    },
+    {
+      "id": "c06",
+      "contributor_name": "Christine Dupire",
+      "role": "Ancienne standardiste — partie en 2015",
+      "message": "J'ai formé Martine au standard quand elle est arrivée, en 1994. Enfin, « formée » est un grand mot, elle a compris en deux jours. Ce qui m'a frappée c'est qu'elle notait le prénom des enfants des clients. Je lui ai demandé pourquoi, elle m'a dit que ça faisait gagner du temps. Trente ans plus tard je pense qu'elle m'avait menti et que c'était simplement sa façon de s'intéresser aux gens.",
+      "photo_urls": [],
+      "created_at": "2026-05-04T16:00:00.000Z"
+    },
+    {
+      "id": "c07",
+      "contributor_name": "Thomas Leroy",
+      "role": "Commercial — arrivé en 2019",
+      "message": "Je suis arrivé il y a sept ans, je suis un des derniers à l'avoir connue. Mon premier jour, personne ne m'attendait vraiment, le manager était en déplacement. Martine m'a installé, m'a fait le tour des bureaux, m'a présenté à quarante personnes en se souvenant de ce que chacun faisait. À midi elle m'a dit de ne pas manger seul et elle m'a collé à la table de la compta. Sept ans après je déjeune encore avec eux.",
+      "photo_urls": [],
+      "created_at": "2026-05-05T09:30:00.000Z"
+    },
+    {
+      "id": "c08",
+      "contributor_name": "Fatou Diallo",
+      "role": "Agent d'entretien",
+      "message": "Madame Lévêque me disait bonjour par mon prénom. Ça peut paraître peu mais dans beaucoup d'endroits où j'ai travaillé, personne ne connaît mon prénom. Elle laissait un mot sur son bureau quand elle avait renversé du café, pour prévenir. Elle a demandé une fois qu'on change mes horaires pour que je puisse récupérer mon fils à l'école. Ça a été fait.",
+      "photo_urls": [],
+      "created_at": "2026-05-05T18:15:00.000Z"
+    },
+    {
+      "id": "c09",
+      "contributor_name": "Bernard Wattel",
+      "role": "Ancien chef d'atelier — retraité depuis 2012",
+      "message": "L'incendie du magasin de papier, c'était en 2009. On a perdu le stock d'une nuit. Le lendemain matin à six heures et demie Martine était là, elle avait sorti son carnet et elle appelait les clients un par un pour décaler les livraisons. Sans qu'on le lui demande. Le directeur n'était pas encore arrivé. Je me souviens qu'elle avait la voix normale au téléphone, comme si de rien n'était, et qu'entre deux appels elle nous disait d'aller boire un café. On était tous secoués sauf elle. Ou elle le cachait bien.",
+      "photo_urls": [],
+      "created_at": "2026-05-06T10:00:00.000Z"
+    },
+    {
+      "id": "c10",
+      "contributor_name": "Émilie Ravet",
+      "role": "Assistante administrative",
+      "message": "Le fameux carnet ! Le mien était noir, parce qu'elle m'en a offert un quand j'ai été titularisée. Elle m'a dit qu'un ordinateur ne se souvient pas des gens, il se souvient des données. Je n'ai pas compris tout de suite. Maintenant j'ai mon carnet et je note les prénoms des enfants des fournisseurs, et parfois ça débloque une situation en trois secondes.",
+      "photo_urls": ["https://cdn.demo/carnet-noir.jpg"],
+      "created_at": "2026-05-06T13:40:00.000Z"
+    },
+    {
+      "id": "c11",
+      "contributor_name": "Patrick Nowak",
+      "role": "Maintenance",
+      "message": "Il y a une quinzaine d'années, quand il y a eu le feu, elle est restée jusqu'à vingt-trois heures avec nous à faire l'inventaire de ce qui restait. Elle n'avait rien à faire là, ce n'était pas son travail. Elle avait mis des bottes.",
+      "photo_urls": [],
+      "created_at": "2026-05-07T08:10:00.000Z"
+    },
+    {
+      "id": "c12",
+      "contributor_name": "Karine Lefebvre",
+      "role": "Administration des ventes",
+      "message": "Ce que je vais regretter, c'est sa manière de dire les choses désagréables. Elle arrivait à te dire que tu avais fait une bêtise sans que tu te sentes idiot. Je ne sais pas comment elle faisait. Elle commençait toujours par une question, jamais par un reproche.",
+      "photo_urls": [],
+      "created_at": "2026-05-07T15:25:00.000Z"
+    },
+    {
+      "id": "c13",
+      "contributor_name": "Mohamed Saidi",
+      "role": "Conducteur offset",
+      "message": "Bon courage pour la retraite Martine, profite bien !",
+      "photo_urls": [],
+      "created_at": "2026-05-08T06:50:00.000Z"
+    },
+    {
+      "id": "c14",
+      "contributor_name": "Isabelle Vandenbossche",
+      "role": "Cliente — directrice d'agence, 22 ans de collaboration",
+      "message": "Je suis cliente de Sograph depuis 2004 et pendant vingt-deux ans ma première interlocutrice a été Martine. Elle connaissait mes délais mieux que moi. Un jour j'ai appelé en catastrophe un 24 décembre pour un tirage qui devait partir le 26, une erreur de mon côté, pas du sien. Elle m'a rappelée quarante minutes plus tard en me disant que c'était réglé. Je n'ai jamais su comment, et je n'ai jamais osé demander qui elle avait dérangé pendant son réveillon.",
+      "photo_urls": [],
+      "created_at": "2026-05-08T11:00:00.000Z"
+    },
+    {
+      "id": "c15",
+      "contributor_name": "Gérard Six",
+      "role": "Expert-comptable externe",
+      "message": "Je viens chez Sograph quatre fois par an depuis 2001. Martine préparait les dossiers avant que je les demande. Sur le plan strictement professionnel, je n'ai jamais eu à réclamer une pièce deux fois en vingt-cinq ans. C'est rare, je peux vous l'assurer.",
+      "photo_urls": [],
+      "created_at": "2026-05-09T09:15:00.000Z"
+    },
+    {
+      "id": "c16",
+      "contributor_name": "Laura Petit",
+      "role": "Alternante 2022-2024, aujourd'hui en poste",
+      "message": "J'ai fait une grosse erreur pendant mon alternance, j'ai envoyé un devis avec le mauvais tarif à un gros client. Je m'en suis rendu compte le soir, chez moi, à vingt-deux heures. J'ai appelé Martine sur son portable en pleurant. Elle m'a dit de dormir et qu'on verrait le lendemain. Le matin elle avait déjà rappelé le client et négocié. Elle m'a juste dit « maintenant tu relis deux fois, ma grande ». Elle n'en a jamais parlé à personne, j'en suis sûre, parce que personne ne m'a jamais taquinée là-dessus.",
+      "photo_urls": [],
+      "created_at": "2026-05-09T14:20:00.000Z"
+    },
+    {
+      "id": "c17",
+      "contributor_name": "Didier Marchand",
+      "role": "Ancien DRH — 1998 à 2016",
+      "message": "En 2014 on a eu un plan social, onze postes supprimés. C'est la période la plus dure que j'ai vécue ici. Martine a demandé à recevoir elle-même les gens concernés, avant les entretiens officiels. Je n'étais pas d'accord au début, ce n'était pas son rôle et je craignais qu'elle promette des choses. Elle n'a rien promis. Elle a juste fait en sorte que personne n'apprenne la nouvelle par un courrier. Sur les onze, huit m'ont dit après coup que ça avait changé la façon dont ils avaient vécu les choses.",
+      "photo_urls": [],
+      "created_at": "2026-05-10T10:30:00.000Z"
+    },
+    {
+      "id": "c18",
+      "contributor_name": "Sophie Delattre",
+      "role": "Marketing",
+      "message": "Le géranium. Il faut parler du géranium. Il est sur le coin de son bureau depuis que je suis arrivée en 2010, et je crois qu'il était déjà là avant. Elle l'a sauvé trois fois. Une fois pendant les congés d'août quand personne n'avait pensé à l'arroser, elle est venue exprès un dimanche. Je l'ai su parce que le badge enregistre les entrées.",
+      "photo_urls": ["https://cdn.demo/geranium.jpg"],
+      "created_at": "2026-05-10T16:45:00.000Z"
+    },
+    {
+      "id": "c19",
+      "contributor_name": "Yannick Hocq",
+      "role": "Chauffeur-livreur",
+      "message": "Je fais la tournée depuis quatorze ans. Quand je rentrais tard, il y avait toujours de la lumière dans son bureau et elle me demandait si tout s'était bien passé. Elle notait mes retards mais pas pour me les reprocher, pour me couvrir si un client se plaignait. Elle avait des tomates dans son jardin, elle en apportait des cageots en août. Elles étaient bonnes.",
+      "photo_urls": [],
+      "created_at": "2026-05-11T07:30:00.000Z"
+    },
+    {
+      "id": "c20",
+      "contributor_name": "Amandine Legrand",
+      "role": "Accueil — a repris le standard en 2019",
+      "message": "J'ai pris sa suite au standard et c'est un cadeau empoisonné. Les gens décrochent et disent « Martine ? » avant que j'aie fini ma phrase. Elle m'a laissé une double page dans son carnet avec les habitudes des vingt principaux clients : celui qui déteste qu'on l'appelle avant dix heures, celle dont le mari a été malade, celui qu'il faut appeler Monsieur et pas par son prénom. Ce n'est écrit nulle part ailleurs. Aucun logiciel ne contient ça.",
+      "photo_urls": ["https://cdn.demo/double-page-carnet.jpg"],
+      "created_at": "2026-05-11T13:00:00.000Z"
+    },
+    {
+      "id": "c21",
+      "contributor_name": "Serge Dhaene",
+      "role": "Délégué syndical",
+      "message": "On n'était pas toujours d'accord, elle et moi. Elle trouvait que je montais les choses en épingle, je trouvais qu'elle arrondissait trop les angles. On s'est engueulés deux ou trois fois pour de vrai. Mais je n'ai jamais douté qu'elle était du côté des gens. En 2014 elle a fait plus pour les onze qui partaient que certains qui avaient des mandats. Je le dis d'autant plus volontiers que ça m'a agacé sur le moment.",
+      "photo_urls": [],
+      "created_at": "2026-05-12T09:00:00.000Z"
+    },
+    {
+      "id": "c22",
+      "contributor_name": "Céline Bonnet",
+      "role": "Comptabilité",
+      "message": "Elle avait un rituel : à 16h30 elle faisait le tour des bureaux avec la corbeille du courrier, alors qu'on avait tous une bannette. C'était un prétexte, évidemment. C'était sa façon de voir tout le monde une fois par jour et de repérer qui n'allait pas bien. On appelait ça « la tournée ». Le jour où elle ne l'a pas faite, on a tous compris qu'elle avait quelque chose.",
+      "photo_urls": [],
+      "created_at": "2026-05-12T15:10:00.000Z"
+    },
+    {
+      "id": "c23",
+      "contributor_name": "Rachid Amrani",
+      "role": "Magasinier",
+      "message": "Elle m'a aidé à remplir mes papiers pour la naturalisation. Ça a pris deux ans et elle a relu chaque dossier. Elle a même appelé la préfecture une fois. Je ne lui avais rien demandé, elle avait vu que j'étais inquiet. Le jour où je l'ai eue, je lui ai apporté des gâteaux et elle a pleuré. C'est la seule fois où je l'ai vue pleurer.",
+      "photo_urls": [],
+      "created_at": "2026-05-13T08:20:00.000Z"
+    },
+    {
+      "id": "c24",
+      "contributor_name": "Valérie Top",
+      "role": "Ancienne collègue — partie en 2008",
+      "message": "Je n'ai travaillé que six ans avec Martine mais on s'appelle encore. Ce qui me revient, c'est le début des années 90, quand le standard était encore avec les fiches cartonnées. Elle avait inventé un système de couleurs que personne n'a jamais réussi à reproduire après elle. Rouge pour les urgents, vert pour les habitués, jaune je ne sais plus.",
+      "photo_urls": [],
+      "created_at": "2026-05-13T17:00:00.000Z"
+    },
+    {
+      "id": "c25",
+      "contributor_name": "Pierre-Yves Caron",
+      "role": "Informatique",
+      "message": "En 2017 on a migré le CRM et j'ai passé trois jours à récupérer les données. Martine est venue me voir avec son carnet et elle a corrigé une centaine de fiches clients à la main, parce que les numéros dans l'ancien système étaient faux. Je lui ai dit qu'on aurait pu s'en passer, elle m'a répondu qu'un client qui tombe sur un mauvais numéro ne rappelle pas. Elle avait raison, et ça m'a servi de leçon pour toutes les migrations suivantes.",
+      "photo_urls": [],
+      "created_at": "2026-05-14T11:30:00.000Z"
+    }
+  ],
+  "_pieges_volontaires": {
+    "contradiction_date_arrivee": "c01 dit 1993, c06 dit 1994, c24 dit 'début des années 90'",
+    "contradiction_patisserie": "c02 tarte au sucre, c05 gaufres — deux faits compatibles, ne pas fusionner en un seul",
+    "contradiction_date_incendie": "c09 dit 2009, c11 dit 'une quinzaine d'années' (soit ~2011)",
+    "contradiction_couleur_carnet": "c02 rouge (celui de Martine), c10 noir (celui offert à Émilie) — faux conflit, deux objets distincts",
+    "piege_attribution": "c03 Kevin (plaque offset cassée, 2011) et c16 Laura (devis au mauvais tarif, 2022) : deux sauvetages distincts, à ne pas mélanger",
+    "surnoms": "Martine / Madame Lévêque (c08) / 'mon grand' et 'ma grande' sont ses mots à ELLE, pas des surnoms qu'on lui donne",
+    "contribution_pauvre": "c13 — 9 mots, aucun fait exploitable",
+    "personne_hors_registre_a_ne_pas_inventer": "Malo (petit-fils) apparaît uniquement dans la config, jamais dans un témoignage"
+  }
+}

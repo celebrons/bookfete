@@ -13,12 +13,4 @@ router.post('/request-revision', authenticate, inviteController.requestRevision)
 router.get('/token/:token', inviteController.checkInviteToken);
 router.post('/token/:token', inviteController.useInviteToken);
 
-if (typeof inviteController.debugSimple === 'function') {
-  router.get('/debug', inviteController.debugSimple);
-}
-
-if (typeof inviteController.debugInvites === 'function') {
-  router.get('/debug/:token', inviteController.debugInvites);
-}
-
 module.exports = router;

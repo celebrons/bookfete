@@ -1,0 +1,212 @@
+{
+  "_readme": "ETAPE E - Chapitres generes. 1 appel Mistral par chapitre. Le prompt ne recoit QUE : l'objectif du chapitre, les contributions assignees par le plan, les faits autorises, les citations autorisees, les verrous d'attribution et la liste des interdits. Chaque paragraphe porte ses sources : c'est ce qui rend le controle de l'etape F possible.",
+  "book_id": "demo-pot-depart-1",
+  "plan_version": 1,
+  "model": "mistral-small-latest",
+  "_note": "Trois chapitres sur six sont rediges ici (4, 5, 6) plus les textes de cadre. Les chapitres 1 a 3 suivent la meme structure.",
+
+  "introduction": {
+    "paragraphs": [
+      {
+        "text": "Vingt-cinq personnes ont écrit dans ce livre. Un directeur général et un agent d'entretien, un cariste et une cliente, des collègues de bureau, un délégué syndical, une alternante arrivée il y a quatre ans et une ancienne collègue partie en 2008. Ils ne se connaissent pas tous. Certains n'ont travaillé ni aux mêmes étages, ni aux mêmes décennies.",
+        "sources": ["registre global", "c01", "c08", "c05", "c14", "c16", "c21", "c24"]
+      },
+      {
+        "text": "Il y a pourtant un objet qui revient dans presque tous leurs textes, et c'est un objet dérisoire : un carnet à spirale rouge, posé sur un bureau, à côté d'un géranium. Pendant trente-deux ans, Martine Lévêque y a noté ce qu'aucun système informatique de Sograph n'a jamais su retenir — les prénoms des enfants des clients, celui qu'il ne faut pas appeler avant dix heures, celle dont le mari a été malade.",
+        "sources": ["c02", "c18", "c06", "c20"]
+      },
+      {
+        "text": "Ce livre n'a rien inventé. Il a seulement mis côte à côte vingt-cinq façons de raconter la même personne, et laissé apparaître ce qu'elles avaient en commun.",
+        "sources": ["registre global"]
+      }
+    ],
+    "word_count": 158
+  },
+
+  "chapters": [
+    {
+      "order_index": 4,
+      "title": "Mon grand, ma grande",
+      "sections": {
+        "ouverture": [
+          {
+            "text": "Il y a des gens dont on se souvient pour ce qu'ils ont dit. De Martine Lévêque, quatre personnes se souviennent surtout de ce qu'elle n'a pas dit — des erreurs qu'elle a couvertes, des bêtises qui ne sont jamais remontées, des choses restées entre elle et celui qui les avait faites. Elle appelait les plus jeunes « mon grand » et « ma grande », et pendant trente-deux ans elle a considéré qu'un débutant qui casse quelque chose est d'abord quelqu'un qu'on n'a pas assez prévenu.",
+            "sources": ["c03", "c07", "c16", "c19"],
+            "quotes_used": ["q-mon-grand", "q-relis"]
+          }
+        ],
+        "corps": [
+          {
+            "text": "Kevin Dubois avait dix-sept ans quand il est arrivé en apprentissage, en 2011. Sa première semaine, il a cassé une plaque offset. Une plaque neuve. Il raconte qu'il a voulu partir en courant, et qu'il serait parti si elle ne l'avait pas arrêté dans le couloir. Elle lui a dit : « viens, on va s'arranger. » Puis elle l'a emmené chez Bernard Wattel, le chef d'atelier, et là elle a expliqué que la faute était la sienne : elle avait envoyé le garçon à l'atelier sans prévenir personne. C'était faux. Kevin le savait, il était à côté d'elle, et il n'a rien dit. Il est aujourd'hui chef d'atelier à son tour, avec des hommes sous ses ordres, et elle a continué à l'appeler « mon grand » jusqu'à la fin.",
+            "sources": ["c03"],
+            "anecdote": "a-c03-1",
+            "quotes_used": ["q-arranger", "q-mon-grand"],
+            "attribution_lock_respected": "a-c03-1 → Kevin Dubois, plaque offset, 2011"
+          },
+          {
+            "text": "Huit ans plus tard, Thomas Leroy est arrivé un matin de 2019 sans que personne l'attende vraiment : son manager était en déplacement. C'est elle qui l'a installé, qui lui a fait le tour des bureaux et qui l'a présenté à une quarantaine de personnes en resituant, pour chacune, ce qu'elle faisait exactement. À midi elle lui a dit de ne pas manger seul et elle l'a assis à la table de la comptabilité. Sept ans après, il y déjeune encore.",
+            "sources": ["c07"],
+            "anecdote": "a-c07-1"
+          },
+          {
+            "text": "L'histoire de Laura Petit est arrivée bien plus tard, pendant son alternance, et elle ressemble à celle de Kevin sans être la même. Laura avait envoyé un devis avec le mauvais tarif à un gros client. Elle s'en est aperçue le soir, chez elle, à vingt-deux heures. Elle a appelé Martine sur son portable en pleurant. Martine lui a dit d'aller dormir et qu'on verrait le lendemain. Le lendemain matin, le client avait déjà été rappelé et la chose négociée. Laura n'a eu droit qu'à une phrase : « maintenant tu relis deux fois, ma grande. » Personne, dans l'entreprise, ne l'a jamais taquinée là-dessus — et c'est ainsi qu'elle sait, aujourd'hui encore, que Martine n'en a parlé à personne.",
+            "sources": ["c16"],
+            "anecdote": "a-c16-1",
+            "quotes_used": ["q-relis"],
+            "attribution_lock_respected": "a-c16-1 → Laura Petit, devis au mauvais tarif, alternance"
+          },
+          {
+            "text": "Il y avait une méthode là-dedans, et Karine Lefebvre en a identifié le ressort : Martine arrivait à dire à quelqu'un qu'il avait fait une bêtise sans que celui-ci se sente idiot. Elle commençait toujours par une question. Jamais par un reproche.",
+            "sources": ["c12"]
+          },
+          {
+            "text": "La même attention s'exerçait sur des gens qui n'étaient plus des débutants. Yannick Hocq fait la tournée de livraison depuis quatorze ans. Quand il rentrait tard, il y avait de la lumière dans son bureau et elle lui demandait si tout s'était bien passé. Elle notait ses retards ; il a longtemps cru que c'était pour les lui reprocher. C'était pour pouvoir le couvrir si un client se plaignait.",
+            "sources": ["c19"],
+            "anecdote": "a-c19-1"
+          }
+        ],
+        "coda": [
+          {
+            "text": "Aucun de ces épisodes n'a laissé de trace écrite. Ni la plaque de 2011, ni le devis de l'alternance, ni les retards de tournée. C'est précisément ce qu'ils ont en commun : ils n'existent que dans la mémoire de ceux qu'elle a protégés, et il a fallu ce livre pour qu'ils se retrouvent sur la même page.",
+            "sources": ["c03", "c16", "c19"]
+          }
+        ]
+      },
+      "word_count": 612,
+      "sources_used": ["c03", "c07", "c12", "c16", "c19"],
+      "anecdotes_used": ["a-c03-1", "a-c07-1", "a-c16-1", "a-c19-1"],
+      "coverage": "4/4 anecdotes assignees utilisees, 5/5 contributions assignees utilisees"
+    },
+
+    {
+      "order_index": 5,
+      "title": "Les années où il a fallu tenir",
+      "sections": {
+        "ouverture": [
+          {
+            "text": "Un livre de départ à la retraite a une pente naturelle : celle de l'éloge. Deux des vingt-cinq témoignages refusent de la suivre, et c'est peut-être à ceux-là qu'il faut donner raison, parce qu'ils décrivent une femme et non une statue.",
+            "sources": ["c17", "c21"]
+          }
+        ],
+        "corps": [
+          {
+            "text": "L'incendie du magasin de papier, en 2009, a détruit le stock d'une nuit. Patrick Nowak, à la maintenance, se souvient d'elle le soir même, en bottes, occupée à faire l'inventaire de ce qui restait jusqu'à vingt-trois heures. Rien ne l'y obligeait : ce n'était pas son travail, et personne ne le lui avait demandé.",
+            "sources": ["c09", "c11"],
+            "anecdote": "a-c11-1",
+            "conflict_resolution_applied": "cf-2 : date 2009 retenue (c09 explicite) contre « une quinzaine d'années » (c11 approximatif)"
+          },
+          {
+            "text": "Le lendemain matin, Bernard Wattel l'a trouvée à son bureau à six heures et demie. Elle avait sorti son carnet et elle appelait les clients un par un pour décaler les livraisons. Le directeur n'était pas encore arrivé. Ce qui a frappé Bernard, c'est sa voix : normale, exactement la même que d'habitude, comme si rien ne s'était passé. Entre deux appels, elle disait aux autres d'aller boire un café. « On était tous secoués sauf elle », dit-il. Puis il ajoute : « Ou elle le cachait bien. »",
+            "sources": ["c09"],
+            "anecdote": "a-c09-1",
+            "conflict_resolution_applied": "cf-2 : c11 (soir) et c09 (lendemain) fusionnes en une sequence chronologique unique — le meme evenement, pas deux"
+          },
+          {
+            "text": "En 2014, l'entreprise a supprimé onze postes. Didier Marchand, alors directeur des ressources humaines, décrit cette période comme la plus dure de sa carrière chez Sograph. Martine a demandé à recevoir elle-même les onze personnes concernées, avant les entretiens officiels. Il n'était pas d'accord. Ce n'était pas son rôle, et il craignait qu'elle promette des choses qu'elle ne pourrait pas tenir. Elle n'a rien promis. Elle a seulement fait en sorte que personne n'apprenne la nouvelle par un courrier. Huit des onze le lui ont dit ensuite : cela avait changé la manière dont ils avaient traversé les choses.",
+            "sources": ["c17"],
+            "anecdote": "a-c17-1"
+          },
+          {
+            "text": "Serge Dhaene, délégué syndical, n'a pas la même lecture, et il tient à ce qu'elle soit écrite. Il l'a trouvée trop conciliante pendant des années ; elle le trouvait excessif. Ils se sont vraiment disputés, deux ou trois fois, et pas pour la forme. Il n'a jamais douté pour autant qu'elle était du côté des salariés, et il reconnaît qu'en 2014 elle a fait pour les onze qui partaient davantage que certains qui en avaient le mandat. Il précise qu'il le dit d'autant plus volontiers que cela l'avait agacé sur le moment.",
+            "sources": ["c21"],
+            "anecdote": "a-c21-1",
+            "objective_check": "Desaccord conserve sans lissage, conformement a l'objectif du chapitre"
+          },
+          {
+            "text": "Il y a enfin les crises minuscules, celles qui ne concernent qu'une seule personne. Isabelle Vandenbossche, cliente pendant vingt-deux ans, a appelé un 24 décembre pour un tirage qui devait partir le 26. L'erreur venait d'elle, pas de Sograph. Martine l'a rappelée quarante minutes plus tard pour dire que c'était réglé. Isabelle n'a jamais su comment, et n'a jamais osé demander qui avait été dérangé un soir de réveillon.",
+            "sources": ["c14"],
+            "anecdote": "a-c14-1",
+            "constraint_respected": "Aucune annee mentionnee pour le 24 decembre — l'annee est inconnue"
+          }
+        ],
+        "coda": [
+          {
+            "text": "Ces épisodes ne disent pas qu'elle était infaillible. Ils disent qu'elle arrivait la première et repartait la dernière quand les choses allaient mal, et qu'elle a préféré, chaque fois, que la mauvaise nouvelle soit portée par une voix plutôt que par une enveloppe.",
+            "sources": ["c09", "c11", "c17"]
+          }
+        ]
+      },
+      "word_count": 655,
+      "sources_used": ["c09", "c11", "c14", "c17", "c21"],
+      "anecdotes_used": ["a-c09-1", "a-c11-1", "a-c14-1", "a-c17-1", "a-c21-1"],
+      "coverage": "5/5 anecdotes assignees, 5/5 contributions assignees"
+    },
+
+    {
+      "order_index": 6,
+      "title": "Personne ne connaît mon prénom",
+      "sections": {
+        "ouverture": [
+          {
+            "text": "Il y a dans une entreprise des gens jusqu'auxquels l'organigramme ne descend pas. Fatou Diallo nettoyait les bureaux de Sograph. La première chose qu'elle a voulu dire de Martine Lévêque, c'est que Martine lui disait bonjour en l'appelant par son prénom.",
+            "sources": ["c08"]
+          }
+        ],
+        "corps": [
+          {
+            "text": "Elle ajoute aussitôt, comme pour s'excuser d'avoir si peu à raconter, que cela peut paraître peu de chose. Puis elle explique : dans beaucoup d'endroits où elle a travaillé, personne ne connaissait son prénom. Il y a aussi les mots laissés sur le bureau quand Martine avait renversé du café, pour prévenir, pour que le nettoyage du lendemain ne soit pas une surprise. Et il y a ce jour où Martine a demandé que les horaires de Fatou soient modifiés, afin qu'elle puisse récupérer son fils à l'école. Fatou ne dit pas si elle avait demandé quelque chose. Elle dit : « Ça a été fait. »",
+            "sources": ["c08"],
+            "anecdote": "a-c08-1, a-c08-2",
+            "constraint_respected": "Le prenom du fils n'est jamais donne — aucun temoignage ne le fournit"
+          },
+          {
+            "text": "Le même mécanisme a joué pour Rachid Amrani, magasinier. Il montait un dossier de naturalisation. Il n'en avait parlé à personne et il n'avait rien demandé ; elle avait simplement vu qu'il était inquiet. Le dossier a pris deux ans. Elle a relu chaque pièce. Elle a appelé la préfecture au moins une fois. Le jour où il a obtenu la nationalité, il est venu avec des gâteaux, et elle a pleuré. C'est la seule fois, dans les vingt-cinq témoignages de ce livre, où quelqu'un rapporte l'avoir vue pleurer.",
+            "sources": ["c23"],
+            "anecdote": "a-c23-1",
+            "constraint_respected": "Aucune date pour la naturalisation — le registre indique SANS_DATE"
+          },
+          {
+            "text": "Ahmed Benali travaille au quai depuis vingt ans et monte rarement dans les bureaux. Il passait quand même dire bonjour chaque matin. Elle savait que sa fille faisait de la danse et elle demandait des nouvelles des galas. Et quand il fallait comparer les bureaux et le quai, elle disait aux caristes que c'étaient eux qui travaillaient le plus dur.",
+            "sources": ["c05"],
+            "constraint_respected": "Le prenom de la fille d'Ahmed n'est jamais donne"
+          },
+          {
+            "text": "Rien de tout cela ne figurait dans sa fiche de poste. Sylvie Meunier, aux ressources humaines, l'a compris avant les autres : officiellement, Martine n'a jamais fait partie des RH ; en pratique elle en faisait la moitié. Les gens passaient la voir avant de venir frapper à la porte du service. Quand on la taquinait là-dessus, elle répondait qu'elle ne faisait qu'écouter. Sylvie le dit sans détour : ce n'est pas vrai. Elle orientait, elle temporisait, elle réglait des situations avant qu'elles ne deviennent des dossiers. Personne ne saura jamais combien de conflits ne sont pas arrivés jusqu'au bureau des ressources humaines.",
+            "sources": ["c04"]
+          }
+        ],
+        "coda": [
+          {
+            "text": "Trente-deux ans à ce poste, et voilà ce qui en reste : un agent d'entretien qui se souvient qu'on l'appelait par son prénom, un magasinier qui a une nationalité, un cariste dont la fille dansait. Aucun de ces trois-là n'apparaissait dans les indicateurs de l'entreprise.",
+            "sources": ["c08", "c23", "c05"]
+          }
+        ]
+      },
+      "word_count": 548,
+      "sources_used": ["c04", "c05", "c08", "c23"],
+      "anecdotes_used": ["a-c08-1", "a-c08-2", "a-c23-1"],
+      "coverage": "3/3 anecdotes assignees, 4/4 contributions assignees"
+    }
+  ],
+
+  "conclusion": {
+    "paragraphs": [
+      {
+        "text": "Amandine Legrand a repris le standard en 2019. Elle dit que c'est un cadeau empoisonné : les correspondants décrochent et demandent « Martine ? » avant qu'elle ait fini sa phrase. Martine lui a laissé une double page de son carnet, avec les habitudes des vingt principaux clients. Ce document n'existe nulle part ailleurs, et aucun logiciel de l'entreprise ne le contient.",
+        "sources": ["c20"],
+        "anecdote": "a-c20-1"
+      },
+      {
+        "text": "Il reste maintenant un jardin, des tomates qui n'auront plus à voyager jusqu'à Tourcoing au mois d'août, et un petit-fils qui s'appelle Malo et qui va grandir sous les yeux de sa grand-mère.",
+        "sources": ["c19", "book_configs.retirement_project"],
+        "_note": "Malo provient de la configuration du livre, jamais d'un temoignage. Le plan autorise sa mention UNIQUEMENT ici."
+      },
+      {
+        "text": "Vingt-cinq personnes ont voulu écrire. C'est peu, à l'échelle des trente-deux années. C'est beaucoup, pour un poste dont la fiche disait « standardiste ».",
+        "sources": ["registre global"]
+      }
+    ],
+    "word_count": 152
+  },
+
+  "_stats": {
+    "chapitres_rediges_ici": 3,
+    "appels_mistral_pour_ces_3_chapitres": 3,
+    "appels_pour_les_textes_de_cadre": 2,
+    "mots_generes": 2125,
+    "paragraphes": 20,
+    "paragraphes_sans_source": 0,
+    "contributions_citees_ou_utilisees": 17,
+    "anecdotes_reutilisees_dans_deux_chapitres": 0
+  }
+}

@@ -19,6 +19,68 @@ const {
   publishInlineChapterAmorcePrompt
 } = require('../services/chapterAmorcePromptAdminService');
 
+async function getBookOwnerId(bookId) {
+  const { data, error } = await supabase
+    .from('books')
+    .select('owner_id')
+    .eq('id', bookId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.owner_id;
+}
+
+async function getChapterBookId(chapterId) {
+  const { data, error } = await supabase
+    .from('chapters')
+    .select('book_id')
+    .eq('id', chapterId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.book_id;
+}
+
+// Verifie que le livre du body appartient a l'utilisateur authentifie.
+async function requireOwnedBookFromBody(req, res, next) {
+  const bookId = req.body?.book_id;
+  if (!bookId) {
+    return res.status(400).json({ error: 'book_id requis.' });
+  }
+
+  const ownerId = await getBookOwnerId(bookId);
+  if (!ownerId) {
+    return res.status(404).json({ error: 'Livre introuvable.' });
+  }
+
+  if (ownerId !== req.user.id) {
+    return res.status(403).json({ error: 'Acces refuse.' });
+  }
+
+  return next();
+}
+
+// Verifie que le chapitre cible appartient (via son livre) a l'utilisateur authentifie.
+async function requireOwnedChapter(req, res, next) {
+  const bookId = await getChapterBookId(req.params.id);
+  if (!bookId) {
+    return res.status(404).json({ error: 'Chapitre introuvable.' });
+  }
+
+  const ownerId = await getBookOwnerId(bookId);
+  if (!ownerId || ownerId !== req.user.id) {
+    return res.status(403).json({ error: 'Acces refuse.' });
+  }
+
+  return next();
+}
+
 function ensurePromptAdmin(req, res, next) {
   const allowListRaw = process.env.AI_PROMPT_ADMIN_EMAILS || '';
   const allowList = allowListRaw
@@ -60,7 +122,7 @@ router.get('/book/:bookId', authenticate, async (req, res) => {
 });
 
 // POST /api/chapters - Créer un chapitre
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireOwnedBookFromBody, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('chapters')
@@ -323,7 +385,7 @@ router.post('/:id/prompt-admin/chapter-amorce/publish', authenticate, ensureProm
   }
 });
 
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, requireOwnedChapter, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('chapters')
@@ -340,7 +402,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/chapters/:id - Supprimer un chapitre
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireOwnedChapter, async (req, res) => {
   try {
     const { error } = await supabase
       .from('chapters')
