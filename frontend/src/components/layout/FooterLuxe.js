@@ -115,6 +115,8 @@ const FooterLuxe = () => {
         }}>
           <span className="body-text" style={{ fontSize: '12px', color: 'var(--text-light)' }}>
             © {new Date().getFullYear()} Célébrons. Tous droits réservés.
+            {' '}
+            <span style={{ color: 'var(--gold)' }}>· build test-deploy</span>
           </span>
           <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
             {['Instagram', 'Pinterest'].map(social => (
