@@ -17,7 +17,6 @@ import RegisterLuxe from './components/auth/RegisterLuxe';
 import CreateBookLuxe from './components/create-book/CreateBookLuxe';
 import DashboardGeneralLuxe from './components/dashboard/DashboardGeneralLuxe';
 import BookPageLuxe  from './components/book/BookPageLuxe';
-import PromptJourneyLabLuxe from './components/admin/PromptJourneyLabLuxe';
 import InvitationPageLuxe from './components/contributeur/InvitationPageLuxe';
 import TokenContributePageLuxe from './components/contributeur/TokenContributePageLuxe';
 import AccountSpaceLuxe from './components/account/AccountSpaceLuxe';
@@ -119,18 +118,6 @@ function App() {
           <Route path="/account" element={
             <ProtectedRoute>
               <AccountSpaceLuxe />
-            </ProtectedRoute>
-          } />
-
-          <Route path="/admin/prompts" element={
-            <ProtectedRoute>
-              <PromptJourneyLabLuxe />
-            </ProtectedRoute>
-          } />
-
-          <Route path="/admin/prompts/journey" element={
-            <ProtectedRoute>
-              <Navigate to="/admin/prompts" replace />
             </ProtectedRoute>
           } />
 
