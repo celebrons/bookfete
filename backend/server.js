@@ -33,6 +33,8 @@ const bookRoutes = require('./routes/books');
 const chapterRoutes = require('./routes/chapters');
 const inviteRoutes = require('./routes/invites');
 const aiRoutes = require('./routes/ai');
+const compositionRoutes = require('./routes/composition');
+const productRoutes = require('./routes/products');
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
@@ -57,6 +59,8 @@ app.use('/api/chapters', chapterRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/', compositionRoutes);
+app.use('/', productRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
