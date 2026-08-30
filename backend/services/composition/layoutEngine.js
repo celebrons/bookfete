@@ -20,6 +20,9 @@
 const DEFAULT_SLOTS_PER_PAGE = 3;
 const DEFAULT_FIXED_PAGES = 2; // garde + page de titre (la couverture est un document a part)
 const TEXT_CHARS_PER_SLOT = 400;
+// Paliers retenus (§ decisions de l'artefact), memes valeurs que le seed de
+// backend/sql/phase03_data_model.sql (book_products.page_count).
+const PAGE_COUNT_TIERS = [24, 32, 40, 48, 60];
 
 function clampInt(value, fallback) {
   const n = Number.parseInt(value, 10);
@@ -68,6 +71,43 @@ function groupIntoBlocks(items) {
   const blocks = [...byContribution.values(), ...standaloneBlocks];
   blocks.sort((a, b) => (a.order - b.order) || String(a.key).localeCompare(String(b.key)));
   return blocks;
+}
+
+// --- Mode Automatique : recommandation de palier a partir du contenu reel --
+// Meme fonction utilisee dans les deux modes (§06 de l'artefact) : en
+// Automatique elle propose le palier par defaut, en Manuel elle sert juste a
+// avertir si le palier choisi est trop juste ou trop large pour le contenu.
+
+// Estime le nombre de pages necessaires pour un contenu donne, a la densite
+// d'un template (ou la densite par defaut si aucun template n'est encore
+// choisi). Ne construit pas les pages elles-memes (voir compose()) : c'est
+// une simple division poids-total / slots-par-page, arrondie au palier
+// superieur le plus proche.
+function estimatePageCount(items, { fixedPages, slotsPerPage } = {}) {
+  const blocks = groupIntoBlocks(items);
+  const totalWeight = blocks.reduce((sum, block) => sum + block.weight, 0);
+  const resolvedSlotsPerPage = clampInt(slotsPerPage, DEFAULT_SLOTS_PER_PAGE);
+  const resolvedFixedPages = clampInt(fixedPages, DEFAULT_FIXED_PAGES);
+  const contentPages = totalWeight === 0 ? 0 : Math.ceil(totalWeight / resolvedSlotsPerPage);
+  return resolvedFixedPages + contentPages;
+}
+
+/**
+ * @param {object} input
+ * @param {Array} input.items - book_content_items du livre
+ * @param {object} [input.template] - book_templates row (pour la densite ; optionnel)
+ * @param {number} [input.fixedPages]
+ * @returns {{ recommended: number, estimatedPages: number, tiers: Array<{pageCount:number, fits:boolean}> }}
+ */
+function recommendPageCount(input = {}) {
+  const items = Array.isArray(input.items) ? input.items : [];
+  const slotsPerPage = input.template?.design_tokens?.slotsPerPage;
+  const estimatedPages = estimatePageCount(items, { fixedPages: input.fixedPages, slotsPerPage });
+
+  const recommended = PAGE_COUNT_TIERS.find((tier) => tier >= estimatedPages) || PAGE_COUNT_TIERS[PAGE_COUNT_TIERS.length - 1];
+  const tiers = PAGE_COUNT_TIERS.map((pageCount) => ({ pageCount, fits: pageCount >= estimatedPages }));
+
+  return { recommended, estimatedPages, tiers };
 }
 
 // --- 4. Choix du layout : PRNG deterministe pour departager les candidats --
@@ -216,6 +256,8 @@ module.exports = {
   compose,
   weightOfItem,
   groupIntoBlocks,
+  recommendPageCount,
   DEFAULT_SLOTS_PER_PAGE,
-  DEFAULT_FIXED_PAGES
+  DEFAULT_FIXED_PAGES,
+  PAGE_COUNT_TIERS
 };

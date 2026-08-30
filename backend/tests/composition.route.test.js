@@ -48,6 +48,15 @@ jest.mock('../config/supabase', () => {
   return mock;
 });
 
+jest.mock('../services/composition/pdfService', () => ({
+  resolveBrowserPath: jest.fn(() => '/fake/chrome'),
+  renderPdfFromHtml: jest.fn(async () => require('path').join(__dirname, 'fixtures', 'fake.pdf'))
+}));
+
+jest.mock('../services/storageService', () => ({
+  uploadFile: jest.fn(async () => ({ success: true, url: 'https://cdn.test/uploaded.jpg', fileName: 'book-test-1/uploaded.jpg' }))
+}));
+
 const express = require('express');
 const request = require('supertest');
 
@@ -125,6 +134,52 @@ describe('routes/composition', () => {
     });
   });
 
+  describe('POST /api/books/:bookId/content-items/photo', () => {
+    it('uploade une photo et cree le content-item', async () => {
+      const response = await request(app)
+        .post(`/api/books/${BOOK_ID}/content-items/photo`)
+        .set('Authorization', 'Bearer valid-token')
+        .attach('photo', Buffer.from('fake-image-bytes'), 'souvenir.jpg');
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        book_id: BOOK_ID,
+        kind: 'photo',
+        url: 'https://cdn.test/uploaded.jpg'
+      });
+
+      const storageService = require('../services/storageService');
+      expect(storageService.uploadFile).toHaveBeenCalledWith('contribution-photos', expect.anything(), BOOK_ID);
+    });
+
+    it('refuse sans fichier joint', async () => {
+      const response = await request(app)
+        .post(`/api/books/${BOOK_ID}/content-items/photo`)
+        .set('Authorization', 'Bearer valid-token');
+      expect(response.status).toBe(400);
+    });
+
+    it("refuse l'upload sur le livre d'un autre proprietaire", async () => {
+      const response = await request(app)
+        .post(`/api/books/${OTHER_BOOK_ID}/content-items/photo`)
+        .set('Authorization', 'Bearer valid-token')
+        .attach('photo', Buffer.from('fake-image-bytes'), 'souvenir.jpg');
+      expect(response.status).toBe(403);
+    });
+  });
+
+  describe('GET /api/books/:bookId/recommended-page-count', () => {
+    it('recommande un palier a partir du contenu du livre', async () => {
+      const response = await request(app)
+        .get(`/api/books/${BOOK_ID}/recommended-page-count`)
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      expect(typeof response.body.recommended).toBe('number');
+      expect(Array.isArray(response.body.tiers)).toBe(true);
+    });
+  });
+
   describe('POST /api/books/:bookId/compose', () => {
     it('refuse si le livre n\'a pas de template', async () => {
       // livre sans template_id/page_count dans les fixtures du mock
@@ -145,6 +200,37 @@ describe('routes/composition', () => {
       expect(Array.isArray(response.body.pages)).toBe(true);
       expect(response.body.pages.length).toBeGreaterThan(0);
       expect(response.body.overflow).toBe(false);
+    });
+  });
+
+  describe('apercu (preview.html / preview.pdf)', () => {
+    it('GET preview.html renvoie un document HTML autonome sans dependance externe', async () => {
+      const response = await request(app)
+        .get(`/api/books/${BOOK_ID}/preview.html`)
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/html');
+      expect(response.text).toContain('<!doctype html>');
+    });
+
+    it("refuse l'apercu HTML du livre d'un autre proprietaire", async () => {
+      const response = await request(app)
+        .get(`/api/books/${OTHER_BOOK_ID}/preview.html`)
+        .set('Authorization', 'Bearer valid-token');
+      expect(response.status).toBe(403);
+    });
+
+    it('GET preview.pdf delegue a pdfService et renvoie un PDF', async () => {
+      const response = await request(app)
+        .get(`/api/books/${BOOK_ID}/preview.pdf`)
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toBe('application/pdf');
+
+      const pdfService = require('../services/composition/pdfService');
+      expect(pdfService.renderPdfFromHtml).toHaveBeenCalled();
     });
   });
 });

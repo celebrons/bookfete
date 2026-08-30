@@ -3,7 +3,7 @@
 // regroupement par contribution. Trois profils de livre, comme prevu par
 // le plan de developpement (livre pauvre / riche / mix photos-texte).
 
-const { compose, weightOfItem, groupIntoBlocks } = require('../../services/composition/layoutEngine');
+const { compose, weightOfItem, groupIntoBlocks, recommendPageCount, PAGE_COUNT_TIERS } = require('../../services/composition/layoutEngine');
 
 const TEMPLATE = {
   id: 'tpl-elegance',
@@ -133,5 +133,36 @@ describe('weightOfItem', () => {
   it('un texte pese au moins 1 slot, et davantage s\'il est long', () => {
     expect(weightOfItem({ kind: 'texte', text: 'court' })).toBe(1);
     expect(weightOfItem({ kind: 'texte', text: 'x'.repeat(900) })).toBe(3);
+  });
+});
+
+describe('recommendPageCount — mode Automatique', () => {
+  it('recommande le plus petit palier pour un livre pauvre en contenu', () => {
+    const items = [photoItem('p1', 0), photoItem('p2', 1)];
+    const { recommended, tiers } = recommendPageCount({ items, template: TEMPLATE });
+
+    expect(recommended).toBe(PAGE_COUNT_TIERS[0]);
+    expect(tiers.every((tier) => tier.fits)).toBe(true);
+  });
+
+  it('recommande un palier plus grand quand le contenu est plus volumineux', () => {
+    const fewItems = Array.from({ length: 3 }, (_, i) => photoItem(`p${i}`, i));
+    const manyItems = Array.from({ length: 120 }, (_, i) => photoItem(`p${i}`, i));
+
+    const small = recommendPageCount({ items: fewItems, template: TEMPLATE });
+    const large = recommendPageCount({ items: manyItems, template: TEMPLATE });
+
+    expect(large.recommended).toBeGreaterThan(small.recommended);
+  });
+
+  it('plafonne au plus grand palier sans jamais depasser', () => {
+    const hugeItems = Array.from({ length: 1000 }, (_, i) => photoItem(`p${i}`, i));
+    const { recommended } = recommendPageCount({ items: hugeItems, template: TEMPLATE });
+    expect(recommended).toBe(PAGE_COUNT_TIERS[PAGE_COUNT_TIERS.length - 1]);
+  });
+
+  it('fonctionne meme sans template choisi (densite par defaut)', () => {
+    const items = [photoItem('p1', 0)];
+    expect(() => recommendPageCount({ items })).not.toThrow();
   });
 });

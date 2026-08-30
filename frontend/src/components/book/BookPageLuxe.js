@@ -2354,6 +2354,17 @@ const BookPageLuxe = () => {
                     </button>
                   </div>
                 )}
+
+                <div className="book-edition-actions">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => navigate(`/book/${bookId}/composer`)}
+                    title="Mettre en page ce livre a partir de vos photos et textes, sans IA"
+                  >
+                    Composer sans IA
+                  </button>
+                </div>
               </>
             )}
 

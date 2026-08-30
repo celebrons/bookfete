@@ -9,14 +9,23 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const upload = require('../middleware/upload');
+const storageService = require('../services/storageService');
 const templateCatalog = require('../services/composition/templateCatalog');
 const bookContentService = require('../services/composition/bookContentService');
 const layoutEngine = require('../services/composition/layoutEngine');
+const pageRenderer = require('../services/composition/pageRenderer');
+const pdfService = require('../services/composition/pdfService');
+
+// Bucket Supabase Storage reutilise (deja utilise par le parcours contributeur
+// cote client). Un bucket dedie pourra etre introduit plus tard sans impact
+// sur le modele de donnees : seul ce nom change.
+const PHOTO_BUCKET = 'contribution-photos';
 
 async function getBook(bookId) {
   const { data, error } = await supabase
     .from('books')
-    .select('id, owner_id, template_id, page_count')
+    .select('id, owner_id, title, template_id, page_count')
     .eq('id', bookId)
     .single();
 
@@ -88,6 +97,43 @@ router.post('/api/books/:bookId/content-items', authenticate, requireOwnedBook, 
   }
 });
 
+// POST /api/books/:bookId/content-items/photo
+// Upload multipart (champ "photo") : stocke le fichier dans Supabase Storage
+// puis cree le book_content_item correspondant. Reutilise le middleware
+// upload.js (multer, 5 Mo/5 fichiers, memoryStorage) et storageService.js
+// deja en place, jusque-la jamais branches ensemble sur une route.
+router.post(
+  '/api/books/:bookId/content-items/photo',
+  authenticate,
+  requireOwnedBook,
+  upload.single('photo'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Fichier manquant (champ "photo").' });
+      }
+
+      const uploadResult = await storageService.uploadFile(PHOTO_BUCKET, req.file, req.params.bookId);
+      if (!uploadResult.success) {
+        return res.status(500).json({ error: uploadResult.error || "Echec de l'upload." });
+      }
+
+      const displayOrder = Number.parseInt(req.body?.display_order, 10);
+
+      const data = await bookContentService.createContentItem(req.params.bookId, {
+        source: 'upload',
+        kind: 'photo',
+        url: uploadResult.url,
+        display_order: Number.isFinite(displayOrder) ? displayOrder : 0
+      });
+
+      res.status(201).json(data);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // PUT /api/books/:bookId/content-items/:itemId
 router.put('/api/books/:bookId/content-items/:itemId', authenticate, requireOwnedBook, async (req, res) => {
   try {
@@ -117,6 +163,25 @@ router.get('/api/books/:bookId/pages', authenticate, requireOwnedBook, async (re
   try {
     const data = await bookContentService.listPages(req.params.bookId);
     res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/books/:bookId/recommended-page-count
+// Mode Automatique (§06) : calcule le palier recommande a partir du volume
+// reel de contenu, avant meme que l'utilisateur ne choisisse. Utilisable
+// aussi en mode Manuel pour avertir si le palier choisi est trop juste.
+router.get('/api/books/:bookId/recommended-page-count', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const { book } = req;
+    const [template, items] = await Promise.all([
+      book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null),
+      bookContentService.listContentItems(book.id)
+    ]);
+
+    const recommendation = layoutEngine.recommendPageCount({ items, template });
+    res.json(recommendation);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -160,6 +225,50 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
     res.json({ pages, overflow: result.overflow, pageBudget: result.pageBudget });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/books/:bookId/preview.html
+// Premier apercu du livre compose, ouvrable directement au navigateur.
+// Ne depend d'aucun binaire externe (contrairement au PDF) : c'est le moyen
+// le plus rapide de voir le rendu pendant que les ecrans frontend (phase 06)
+// ne sont pas encore branches.
+router.get('/api/books/:bookId/preview.html', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const [pages, items, layouts] = await Promise.all([
+      bookContentService.listPages(req.params.bookId),
+      bookContentService.listContentItems(req.params.bookId),
+      templateCatalog.listActiveLayouts()
+    ]);
+
+    const html = pageRenderer.renderBookHtml({ book: req.book, pages, items, layouts });
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/books/:bookId/preview.pdf
+// Meme rendu, converti en PDF via Chrome/Edge headless. Peut echouer si
+// aucun navigateur headless n'est installe sur l'environnement (voir
+// pdfService.resolveBrowserPath) : dans ce cas, utiliser preview.html.
+router.get('/api/books/:bookId/preview.pdf', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const [pages, items, layouts] = await Promise.all([
+      bookContentService.listPages(req.params.bookId),
+      bookContentService.listContentItems(req.params.bookId),
+      templateCatalog.listActiveLayouts()
+    ]);
+
+    const html = pageRenderer.renderBookHtml({ book: req.book, pages, items, layouts });
+    const pdfPath = await pdfService.renderPdfFromHtml(html, { fileBaseName: `book-${req.params.bookId}` });
+
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', 'inline; filename="apercu.pdf"');
+    res.sendFile(pdfPath);
+  } catch (error) {
+    res.status(503).json({ error: error.message });
   }
 });
 
