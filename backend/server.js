@@ -32,7 +32,6 @@ const bookCreationRoutes = require('./routes/bookCreation');
 const bookRoutes = require('./routes/books');
 const chapterRoutes = require('./routes/chapters');
 const inviteRoutes = require('./routes/invites');
-const aiRoutes = require('./routes/ai');
 const compositionRoutes = require('./routes/composition');
 const productRoutes = require('./routes/products');
 
@@ -57,7 +56,6 @@ app.use('/api/books/create', bookCreationRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/chapters', chapterRoutes);
 app.use('/api/invites', inviteRoutes);
-app.use('/api/ai', aiRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/', compositionRoutes);
 app.use('/', productRoutes);

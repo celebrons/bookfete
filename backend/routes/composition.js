@@ -120,11 +120,22 @@ router.post(
 
       const displayOrder = Number.parseInt(req.body?.display_order, 10);
 
+      // Orientation/ratio sondes a l'upload (voir storageService.js) : un
+      // facteur de scoring doux pour le moteur de mise en page (voir
+      // layoutScoring.js) — absent (photo deja uploadee avant cette passe,
+      // ou sonde en echec) ne bloque jamais rien, juste neutre pour le score.
+      const metadata = {};
+      if (uploadResult.orientation) metadata.orientation = uploadResult.orientation;
+      if (uploadResult.ratio) metadata.ratio = uploadResult.ratio;
+      if (uploadResult.width) metadata.width = uploadResult.width;
+      if (uploadResult.height) metadata.height = uploadResult.height;
+
       const data = await bookContentService.createContentItem(req.params.bookId, {
         source: 'upload',
         kind: 'photo',
         url: uploadResult.url,
-        display_order: Number.isFinite(displayOrder) ? displayOrder : 0
+        display_order: Number.isFinite(displayOrder) ? displayOrder : 0,
+        metadata
       });
 
       res.status(201).json(data);
@@ -175,12 +186,13 @@ router.get('/api/books/:bookId/pages', authenticate, requireOwnedBook, async (re
 router.get('/api/books/:bookId/recommended-page-count', authenticate, requireOwnedBook, async (req, res) => {
   try {
     const { book } = req;
-    const [template, items] = await Promise.all([
+    const [template, items, layouts] = await Promise.all([
       book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null),
-      bookContentService.listContentItems(book.id)
+      bookContentService.listContentItems(book.id),
+      templateCatalog.listActiveLayouts()
     ]);
 
-    const recommendation = layoutEngine.recommendPageCount({ items, template });
+    const recommendation = layoutEngine.recommendPageCount({ items, template, layouts });
     res.json(recommendation);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -222,7 +234,7 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
     });
 
     const pages = await bookContentService.replaceBookPages(book.id, result.pages);
-    res.json({ pages, overflow: result.overflow, pageBudget: result.pageBudget });
+    res.json({ pages, overflow: result.overflow, underflow: result.underflow, pageBudget: result.pageBudget });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -261,8 +273,13 @@ router.get('/api/books/:bookId/preview.pdf', authenticate, requireOwnedBook, asy
       templateCatalog.listActiveLayouts()
     ]);
 
-    const html = pageRenderer.renderBookHtml({ book: req.book, pages, items, layouts });
-    const pdfPath = await pdfService.renderPdfFromHtml(html, { fileBaseName: `book-${req.params.bookId}` });
+    const pdfPath = await pdfService.renderPdfFromPages({
+      book: req.book,
+      pages,
+      items,
+      layouts,
+      fileBaseName: `book-${req.params.bookId}`
+    });
 
     res.set('Content-Type', 'application/pdf');
     res.set('Content-Disposition', 'inline; filename="apercu.pdf"');

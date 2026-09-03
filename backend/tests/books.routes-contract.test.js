@@ -3,6 +3,10 @@
 // Ce test fige l'ensemble exact des routes exposees par le router books.
 // Le decoupage du monolithe en sous-modules doit laisser cette liste INTACTE.
 // Toute route ajoutee/supprimee/renommee fait echouer le test : c'est voulu.
+//
+// Mis a jour lors du retrait de la chaine IA (routes de generation de
+// brouillon, prompt-admin) : seules les routes de CRUD livre et d'export
+// PDF (non-IA, alimente par le contenu deja valide) restent.
 
 jest.mock('../config/supabase', () => require('./helpers/supabaseMock').createSupabaseMock({}));
 
@@ -14,15 +18,8 @@ const EXPECTED_ROUTES = [
   'GET /:id',
   'GET /:id/export-final-pdf/:jobId/download/:kind',
   'GET /:id/export-final-pdf/:jobId/status',
-  'GET /:id/prompt-admin/:promptKey',
   'POST /',
-  'POST /:id/chapters/:chapterId/finalize-draft',
-  'POST /:id/chapters/:chapterId/generate-draft',
-  'POST /:id/chapters/:chapterId/save-draft',
   'POST /:id/export-final-pdf',
-  'POST /:id/generate-draft',
-  'POST /:id/prompt-admin/:promptKey/publish',
-  'POST /:id/prompt-admin/:promptKey/test',
   'PUT /:id'
 ];
 
@@ -42,15 +39,5 @@ describe('routes/books — contrat de routage', () => {
       (route) => !route.handlerNames.includes('authenticate')
     );
     expect(unprotected).toEqual([]);
-  });
-
-  it('reserve les routes prompt-admin au middleware ensurePromptAdmin', () => {
-    const promptAdminRoutes = listRoutes(router).filter((route) =>
-      route.path.includes('/prompt-admin')
-    );
-    expect(promptAdminRoutes).toHaveLength(3);
-    promptAdminRoutes.forEach((route) => {
-      expect(route.handlerNames).toContain('ensurePromptAdmin');
-    });
   });
 });

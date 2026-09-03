@@ -27,28 +27,38 @@
   margin: var(--space-md) 0;
 }
 
-.compose-template-card,
-.compose-pagecount-card {
-  text-align: left;
-  cursor: pointer;
-  border: 2px solid transparent;
-  font-family: var(--font-primary);
-}
-
-.compose-template-card h3 { margin: 0 0 var(--space-xs); color: var(--ink); }
-.compose-template-card p { margin: 0; font-size: 13px; color: var(--ink); opacity: 0.7; }
-
 .compose-pagecount-card {
   text-align: center;
-  font-weight: 600;
-  color: var(--ink);
 }
 
-.compose-template-card.is-selected,
-.compose-pagecount-card.is-selected {
-  border-color: var(--gold);
-  background-color: var(--gold-light);
+.template-mini-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
 }
+
+.template-mini-page {
+  width: 62px;
+  height: 88px; /* proportion A4 */
+  padding: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  display: flex;
+  gap: 4px;
+}
+
+.template-mini-page.is-single { align-items: stretch; }
+.template-mini-page.is-single .template-mini-block { flex: 1; }
+
+.template-mini-page.is-stack { flex-direction: column; }
+.template-mini-page.is-stack .template-mini-block { flex: 1; }
+
+.template-mini-page.is-grid { flex-wrap: wrap; }
+.template-mini-page.is-grid .template-mini-block { width: calc(50% - 2px); height: calc(50% - 2px); }
+
+.template-mini-block { display: block; }
 
 .compose-text-list {
   display: flex;
@@ -89,6 +99,8 @@
   text-align: center;
   padding: var(--space-lg);
   margin-bottom: var(--space-md);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-luxe);
 }
 .compose-recommendation h3 {
   font-size: 32px;
@@ -116,4 +128,10 @@
   border: 1px solid var(--gold-light);
   border-radius: 8px;
   margin-top: var(--space-md);
+}
+
+.compose-last-updated {
+  margin: 0 0 var(--space-md);
+  font-size: 13px;
+  opacity: 0.75;
 }

@@ -9,28 +9,28 @@ const HowItWorksLuxe = () => {
     {
       number: '1️⃣',
       title: 'Créez votre projet',
-      description: 'Choisissez votre événement (anniversaire, mariage, départ...), personnalisez la couverture et sélectionnez vos options (finition, papier, style).',
-      time: '5 minutes',
-      highlight: 'L\'IA génère automatiquement les chapitres et questions'
+      description: 'Choisissez votre événement (anniversaire, mariage, départ...) et donnez un titre à votre livre.',
+      time: '1 minute',
+      highlight: 'Aucune inscription requise pour commencer'
     },
     {
       number: '2️⃣',
-      title: 'Invitez vos proches',
-      description: 'Ajoutez les emails de vos contributeurs en quelques clics. Chaque personne reçoit une invitation personnalisée avec un lien unique.',
-      time: '3 minutes',
-      highlight: 'Gérez les invitations par chapitre'
+      title: 'Ajoutez vos photos et vos textes',
+      description: 'Importez vos photos et écrivez vos souvenirs directement dans l\'éditeur, à votre rythme.',
+      time: '10 minutes',
+      highlight: 'Vous gardez la main sur chaque mot et chaque image'
     },
     {
       number: '3️⃣',
-      title: 'Collectez les témoignages',
-      description: 'Les contributeurs arrivent sur une page élégante avec des questions guides générées par l\'IA. Ils peuvent écrire leur message et ajouter jusqu\'à 2 photos.',
-      time: '2 semaines (selon vos proches)',
-      highlight: 'Sauvegarde automatique des brouillons'
+      title: 'Choisissez le style',
+      description: 'Sélectionnez une mise en page (finition, papier, style narratif) et le nombre de pages. L\'aperçu se met à jour en direct.',
+      time: '5 minutes',
+      highlight: 'Mise en page automatique, sans IA'
     },
     {
       number: '4️⃣',
-      title: 'Générez et commandez',
-      description: 'L\'IA assemble toutes les contributions dans une mise en page luxueuse. Validez, commandez et recevez votre livre chez vous en 2 semaines.',
+      title: 'Composez et commandez',
+      description: 'Générez l\'aperçu de votre livre, validez, commandez et recevez-le chez vous en 2 semaines.',
       time: '5 minutes',
       highlight: 'Qualité d\'impression professionnelle'
     }
@@ -38,14 +38,14 @@ const HowItWorksLuxe = () => {
 
   const features = [
     {
-      icon: '🎯',
-      title: 'Questions personnalisées',
-      description: 'L\'IA génère 4 questions uniques par chapitre, adaptées à votre événement et au style choisi (intime, poétique ou factuel).'
+      icon: '🎨',
+      title: 'Styles personnalisables',
+      description: 'Choisissez la finition, le papier et le ton de votre livre parmi plusieurs styles pensés pour chaque type d\'événement.'
     },
     {
       icon: '📸',
       title: 'Photos de qualité',
-      description: 'Jusqu\'à 2 photos par contribution, optimisées pour l\'impression. Chaque image est placée harmonieusement dans le livre.'
+      description: 'Importez vos photos, elles sont optimisées pour l\'impression et placées harmonieusement dans le livre.'
     },
     {
       icon: '✨',
@@ -53,37 +53,37 @@ const HowItWorksLuxe = () => {
       description: 'Typographie élégante, marges généreuses, papiers premium. Votre livre a l\'allure d\'un véritable ouvrage d\'éditeur.'
     },
     {
-      icon: '🤖',
-      title: 'IA invisible',
-      description: 'L\'IA travaille en coulisses pour harmoniser les styles, corriger l\'orthographe et suggérer des améliorations sans jamais s\'imposer.'
+      icon: '🖊️',
+      title: 'Vous restez l\'auteur',
+      description: 'Aucun texte n\'est généré à votre place : c\'est vous qui écrivez, le moteur se charge uniquement de la mise en page.'
     },
     {
-      icon: '⏱️',
-      title: 'Sauvegarde automatique',
-      description: 'Les contributeurs peuvent sauvegarder leur brouillon et revenir plus tard. Plus jamais de messages perdus !'
+      icon: '👁️',
+      title: 'Aperçu en direct',
+      description: 'Visualisez votre livre au fil de la composition et ajustez le style ou le nombre de pages avant de commander.'
     },
     {
-      icon: '📊',
-      title: 'Suivi en temps réel',
-      description: 'Dans votre tableau de bord, voyez qui a répondu, relancez en un clic, et modérez les contributions facilement.'
+      icon: '📄',
+      title: 'Export PDF',
+      description: 'Téléchargez un aperçu PDF de votre livre a tout moment, avant meme de passer commande.'
     }
   ];
 
   const testimonials = [
     {
-      text: "J'ai créé un livre pour les 60 ans de mon mari en seulement 20 minutes. Nos amis ont adoré contribuer, et le résultat est magnifique !",
+      text: "J'ai créé un livre pour les 60 ans de mon mari en seulement 20 minutes. J'ai ajouté mes photos et mes textes, et le résultat est magnifique !",
       name: "Sophie",
       role: "Les 60 ans de Gégé",
       image: "https://images.unsplash.com/photo-1494790108777-296ef5a2ec48?w=100&h=100&fit=crop"
     },
     {
-      text: "Pour le départ de notre collègue, on a rassemblé 25 témoignages. L'IA a fait un travail incroyable pour tout organiser. Le livre est splendide !",
+      text: "Pour le départ de notre collègue, j'ai rassemblé nos photos et nos mots en une soirée. La mise en page automatique a fait un travail incroyable. Le livre est splendide !",
       name: "Thomas",
       role: "Pot de départ",
       image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop"
     },
     {
-      text: "Notre livre de mariage est unique. Tous nos invités ont participé, et les photos sont magnifiques. Merci pour cette pépite !",
+      text: "Notre livre de mariage est unique. J'ai pu tout composer moi-même, et les photos sont magnifiques. Merci pour cette pépite !",
       name: "Marie & Pierre",
       role: "Mariage",
       image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop"
@@ -97,11 +97,11 @@ const HowItWorksLuxe = () => {
     },
     {
       question: "📸 Peut-on ajouter des photos ?",
-      answer: "Oui, chaque contributeur peut ajouter jusqu'à 2 photos. Elles sont optimisées automatiquement pour une qualité d'impression parfaite."
+      answer: "Oui, vous pouvez importer autant de photos que vous le souhaitez. Elles sont optimisées automatiquement pour une qualité d'impression parfaite."
     },
     {
-      question: "🤖 L'IA écrit-elle à ma place ?",
-      answer: "Non, l'IA guide et suggère, mais ce sont vos proches qui écrivent. Elle s'assure juste que l'ensemble soit harmonieux."
+      question: "🖊️ Qui écrit les textes du livre ?",
+      answer: "Vous. Aucun contenu n'est généré automatiquement : le moteur de mise en page place vos photos et vos textes dans le style choisi."
     },
     {
       question: "💳 Comment fonctionne le paiement ?",
@@ -109,7 +109,7 @@ const HowItWorksLuxe = () => {
     },
     {
       question: "📝 Peut-on modifier après validation ?",
-      answer: "Oui, chaque contribution peut être sauvegardée en brouillon. La validation est définitive uniquement quand vous le décidez."
+      answer: "Oui, vous pouvez ajuster vos photos, vos textes et le style tant que vous n'avez pas validé définitivement votre livre."
     },
     {
       question: "🎁 Y a-t-il une version coffret ?",
@@ -125,7 +125,7 @@ const HowItWorksLuxe = () => {
           <span className="label-gold">DÉCOUVRIR</span>
           <h1>✨ Comment ça marche ?</h1>
           <p className="hero-description">
-            Créez un livre unique en 4 étapes simples, sans aucune compétence technique. L'IA s'occupe de tout !
+            Créez un livre unique en 4 étapes simples, sans aucune compétence technique. Vos photos, vos textes, votre style.
           </p>
           
           <div className="hero-stats">
@@ -179,7 +179,7 @@ const HowItWorksLuxe = () => {
           <div className="section-header">
             <span className="label-gold">L'EXPÉRIENCE</span>
             <h2>🌟 Ce qui rend votre livre unique</h2>
-            <p className="section-subtitle">L'IA guide chaque étape pour un résultat professionnel</p>
+            <p className="section-subtitle">Un moteur de mise en page automatique pour un résultat professionnel</p>
           </div>
 
           <div className="features-grid">

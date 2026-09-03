@@ -1,48 +1,64 @@
 // backend/services/composition/layoutEngine.js
 //
-// Coeur du moteur de mise en page sans IA (voir l'artefact "Celebrons sans
-// IA", section 06). Une fonction pure : compose(input) -> { pages, overflow }.
-// Aucun appel reseau, aucun appel modele : memes entrees => meme sortie, a
-// chaque execution. C'est ce qui la rend testable comme n'importe quelle
-// fonction, et ce qui rend "regenerer" reproductible (voir buildSeed/variant).
+// Coeur du moteur de mise en page sans IA — v2 (voir le plan "Moteur de mise
+// en page v2" : contenu -> volume -> profil -> templates compatibles ->
+// scoring -> pages -> PDF). Une fonction pure : compose(input) -> { pages,
+// overflow }. Aucun appel reseau, aucun appel modele : memes entrees =>
+// meme sortie, a chaque execution.
 //
-// Etapes (fidele au sequencement de l'artefact) :
-//   1. Normalisation   -> poids en "equivalent-slots" de chaque item
-//   2. Budget de pages -> pages utiles = pageCount - pages fixes
-//   3. Regroupement    -> blocs homogenes (ex. contribution = photos+texte
-//                         d'un meme contributeur), tries de facon stable
-//   4. Choix du layout -> par bloc, le layout dont le nombre de cases
-//                         correspond le mieux, parmi les layouts autorises
-//                         par le template
-//   5. Garde-fous       -> pas de page vide, pas de bloc coupe entre deux pages
-//   6. Ecriture          -> pages[] pret a etre persiste (book_pages)
+// Contrairement au v1 (empaquetage par poids puis choix de presentation
+// apres coup), le regroupement en pages et le choix du layout sont ICI la
+// meme decision : pour le contenu restant (une fenetre ordonnee, jamais
+// reordonnee), on filtre les layouts structurellement compatibles
+// (layoutCapacity.js), on les note (layoutScoring.js) et on prend le
+// meilleur — le contenu determine les layouts compatibles, jamais l'inverse.
+//
+// Etapes :
+//   1. Unites       -> chaque item devient une unite atomique (bloc de
+//                      contribution, photo, texte — avec decoupage prealable
+//                      des textes trop longs, voir textLength.js)
+//   2. Profil        -> PHOTO / TEXTE / EQUILIBRE (contentProfile.js), sert
+//                      uniquement a orienter le scoring
+//   3. Boucle        -> pour la fenetre de tete : candidats compatibles ->
+//                      scoring -> meilleur (egalites departagees par PRNG
+//                      seede, reproductible via `variant`) -> consommation
+//   4. Garde-fous    -> jamais de page videe de force, jamais de contenu
+//                      perdu (voir GUARANTEED_FALLBACK_SLUGS)
+//   5. Ecriture      -> pages[] pret a etre persiste (book_pages)
 
-const DEFAULT_SLOTS_PER_PAGE = 3;
+const { detectContentProfile, weightOfItem } = require('./contentProfile');
+const { classifyTextLength, splitTextSafely, TEXT_HARD_SPLIT_THRESHOLD } = require('./textLength');
+const { resolveCandidates, consumedCount, MAX_LOOKAHEAD_UNITS } = require('./layoutCapacity');
+const {
+  scoreLayoutCandidate,
+  createRhythmState,
+  updateRhythmState,
+  createFamilyCounts,
+  updateFamilyCounts
+} = require('./layoutScoring');
+
 const DEFAULT_FIXED_PAGES = 2; // garde + page de titre (la couverture est un document a part)
-const TEXT_CHARS_PER_SLOT = 400;
-// Paliers retenus (§ decisions de l'artefact), memes valeurs que le seed de
-// backend/sql/phase03_data_model.sql (book_products.page_count).
-const PAGE_COUNT_TIERS = [24, 32, 40, 48, 60];
+// Paliers retenus (cahier des charges v2) : 16 / 24 / 32 / 48 / 64 pages.
+const PAGE_COUNT_TIERS = [16, 24, 32, 48, 64];
+
+// Layouts qui doivent TOUJOURS exister, etre actifs, et rester utilisables
+// meme si la liste blanche du style choisi (allowed_layouts) ne les contient
+// pas ou est mal configuree : garantit qu'un contenu valide trouve toujours
+// une place (voir plan §6). Slugs alignes sur la migration SQL v2.
+const GUARANTEED_FALLBACK_SLUGS = ['FULL_PHOTO', 'TWO_PHOTOS', 'ONE_TESTIMONY', 'PHOTO_TEXT', 'contribution-standard'];
 
 function clampInt(value, fallback) {
   const n = Number.parseInt(value, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-// --- 1. Normalisation ------------------------------------------------------
-
-function weightOfItem(item) {
-  if (item.kind === 'photo') return 1;
-  const length = String(item.text || '').length;
-  return Math.max(1, Math.ceil(length / TEXT_CHARS_PER_SLOT));
-}
-
-// --- 3. Regroupement --------------------------------------------------------
+// --- 1. Regroupement en blocs atomiques -------------------------------------
 
 // Rassemble les items en blocs homogenes : les items d'une meme contribution
 // (contribution_id commun) forment un seul bloc "contribution" (photo(s) +
-// message) ; les items sans contribution restent des blocs a un seul item.
-// Le tri est stable : display_order puis id, pour un resultat reproductible.
+// message), toujours atomique ; les items sans contribution restent des
+// blocs a un seul item. Tri stable : display_order puis id, pour un resultat
+// reproductible.
 function groupIntoBlocks(items) {
   const byContribution = new Map();
   const standaloneBlocks = [];
@@ -73,46 +89,110 @@ function groupIntoBlocks(items) {
   return blocks;
 }
 
-// --- Mode Automatique : recommandation de palier a partir du contenu reel --
-// Meme fonction utilisee dans les deux modes (§06 de l'artefact) : en
-// Automatique elle propose le palier par defaut, en Manuel elle sert juste a
-// avertir si le palier choisi est trop juste ou trop large pour le contenu.
+// --- 1bis. Unites du moteur : blocs enrichis (longueur/orientation) + ------
+// decoupage prealable des textes trop longs (jamais de texte coupe a
+// l'affichage — voir textLength.js). Les fragments issus d'un decoupage
+// referencent TOUJOURS l'item reel d'origine (itemIds inchange) : seul le
+// texte affiche (textOverride) differe par fragment, jamais un id synthetique
+// dans book_pages.content (contrat preserve pour tout code qui lit itemIds).
 
-// Estime le nombre de pages necessaires pour un contenu donne, a la densite
-// d'un template (ou la densite par defaut si aucun template n'est encore
-// choisi). Ne construit pas les pages elles-memes (voir compose()) : c'est
-// une simple division poids-total / slots-par-page, arrondie au palier
-// superieur le plus proche.
-function estimatePageCount(items, { fixedPages, slotsPerPage } = {}) {
+function buildUnitsFromItems(items) {
+  const itemsById = Object.fromEntries(items.map((item) => [item.id, item]));
   const blocks = groupIntoBlocks(items);
-  const totalWeight = blocks.reduce((sum, block) => sum + block.weight, 0);
-  const resolvedSlotsPerPage = clampInt(slotsPerPage, DEFAULT_SLOTS_PER_PAGE);
-  const resolvedFixedPages = clampInt(fixedPages, DEFAULT_FIXED_PAGES);
-  const contentPages = totalWeight === 0 ? 0 : Math.ceil(totalWeight / resolvedSlotsPerPage);
-  return resolvedFixedPages + contentPages;
+  const units = [];
+
+  for (const block of blocks) {
+    if (block.kind === 'contribution') {
+      const textItemId = block.itemIds.find((id) => itemsById[id]?.kind === 'texte');
+      const text = textItemId ? String(itemsById[textItemId]?.text || '') : '';
+
+      if (text.length > TEXT_HARD_SPLIT_THRESHOLD) {
+        const parts = splitTextSafely(text, TEXT_HARD_SPLIT_THRESHOLD);
+        parts.forEach((part, index) => {
+          if (index === 0) {
+            units.push({
+              key: block.key,
+              kind: 'contribution',
+              itemIds: block.itemIds,
+              order: block.order,
+              weight: block.weight,
+              textOverride: part,
+              splitIndex: 0,
+              splitTotal: parts.length
+            });
+          } else {
+            units.push({
+              key: `${block.key}::part${index}`,
+              kind: 'texte',
+              itemIds: [textItemId],
+              order: block.order,
+              weight: 1,
+              textOverride: part,
+              textLength: part.length,
+              textLengthClass: classifyTextLength(part.length),
+              splitIndex: index,
+              splitTotal: parts.length,
+              continuationOfContribution: true
+            });
+          }
+        });
+      } else {
+        units.push({ key: block.key, kind: 'contribution', itemIds: block.itemIds, order: block.order, weight: block.weight });
+      }
+      continue;
+    }
+
+    if (block.kind === 'texte') {
+      const text = String(itemsById[block.itemIds[0]]?.text || '');
+
+      if (text.length > TEXT_HARD_SPLIT_THRESHOLD) {
+        const parts = splitTextSafely(text, TEXT_HARD_SPLIT_THRESHOLD);
+        parts.forEach((part, index) => {
+          units.push({
+            key: `${block.key}::part${index}`,
+            kind: 'texte',
+            itemIds: block.itemIds,
+            order: block.order,
+            weight: 1,
+            textOverride: part,
+            textLength: part.length,
+            textLengthClass: classifyTextLength(part.length),
+            splitIndex: index,
+            splitTotal: parts.length
+          });
+        });
+      } else {
+        units.push({
+          key: block.key,
+          kind: 'texte',
+          itemIds: block.itemIds,
+          order: block.order,
+          weight: block.weight,
+          textLength: text.length,
+          textLengthClass: classifyTextLength(text.length)
+        });
+      }
+      continue;
+    }
+
+    // photo
+    units.push({
+      key: block.key,
+      kind: 'photo',
+      itemIds: block.itemIds,
+      order: block.order,
+      weight: block.weight,
+      orientation: itemsById[block.itemIds[0]]?.metadata?.orientation || null
+    });
+  }
+
+  return units;
 }
 
-/**
- * @param {object} input
- * @param {Array} input.items - book_content_items du livre
- * @param {object} [input.template] - book_templates row (pour la densite ; optionnel)
- * @param {number} [input.fixedPages]
- * @returns {{ recommended: number, estimatedPages: number, tiers: Array<{pageCount:number, fits:boolean}> }}
- */
-function recommendPageCount(input = {}) {
-  const items = Array.isArray(input.items) ? input.items : [];
-  const slotsPerPage = input.template?.design_tokens?.slotsPerPage;
-  const estimatedPages = estimatePageCount(items, { fixedPages: input.fixedPages, slotsPerPage });
-
-  const recommended = PAGE_COUNT_TIERS.find((tier) => tier >= estimatedPages) || PAGE_COUNT_TIERS[PAGE_COUNT_TIERS.length - 1];
-  const tiers = PAGE_COUNT_TIERS.map((pageCount) => ({ pageCount, fits: pageCount >= estimatedPages }));
-
-  return { recommended, estimatedPages, tiers };
-}
-
-// --- 4. Choix du layout : PRNG deterministe pour departager les candidats --
-// equivalents (meme kind, meme gabarit de cases). Ne change jamais le
-// contenu : seule la presentation alterne, de facon reproductible.
+// --- Choix du layout : PRNG deterministe pour departager les egalites de ---
+// score. Ne change jamais le contenu place : seul le candidat exact
+// (presentation, parfois decoupage en pages a capacite egale) alterne, de
+// facon reproductible.
 
 function hashSeed(seed) {
   let hash = 2166136261;
@@ -141,123 +221,200 @@ function pickDeterministic(candidates, seed) {
   return candidates[Math.min(index, candidates.length - 1)];
 }
 
-function chooseLayout(block, layouts, allowedSlugs, seed) {
-  const itemCount = block.itemIds.length;
-  const pool = allowedSlugs && allowedSlugs.length > 0
-    ? layouts.filter((layout) => allowedSlugs.includes(layout.slug))
-    : layouts;
+// --- 3. Boucle unifiee : consommation du contenu restant, page par page ---
 
-  const byKindAndCount = pool.filter(
-    (layout) => layout.kind === block.kind && itemCount >= layout.min_items && itemCount <= layout.max_items
-  );
-  if (byKindAndCount.length > 0) {
-    return pickDeterministic(byKindAndCount, seed).id;
-  }
+function buildPageEntry(pageIndex, layout, consumedUnits, presentationVariant) {
+  const kinds = new Set(consumedUnits.map((unit) => unit.kind));
+  const pageKind = kinds.size === 1 ? [...kinds][0] : 'mixte';
 
-  const byKind = pool.filter((layout) => layout.kind === block.kind);
-  if (byKind.length > 0) {
-    return pickDeterministic(byKind, seed).id;
-  }
+  const textOverrides = consumedUnits
+    .filter((unit) => unit.textOverride !== undefined)
+    .map((unit) => ({
+      itemId: unit.itemIds[0],
+      text: unit.textOverride,
+      splitIndex: unit.splitIndex,
+      splitTotal: unit.splitTotal,
+      continuation: Boolean(unit.continuationOfContribution)
+    }));
 
-  const mixte = pool.filter((layout) => layout.kind === 'mixte');
-  if (mixte.length > 0) {
-    return pickDeterministic(mixte, seed).id;
-  }
+  const block = {
+    itemIds: consumedUnits.flatMap((unit) => unit.itemIds),
+    kind: pageKind,
+    layoutId: layout?.id || null,
+    // Alterne une sous-presentation purement cosmetique (voir pageRenderer.js)
+    // independamment du choix structurel du layout : garantit que "essayer
+    // une autre presentation" (regeneration via `variant`) change toujours
+    // visiblement quelque chose, meme quand le scoring ne depart aucune
+    // egalite entre layouts differents pour ce contenu.
+    presentationVariant
+  };
+  if (textOverrides.length > 0) block.textOverrides = textOverrides;
 
-  return pool.length > 0 ? pickDeterministic(pool, seed).id : null;
-}
-
-// --- 2 + 5 + 6. Budget, empaquetage, garde-fous, ecriture -------------------
-
-// Empaquette les blocs (deja tries) sur des pages, sans jamais couper un
-// bloc en deux ni produire de page vide : un bloc trop lourd pour le budget
-// d'une page occupe simplement sa propre page.
-function packBlocksIntoPages(blocks, slotsPerPage) {
-  const pageGroups = [];
-  let current = [];
-  let currentWeight = 0;
-
-  for (const block of blocks) {
-    const wouldOverflow = current.length > 0 && currentWeight + block.weight > slotsPerPage;
-    if (wouldOverflow) {
-      pageGroups.push(current);
-      current = [];
-      currentWeight = 0;
+  return {
+    page_index: pageIndex,
+    layout_id: block.layoutId,
+    content: {
+      kind: pageKind,
+      itemIds: block.itemIds,
+      blocks: [block]
     }
-    current.push(block);
-    currentWeight += block.weight;
-  }
-  if (current.length > 0) pageGroups.push(current);
-
-  return pageGroups;
+  };
 }
 
-function kindOfPage(blocksOnPage) {
-  const kinds = new Set(blocksOnPage.map((block) => block.kind));
-  if (kinds.size === 1) return [...kinds][0];
-  return 'mixte';
+/**
+ * Construit toutes les pages necessaires pour placer TOUT le contenu restant
+ * (jamais de contenu perdu) : pas de budget de pages ici, c'est compose() qui
+ * decide ensuite si le resultat depasse le nombre de pages demande
+ * (overflow, purement indicatif) ou doit etre complete par des pages
+ * blanches. Aussi reutilise tel quel par recommendPageCount (§5 du plan).
+ *
+ * @param {object} input
+ * @param {Array} input.units - buildUnitsFromItems(items)
+ * @param {Array} input.layouts - layout_definitions actifs
+ * @param {Array} input.allowedSlugs - liste blanche du style choisi (vide = pas de restriction)
+ * @param {string} input.profile - 'PHOTO'|'TEXTE'|'EQUILIBRE'
+ * @param {string} input.seedBase
+ * @returns {{ pages: Array }}
+ */
+function buildPages(input) {
+  const allUnits = Array.isArray(input.units) ? input.units : [];
+  const layouts = Array.isArray(input.layouts) ? input.layouts : [];
+  const allowedSlugs = Array.isArray(input.allowedSlugs) ? input.allowedSlugs : [];
+  const profile = input.profile || 'EQUILIBRE';
+  const seedBase = input.seedBase || 'no-template:0';
+
+  const pool = allowedSlugs.length > 0
+    ? layouts.filter((layout) => allowedSlugs.includes(layout.slug) || GUARANTEED_FALLBACK_SLUGS.includes(layout.slug))
+    : layouts;
+  const fallbackPool = layouts.filter((layout) => GUARANTEED_FALLBACK_SLUGS.includes(layout.slug));
+
+  let queue = allUnits.slice();
+  let rhythmState = createRhythmState();
+  let familyCounts = createFamilyCounts();
+  const pages = [];
+
+  while (queue.length > 0) {
+    const window = queue.slice(0, MAX_LOOKAHEAD_UNITS);
+
+    let candidates = resolveCandidates(pool, window);
+    if (candidates.length === 0) candidates = resolveCandidates(fallbackPool, window);
+    if (candidates.length === 0) {
+      // Filet de securite ultime (catalogue incomplet/mal configure) : place
+      // au moins l'unite de tete seule plutot que de perdre du contenu ou de
+      // boucler indefiniment. Ne devrait jamais servir en production tant que
+      // GUARANTEED_FALLBACK_SLUGS reste actif en base (voir migration SQL).
+      candidates = [{ slug: null, kind: window[0].kind, capacity: {}, min_items: 1, max_items: 1 }];
+    }
+
+    const scored = candidates.map((layout) => {
+      const units = window.slice(0, consumedCount(layout, window) || 1);
+      return { layout, units, score: scoreLayoutCandidate(layout, units, { profile, rhythmState, familyCounts }) };
+    });
+
+    const maxScore = Math.max(...scored.map((entry) => entry.score));
+    const best = scored.filter((entry) => Math.abs(entry.score - maxScore) < 1e-9);
+    const chosen = pickDeterministic(best, `${seedBase}:${pages.length}:${window[0].key}`);
+
+    // Seed distincte de celle du choix structurel ci-dessus : la sous-presentation
+    // varie a chaque regeneration meme quand le choix de layout, lui, ne
+    // change pas (voir buildPageEntry et pageRenderer.js).
+    const presentationSeed = hashSeed(`${seedBase}:${pages.length}:presentation`);
+    const presentationVariant = Math.floor(mulberry32(presentationSeed)() * 2);
+
+    pages.push(buildPageEntry(pages.length, chosen.layout, chosen.units, presentationVariant));
+    rhythmState = updateRhythmState(rhythmState, chosen.layout);
+    familyCounts = updateFamilyCounts(familyCounts, chosen.layout);
+    queue = queue.slice(chosen.units.length);
+  }
+
+  return { pages };
+}
+
+// --- Mode Automatique : recommandation de palier a partir du contenu reel --
+// Reutilise la meme boucle que compose() (source unique de verite) avec un
+// budget de pages non borne : le nombre de pages qu'il faudrait reellement
+// pour tout placer, sans jamais inventer de contenu pour combler.
+
+/**
+ * @param {object} input
+ * @param {Array} input.items - book_content_items du livre
+ * @param {Array} [input.layouts] - layout_definitions actifs (necessaire pour une estimation precise)
+ * @param {object} [input.template] - book_templates row (pour allowed_layouts ; optionnel)
+ * @param {number} [input.fixedPages]
+ * @returns {{ recommended: number, estimatedPages: number, tiers: Array<{pageCount:number, fits:boolean}> }}
+ */
+function recommendPageCount(input = {}) {
+  const items = Array.isArray(input.items) ? input.items : [];
+  const layouts = Array.isArray(input.layouts) ? input.layouts : [];
+  const allowedSlugs = Array.isArray(input.template?.allowed_layouts) ? input.template.allowed_layouts : [];
+  const fixedPages = clampInt(input.fixedPages, DEFAULT_FIXED_PAGES);
+
+  const units = buildUnitsFromItems(items);
+  const { profile } = detectContentProfile(items);
+  const seedBase = `${input.template?.id || 'no-template'}:recommend`;
+  const { pages } = buildPages({ units, layouts, allowedSlugs, profile, seedBase });
+
+  const estimatedPages = units.length === 0 ? 0 : fixedPages + pages.length;
+  const recommended = PAGE_COUNT_TIERS.find((tier) => tier >= estimatedPages) || PAGE_COUNT_TIERS[PAGE_COUNT_TIERS.length - 1];
+  const tiers = PAGE_COUNT_TIERS.map((pageCount) => ({ pageCount, fits: pageCount >= estimatedPages }));
+
+  return { recommended, estimatedPages, tiers };
 }
 
 /**
  * @param {object} input
- * @param {Array} input.items - book_content_items du livre (kind, text, url, contribution_id, display_order, id)
- * @param {object} input.template - book_templates row (allowed_layouts, design_tokens)
+ * @param {Array} input.items - book_content_items du livre (kind, text, url, contribution_id, display_order, id, metadata)
+ * @param {object} input.template - book_templates row (allowed_layouts, id)
  * @param {Array} input.layouts - layout_definitions actifs
  * @param {number} input.pageCount - nombre de pages demande pour le livre (couverture non comprise)
  * @param {number} [input.variant] - graine de regeneration (0 par defaut)
  * @param {number} [input.fixedPages] - pages fixes non composees (garde/titre)
- * @returns {{ pages: Array<{page_index:number, layout_id:string|null, content:object}>, overflow: boolean }}
+ * @returns {{ pages: Array<{page_index:number, layout_id:string|null, content:object}>, overflow: boolean, underflow: boolean, pageBudget: number, totalWeight: number }}
  */
 function compose(input) {
   const items = Array.isArray(input.items) ? input.items : [];
   const layouts = Array.isArray(input.layouts) ? input.layouts : [];
   const allowedSlugs = Array.isArray(input.template?.allowed_layouts) ? input.template.allowed_layouts : [];
-  const slotsPerPage = clampInt(input.template?.design_tokens?.slotsPerPage, DEFAULT_SLOTS_PER_PAGE);
   const fixedPages = clampInt(input.fixedPages, DEFAULT_FIXED_PAGES);
   const variant = Number.isInteger(input.variant) ? input.variant : 0;
   const seedBase = `${input.template?.id || 'no-template'}:${variant}`;
 
   const pagesAvailable = Math.max(0, clampInt(input.pageCount, 0) - fixedPages);
-  const budgetSlots = pagesAvailable * slotsPerPage;
 
-  const blocks = groupIntoBlocks(items);
-  const totalWeight = blocks.reduce((sum, block) => sum + block.weight, 0);
-  const overflow = budgetSlots > 0 && totalWeight > budgetSlots;
+  const units = buildUnitsFromItems(items);
+  const { profile } = detectContentProfile(items);
+  const { pages: contentPages } = buildPages({ units, layouts, allowedSlugs, profile, seedBase });
 
-  const pageGroups = packBlocksIntoPages(blocks, slotsPerPage);
+  // Le livre compte EXACTEMENT le nombre de pages que le contenu occupe,
+  // jamais plus : aucune page blanche n'est jamais inseree pour atteindre un
+  // palier (une page vide est une forme de "remplissage artificiel" au meme
+  // titre qu'inventer du contenu — voir cahier des charges §2 et §10).
+  //
+  // Si le contenu depasse le budget demande, tout est tout de meme place
+  // (jamais de troncature) et `overflow` previent l'appelant. Si le contenu
+  // tient sur moins de pages que demande, `underflow` previent l'appelant
+  // (le livre sera plus court que le palier choisi) — dans les deux cas une
+  // simple recommandation/alerte cote ecran, jamais un blocage.
+  const overflow = pagesAvailable > 0 && contentPages.length > pagesAvailable;
+  const underflow = pagesAvailable > 0 && contentPages.length < pagesAvailable && contentPages.length > 0;
 
-  const pages = pageGroups.map((blocksOnPage, pageIndex) => {
-    const pageKind = kindOfPage(blocksOnPage);
-    const layoutSeed = `${seedBase}:${pageIndex}`;
-    // Une page melangeant plusieurs blocs heterogenes n'a en general qu'un
-    // seul bloc dominant a placer via un layout "mixte" ; sinon, chaque bloc
-    // garde son propre layout dans le contenu de la page.
-    const blockPlacements = blocksOnPage.map((block) => ({
-      itemIds: block.itemIds,
-      kind: block.kind,
-      layoutId: chooseLayout(block, layouts, allowedSlugs, `${layoutSeed}:${block.key}`)
-    }));
+  const pages = contentPages.map((page, index) => ({ ...page, page_index: index }));
+  const totalWeight = units.reduce((sum, unit) => sum + (unit.weight || 1), 0);
 
-    return {
-      page_index: pageIndex,
-      layout_id: blockPlacements.length === 1 ? blockPlacements[0].layoutId : null,
-      content: {
-        kind: pageKind,
-        itemIds: blocksOnPage.flatMap((block) => block.itemIds),
-        blocks: blockPlacements
-      }
-    };
-  });
-
-  return { pages, overflow, pageBudget: pagesAvailable, totalWeight };
+  return { pages, overflow, underflow, pageBudget: pagesAvailable, totalWeight };
 }
 
 module.exports = {
   compose,
+  buildUnitsFromItems,
+  buildPages,
   weightOfItem,
   groupIntoBlocks,
   recommendPageCount,
-  DEFAULT_SLOTS_PER_PAGE,
+  hashSeed,
+  mulberry32,
+  pickDeterministic,
   DEFAULT_FIXED_PAGES,
-  PAGE_COUNT_TIERS
+  PAGE_COUNT_TIERS,
+  GUARANTEED_FALLBACK_SLUGS
 };

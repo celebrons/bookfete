@@ -105,20 +105,6 @@ const HeaderLuxe = () => {
                 Tableau de bord
               </Link>
               <Link
-                to="/admin/prompts"
-                style={{
-                  textDecoration: 'none',
-                  color: 'var(--ink)',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'color var(--transition-fast)'
-                }}
-                onMouseEnter={(e) => e.target.style.color = 'var(--gold)'}
-                onMouseLeave={(e) => e.target.style.color = 'var(--ink)'}
-              >
-                Prompts IA
-              </Link>
-              <Link
                 to="/account"
                 title="Espace client"
                 style={{

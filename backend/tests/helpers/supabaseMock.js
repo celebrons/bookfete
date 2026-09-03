@@ -89,6 +89,40 @@ function createSupabaseMock(tables = {}, options = {}) {
         return { data: inserted, error: null };
       }
 
+      if (state.operation === 'upsert') {
+        // Honore onConflict : met a jour la ligne existante correspondant a
+        // la cle composite plutot que d'en creer une doublon (contrairement
+        // a un simple insert) — reproduit le vrai comportement Supabase.
+        const conflictColumns = String(state.onConflict || '')
+          .split(',')
+          .map((column) => column.trim())
+          .filter(Boolean);
+        const incoming = Array.isArray(state.payload) ? state.payload : [state.payload];
+        const upserted = [];
+
+        incoming.forEach((row) => {
+          const matchIndex = conflictColumns.length > 0
+            ? rows.findIndex((existing) => conflictColumns.every((column) => String(existing[column]) === String(row[column])))
+            : -1;
+
+          if (matchIndex >= 0) {
+            rows[matchIndex] = { ...rows[matchIndex], ...row };
+            upserted.push(rows[matchIndex]);
+          } else {
+            const inserted = {
+              id: row.id || `${table}-generated-${rows.length + 1}`,
+              created_at: row.created_at || '2026-01-01T00:00:00.000Z',
+              ...row
+            };
+            rows.push(inserted);
+            upserted.push(inserted);
+          }
+        });
+
+        if (onInsert) onInsert(table, upserted);
+        return { data: upserted, error: null };
+      }
+
       if (state.operation === 'update') {
         const updated = [];
         rows.forEach((row, index) => {
@@ -194,9 +228,10 @@ function createSupabaseMock(tables = {}, options = {}) {
         state.payload = payload;
         return query;
       },
-      upsert(payload) {
-        state.operation = 'insert';
+      upsert(payload, options = {}) {
+        state.operation = 'upsert';
         state.payload = payload;
+        state.onConflict = options.onConflict;
         return query;
       },
       update(payload) {

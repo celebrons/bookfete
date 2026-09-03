@@ -56,16 +56,10 @@ const BookConfigLuxe = ({
   bookTitle = '',
   onOpenTab,
   chaptersCount = 6,
-  onPagesChange,
-  onOpenBookPreview,
-  canOpenBookPreview = false,
-  previewUnavailableReason = '',
-  isGeneratingPreview = false,
   onOpenCoverConfig
 }) => {
   const [formData, setFormData] = useState(() => buildInitialFormData(book, chaptersCount));
   const [isSaving, setIsSaving] = useState(false);
-  const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(null);
 
   useEffect(() => {
@@ -104,18 +98,6 @@ const BookConfigLuxe = ({
     return Math.round(withStyle * 100) / 100;
   }, [formData.pages, selectedFinition.basePrice, selectedPapier.multiplier, selectedStyle.multiplier]);
 
-  const calculatedChapters = useMemo(
-    () => Math.max(4, Math.floor(formData.pages / DEFAULT_PAGES_PER_CHAPTER)),
-    [formData.pages]
-  );
-
-  const chapterDelta = calculatedChapters - chaptersCount;
-  const willChaptersChange = chapterDelta !== 0;
-  const isChapterReduction = chapterDelta < 0;
-  const requiresChapterReductionConfirmation = willChaptersChange
-    && isChapterReduction
-    && formData.pages !== currentBookSnapshot.pages;
-
   const hasPendingChanges = useMemo(() => (
     formData.title !== currentBookSnapshot.title
     || formData.finition !== currentBookSnapshot.finition
@@ -139,18 +121,6 @@ const BookConfigLuxe = ({
     if (!hasPendingChanges) {
       return false;
     }
-    if (requiresChapterReductionConfirmation && typeof window !== 'undefined') {
-      const confirmed = window.confirm(
-        `Vous allez retirer ${Math.abs(chapterDelta)} chapitre(s).\n\nLes chapitres supprimes et leur contenu ne pourront pas etre recuperes.\nContinuer ?`
-      );
-      if (!confirmed) {
-        setSaveFeedback({
-          type: 'info',
-          message: 'Modification annulee. Le nombre de chapitres n a pas ete reduit.'
-        });
-        return false;
-      }
-    }
     setIsSaving(true);
     setSaveFeedback(null);
 
@@ -164,10 +134,6 @@ const BookConfigLuxe = ({
 
     try {
       await onUpdateBook(payload);
-
-      if (formData.pages !== currentBookSnapshot.pages && typeof onPagesChange === 'function') {
-        await onPagesChange(formData.pages);
-      }
 
       if (showSuccessBanner) {
         setSaveFeedback({
@@ -188,7 +154,7 @@ const BookConfigLuxe = ({
   };
 
   const handleValidate = async () => {
-    if (isSaving || isPreparingPreview || !hasPendingChanges) {
+    if (isSaving || !hasPendingChanges) {
       return;
     }
     try {
@@ -198,40 +164,7 @@ const BookConfigLuxe = ({
     }
   };
 
-  const handleOpenLivePreview = async () => {
-    if (
-      isSaving
-      || isPreparingPreview
-      || typeof onOpenBookPreview !== 'function'
-      || !canOpenBookPreview
-    ) {
-      return;
-    }
-
-    setIsPreparingPreview(true);
-    setSaveFeedback(null);
-    try {
-      if (hasPendingChanges) {
-        const persisted = await persistConfiguration({ showSuccessBanner: false });
-        if (!persisted) {
-          return;
-        }
-      }
-      await onOpenBookPreview();
-    } catch (_error) {
-      // Parent displays detailed notice when preview generation fails.
-    } finally {
-      setIsPreparingPreview(false);
-    }
-  };
-
   const pageProgress = ((formData.pages - MIN_PAGES) / (MAX_PAGES - MIN_PAGES)) * 100;
-  const previewActionDisabled = (
-    isSaving
-    || isPreparingPreview
-    || isGeneratingPreview
-    || !canOpenBookPreview
-  );
 
   return (
     <div className="book-config-live">
@@ -322,11 +255,6 @@ const BookConfigLuxe = ({
               <span className="book-config-pages-value">{formData.pages} pages</span>
             </div>
 
-            <div className="book-config-pages-meta">
-              <span>{calculatedChapters} chapitres</span>
-              <span>{DEFAULT_PAGES_PER_CHAPTER} pages / chapitre</span>
-            </div>
-
             <input
               type="range"
               min={MIN_PAGES}
@@ -345,14 +273,6 @@ const BookConfigLuxe = ({
             <div className="book-config-progress-track">
               <span className="book-config-progress-bar" style={{ width: `${pageProgress}%` }} />
             </div>
-
-            {willChaptersChange && (
-              <div className={`book-config-delta ${chapterDelta > 0 ? 'is-positive' : 'is-warning'}`}>
-                {chapterDelta > 0
-                  ? `${chapterDelta} chapitre(s) seront ajoutes apres validation.`
-                  : `${Math.abs(chapterDelta)} chapitre(s) seront retires apres validation.`}
-              </div>
-            )}
           </div>
 
           <div className="book-config-panel-actions">
@@ -365,7 +285,7 @@ const BookConfigLuxe = ({
               type="button"
               className="chapter-editor-primary-action book-config-panel-action"
               onClick={handleValidate}
-              disabled={!hasPendingChanges || isSaving || isPreparingPreview}
+              disabled={!hasPendingChanges || isSaving}
             >
               {isSaving ? 'Validation...' : 'Valider'}
             </button>
@@ -378,7 +298,7 @@ const BookConfigLuxe = ({
             <div className="book-config-preview-content">
               <span className="book-config-preview-chip">{selectedStyle.label}</span>
               <h3>{formData.title || 'Titre du livre'}</h3>
-              <p>{calculatedChapters} chapitres - {formData.pages} pages</p>
+              <p>{formData.pages} pages</p>
             </div>
           </div>
 
@@ -391,35 +311,12 @@ const BookConfigLuxe = ({
           <div className="book-config-preview-actions">
             <button
               type="button"
-              className="btn btn-primary book-config-preview-btn"
-              onClick={handleOpenLivePreview}
-              disabled={previewActionDisabled}
-              title={canOpenBookPreview ? 'Ouvrir un apercu feuillete du livre' : previewUnavailableReason}
-            >
-              {isSaving || isPreparingPreview || isGeneratingPreview
-                ? 'Preparation...'
-                : (hasPendingChanges ? 'Enregistrer + ouvrir l apercu' : 'Ouvrir l apercu livre')}
-            </button>
-            <div className="book-config-preview-helper">
-              Apercu feuillete non contractuel. Vous pouvez encore modifier avant validation definitive.
-            </div>
-
-            <button
-              type="button"
               className="btn btn-outline book-config-cover-btn"
               onClick={onOpenCoverConfig}
               disabled={typeof onOpenCoverConfig !== 'function'}
             >
               Configurer couverture et 4e
             </button>
-            {!canOpenBookPreview && previewUnavailableReason && (
-              <div className="book-config-preview-warning">{previewUnavailableReason}</div>
-            )}
-            {requiresChapterReductionConfirmation && (
-              <div className="book-config-preview-warning">
-                Attention: la nouvelle pagination supprimera {Math.abs(chapterDelta)} chapitre(s) a la validation.
-              </div>
-            )}
           </div>
         </aside>
       </div>

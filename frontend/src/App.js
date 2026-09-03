@@ -5,6 +5,7 @@ import { supabase } from './services/supabaseClient';
 
 
 import './styles/luxe-theme.css';
+import './styles/wizard.css';
 
 // Layout
 import Layout from './components/layout/Layout';
@@ -14,7 +15,7 @@ import HomePageLuxe from './components/home/HomePageLuxe';
 import HowItWorksLuxe from './components/home/HowItWorksLuxe';
 import LoginLuxe from './components/auth/LoginLuxe';
 import RegisterLuxe from './components/auth/RegisterLuxe';
-import CreateBookLuxe from './components/create-book/CreateBookLuxe';
+import CreateBookSansIA from './components/create-book/CreateBookSansIA';
 import DashboardGeneralLuxe from './components/dashboard/DashboardGeneralLuxe';
 import BookPageLuxe  from './components/book/BookPageLuxe';
 import BookComposeLuxe from './components/book/BookComposeLuxe';
@@ -83,7 +84,7 @@ function App() {
           <Route path="/how-it-works" element={<HowItWorksLuxe />} />
           <Route path="/login" element={<LoginLuxe />} />
           <Route path="/register" element={<RegisterLuxe />} />
-          <Route path="/create-book" element={<CreateBookLuxe />} />
+          <Route path="/create-book" element={<CreateBookSansIA />} />
 		  <Route path="/invite/:token" element={<InvitationPageLuxe />} />
 		  <Route path="/contribute/:token" element={<TokenContributePageLuxe />} />
 

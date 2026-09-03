@@ -68,6 +68,44 @@ const rawRequest = async (path, options = {}) => {
   return response;
 };
 
+// Requete publique (aucune session requise) : pour les pages accessibles
+// avant connexion, comme l'entree de creation depuis la page d'accueil.
+const publicRequest = async (path, options = {}) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${buildApiBaseUrl()}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+    });
+    const payload = await parseJsonSafe(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Erreur.');
+    }
+    return payload;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Le serveur met trop de temps a repondre. Reessayez dans quelques secondes.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+// --- Creation d'un livre (occasion + titre, sans IA) -------------------------
+
+// Catalogue des occasions (public, donnees pures — pas d'appel IA).
+export const listEventTypes = () => publicRequest('/books/create/event-types');
+
+// Cree un livre nu (titre + occasion), sans passer par l'assistant IA
+// (backend/routes/bookCreation.js). Reutilise le CRUD generique existant.
+export const createBook = (payload) => request('/books', {
+  method: 'POST',
+  body: JSON.stringify(payload)
+});
+
 // --- Catalogues (publics, pas d'auth requise) -------------------------------
 
 export const listTemplates = () => request('/catalog/templates');

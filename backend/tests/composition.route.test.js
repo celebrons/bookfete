@@ -27,12 +27,21 @@ jest.mock('../config/supabase', () => {
           label: 'Elegance',
           active: true,
           sort_order: 1,
-          allowed_layouts: ['photo-pleine-page'],
+          allowed_layouts: ['FULL_PHOTO'],
           design_tokens: { slotsPerPage: 3 }
         }
       ],
       layout_definitions: [
-        { id: 'lay-1', slug: 'photo-pleine-page', label: 'Photo pleine page', kind: 'photo', active: true, min_items: 1, max_items: 1 }
+        {
+          id: 'lay-1',
+          slug: 'FULL_PHOTO',
+          label: 'Photo pleine page',
+          kind: 'photo',
+          active: true,
+          min_items: 1,
+          max_items: 1,
+          capacity: { slots: [{ type: 'photo' }] }
+        }
       ],
       book_products: [
         { id: 'prod-1', page_count: 24, format: 'standard', price_cents: 2900, active: true }
@@ -50,7 +59,8 @@ jest.mock('../config/supabase', () => {
 
 jest.mock('../services/composition/pdfService', () => ({
   resolveBrowserPath: jest.fn(() => '/fake/chrome'),
-  renderPdfFromHtml: jest.fn(async () => require('path').join(__dirname, 'fixtures', 'fake.pdf'))
+  renderPdfFromHtml: jest.fn(async () => require('path').join(__dirname, 'fixtures', 'fake.pdf')),
+  renderPdfFromPages: jest.fn(async () => require('path').join(__dirname, 'fixtures', 'fake.pdf'))
 }));
 
 jest.mock('../services/storageService', () => ({
@@ -230,7 +240,7 @@ describe('routes/composition', () => {
       expect(response.headers['content-type']).toBe('application/pdf');
 
       const pdfService = require('../services/composition/pdfService');
-      expect(pdfService.renderPdfFromHtml).toHaveBeenCalled();
+      expect(pdfService.renderPdfFromPages).toHaveBeenCalled();
     });
   });
 });

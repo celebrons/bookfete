@@ -3,8 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { listOrdersByBook } from '../../services/ordersApi';
-import ChapterListLuxe from './ChapterListLuxe';
 import BookConfigLuxe from './BookConfigLuxe';
+import BookCoverDesignerLuxe from './BookCoverDesignerLuxe';
 import ContributorsTabLuxe from './contributors/ContributorsTabLuxe';
 import Loading from '../common/Loading';
 import BookWorkspaceHeader from './BookWorkspaceHeader';
@@ -1095,28 +1095,6 @@ const BookPageLuxe = () => {
     );
   };
 
-  const mergeContributionIntoChapterState = (chapterId, contribution) => {
-    if (!contribution?.id) {
-      return;
-    }
-
-    updateChapterInState(chapterId, (chapter) => {
-      const contributions = Array.isArray(chapter?.contributions) ? [...chapter.contributions] : [];
-      const existingIndex = contributions.findIndex((item) => item.id === contribution.id);
-
-      if (existingIndex >= 0) {
-        contributions[existingIndex] = contribution;
-      } else {
-        contributions.push(contribution);
-      }
-
-      return {
-        ...chapter,
-        contributions
-      };
-    });
-  };
-
   const persistChapterWorkflowState = async (chapterId, nextState) => {
     const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
     const existingStateContribution = Array.isArray(currentChapter?.contributions)
@@ -1224,23 +1202,6 @@ const BookPageLuxe = () => {
     }
   };
 
-  const generateChapterAmorce = async (chapterId, { force = false } = {}) => {
-    const token = await getAuthAccessToken();
-    const response = await fetch(`${getApiBaseUrl()}/chapters/${chapterId}/generate-amorce`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ force })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload?.error || 'Erreur lors de la generation de l amorce.');
-    }
-    return payload?.chapter || null;
-  };
-
   const handleUpdateChapter = async (chapterId, updates) => {
     try {
       const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
@@ -1280,24 +1241,6 @@ const BookPageLuxe = () => {
 
       if (error) throw error;
       updateChapterInState(chapterId, (chapter) => ({ ...chapter, ...data }));
-
-      const titleChanged = Object.prototype.hasOwnProperty.call(safeChapterUpdates, 'title')
-        && normalizeText(safeChapterUpdates.title) !== normalizeText(currentChapter?.title);
-      const canAutoRefreshAmorce = titleChanged
-        && !currentChapter?.amorce_validated
-        && (!currentChapter?.amorce_text || Boolean(currentChapter?.amorce_generated_at));
-
-      if (canAutoRefreshAmorce) {
-        try {
-          const regeneratedChapter = await generateChapterAmorce(chapterId);
-          if (regeneratedChapter) {
-            updateChapterInState(chapterId, (chapter) => ({ ...chapter, ...regeneratedChapter }));
-            return regeneratedChapter;
-          }
-        } catch (amorceError) {
-          showPageNotice(amorceError.message || 'Le titre a ete modifie, mais l amorce n a pas pu etre regeneree.', 'info');
-        }
-      }
 
       return data;
     } catch (error) {
@@ -1413,102 +1356,6 @@ const BookPageLuxe = () => {
       return data;
     } catch (error) {
       console.error('❌ Erreur finalisation contribution:', error);
-      throw error;
-    }
-  };
-
-  const handleGenerateChapterDraft = async (chapterId, options = {}) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error('Session introuvable');
-      }
-
-      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/chapters/${chapterId}/generate-draft`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(options || {})
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de la generation du chapitre');
-      }
-
-      if (data?.draftContribution) {
-        mergeContributionIntoChapterState(chapterId, data.draftContribution);
-      }
-      return data;
-    } catch (error) {
-      console.error('Erreur generation chapitre:', error);
-      throw error;
-    }
-  };
-
-  const handleSaveChapterDraft = async (chapterId, html) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error('Session introuvable');
-      }
-
-      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/chapters/${chapterId}/save-draft`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ html })
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de la sauvegarde du chapitre');
-      }
-
-      mergeContributionIntoChapterState(chapterId, data.draftContribution);
-      return data;
-    } catch (error) {
-      console.error('Erreur sauvegarde chapitre:', error);
-      throw error;
-    }
-  };
-
-  const handleFinalizeChapterDraft = async (chapterId, html) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error('Session introuvable');
-      }
-
-      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/chapters/${chapterId}/finalize-draft`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ html })
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de la validation finale');
-      }
-
-      mergeContributionIntoChapterState(chapterId, data.draftContribution);
-      mergeContributionIntoChapterState(chapterId, data.workflowContribution);
-      return data;
-    } catch (error) {
-      console.error('Erreur validation finale chapitre:', error);
       throw error;
     }
   };
@@ -1684,93 +1531,6 @@ const BookPageLuxe = () => {
     updatingLifecycleStatus
   ]);
 
-  const handleGenerateDraft = async () => {
-    try {
-      if (!isBookReadyForPreview) {
-        throw new Error('Validez tous les chapitres, la couverture et la 4e avant l apercu global');
-      }
-
-      setGeneratingDraft(true);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error('Session introuvable');
-      }
-
-      const response = await fetch(`${getApiBaseUrl()}/books/${bookId}/generate-draft`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          previewFormat: selectedPreviewFormat,
-          previewLayoutSettings: {
-            textDensity: draftLayoutSettings.textDensity,
-            imageDensity: draftLayoutSettings.imageDensity,
-            lineSpacing: draftLayoutSettings.lineSpacing,
-            fontScale: draftLayoutSettings.fontScale
-          }
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l apercu du livre');
-      }
-
-      setDraftPreview({
-        ...data,
-        previewFormat: selectedPreviewFormat,
-        previewLayoutSettings: data?.previewLayoutSettings || {
-          textDensity: draftLayoutSettings.textDensity,
-          imageDensity: draftLayoutSettings.imageDensity
-        }
-      });
-      setDraftSpreadIndex(0);
-      dismissPageNotice();
-      await setBookLifecycleStatus('preview_available', { silent: true, onlyForward: true });
-    } catch (error) {
-      console.error('Erreur apercu livre:', error);
-      showPageNotice(error.message || 'Erreur lors de l apercu du livre', 'error');
-    } finally {
-      setGeneratingDraft(false);
-    }
-  };
-
-  const handleFinalizeBook = async () => {
-    try {
-      if (!isBookReadyForPreview) {
-        throw new Error('Le livre doit etre complet (chapitres + couverture + 4e) avant validation finale.');
-      }
-
-      const lifecycleStatus = getAutomaticLifecycleStatus();
-      if (!isBookLifecycleAtLeast(lifecycleStatus, 'preview_available')) {
-        throw new Error('Generez d abord un apercu avant la validation finale.');
-      }
-
-      if (typeof window !== 'undefined') {
-        const confirmed = window.confirm(
-          'Validation definitive du livre ?\n\nCette action verrouille le contenu (chapitres, couverture et 4e de couverture).\nVous pourrez commander ensuite, mais plus modifier le livre.'
-        );
-        if (!confirmed) {
-          return;
-        }
-      }
-
-      const updated = await setBookLifecycleStatus('finalized', { onlyForward: true });
-      if (!updated) {
-        throw new Error('Impossible de valider le livre pour le moment.');
-      }
-
-      showPageNotice('Livre valide definitivement. Vous pouvez maintenant commander.', 'success');
-    } catch (error) {
-      showPageNotice(error.message || 'Erreur lors de la validation finale du livre.', 'error');
-    }
-  };
 
   const handleDownloadPdfFile = async (kind) => {
     const accessSnapshot = await loadBookOrderAccess();
@@ -1891,104 +1651,6 @@ const BookPageLuxe = () => {
       }
     };
   }, [bookId, user, pdfExportJob?.jobId, pdfExportJob?.status]);
-
-  const handleUpdateChaptersFromPages = async (newPages) => {
-    try {
-      const minPages = 32;
-      const maxPages = MAX_CHAPTERS * 8;
-      const pagesToPersist = Math.max(minPages, Math.min(newPages, maxPages));
-      const newChaptersCount = Math.max(4, Math.min(MAX_CHAPTERS, Math.floor(pagesToPersist / 8)));
-      const currentChaptersCount = chapters.length;
-
-      if (newPages > maxPages) {
-        showPageNotice(`Le livre est limité à ${MAX_CHAPTERS} chapitres maximum.`, 'info');
-      }
-
-      if (newPages < minPages) {
-        showPageNotice('Le livre conserve un minimum de 4 chapitres.', 'info');
-      }
-
-      if (newChaptersCount > currentChaptersCount) {
-        const chaptersToAdd = newChaptersCount - currentChaptersCount;
-        
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-
-        const response = await fetch(`${getApiBaseUrl()}/ai/generate-chapters`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            bookId,
-            eventType: book.event_type,
-            style: book.style_narratif,
-            count: chaptersToAdd,
-            bookTitle: book.title,
-            recipientName: book.recipient_name,
-            recipientAge: book.recipient_age,
-            recipientGender: book.recipient_gender,
-            recipientNickname: '',
-            recipientTrait: '',
-            recipientAnecdote: '',
-            additionalContext: book?.cover_config?.aiProjectBrief || ''
-          })
-        });
-
-        const data = await response.json();
-        
-        if (response.ok) {
-          const newChapters = data.chapters.map((ch, index) => ({
-            book_id: bookId,
-            title: getSafeChapterTitle(ch.title, currentChaptersCount + index),
-            description: ch.description || `Chapitre ${currentChaptersCount + index + 1}`,
-            order_index: currentChaptersCount + index,
-            amorce_text: null,
-            triggers: [],
-            amorce_generated_at: null,
-            amorce_validated: false,
-            questions_ia: []
-          }));
-
-          const { data: insertedChapters, error: insertError } = await supabase
-            .from('chapters')
-            .insert(newChapters)
-            .select('*');
-
-          if (insertError) throw insertError;
-
-          if (Array.isArray(insertedChapters) && insertedChapters.length > 0) {
-            for (const insertedChapter of insertedChapters) {
-              try {
-                // eslint-disable-next-line no-await-in-loop
-                await generateChapterAmorce(insertedChapter.id);
-              } catch (_error) {
-                // Keep chapter creation resilient even if the amorce prompt is unavailable.
-              }
-            }
-          }
-        }
-      } else if (newChaptersCount < currentChaptersCount) {
-        const chaptersToRemove = currentChaptersCount - newChaptersCount;
-        const chaptersToDelete = chapters.slice(-chaptersToRemove).map(ch => ch.id);
-
-        const { error: deleteError } = await supabase
-          .from('chapters')
-          .delete()
-          .in('id', chaptersToDelete);
-
-        if (deleteError) throw deleteError;
-      }
-      
-      await loadBookAndChapters();
-      await handleUpdateBook({ pages: pagesToPersist });
-      
-    } catch (error) {
-      console.error('❌ Erreur mise à jour chapitres:', error);
-      showPageNotice('Erreur lors de la mise à jour des chapitres.', 'error');
-    }
-  };
 
   const draftPreviewPages = useMemo(
     () => buildDraftPreviewPages(draftPreview?.html || ''),
@@ -2329,66 +1991,29 @@ const BookPageLuxe = () => {
         )}
 
         {activeTab === 'chapitres' && (
-          <div className={`book-edition-live ${isChapterWorkspaceActive ? 'is-workspace-active' : ''}`}>
-            {!isChapterWorkspaceActive && (
-              <>
-                <BookWorkspaceHeader
-                  sectionLabel="Edition"
-                  bookTitle={displayBookTitle || book?.title || ''}
-                  activeTab={activeTab}
-                  onOpenTab={setActiveTab}
-                />
-
-                {canGenerateBookPreview && (
-                  <div className="book-edition-actions">
-                    <button
-                      type="button"
-                      className="chapter-editor-primary-action"
-                      onClick={handleGenerateDraft}
-                      disabled={generatingDraft || !canGenerateBookPreview}
-                      title={canGenerateBookPreview
-                        ? 'Afficher l apercu assemble du livre'
-                        : 'Validez chapitres + couverture + 4e avant l apercu'}
-                    >
-                      {generatingDraft ? 'Generation...' : 'Apercu livre'}
-                    </button>
-                  </div>
-                )}
-
-                <div className="book-edition-actions">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => navigate(`/book/${bookId}/composer`)}
-                    title="Mettre en page ce livre a partir de vos photos et textes, sans IA"
-                  >
-                    Composer sans IA
-                  </button>
-                </div>
-              </>
-            )}
-
-            <ChapterListLuxe
-              key={`edition-gallery-${editionGalleryRequest}`}
-              chapters={chapters}
-              bookId={bookId}
-              book={book}
+          <div className="book-edition-live">
+            <BookWorkspaceHeader
+              sectionLabel="Edition"
               bookTitle={displayBookTitle || book?.title || ''}
-              onWorkspaceModeChange={setIsChapterWorkspaceActive}
+              activeTab={activeTab}
               onOpenTab={setActiveTab}
-              onUpdateChapter={handleUpdateChapter}
-              onSaveContribution={handleSaveContribution}
-              onFinalizeContribution={handleFinalizeContribution}
-              onGenerateChapterDraft={handleGenerateChapterDraft}
-              onSaveChapterDraft={handleSaveChapterDraft}
-              onFinalizeChapterDraft={handleFinalizeChapterDraft}
-              onDeleteChapter={handleDeleteChapter}
-              onUpdateBook={handleUpdateBook}
-              editionGalleryRequest={editionGalleryRequest}
             />
+
+            <div className="book-edition-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => navigate(`/book/${bookId}/composer`)}
+                title="Mettre en page ce livre a partir de vos photos et textes, sans IA"
+              >
+                Composer mon livre
+              </button>
+            </div>
+
+            <BookCoverDesignerLuxe book={book} onUpdateBook={handleUpdateBook} />
           </div>
         )}
-        
+
         {activeTab === 'contributeurs' && (
           <ContributorsTabLuxe
             bookId={bookId}
@@ -2398,277 +2023,19 @@ const BookPageLuxe = () => {
             onUpdateBook={handleUpdateBook}
           />
         )}
-        
+
         {activeTab === 'config' && (
-          <BookConfigLuxe 
-              book={book} 
+          <BookConfigLuxe
+              book={book}
               bookTitle={displayBookTitle || book?.title || ''}
               onOpenTab={setActiveTab}
               onUpdateBook={handleUpdateBook}
             chaptersCount={chapters.length}
-            onPagesChange={handleUpdateChaptersFromPages}
-            onOpenBookPreview={handleGenerateDraft}
-            canOpenBookPreview={canGenerateBookPreview}
-            previewUnavailableReason={previewUnavailableReason}
-            isGeneratingPreview={generatingDraft}
-            onOpenCoverConfig={openEditionGallery}
+            onOpenCoverConfig={() => setActiveTab('chapitres')}
           />
         )}
 
       </div>
-
-      {draftPreview && (
-        <div className="modal-overlay">
-          <div className="modal-content book-draft-modal">
-            <div className="book-draft-modal-shell">
-            <div className="book-draft-modal-toolbar is-visible is-sidebar">
-              <div className="book-draft-modal-header">
-                <div className="book-draft-modal-heading">
-                  <h3 className="book-draft-modal-title">Apercu du livre</h3>
-                  {draftPreview.generatedAt && (
-                    <div className="book-draft-modal-meta">
-                      Genere le {new Date(draftPreview.generatedAt).toLocaleString('fr-FR')} | Format {selectedPreviewFormatMeta.label}
-                    </div>
-                  )}
-                </div>
-                <div className="book-draft-modal-header-actions">
-                  <button
-                    type="button"
-                    className="modal-close"
-                    onClick={() => setDraftPreview(null)}
-                  >
-                    x
-                  </button>
-                </div>
-              </div>
-
-              <div className="book-draft-modal-format">
-                <div className="book-draft-modal-format-block">
-                  <span className="book-preview-format-label">Formats</span>
-                  <div className="book-preview-format-switch is-modal">
-                    {BOOK_PREVIEW_FORMATS.map((format) => (
-                      <button
-                        key={format.id}
-                        type="button"
-                        className={`book-preview-format-btn ${selectedPreviewFormat === format.id ? 'is-active' : ''}`}
-                        onClick={() => handlePreviewFormatChange(format.id)}
-                      >
-                        <span>{format.label}</span>
-                        <small>{format.note}</small>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="book-draft-layout-hint">
-                    {PREVIEW_FORMAT_IMPACT[selectedPreviewFormatMeta.id] || PREVIEW_FORMAT_IMPACT.standard}
-                  </div>
-                </div>
-                <div className="book-draft-reading-toggle" role="group" aria-label="Mode de lecture">
-                  <button
-                    type="button"
-                    className={`book-draft-reading-btn ${isHorizontalDraftMode ? 'is-active' : ''}`}
-                    onClick={() => {
-                      setDraftReadingMode('horizontal');
-                      setDraftSpreadIndex(0);
-                    }}
-                  >
-                    Feuilletage
-                  </button>
-                  <button
-                    type="button"
-                    className={`book-draft-reading-btn ${!isHorizontalDraftMode ? 'is-active' : ''}`}
-                    onClick={() => setDraftReadingMode('vertical')}
-                  >
-                    Vertical
-                  </button>
-                </div>
-              </div>
-
-              <div className="book-draft-layout-controls">
-                <div className="book-draft-layout-group">
-                  <span className="book-preview-format-label">Texte</span>
-                  <div className="book-draft-layout-switch" role="group" aria-label="Densite de texte">
-                    {PREVIEW_TEXT_DENSITY_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`book-draft-layout-btn ${draftLayoutSettings.textDensity === option.id ? 'is-active' : ''}`}
-                        onClick={() => {
-                          applyDraftLayoutSettings({
-                            textDensity: option.id
-                          });
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <span className="book-draft-layout-hint">
-                    {PREVIEW_TEXT_DENSITY_IMPACT[draftLayoutSettings.textDensity] || PREVIEW_TEXT_DENSITY_IMPACT.balanced}
-                  </span>
-                </div>
-
-                <div className="book-draft-layout-group">
-                  <span className="book-preview-format-label">Images</span>
-                  <div className="book-draft-layout-switch" role="group" aria-label="Densite d images">
-                    {PREVIEW_IMAGE_DENSITY_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`book-draft-layout-btn ${draftLayoutSettings.imageDensity === option.id ? 'is-active' : ''}`}
-                        onClick={() => {
-                          applyDraftLayoutSettings({
-                            imageDensity: option.id
-                          });
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <span className="book-draft-layout-hint">
-                    {PREVIEW_IMAGE_DENSITY_IMPACT[draftLayoutSettings.imageDensity] || PREVIEW_IMAGE_DENSITY_IMPACT.balanced}
-                  </span>
-                  {!draftPreviewHasImages && (
-                    <span className="book-draft-layout-hint is-warning">
-                      Aucune image detectee dans cet apercu: ce reglage agira sur les pages avec photos.
-                    </span>
-                  )}
-                </div>
-
-                <div className="book-draft-layout-group">
-                  <span className="book-preview-format-label">Interligne</span>
-                  <div className="book-draft-layout-switch" role="group" aria-label="Interligne">
-                    {PREVIEW_LINE_SPACING_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`book-draft-layout-btn ${draftLayoutSettings.lineSpacing === option.id ? 'is-active' : ''}`}
-                        onClick={() => {
-                          applyDraftLayoutSettings({
-                            lineSpacing: option.id
-                          });
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <span className="book-draft-layout-hint">
-                    {PREVIEW_LINE_SPACING_IMPACT[draftLayoutSettings.lineSpacing] || PREVIEW_LINE_SPACING_IMPACT.balanced}
-                  </span>
-                </div>
-
-                <div className="book-draft-layout-group is-span-2">
-                  <span className="book-preview-format-label">Taille texte</span>
-                  <div className="book-draft-slider">
-                    <input
-                      type="range"
-                      min="0.9"
-                      max="1.08"
-                      step="0.02"
-                      value={draftLayoutSettings.fontScale}
-                      onChange={(event) => {
-                        applyDraftLayoutSettings({
-                          fontScale: Number(event.target.value)
-                        });
-                      }}
-                      aria-label="Taille de texte"
-                    />
-                    <span className="book-draft-slider-value">
-                      {Math.round((draftLayoutSettings.fontScale || 1) * 100)}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="book-draft-layout-summary" aria-live="polite">
-                  <span>Format: {selectedPreviewFormatMeta.label}</span>
-                  <span>Texte: {selectedTextDensityMeta.label}</span>
-                  <span>Images: {selectedImageDensityMeta.label}</span>
-                  <span>Interligne: {selectedLineSpacingMeta.label}</span>
-                </div>
-              </div>
-
-              <div className="book-draft-modal-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={handleGenerateDraft}
-                  disabled={generatingDraft}
-                  title="Regenerer le contenu de l apercu avec l IA, en conservant vos reglages"
-                >
-                  {generatingDraft ? 'Generation...' : 'Regenerer le contenu IA'}
-                </button>
-                <div className="book-draft-modal-action-note">
-                  Les reglages de mise en page s appliquent en direct. Ce bouton relance uniquement la generation IA.
-                </div>
-              </div>
-
-            </div>
-
-            <div
-              className={`book-draft-preview book-draft-preview-format-${selectedPreviewFormat} book-draft-layout-text-${draftLayoutSettings.textDensity} book-draft-layout-image-${draftLayoutSettings.imageDensity} ${isHorizontalDraftMode ? 'is-horizontal' : 'is-vertical'} ${hasPaidOrderAccess ? '' : 'is-protected'}`.trim()}
-              style={draftPreviewInlineStyle}
-            >
-              {!hasPaidOrderAccess && (
-                <div className="book-draft-protected-badge" aria-hidden="true">
-                  Apercu non contractuel
-                </div>
-              )}
-              {isHorizontalDraftMode && draftPreviewPages.length > 0 ? (
-                <div className="book-draft-preview-stage book-draft-preview-stage-spread">
-                  <button
-                    type="button"
-                    className="book-draft-nav-arrow is-left"
-                    onClick={() => shiftDraftSpread(-1)}
-                    disabled={!canGoToPreviousSpread}
-                    aria-label="Page precedente"
-                  >
-                    &lt;
-                  </button>
-                  <div className="book-draft-book-spread">
-                    <article className="draft-book-leaf is-left">
-                      <div
-                        className="draft-book-leaf-content"
-                        dangerouslySetInnerHTML={{ __html: leftDraftPageHtml }}
-                      />
-                    </article>
-                    <article className="draft-book-leaf is-right">
-                      <div
-                        className="draft-book-leaf-content"
-                        dangerouslySetInnerHTML={{
-                          __html: rightDraftPageHtml || '<div class="draft-book-leaf-empty"></div>'
-                        }}
-                      />
-                    </article>
-                  </div>
-                  <button
-                    type="button"
-                    className="book-draft-nav-arrow is-right"
-                    onClick={() => shiftDraftSpread(1)}
-                    disabled={!canGoToNextSpread}
-                    aria-label="Page suivante"
-                  >
-                    &gt;
-                  </button>
-                </div>
-              ) : (
-                <div className="book-draft-preview-stage">
-                  <div
-                    className="book-draft-preview-paper"
-                    dangerouslySetInnerHTML={{ __html: draftPreview.html }}
-                  />
-                </div>
-              )}
-              {isHorizontalDraftMode && draftPreviewPages.length > 0 && (
-                <div className="book-draft-spread-meta">
-                  Pages {currentDraftSpreadIndex * 2 + 1}-{Math.min((currentDraftSpreadIndex + 1) * 2, draftPreviewPages.length)} / {draftPreviewPages.length}
-                </div>
-              )}
-            </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {pdfPreviewModal.open && (
         <div className="modal-overlay" onClick={closePdfPreviewModal}>

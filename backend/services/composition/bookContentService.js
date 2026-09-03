@@ -66,9 +66,17 @@ async function listPages(bookId) {
 // remplace toutes les pages non verrouillees du livre par le nouveau
 // resultat. Les pages verrouillees (locked = true) sont preservees telles
 // quelles, meme si le moteur en proposait une version differente.
+//
+// Le moteur v2 ne pad plus jamais avec des pages blanches (voir
+// layoutEngine.js) : une recomposition peut donc legitimement produire MOINS
+// de pages qu'avant (contenu supprime, texte redevenu plus court, etc.). Les
+// pages devenues orphelines (au-dela du nouveau resultat, non verrouillees)
+// sont donc explicitement supprimees plutot que laissees en base — sinon un
+// "Recomposer" laisserait trainer d'anciennes pages jamais nettoyees.
 async function replaceBookPages(bookId, pages = []) {
   const existing = await listPages(bookId);
   const lockedIndexes = new Set(existing.filter((page) => page.locked).map((page) => page.page_index));
+  const newIndexes = new Set(pages.map((page) => page.page_index));
 
   const rows = pages
     .filter((page) => !lockedIndexes.has(page.page_index))
@@ -79,15 +87,28 @@ async function replaceBookPages(bookId, pages = []) {
       content: page.content || {}
     }));
 
-  if (rows.length === 0) {
-    return listPages(bookId);
+  if (rows.length > 0) {
+    const { error } = await supabase
+      .from('book_pages')
+      .upsert(rows, { onConflict: 'book_id,page_index' });
+
+    if (error) throw error;
   }
 
-  const { error } = await supabase
-    .from('book_pages')
-    .upsert(rows, { onConflict: 'book_id,page_index' });
+  const staleIndexes = existing
+    .filter((page) => !page.locked && !newIndexes.has(page.page_index))
+    .map((page) => page.page_index);
 
-  if (error) throw error;
+  if (staleIndexes.length > 0) {
+    const { error: deleteError } = await supabase
+      .from('book_pages')
+      .delete()
+      .eq('book_id', bookId)
+      .in('page_index', staleIndexes);
+
+    if (deleteError) throw deleteError;
+  }
+
   return listPages(bookId);
 }
 

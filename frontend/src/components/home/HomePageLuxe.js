@@ -258,17 +258,17 @@ const homepageEvents = events.slice(0, 0).concat([
     {
       number: '01',
       title: 'Créez votre projet',
-      description: 'Choisissez votre événement, votre style et vos besoins.'
+      description: 'Choisissez votre événement et donnez un titre à votre livre.'
     },
     {
       number: '02',
-      title: 'Invitez vos proches',
-      description: 'Partagez les liens d\'invitation pour collecter messages et photos.'
+      title: 'Ajoutez vos photos et textes',
+      description: 'Importez vos photos et écrivez vos souvenirs directement dans l\'éditeur.'
     },
     {
       number: '03',
-      title: 'Validez les contributions',
-      description: 'Approuvez les messages et photos avant l\'impression.'
+      title: 'Choisissez le style',
+      description: 'Sélectionnez une mise en page et le nombre de pages, l\'aperçu se met à jour en direct.'
     },
     {
       number: '04',
@@ -295,9 +295,9 @@ const homepageEvents = events.slice(0, 0).concat([
         <div className="container-luxe">
           <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
             <span className="label-gold" style={{ marginBottom: 'var(--space-md)' }}>
-              ÉDITION COLLABORATIVE
+              MISE EN PAGE SANS IA
             </span>
-            
+
             <h1 style={{
               fontSize: 'clamp(40px, 8vw, 64px)',
               fontWeight: '700',
@@ -308,7 +308,7 @@ const homepageEvents = events.slice(0, 0).concat([
             }}>
               Transformez vos souvenirs<br />en un livre unique
             </h1>
-            
+
             <p style={{
               fontSize: '18px',
               color: 'var(--text-light)',
@@ -318,7 +318,7 @@ const homepageEvents = events.slice(0, 0).concat([
               marginRight: 'auto',
               lineHeight: '1.6'
             }}>
-              Créez un livre souvenir collaboratif pour marquer tous vos événements importants.
+              Ajoutez vos photos et vos textes, choisissez un style : votre livre souvenir prend forme sous vos yeux.
             </p>
             
             <div style={{
@@ -608,7 +608,7 @@ const homepageEvents = events.slice(0, 0).concat([
             </div>
             <div>
               <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--gold)' }}>50k+</div>
-              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>CONTRIBUTEURS</div>
+              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>PAGES COMPOSÉES</div>
             </div>
             <div>
               <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--gold)' }}>4.9★</div>
