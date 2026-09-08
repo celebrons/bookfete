@@ -57,10 +57,17 @@ const BookWorkspaceHeader = ({
   bookTitle,
   activeTab,
   onOpenTab,
-  subactions = null
+  subactions = null,
+  // "Contributeurs" n'a de sens qu'en mode collaboratif (book.collection_mode
+  // !== 'solo') — invisible sinon, pour ne pas proposer un ecran vide/hors
+  // sujet a un livre solo. book optionnel : les appelants qui ne l'ont pas
+  // encore charge continuent d'afficher les 3 items comme avant.
+  book
 }) => {
   const navigate = useNavigate();
   const displayBookTitle = getDisplayBookTitle(bookTitle || 'Livre');
+  const isSolo = !book || (book.collection_mode || 'solo') === 'solo';
+  const navItems = isSolo ? NAV_ITEMS.filter((item) => item.key !== 'contributeurs') : NAV_ITEMS;
 
   return (
     <div className="book-workspace-header-shell">
@@ -84,7 +91,7 @@ const BookWorkspaceHeader = ({
 
         <div className="chapter-editor-topbar-right">
           <div className="book-workspace-nav-group" aria-label="Navigation du livre">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               return (
                 <Tooltip key={item.key} text={item.label} position="bottom">

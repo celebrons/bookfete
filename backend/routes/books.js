@@ -185,7 +185,13 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const newBook = {
       ...req.body,
-      owner_id: req.user.id
+      owner_id: req.user.id,
+      // Genere pour tout livre (jamais expose au client tant que
+      // collection_mode n'est pas 'open'/'targeted') : evite un aller-retour
+      // supplementaire pour generer le token seulement au moment ou le
+      // proprietaire clique "Partager le lien" (voir routes/composition.js,
+      // GET/POST /api/public/share/:token).
+      share_token: crypto.randomUUID()
     };
 
     const { data, error } = await supabase

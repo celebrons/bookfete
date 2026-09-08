@@ -20,7 +20,94 @@ const SCORING_WEIGHTS = {
   lengthFit: 2,
   orientation: 1,
   rhythmPenalty: 4,
-  balance: 1
+  balance: 1,
+  mood: 2
+};
+
+// Ponderation par "ambiance" (context.mood, optionnel — voir scoreMood) :
+// un axe totalement independant du "style" (book_templates/template_id,
+// l'identite graphique choisie en Configuration) — l'ambiance ne joue que
+// sur le RYTHME de composition (densite de photos par page, presence de
+// pages-titres), jamais sur les couleurs/polices. 'classique' == aucune
+// entree == 0 partout : non-regression garantie pour tout appelant qui ne
+// passe pas de mood (meme principe que cover_overrides.frontVariant =
+// 'AUTO'). Tout slug absent d'une ambiance donnee reste neutre (0) — les
+// layouts hors atelier (ex. contribution) ne sont donc jamais affectes.
+const MOOD_LAYOUT_WEIGHTS = {
+  classique: {},
+  aere: {
+    FULL_PHOTO: 1,
+    PHOTO_WITH_CAPTION: 0.8,
+    TWO_PHOTOS: 0.3,
+    TITLE_TEXT: 0.4,
+    THREE_PHOTOS: -0.6,
+    FOUR_PHOTOS: -1,
+    TWO_PHOTOS_TEXT: -0.5,
+    TITLE_FOUR_PHOTOS: -0.6
+  },
+  compact: {
+    FOUR_PHOTOS: 1,
+    THREE_PHOTOS: 0.8,
+    TWO_PHOTOS_TEXT: 0.8,
+    TITLE_FOUR_PHOTOS: 0.6,
+    TWO_PHOTOS: 0.3,
+    FULL_PHOTO: -1,
+    PHOTO_WITH_CAPTION: -0.5
+  },
+  chapitre: {
+    TITLE_TEXT: 1,
+    TITLE_TWO_PHOTOS: 1,
+    TITLE_FOUR_PHOTOS: 0.8,
+    PHOTO_WITH_CAPTION: 0.6,
+    ONE_TESTIMONY: 0.4,
+    TWO_TESTIMONIES: 0.4,
+    THREE_TESTIMONIES: 0.4
+  },
+  collage: {
+    THREE_PHOTOS: 1,
+    FOUR_PHOTOS: 1,
+    TWO_PHOTOS: 0.5,
+    ONE_TESTIMONY: -0.6,
+    TWO_TESTIMONIES: -0.4,
+    THREE_TESTIMONIES: -0.4,
+    TITLE_TEXT: -0.5
+  },
+  // Entrees dediees au format d'impression (voir formatDensity.js), volontairement
+  // SEPAREES de 'compact'/'aere' ci-dessus (reservees au bouton "essayer une autre
+  // ambiance", une nuance cosmetique ponctuelle) et amplifiees (~2.2x) : le cahier
+  // des charges de l'apercu multi-format exige un changement de mise en page
+  // "IMPORTANT", pas juste perceptible — a ce poids (SCORING_WEIGHTS.mood = 2), une
+  // entree ~2.2-2.4 pese jusqu'a environ +/-5 dans le score total, du meme ordre que
+  // rhythmPenalty (poids 4) plutot que sous son ombre — de quoi renverser fiablement
+  // le choix de layout entre Livret/Luxe sans jamais l'imposer dans l'absolu (le
+  // rythme reprend la main si un format s'entete trop longtemps sur la meme famille).
+  // 'standard' n'a pas d'entree ici : formatDensity.js lui laisse mood=undefined,
+  // c'est-a-dire le comportement neutre/equilibre deja par defaut (scoreMood -> 0).
+  'format-livret': {
+    FOUR_PHOTOS: 2.2,
+    THREE_PHOTOS: 2,
+    TWO_PHOTOS_TEXT: 1.8,
+    TITLE_FOUR_PHOTOS: 1.4,
+    TWO_PHOTOS: 1,
+    TWO_TESTIMONIES: 0.8,
+    THREE_TESTIMONIES: 0.8,
+    FULL_PHOTO: -2.2,
+    PHOTO_WITH_CAPTION: -1.2,
+    TITLE_TEXT: -0.6
+  },
+  'format-luxe': {
+    FULL_PHOTO: 2.4,
+    PHOTO_WITH_CAPTION: 1.8,
+    TITLE_TEXT: 1.2,
+    TWO_PHOTOS: 0.6,
+    ONE_TESTIMONY: 0.6,
+    THREE_PHOTOS: -1.6,
+    FOUR_PHOTOS: -2.2,
+    TWO_PHOTOS_TEXT: -1.2,
+    TITLE_FOUR_PHOTOS: -1.4,
+    TWO_TESTIMONIES: -0.6,
+    THREE_TESTIMONIES: -0.6
+  }
 };
 
 // Proportions cibles de pages par famille selon le profil detecte —
@@ -118,6 +205,14 @@ function scoreBalance(layout, context) {
   return Math.max(0, Math.min(1, 0.5 + (target - current)));
 }
 
+// --- ambiance : affinite entre ce layout et l'ambiance choisie (voir
+// MOOD_LAYOUT_WEIGHTS ci-dessus). context.mood absent/inconnu -> 0 partout,
+// donc jamais bloquant et toujours non-regressif par defaut.
+function scoreMood(layout, mood) {
+  if (!mood) return 0;
+  return MOOD_LAYOUT_WEIGHTS[mood]?.[layout.slug] ?? 0;
+}
+
 // --- rythme : etat glissant des dernieres pages, penalise la monotonie
 // (jamais une exclusion : le contenu peut forcer la repetition, ex. 40
 // photos et rien d'autre — dans ce cas le fallback doit rester atteignable).
@@ -174,6 +269,7 @@ function scoreLayoutCandidate(layout, units, context = {}) {
   const orientation = scoreOrientation(layout, units);
   const balance = scoreBalance(layout, context);
   const penalty = rhythmPenalty(layout, rhythmState);
+  const mood = scoreMood(layout, context.mood);
 
   return (
     fit * SCORING_WEIGHTS.fit
@@ -181,6 +277,7 @@ function scoreLayoutCandidate(layout, units, context = {}) {
     + lengthFit * SCORING_WEIGHTS.lengthFit
     + orientation * SCORING_WEIGHTS.orientation
     + balance * SCORING_WEIGHTS.balance
+    + mood * SCORING_WEIGHTS.mood
     - penalty * SCORING_WEIGHTS.rhythmPenalty
   );
 }
@@ -193,5 +290,6 @@ module.exports = {
   updateFamilyCounts,
   layoutFamily,
   SCORING_WEIGHTS,
-  PROFILE_TARGETS
+  PROFILE_TARGETS,
+  MOOD_LAYOUT_WEIGHTS
 };

@@ -15,6 +15,24 @@ const EVENT_TYPE_ICONS = {
   custom: 'sparkles'
 };
 
+// Libelles humains des occasions (event_type), pour tout affichage cote
+// utilisateur qui ne part que du slug stocke en base (ex: le "kicker" de la
+// couverture, coverComposer.js). Memes libelles que ceux deja montres dans
+// le formulaire de creation (routes/bookCreation.js, FALLBACK_EVENT_TYPE_ROWS)
+// — jamais un texte invente, juste sa propre selection redite lisiblement au
+// lieu du slug technique brut.
+const EVENT_TYPE_LABELS = {
+  anniversaire: 'Anniversaire',
+  retraite: 'Retraite',
+  depart: 'Depart',
+  mariage: 'Mariage / Union',
+  naissance: 'Naissance',
+  voyage: 'Voyage / Vacances',
+  projet: 'Fin de projet',
+  famille: 'Reunion de famille',
+  custom: 'Choix libre'
+};
+
 const FIELD_DEFINITIONS = {
   recipient_age: {
     key: 'recipient_age',
@@ -550,6 +568,7 @@ module.exports = {
   PAPER_TYPES,
   NARRATIVE_STYLES,
   EVENT_TYPE_ICONS,
+  EVENT_TYPE_LABELS,
   FIELD_DEFINITIONS,
   SUBTYPE_SCHEMAS,
   getSubtypeSchema,

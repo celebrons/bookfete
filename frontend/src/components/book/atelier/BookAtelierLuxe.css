@@ -1,0 +1,1207 @@
+/* Atelier de creation personnalisee — trois zones (Mes souvenirs / Le livre /
+   Mise en page). Design autonome, prefixe atelier- deliberement distinct de
+   coverlite-/book-config- (ecrans differents, meme famille visuelle Luxe). */
+
+.atelier-loading {
+  padding: var(--space-xxl) var(--space-md);
+  text-align: center;
+  color: var(--ink);
+  font-family: var(--font-primary);
+}
+
+.atelier-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-md);
+}
+
+.atelier-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+}
+
+.atelier-back-link {
+  color: var(--ink);
+  opacity: 0.7;
+  text-decoration: none;
+  font-size: 14px;
+}
+.atelier-back-link:hover { opacity: 1; }
+
+.atelier-title {
+  margin: 0;
+  font-size: 22px;
+  color: var(--ink);
+}
+
+.atelier-header-note {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.atelier-help-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.atelier-generate-btn {
+  margin-left: auto;
+}
+
+.atelier-error {
+  margin-bottom: var(--space-md);
+}
+
+/* --- Filmstrip de pages (navigation directe, pleine largeur) ----------- */
+/* Retour utilisateur : atteindre une page precise dans un livre de 16+
+   pages ne devrait pas demander autant de clics sur precedente/suivante.
+   Toujours visible sous les 3 colonnes de travail (pas seulement dans la
+   colonne centrale) donc accessible depuis n'importe quelle vue. Vignettes
+   schematiques (numero + statut), pas de vrai rendu — voir
+   AtelierPageFilmstrip.js. */
+.atelier-filmstrip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-md);
+  padding: 10px var(--space-md);
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(223, 216, 201, 0.7);
+  border-radius: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold) rgba(0, 0, 0, 0.06);
+}
+.atelier-filmstrip::-webkit-scrollbar { height: 6px; }
+.atelier-filmstrip::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.06); border-radius: 999px; }
+.atelier-filmstrip::-webkit-scrollbar-thumb { background-color: var(--gold); border-radius: 999px; }
+
+.atelier-filmstrip-sep {
+  flex: none;
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 4px;
+  background: rgba(223, 216, 201, 0.9);
+}
+
+.atelier-filmstrip-cell {
+  position: relative;
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1.5px dashed rgba(120, 108, 90, 0.35);
+  background: var(--silk);
+  color: rgba(60, 52, 40, 0.55);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-filmstrip-cell:hover { border-color: rgba(184, 146, 74, 0.6); }
+.atelier-filmstrip-cell.is-partial {
+  border-style: solid;
+  border-color: rgba(184, 146, 74, 0.5);
+  color: var(--ink);
+}
+.atelier-filmstrip-cell.is-complete {
+  border-style: solid;
+  border-color: var(--gold);
+  background: rgba(184, 146, 74, 0.12);
+  color: var(--ink);
+}
+.atelier-filmstrip-cell.is-cover {
+  border-style: solid;
+  border-color: rgba(120, 108, 90, 0.4);
+  background: var(--white);
+  color: var(--ink);
+  font-style: italic;
+}
+.atelier-filmstrip-cell.is-active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.3);
+}
+.atelier-filmstrip-cell-check {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 9px;
+  color: var(--gold);
+}
+
+/* --- "Terminer mon livre" (bas de page) + verification --------------- */
+
+.atelier-finish-bar {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid rgba(223, 216, 201, 0.7);
+}
+
+.atelier-finish-btn {
+  padding: 14px 36px;
+  font-size: 15px;
+}
+
+.atelier-finish-checklist {
+  list-style: none;
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atelier-finish-checklist li {
+  font-size: 14px;
+  line-height: 1.4;
+}
+.atelier-finish-checklist li.is-ok { color: #1f7a3d; }
+.atelier-finish-checklist li.is-warning { color: #b45f13; }
+
+/* --- Explications de prise en main (AtelierOnboarding) ------------------ */
+
+.atelier-onboarding {
+  position: relative;
+  background: var(--silk);
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 14px;
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.atelier-onboarding-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.atelier-onboarding-close:hover { color: var(--ink); }
+
+.atelier-onboarding-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.atelier-onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-sm) var(--space-lg);
+}
+
+.atelier-onboarding-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.atelier-onboarding-step-icon {
+  font-size: 18px;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.atelier-onboarding-step-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.atelier-onboarding-step-text {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-light);
+}
+
+/* --- Generation automatique (AtelierGenerateModal) -------------------- */
+
+.atelier-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(36, 31, 24, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+.atelier-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--white);
+  border-radius: 16px;
+  padding: var(--space-lg);
+  box-shadow: 0 30px 70px -25px rgba(36, 31, 24, 0.45);
+}
+
+.atelier-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.atelier-modal-title {
+  margin: 0;
+  font-size: 19px;
+  color: var(--ink);
+}
+
+.atelier-modal-close {
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.atelier-modal-close:hover { color: var(--ink); }
+
+.atelier-confirm-modal { max-width: 440px; }
+.atelier-confirm-modal .atelier-hint { margin: 4px 0 0; }
+
+.atelier-mood-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin: var(--space-md) 0;
+}
+.atelier-mood-grid.is-disabled { opacity: 0.5; }
+
+.atelier-mood-card {
+  text-align: left;
+  border: 2px solid rgba(223, 216, 201, 0.9);
+  background: var(--silk);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: var(--transition-fast);
+}
+.atelier-mood-card:hover { border-color: rgba(184, 146, 74, 0.5); }
+.atelier-mood-card.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+.atelier-mood-card:disabled { opacity: 0.6; cursor: default; }
+
+.atelier-mood-card-label {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.atelier-mood-card-description {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-light);
+}
+
+.atelier-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: var(--space-md);
+}
+
+/* --- Couverture/4e integrees a l'atelier (AtelierCoverPanel) ----------- */
+
+.atelier-cover-panel {
+  max-height: 82vh;
+  overflow-y: auto;
+}
+.atelier-cover-panel .coverlite-group { margin-bottom: var(--space-sm); }
+
+.atelier-workspace {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 280px;
+  gap: var(--space-md);
+  align-items: start;
+}
+
+/* --- Colonne gauche : Mes souvenirs --------------------------------- */
+
+.atelier-sidebar {
+  background: var(--white);
+  border: 1px solid rgba(223, 216, 201, 0.88);
+  border-radius: 14px;
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 82vh;
+  overflow-y: auto;
+}
+
+.atelier-sidebar-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.atelier-sidebar-tab {
+  flex: 1;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  background: var(--silk);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-sidebar-tab.is-active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--white);
+}
+
+.atelier-sidebar-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+.atelier-sidebar-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+  padding: var(--space-md) 0;
+}
+
+/* --- Ajout direct (upload photos / nouveau souvenir) -------------------- */
+
+.atelier-sidebar-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atelier-sidebar-add-btn {
+  display: block;
+  text-align: center;
+  border: 1px dashed rgba(184, 146, 74, 0.55);
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-sidebar-add-btn:hover { background: rgba(184, 146, 74, 0.08); }
+.atelier-sidebar-add-btn.is-disabled { opacity: 0.6; cursor: default; }
+
+.atelier-sidebar-add-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.atelier-sidebar-add-text textarea { font-size: 12px; resize: vertical; }
+
+.atelier-sidebar-add-error {
+  margin: 0;
+  font-size: 11px;
+  color: #b42318;
+}
+
+.atelier-sidebar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.atelier-sidebar-item-wrap {
+  position: relative;
+}
+
+.atelier-sidebar-item {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: grab;
+  background: var(--silk);
+  transition: var(--transition-fast);
+}
+.atelier-sidebar-item:hover { border-color: rgba(184, 146, 74, 0.35); }
+.atelier-sidebar-item.is-selected { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+.atelier-sidebar-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Deja placee sur une page interieure du livre (voir usedItemIds,
+   BookAtelierLuxe.js) — assombrie pour signaler visuellement le risque de
+   doublon accidentel, jamais desactivee (reutilisation volontaire toujours
+   possible). is-selected reste prioritaire visuellement (une selection
+   active compte plus que le simple statut "deja utilisee"). */
+.atelier-sidebar-item.is-used img,
+.atelier-sidebar-item.is-used .atelier-sidebar-text-preview { opacity: 0.4; }
+.atelier-sidebar-item.is-used.is-selected img,
+.atelier-sidebar-item.is-used.is-selected .atelier-sidebar-text-preview { opacity: 0.7; }
+
+.atelier-sidebar-item-used-badge {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 3px 4px;
+  background: rgba(20, 16, 10, 0.72);
+  color: #d9c48f;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  pointer-events: none;
+}
+
+.atelier-sidebar-item-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  text-align: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(36, 31, 24, 0.65);
+  color: var(--white);
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+.atelier-sidebar-item-wrap:hover .atelier-sidebar-item-remove { opacity: 1; }
+.atelier-sidebar-item-remove:hover { background: #b42318; }
+
+.atelier-sidebar-text-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding: 6px;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--ink);
+  text-align: left;
+}
+
+/* --- Colonne centrale : Le livre ------------------------------------- */
+
+.atelier-book-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.atelier-book-stage {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.atelier-book-loading {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--text-light);
+  z-index: 2;
+  margin: 0;
+}
+
+.atelier-spread {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  box-shadow: 0 24px 50px -30px rgba(70, 54, 24, 0.35);
+}
+
+.atelier-page-pane {
+  position: relative;
+  flex: 1;
+  /* Valeur de REPLI (format "standard") uniquement : le rendu de la page
+     (pageRenderer.js) s'etire toujours en 100vw/100vh dans son iframe, donc
+     c'est la forme de ce conteneur qui doit porter le vrai ratio du format
+     choisi, sinon le plateau parait identique quel que soit le format (bug
+     corrige). Valeur reelle posee en style inline par AtelierBookView.js
+     (pageAspectRatio, depuis FORMAT_DIMENSIONS_MM/printFormat) ; celle-ci ne
+     sert que si le style inline manquait pour une raison quelconque. */
+  aspect-ratio: 220 / 280;
+  background: var(--silk);
+  border: 2px solid transparent;
+  overflow: hidden;
+}
+/* Couverture / 4e de couverture : seules (pas dans .atelier-spread), donc
+   sans voisine pour partager flex:1 — sans ce correctif elles s'etirent sur
+   toute la largeur du plateau, deux fois plus grandes qu'une page interieure
+   du double-page. Le selecteur `>` ne cible que ce cas (les pages d'un
+   double-page sont des petits-enfants de .atelier-book-stage, via
+   .atelier-spread, jamais des enfants directs) : meme largeur qu'UNE page
+   d'un double-page, calquee sur le calcul de .atelier-spread (gap 4px,
+   2 x flex:1 sur 100%). */
+.atelier-book-stage > .atelier-page-pane {
+  flex: none;
+  width: calc(50% - 2px);
+}
+
+/* --- "Taille reelle" (bouton dans la barre de nav, calque) ------------- */
+/* Deplace hors du coin de page (retour utilisateur : bouton trop discret,
+   "le rendre plus visible/permanent" avant "Terminer mon livre") — vit
+   maintenant dans .atelier-book-nav, toujours au meme endroit quelle que
+   soit la vue, avec un accent dore pour rester repérable au premier coup
+   d'oeil plutot qu'un simple bouton outline parmi d'autres. */
+.atelier-realsize-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(184, 146, 74, 0.45);
+  background: rgba(184, 146, 74, 0.08);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 7px 14px 7px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-realsize-toggle-btn:hover { background: rgba(184, 146, 74, 0.16); border-color: var(--gold); }
+.atelier-realsize-toggle-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.atelier-realsize-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(20, 16, 10, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+.atelier-realsize-panel {
+  width: 100%;
+  height: 100%;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atelier-realsize-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Repli sur la taille reelle stricte (echelle 1 toujours, voir
+   RealSizePage/AtelierBookView.js pour l'historique complet des allers-
+   retours sur ce point) : la/les page(s) sont dimensionnees en VRAIS mm
+   convertis en px, jamais retassees — la zone defile (overflow:auto) si le
+   format ne tient pas entierement a l'ecran, avec une scrollbar fine et
+   doree plutot que la scrollbar grise par defaut du navigateur (retour
+   utilisateur d'une passe precedente : "moche", "pas luxe"). */
+.atelier-realsize-stage {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  gap: 10px;
+  padding: var(--space-lg);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold) rgba(255, 255, 255, 0.08);
+}
+.atelier-realsize-stage::-webkit-scrollbar { width: 8px; height: 8px; }
+.atelier-realsize-stage::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.08); border-radius: 999px; }
+.atelier-realsize-stage::-webkit-scrollbar-thumb { background-color: var(--gold); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+.atelier-realsize-stage::-webkit-scrollbar-thumb:hover { background-color: #cda668; }
+.atelier-realsize-stage::-webkit-scrollbar-corner { background: transparent; }
+
+.atelier-realsize-page {
+  flex-shrink: 0;
+  /* `margin:auto 0` (pas align-items:center sur le parent) : centre la page
+     quand elle tient dans la hauteur disponible, mais se reduit proprement
+     a 0 (au lieu de rogner le haut de facon inaccessible au scroll) des que
+     le contenu depasse et doit defiler — piege classique d'un flex
+     align-items:center combine a overflow:auto. */
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.atelier-realsize-page-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Navigation dans le calque (retour utilisateur : naviguer sans devoir
+   fermer/rouvrir) — meme disposition que .preview-final-fullscreen-nav
+   (BookPreviewFinalLuxe.css), pour rester coherent entre les deux calques
+   plein ecran du produit. */
+.atelier-realsize-nav {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+}
+.atelier-realsize-nav .btn { background: rgba(255, 255, 255, 0.92); }
+
+.atelier-realsize-frame {
+  display: block;
+  border: none;
+  background: #fff;
+  box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.55);
+}
+.atelier-page-pane.is-selectable { cursor: pointer; }
+/* Page en cours de modification : bordure epaisse + halo, sans ambiguite
+   possible avec l'autre page du double-page. */
+.atelier-page-pane.is-selected {
+  border-color: var(--gold);
+  border-width: 3px;
+  box-shadow: 0 0 0 3px rgba(184, 146, 74, 0.22);
+}
+/* L'autre page du double-page : assombrie et desaturee tant qu'elle n'est
+   pas selectionnee — pour qu'un depot par erreur y soit visuellement
+   improbable plutot que juste techniquement empeche (voir AtelierBookView.js
+   : overlay=null sur ce cote). */
+.atelier-page-pane.is-inactive {
+  filter: grayscale(0.35) brightness(0.82);
+  opacity: 0.75;
+  transition: var(--transition-fast);
+}
+.atelier-page-pane.is-inactive:hover {
+  filter: grayscale(0.1) brightness(0.94);
+  opacity: 0.92;
+}
+
+.atelier-page-pane-editing-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: var(--gold);
+  padding: 4px 9px;
+  border-radius: 999px;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(70, 54, 24, 0.25);
+}
+
+.atelier-page-pane-inactive-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: rgba(36, 31, 24, 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition-fast);
+}
+.atelier-page-pane.is-inactive:hover .atelier-page-pane-inactive-hint {
+  opacity: 1;
+  background: rgba(36, 31, 24, 0.32);
+}
+
+/* Incrustation de glisser-deposer directe sur la page (AtelierPageOverlay) —
+   par-dessus l'iframe (pointer-events:none, voir .atelier-page-frame
+   ci-dessous), positionnee/dimensionnee en JS via atelierLayoutGeometry.js.
+   Le conteneur laisse passer les clics entre les emplacements (vers le
+   .atelier-page-pane parent, pour changer de cote) ; seuls les emplacements
+   eux-memes captent clic/depot. */
+.atelier-page-overlay {
+  position: absolute;
+  pointer-events: none;
+}
+
+.atelier-overlay-slot {
+  position: absolute;
+  pointer-events: auto;
+  box-sizing: border-box;
+  border: 2px dashed rgba(184, 146, 74, 0.6);
+  border-radius: 4px;
+  background: rgba(244, 240, 230, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-overlay-slot:hover { background: rgba(184, 146, 74, 0.18); border-color: var(--gold); }
+.atelier-overlay-slot.is-filled {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.7);
+  background: transparent;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 6px 6px 0;
+}
+.atelier-overlay-slot.is-filled:hover { background: rgba(36, 31, 24, 0.22); }
+.atelier-overlay-slot.is-rejecting { border-color: #b42318; background: rgba(180, 35, 24, 0.16); }
+/* Retrait a deux temps (retour utilisateur : jamais de retrait direct au
+   clic) — meme mecanisme que le panneau "Mise en page", voir
+   .atelier-format-slot.is-pending-remove. Toujours visible (pas seulement
+   au survol, contrairement a .atelier-overlay-slot-remove) : l'utilisateur
+   vient de cliquer, il doit voir tout de suite qu'une confirmation est
+   attendue, meme si le curseur ne "survole" plus rien de precis ensuite. */
+.atelier-overlay-slot.is-pending-remove {
+  border-style: solid;
+  border-color: #b42318;
+  background: rgba(180, 35, 24, 0.28);
+}
+
+.atelier-overlay-slot-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6d5a34;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 3px 8px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.atelier-overlay-slot-remove {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: rgba(36, 31, 24, 0.65);
+  padding: 2px 7px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition-fast);
+}
+.atelier-overlay-slot.is-filled:hover .atelier-overlay-slot-remove { opacity: 1; }
+
+.atelier-overlay-slot-confirm {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--white);
+  background: rgba(180, 35, 24, 0.9);
+  padding: 3px 8px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.atelier-page-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  pointer-events: none;
+}
+
+.atelier-page-placeholder {
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(45deg, rgba(0,0,0,0.02), rgba(0,0,0,0.02) 10px, transparent 10px, transparent 20px);
+}
+
+.atelier-page-pane-label {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: rgba(36, 31, 24, 0.55);
+  padding: 2px 7px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* 3 zones (gauche vide / centre precedente-label-suivante / droite Taille
+   reelle) de meme largeur flexible (flex:1 des deux cotes) pour garder les
+   controles de navigation vraiment centres malgre le bouton "Taille reelle"
+   qui n'occupe QUE le cote droit. */
+.atelier-book-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.atelier-book-nav-side {
+  flex: 1;
+  display: flex;
+}
+.atelier-book-nav-side-end {
+  justify-content: flex-end;
+}
+
+.atelier-book-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.atelier-book-nav-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 90px;
+  text-align: center;
+}
+
+/* --- Colonne droite : Mise en page ------------------------------------ */
+
+.atelier-layout-panel {
+  background: var(--white);
+  border: 1px solid rgba(223, 216, 201, 0.88);
+  border-radius: 14px;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.atelier-layout-panel-cover-note {
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+.atelier-layout-panel-cover-note p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.atelier-layout-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.atelier-layout-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.atelier-save-status {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+.atelier-save-status.is-saved { color: #1f7a3d; }
+.atelier-save-status.is-error { color: #b42318; }
+
+.atelier-layout-question {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.atelier-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atelier-category-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  background: var(--silk);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-category-btn:hover { border-color: rgba(184, 146, 74, 0.4); }
+.atelier-category-btn.is-active { background: var(--gold-light); border-color: var(--gold); }
+
+.atelier-category-icon { font-size: 15px; }
+
+.atelier-format-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+}
+
+.atelier-format-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 6px;
+  background: var(--silk);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-format-option:hover { border-color: rgba(184, 146, 74, 0.35); }
+.atelier-format-option.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+
+.atelier-format-label {
+  font-size: 9.5px;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--text-light);
+}
+
+.atelier-layout-mini {
+  width: 46px;
+  height: 58px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  background: var(--white);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  padding: 3px;
+  box-sizing: border-box;
+}
+.atelier-layout-mini-title { flex: 1 1 100%; height: 6px; border-radius: 1px; background: #8a7a5c; }
+.atelier-layout-mini-photo { flex: 1 1 40%; min-height: 12px; border-radius: 1px; background: #d3c6a6; }
+.atelier-layout-mini-text { flex: 1 1 100%; min-height: 10px; border-radius: 1px; background: #cbbfa5; }
+/* TWO_TESTIMONIES/THREE_TESTIMONIES : emplacements texte cote a cote dans
+   le vrai rendu (cartes de temoignage) — la vignette doit le montrer,
+   sinon elle donne l'impression trompeuse d'un format vertical. */
+.atelier-layout-mini-text-inline { flex: 1 1 28%; min-height: 24px; }
+
+.atelier-layout-chosen {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid rgba(223, 216, 201, 0.7);
+}
+
+.atelier-layout-chosen-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.atelier-layout-change-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--gold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Miniature fidele au format choisi (retour utilisateur : plus de vignette
+   photo par emplacement, qui faisait doublon avec la vraie page au centre —
+   a la place, la VRAIE FORME de la mise en page, avec une coche verte pour
+   "rempli" et un pointille pour "vide"). Le ratio (aspect-ratio pose en
+   style inline, voir AtelierLayoutPanel.js) suit le format d'impression du
+   livre, comme le reste de l'atelier. */
+.atelier-format-miniature {
+  position: relative;
+  width: 100%;
+  background: var(--white);
+  border: 1px solid rgba(223, 216, 201, 0.8);
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.atelier-format-miniature-inset {
+  position: absolute;
+}
+
+/* Meme langage visuel que l'incrustation posee directement sur la page
+   (voir .atelier-overlay-slot) : pointille = vide, plein = rempli — les
+   deux endroits doivent se reconnaitre comme le meme etat. */
+.atelier-format-slot {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed rgba(184, 146, 74, 0.5);
+  border-radius: 4px;
+  background: var(--silk);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-format-slot:hover { border-color: var(--gold); background: rgba(184, 146, 74, 0.12); }
+.atelier-format-slot.is-filled {
+  border-style: solid;
+  border-color: rgba(31, 122, 61, 0.35);
+  background: rgba(31, 122, 61, 0.07);
+}
+.atelier-format-slot.is-filled:hover { background: rgba(31, 122, 61, 0.14); }
+.atelier-format-slot.is-rejecting { border-color: #b42318; background: rgba(180, 35, 24, 0.1); }
+/* Retrait a deux temps (retour utilisateur : jamais de retrait direct au
+   clic) : premier clic arme cet etat, second clic sur LE MEME emplacement
+   confirme (voir atelierSlotInteractions.js). */
+.atelier-format-slot.is-pending-remove {
+  border-style: solid;
+  border-color: #b42318;
+  background: rgba(180, 35, 24, 0.1);
+}
+
+.atelier-format-slot-confirm {
+  padding: 2px 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  color: #b42318;
+  pointer-events: none;
+}
+
+.atelier-format-slot-empty-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  pointer-events: none;
+}
+
+.atelier-format-slot-check {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f7a3d;
+  pointer-events: none;
+  transition: var(--transition-fast);
+}
+/* "Retirer" au survol, a la place de la coche (meme espace, en surimpression
+   — voir inset:0 ci-dessous) — meme principe que .atelier-overlay-slot-remove
+   (l'incrustation sur la page). */
+.atelier-format-slot-remove {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: rgba(36, 31, 24, 0.7);
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition-fast);
+}
+.atelier-format-slot.is-filled:hover .atelier-format-slot-check { opacity: 0; }
+.atelier-format-slot.is-filled:hover .atelier-format-slot-remove { opacity: 1; }
+
+.atelier-clear-btn {
+  align-self: flex-start;
+}
+
+/* Confirmation a deux temps (retour utilisateur : "ajouter une confirmation
+   ou un undo visible sur Vider cette page") — meme esprit que le retrait
+   d'un seul emplacement (couleur d'alerte + libelle explicite au 2e temps),
+   avec un "Annuler" toujours visible a cote plutot qu'un simple second clic
+   au meme endroit (l'action ici efface TOUTE la page, pas un seul
+   emplacement — une sortie explicite parait plus sure). */
+.atelier-clear-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+}
+.atelier-clear-btn.is-pending {
+  border-color: #b42318;
+  color: #b42318;
+}
+.atelier-clear-btn.is-pending:hover {
+  background: rgba(180, 35, 24, 0.08);
+}
+.atelier-clear-cancel {
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(60, 52, 40, 0.6);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.atelier-clear-cancel:hover { color: var(--ink); }
+
+@media (max-width: 1080px) {
+  .atelier-workspace {
+    grid-template-columns: 1fr;
+  }
+  .atelier-sidebar {
+    max-height: none;
+  }
+}

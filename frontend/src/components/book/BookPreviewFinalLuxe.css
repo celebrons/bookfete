@@ -1,0 +1,502 @@
+/* Aperçu final — "JE VÉRIFIE" du parcours. Ambiance volontairement
+   différente de l'atelier (on quitte l'éditeur) : plus calme, centrée sur
+   le résultat plutôt que sur la construction. Préfixe preview-final-
+   distinct de atelier-/coverlite-/book-config- (écrans différents). */
+
+.preview-final-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-lg) var(--space-md) var(--space-xxl);
+}
+
+.preview-final-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.preview-final-back-link {
+  flex-shrink: 0;
+  color: var(--text-light);
+  text-decoration: none;
+  font-size: 13px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 999px;
+  padding: 7px 14px;
+  transition: var(--transition-fast);
+}
+.preview-final-back-link:hover { color: var(--ink); border-color: rgba(184, 146, 74, 0.4); }
+
+.preview-final-title {
+  margin: 0;
+  font-size: 26px;
+  color: var(--ink);
+}
+
+.preview-final-subtitle {
+  margin: 4px 0 0;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.preview-final-error {
+  margin-bottom: var(--space-md);
+}
+
+.preview-final-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .preview-final-layout { grid-template-columns: 1fr; }
+}
+
+/* --- Feuilletage central ------------------------------------------------ */
+
+.preview-final-stage {
+  position: relative;
+  background: var(--white);
+  border: 1px solid rgba(223, 216, 201, 0.88);
+  border-radius: 18px;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.preview-final-loading {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+/* Mode livre : couverture/4e seules, pages interieures par double-page
+   (voir .preview-final-spread) — chaque cadre garde son ratio A4 reel via
+   son propre wrapper, jamais l'iframe directement (meme raison que le
+   calque plein ecran : besoin d'une taille DEFINIE pour que le contenu ne
+   s'effondre pas). */
+.preview-final-frame-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  /* Ratio du format "standard" (coverFormat.js) EN REPLI seulement : le
+     rendu envoye a l'iframe (pageRenderer.js: renderSinglePageHtml) etire
+     toujours la page en 100vw/100vh, donc c'est la FORME DE CE CONTENEUR
+     qui doit porter le vrai ratio du format choisi (livret/standard/luxe),
+     sinon changer de format ne change jamais rien a l'ecran (bug corrige).
+     Valeur reelle posee en style inline par BookPreviewFinalLuxe.js
+     (pageAspectRatio, calculee depuis PRINT_FORMATS) ; celle-ci ne sert que
+     si le style inline manquait pour une raison quelconque. */
+  aspect-ratio: 220 / 280;
+  /* overflow reste visible ICI (pas hidden) : .preview-final-frame-spine
+     (la tranche du livre) depasse volontairement de ce cadre — c'est
+     .scaled-page-frame-clip, un niveau plus interieur, qui coupe
+     l'<iframe>. Voir ScaledPageFrame (BookPreviewFinalLuxe.js). */
+}
+
+/* Coupe l'<iframe> a la taille reellement rendue par ce wrapper — voir
+   ScaledPageFrame (BookPreviewFinalLuxe.js) : l'iframe garde TOUJOURS sa
+   taille naturelle interne et n'est que visuellement mise a l'echelle par
+   transform:scale(), overflow:hidden empeche le surplus (naturel > rendu)
+   de deborder visuellement. Absolument positionne pour remplir tout le
+   wrapper parent (deja position:relative) sans influer sur sa taille CSS
+   (aspect-ratio/max-width), qui reste seule responsable du dimensionnement.
+   Partagee par les 4 usages (normal/plein ecran x gauche-droite/single). */
+.scaled-page-frame-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Centre l'iframe (echelle "contain fit", voir ScaledPageFrame.measure) :
+     quand le ratio du wrapper ne correspond plus exactement au ratio
+     naturel du format (ex. max-height:65vh sur la carte couverture), un des
+     deux axes laisse un peu d'espace — centre plutot que colle en haut a
+     gauche, comme un object-fit:contain classique. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-final-frame-wrap-single {
+  max-width: 480px;
+  max-height: 65vh;
+}
+
+/* Reprend une transition legere a chaque changement de FORMAT (key React
+   composite avec currentFormat -> remontage -> animation rejouee) : jamais
+   au simple feuilletage de page (la key ne depend pas de viewIndex), ce
+   n'est pas ce qui a ete demande la. */
+@keyframes previewFormatFadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+.preview-final-frame-wrap { animation: previewFormatFadeIn 220ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .preview-final-frame-wrap { animation: none; }
+}
+
+/* Tranche du livre sur la couverture affichee (voir aussi
+   .preview-final-format-spine, meme principe applique aux cartes format) —
+   uniquement visible sur la couverture (viewKind === 'cover'), jamais sur
+   une double-page interieure ou la 4e de couverture. */
+.preview-final-frame-spine {
+  position: absolute;
+  top: 4%;
+  bottom: 4%;
+  right: -7px;
+  width: 7px;
+  border-radius: 0 3px 3px 0;
+  z-index: 2;
+}
+.preview-final-frame-spine.is-soft {
+  background: linear-gradient(90deg, rgba(70, 54, 24, 0.22), rgba(70, 54, 24, 0.04));
+}
+.preview-final-frame-spine.is-rigid {
+  background: linear-gradient(90deg, rgba(60, 48, 30, 0.6), rgba(60, 48, 30, 0.12));
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.25);
+}
+.preview-final-frame-spine.is-premium {
+  background: linear-gradient(90deg, #b6923f, #6f5427);
+  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.35);
+}
+
+.preview-final-spread {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  max-width: 700px;
+  justify-content: center;
+  box-shadow: 0 24px 50px -30px rgba(70, 54, 24, 0.35);
+}
+.preview-final-spread .preview-final-frame-wrap {
+  flex: 1;
+  max-width: 350px;
+}
+
+/* Ni position:absolute ni width/height:100% : l'<iframe> recoit sa taille
+   NATURELLE reelle en style inline (ScaledPageFrame) et est mise a l'echelle
+   par transform:scale(), jamais retassee directement — voir le commentaire
+   de ScaledPageFrame en tete de BookPreviewFinalLuxe.js pour le pourquoi
+   (unites mm/pt absolues dans le CSS de la page, qui debordent/se decalent
+   si l'iframe est redimensionnee directement plutot que zoomee). */
+.preview-final-frame {
+  display: block;
+  border: none;
+  background: var(--white);
+  /* transform-origin par defaut (center) : .scaled-page-frame-clip centre
+     cette iframe via flex, la mise a l'echelle doit se faire depuis son
+     propre centre pour rester alignee avec ce centrage. */
+}
+/* Sur le WRAPPER (pas l'iframe) : un box-shadow pose sur l'iframe serait
+   coupe par le overflow:hidden du wrapper des que l'echelle rendue est
+   proche de 1 (le cas courant), le cadre et l'iframe mise a l'echelle ayant
+   alors quasiment la meme taille. */
+.preview-final-frame-wrap-single {
+  box-shadow: 0 24px 50px -30px rgba(70, 54, 24, 0.35);
+}
+
+.preview-final-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.preview-final-nav-label {
+  min-width: 140px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Bouton plein ecran : coin superieur droit du plateau (jamais dans
+   .preview-final-nav) — meme emplacement/style que l'atelier (voir
+   BookAtelierLuxe.css : .atelier-expand-btn), pour deux raisons : coherence
+   avec le reste du produit, et surtout parce que le laisser dans la barre de
+   navigation ajoutait une largeur asymetrique a droite des fleches ‹ › (le
+   groupe entier restait centre sous le plateau, mais son propre centre de
+   masse — donc les fleches — se retrouvait decale par rapport au livre
+   au-dessus). Sorti de la barre, les fleches redeviennent le seul contenu de
+   .preview-final-nav et se centrent naturellement sur le livre. */
+.preview-final-fullscreen-btn {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  background: var(--white);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.preview-final-fullscreen-btn:hover { border-color: rgba(184, 146, 74, 0.4); }
+.preview-final-fullscreen-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* --- Colonne resume permanente ------------------------------------------ */
+
+.preview-final-sidebar {
+  background: var(--white);
+  border: 1px solid rgba(223, 216, 201, 0.88);
+  border-radius: 18px;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  position: sticky;
+  top: var(--space-md);
+}
+
+.preview-final-sidebar-section {
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(223, 216, 201, 0.7);
+}
+.preview-final-sidebar-section:last-of-type { border-bottom: none; padding-bottom: 0; }
+
+.preview-final-sidebar-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+
+.preview-final-book-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.preview-final-book-stats {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-light);
+}
+
+.preview-final-format-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-final-format-card {
+  position: relative;
+  text-align: left;
+  border: 2px solid rgba(223, 216, 201, 0.9);
+  background: var(--silk);
+  border-radius: 10px;
+  padding: 8px 10px 8px 18px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 8px;
+  transition: var(--transition-fast);
+}
+.preview-final-format-card:hover { border-color: rgba(184, 146, 74, 0.45); }
+.preview-final-format-card.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+.preview-final-format-card:disabled { opacity: 0.6; cursor: progress; }
+
+/* Tranche du livre : purement decorative (voir le composant, --spine-thickness
+   posee en style inline depuis le nombre de pages du format) — souple/rigide/
+   rigide premium se distinguent par la texture, pas seulement l'epaisseur. */
+.preview-final-format-spine {
+  position: absolute;
+  left: 5px;
+  top: 8px;
+  bottom: 8px;
+  width: var(--spine-thickness, 4px);
+  border-radius: 2px;
+}
+.preview-final-format-spine.is-soft {
+  background: rgba(184, 146, 74, 0.4);
+  box-shadow: 0 1px 2px rgba(70, 54, 24, 0.15);
+}
+.preview-final-format-spine.is-rigid {
+  background: rgba(90, 74, 48, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.preview-final-format-spine.is-premium {
+  background: linear-gradient(180deg, #ddbd82, #97753c);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.preview-final-format-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.preview-final-format-tagline {
+  grid-column: 1 / 2;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--gold);
+}
+.preview-final-format-description {
+  grid-column: 1 / 2;
+  font-size: 11px;
+  color: var(--text-light);
+  line-height: 1.35;
+}
+.preview-final-format-dimensions {
+  grid-column: 1 / 2;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-light);
+  opacity: 0.85;
+}
+.preview-final-format-pagecount {
+  grid-column: 1 / 2;
+  font-size: 10.5px;
+  color: var(--text-light);
+  margin-top: 1px;
+}
+.preview-final-format-price {
+  grid-row: 1 / span 5;
+  grid-column: 2;
+  align-self: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.preview-final-total-price {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.preview-final-order-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+}
+
+/* --- Aperçu plein écran -------------------------------------------------- */
+
+.preview-final-fullscreen-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(20, 16, 10, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  /* Filet de securite (retour utilisateur : un scroll restait possible en
+     plein ecran) : meme si le budget de hauteur ci-dessous (voir
+     .preview-final-fullscreen-frame-wrap) est mal calcule sur un cas
+     extreme, rien ne doit jamais deborder du calque plutot que faire
+     defiler la page derriere — voir aussi le blocage de <body>/<html> dans
+     BookPreviewFinalLuxe.js pendant que ce calque est ouvert. */
+  overflow: hidden;
+}
+
+/* Hauteur NATURELLE (pas de height:100%) : la taille de la page vient
+   desormais d'un calcul JS en pixels (fullscreenBoxPx, voir
+   BookPreviewFinalLuxe.js) qui mesure reellement l'espace disponible —
+   le panneau n'a donc plus besoin de s'etirer lui-meme, il se contente
+   d'empiler entete + page + nav a leur taille naturelle, et le calque
+   (.preview-final-fullscreen-backdrop, deja align-items/justify-content:
+   center) centre ce bloc entier. */
+.preview-final-fullscreen-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 94vw;
+}
+
+.preview-final-fullscreen-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.preview-final-fullscreen-head .atelier-modal-close {
+  color: var(--white);
+  font-size: 22px;
+}
+.preview-final-fullscreen-head .atelier-modal-close:hover { color: var(--gold); }
+
+.preview-final-loading.is-on-dark {
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
+
+/* Taille calculee en PIXELS par BookPreviewFinalLuxe.js (fullscreenBoxPx),
+   posee en style inline sur ces deux classes — deux tentatives en CSS pure
+   (budget en vh, puis flex+aspect-ratio) laissaient encore un scroll
+   visible selon le navigateur/l'ecran ; un calcul JS explicite ("contain
+   fit" classique : le duo ou la page seule est mis a l'echelle pour tenir
+   ENTIEREMENT dans l'espace reellement mesure, jamais plus) supprime toute
+   ambiguite. Les valeurs ci-dessous ne sont qu'un REPLI, utilise seulement
+   avant que fullscreenBoxPx soit calcule (une fraction de seconde a
+   l'ouverture, via useLayoutEffect) — l'inline gagne toujours ensuite. */
+.preview-final-fullscreen-frame-wrap {
+  position: relative;
+  max-width: 88vw;
+  max-height: 80vh;
+  aspect-ratio: 220 / 280;
+  animation: previewFormatFadeIn 220ms ease;
+  /* overflow reste visible (voir .scaled-page-frame-clip, le niveau qui
+     coupe reellement l'iframe) ; box-shadow deplace ici depuis
+     .preview-final-fullscreen-frame (evite d'etre coupe par le clip). */
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-final-fullscreen-frame-wrap { animation: none; }
+}
+
+/* Mode livre en plein ecran : deux pages cote a cote. */
+.preview-final-fullscreen-spread {
+  display: flex;
+  gap: 4px;
+  max-width: 92vw;
+  max-height: 80vh;
+}
+.preview-final-fullscreen-spread .preview-final-fullscreen-frame-wrap {
+  max-width: none;
+}
+
+/* Voir .preview-final-frame plus haut : meme raison (taille naturelle +
+   transform:scale(), jamais un redimensionnement direct). box-shadow
+   deplace sur le wrapper ci-dessus pour la meme raison. */
+.preview-final-fullscreen-frame {
+  display: block;
+  border: none;
+  background: var(--white);
+  border-radius: 6px;
+  /* transform-origin par defaut (center), voir .preview-final-frame plus
+     haut pour le pourquoi. */
+}
+
+.preview-final-fullscreen-nav {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+}
+.preview-final-fullscreen-nav .btn { background: rgba(255, 255, 255, 0.92); }

@@ -227,6 +227,35 @@ describe('layoutEngine.compose — contributions et decoupage de textes longs', 
   });
 });
 
+describe('layoutEngine.compose — jamais de doublon (chaque photo/texte utilise une seule fois)', () => {
+  it("aucune photo n'apparait sur plus d'une page (contenu riche en photos, plusieurs variants)", () => {
+    const items = Array.from({ length: 23 }, (_, i) => photoItem(`p${i}`, i));
+    [0, 1, 2, 3].forEach((variant) => {
+      const { pages } = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant });
+      const ids = placedItemIds(pages);
+      expect(ids.length).toBe(new Set(ids).size);
+    });
+  });
+
+  it("aucun texte (assez court pour ne jamais etre decoupe) n'apparait sur plus d'une page", () => {
+    const items = Array.from({ length: 12 }, (_, i) => textItem(`t${i}`, i, 80));
+    const { pages } = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24 });
+    const ids = placedItemIds(pages);
+    expect(ids.length).toBe(new Set(ids).size);
+  });
+
+  it('contenu mixte (photos + textes courts) : aucun item place deux fois, tout le contenu est place une fois chacun', () => {
+    const items = [
+      ...Array.from({ length: 10 }, (_, i) => photoItem(`mp${i}`, i)),
+      ...Array.from({ length: 6 }, (_, i) => textItem(`mt${i}`, 10 + i, 90))
+    ];
+    const { pages } = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24 });
+    const ids = placedItemIds(pages);
+    expect(ids.length).toBe(new Set(ids).size);
+    expect(new Set(ids)).toEqual(new Set(items.map((item) => item.id)));
+  });
+});
+
 describe('layoutEngine.compose — garantie de repli', () => {
   it('place toujours 1 photo seule, meme avec un catalogue minimal', () => {
     const minimalLayouts = LAYOUTS.filter((l) => GUARANTEED_FALLBACK_SLUGS.includes(l.slug));
@@ -269,6 +298,32 @@ describe('layoutEngine.compose — determinisme', () => {
     // peut alors faire varier le nombre de pages de contenu d'un variant a
     // l'autre. Voir le plan "Moteur de mise en page v2", section scoring.
     expect(placedItemIds(runA.pages)).toEqual(placedItemIds(runB.pages));
+  });
+});
+
+describe('layoutEngine.compose — ambiance (mood)', () => {
+  // Contenu volontairement tres riche en photos, sans texte : c'est le cas
+  // ou l'ecart aere/compact doit etre le plus net (FULL_PHOTO vs FOUR_PHOTOS).
+  const items = Array.from({ length: 12 }, (_, i) => photoItem(`p${i}`, i));
+
+  it("l'absence de mood et le mood 'classique' produisent exactement le meme resultat (non-regression)", () => {
+    const withoutMood = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 2 });
+    const withClassique = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 2, mood: 'classique' });
+    expect(withClassique.pages).toEqual(withoutMood.pages);
+  });
+
+  it("'aere' produit davantage de pages que 'compact' pour le meme contenu tres riche en photos (rythme visiblement different)", () => {
+    const aere = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 1, mood: 'aere' });
+    const compact = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 1, mood: 'compact' });
+    expect(aere.pages.length).toBeGreaterThan(compact.pages.length);
+    // Meme contenu place au total, seul le rythme (nombre de pages/densite) change.
+    expect(placedItemIds(aere.pages)).toEqual(placedItemIds(compact.pages));
+  });
+
+  it('un id de mood inconnu degrade silencieusement vers le comportement standard (aucune erreur, aucun contenu perdu)', () => {
+    const withUnknownMood = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 2, mood: 'inexistant' });
+    const withoutMood = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 2 });
+    expect(placedItemIds(withUnknownMood.pages)).toEqual(placedItemIds(withoutMood.pages));
   });
 });
 

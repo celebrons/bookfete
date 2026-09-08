@@ -19,8 +19,11 @@ import CreateBookSansIA from './components/create-book/CreateBookSansIA';
 import DashboardGeneralLuxe from './components/dashboard/DashboardGeneralLuxe';
 import BookPageLuxe  from './components/book/BookPageLuxe';
 import BookComposeLuxe from './components/book/BookComposeLuxe';
+import BookAtelierLuxe from './components/book/atelier/BookAtelierLuxe';
+import BookPreviewFinalLuxe from './components/book/BookPreviewFinalLuxe';
 import InvitationPageLuxe from './components/contributeur/InvitationPageLuxe';
 import TokenContributePageLuxe from './components/contributeur/TokenContributePageLuxe';
+import BookShareJoinLuxe from './components/contributeur/BookShareJoinLuxe';
 import AccountSpaceLuxe from './components/account/AccountSpaceLuxe';
 import BookCheckoutLuxe from './components/orders/BookCheckoutLuxe';
 import OrdersLuxe from './components/orders/OrdersLuxe';
@@ -87,6 +90,7 @@ function App() {
           <Route path="/create-book" element={<CreateBookSansIA />} />
 		  <Route path="/invite/:token" element={<InvitationPageLuxe />} />
 		  <Route path="/contribute/:token" element={<TokenContributePageLuxe />} />
+		  <Route path="/participer/:token" element={<BookShareJoinLuxe />} />
 
 
 
@@ -108,6 +112,18 @@ function App() {
           <Route path="/book/:bookId/composer" element={
             <ProtectedRoute>
               <BookComposeLuxe />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/book/:bookId/atelier" element={
+            <ProtectedRoute>
+              <BookAtelierLuxe />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/book/:bookId/apercu" element={
+            <ProtectedRoute>
+              <BookPreviewFinalLuxe />
             </ProtectedRoute>
           } />
 

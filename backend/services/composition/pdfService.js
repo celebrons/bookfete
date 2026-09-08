@@ -200,18 +200,26 @@ function cdpClient(wsUrl) {
   return { call, close: () => ws.close() };
 }
 
-// Attend que toutes les <img> de la page courante soient chargees (ou
-// abandonne apres IMAGE_WAIT_TIMEOUT_MS) : les photos viennent du Storage
-// Supabase, un vrai fetch reseau, pas un asset local instantane.
+// Attend que toutes les <img> de la page courante soient chargees ET que les
+// polices web (document.fonts.ready) aient fini de se charger, ou abandonne
+// apres IMAGE_WAIT_TIMEOUT_MS : les photos viennent du Storage Supabase, un
+// vrai fetch reseau, pas un asset local instantane — et depuis l'ajout du
+// lien Google Fonts (couverture, voir pageRenderer.js), les polices aussi.
+// Sans ce second signal, une capture pourrait arriver avant la fin du
+// telechargement de la police et retomber silencieusement sur la police de
+// repli (Georgia) de facon intermittente — un bug difficile a reproduire.
 async function waitForImages(cdp) {
   const expression = `
     Promise.race([
-      Promise.all(Array.from(document.images).map((img) =>
-        img.complete ? Promise.resolve() : new Promise((resolve) => {
-          img.addEventListener('load', resolve, { once: true });
-          img.addEventListener('error', resolve, { once: true });
-        })
-      )),
+      Promise.all([
+        Promise.all(Array.from(document.images).map((img) =>
+          img.complete ? Promise.resolve() : new Promise((resolve) => {
+            img.addEventListener('load', resolve, { once: true });
+            img.addEventListener('error', resolve, { once: true });
+          })
+        )),
+        (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve()
+      ]),
       new Promise((resolve) => setTimeout(resolve, ${IMAGE_WAIT_TIMEOUT_MS}))
     ])
   `;

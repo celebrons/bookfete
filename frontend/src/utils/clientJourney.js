@@ -75,8 +75,8 @@ const JOURNEY_STATUS_CONFIG = {
 
 const JOURNEY_PRIMARY_ACTION = {
   continue_editing: {
-    label: 'Continuer l edition',
-    note: 'Revenir aux chapitres'
+    label: "Continuer l'album",
+    note: 'Photos, textes et mise en page'
   },
   view_preview: {
     label: 'Voir l apercu',

@@ -156,23 +156,6 @@
   margin: 0 0 18px;
 }
 
-.book-edition-live {
-  position: relative;
-  background: var(--white);
-  border: 1px solid rgba(223, 216, 201, 0.88);
-  border-radius: 18px;
-  padding: var(--space-xl);
-  box-shadow: 0 24px 40px -34px rgba(70, 54, 24, 0.22);
-}
-
-.book-edition-live.is-workspace-active {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  box-shadow: none;
-}
-
 .book-workspace-topbar .book-topbar-icon-link.is-active::after,
 .book-workspace-topbar .book-header-inline-btn.book-topbar-icon-link::after {
   display: block;
@@ -7197,30 +7180,64 @@
   background: linear-gradient(180deg, #f7f6f3 0%, #ecebe7 100%);
 }
 
-.book-config-panel-actions {
-  position: sticky;
-  bottom: 18px;
+/* COUVERTURE — resume lecture seule, jamais modifiable depuis Configuration. */
+.book-config-cover-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(220, 215, 204, 0.92);
+}
+
+.book-config-cover-summary-line {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: var(--space-lg);
-  padding: 14px 16px;
-  border: 1px solid rgba(223, 216, 201, 0.92);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 20px 34px -30px rgba(70, 54, 24, 0.26);
-  backdrop-filter: blur(8px);
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink);
 }
 
-.book-config-panel-actions-text {
+.book-config-cover-summary-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text-light);
+}
+
+.book-config-cover-btn {
+  width: 100%;
+}
+
+/* Rappel recomposition — les pages interieures deja composees ne suivent
+   jamais automatiquement un changement de Style/Pagination (acte explicite,
+   comme dans le composeur). */
+.book-config-recompose-hint {
+  margin-top: var(--space-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(184, 146, 74, 0.08);
+  border: 1px solid rgba(184, 146, 74, 0.3);
+}
+
+.book-config-recompose-hint p {
+  margin: 0;
   font-size: 12px;
+  color: var(--ink);
   line-height: 1.5;
 }
 
-.book-config-panel-action {
-  flex: 0 0 auto;
+.book-config-recompose-status {
+  font-size: 11.5px;
+  color: var(--text-light);
 }
 
 .book-config-group + .book-config-group {
@@ -7237,6 +7254,7 @@
   color: #8d6d35;
 }
 
+/* Choix du type d'album (Livret/Standard/Luxe) — 3 cartes. */
 .book-config-choice-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -7285,80 +7303,10 @@
   color: var(--text-light);
 }
 
-.book-config-pages-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-}
-
-.book-config-pages-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--gold);
-  line-height: 1;
-}
-
-.book-config-pages-meta {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
+.book-config-choice-meta {
+  font-size: 10.5px;
   color: var(--text-light);
-}
-
-.book-config-slider {
-  margin-top: 12px;
-  width: 100%;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--gold) 0%, rgba(184, 146, 74, 0.2) 100%);
-  outline: none;
-  cursor: pointer;
-  -webkit-appearance: none;
-}
-
-.book-config-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--gold);
-  border: 2px solid #fff;
-  box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.35);
-}
-
-.book-config-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--gold);
-  border: 2px solid #fff;
-  box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.35);
-}
-
-.book-config-pages-minmax {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--text-light);
-}
-
-.book-config-progress-track {
-  margin-top: 10px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(209, 200, 185, 0.4);
-  overflow: hidden;
-}
-
-.book-config-progress-bar {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #b8924a 0%, #d7bf8b 100%);
+  opacity: 0.8;
 }
 
 .book-config-delta {
@@ -7404,7 +7352,7 @@
   box-shadow: 0 16px 30px -26px rgba(70, 54, 24, 0.38);
 }
 
-.book-config-preview-cover.is-classique {
+.book-config-preview-cover.is-standard {
   background: linear-gradient(150deg, #e8edf2 0%, #b8c6d6 100%);
 }
 
@@ -7427,19 +7375,6 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-}
-
-.book-config-preview-chip {
-  align-self: flex-start;
-  margin-bottom: auto;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(27, 33, 40, 0.75);
-  background: rgba(255, 255, 255, 0.6);
 }
 
 .book-config-preview-content h3 {
@@ -7484,35 +7419,13 @@
   line-height: 1.3;
 }
 
-.book-config-preview-price-card {
-  border-radius: 12px;
-  background: linear-gradient(150deg, #23292f 0%, #12161c 100%);
-  color: #fff;
-  padding: 14px 16px;
-  border: 1px solid rgba(27, 32, 37, 0.9);
-}
-
-.book-config-preview-price-label {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.72;
-}
-
-.book-config-preview-price-value {
-  margin-top: 4px;
-  font-size: 38px;
-  line-height: 1;
-  font-weight: 700;
-  color: #d8b67c;
-}
-
+/* Reste utilisee seule (le prix a demenage vers l'Apercu final — voir
+   BookConfigLuxe.js) : juste une petite note sous l'apercu de couverture,
+   plus dans une carte sombre dediee au prix comme avant. */
 .book-config-preview-price-note {
-  margin-top: 4px;
+  margin-top: 8px;
   font-size: 12px;
-  opacity: 0.78;
+  color: var(--text-light);
 }
 
 .book-config-price-breakdown {
@@ -7537,24 +7450,6 @@
   color: var(--ink);
   font-size: 12px;
   font-weight: 700;
-}
-
-.book-config-preview-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.book-config-preview-btn,
-.book-config-cover-btn {
-  width: 100%;
-}
-
-.book-config-preview-helper {
-  font-size: 12px;
-  color: var(--text-light);
-  line-height: 1.45;
 }
 
 .book-config-preview-warning {
@@ -8811,12 +8706,12 @@
     align-items: flex-start;
   }
 
-  .book-config-choice-grid {
+  .cover-style-grid,
+  .cover-palette-grid {
     grid-template-columns: 1fr;
   }
 
-  .cover-style-grid,
-  .cover-palette-grid {
+  .book-config-choice-grid {
     grid-template-columns: 1fr;
   }
 
@@ -9624,5 +9519,503 @@
   .prompt-testing-guide-toggle {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* Controle manuel leger sur la couverture automatique (BookCoverDesignerLuxe.js,
+   nouvelle version — coverComposer.js). Prefixe coverlite- deliberement
+   distinct de .cover-* (ancien systeme retire, quelques regles CSS mortes
+   encore presentes plus haut dans ce fichier). */
+.coverlite-panel {
+  position: relative;
+  background: var(--white);
+  border: 1px solid rgba(223, 216, 201, 0.88);
+  border-radius: 18px;
+  padding: var(--space-xl);
+  box-shadow: 0 24px 40px -34px rgba(70, 54, 24, 0.22);
+  margin-top: var(--space-lg);
+}
+
+.coverlite-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.coverlite-title {
+  margin: 6px 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.coverlite-subtitle {
+  margin: 0;
+  max-width: 520px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-light);
+}
+
+.coverlite-save-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  padding-top: 6px;
+}
+
+.coverlite-save-status.is-saved {
+  color: #1f7a3d;
+}
+
+.coverlite-save-status.is-error {
+  color: #b42318;
+}
+
+.coverlite-shell {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+.coverlite-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.coverlite-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coverlite-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.coverlite-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-light);
+}
+
+.coverlite-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+}
+
+.coverlite-photo-option {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  background: var(--silk);
+  transition: var(--transition-fast);
+}
+
+.coverlite-photo-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.coverlite-photo-option.is-auto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-light);
+  text-align: center;
+  padding: 6px;
+}
+
+.coverlite-photo-option:hover {
+  border-color: rgba(184, 146, 74, 0.35);
+}
+
+.coverlite-photo-option.is-selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18);
+}
+
+/* Galerie de choix de format (recto : 7 vignettes : Automatique + 6 formats ;
+   verso : 4 vignettes) — voir CoverFormatMiniPreview/FormatGallery
+   (BookCoverDesignerLuxe.js). */
+.coverlite-format-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 10px;
+}
+
+.coverlite-format-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 8px 6px;
+  cursor: pointer;
+  background: var(--silk);
+  transition: var(--transition-fast);
+}
+
+.coverlite-format-option:hover {
+  border-color: rgba(184, 146, 74, 0.35);
+}
+
+.coverlite-format-option.is-selected {
+  border-color: var(--gold);
+  background: var(--white);
+  box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18);
+}
+
+.coverlite-format-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--text-light);
+}
+
+.coverlite-format-option.is-selected .coverlite-format-label {
+  color: var(--ink);
+}
+
+/* Mini-mockups des vignettes : blocs de couleur qui suggerent la
+   disposition, jamais une vraie photo ni un rendu live. Proportion alignee
+   sur le format d'impression standard (210x297). */
+.cvrmini-page {
+  position: relative;
+  width: 54px;
+  height: 76px;
+  background: var(--white);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cvrmini-row-full { flex-direction: row; }
+
+.cvrmini-photo { display: block; background: #d3c6a6; }
+
+.cvrmini-photo-bg { position: absolute; inset: 0; }
+
+.cvrmini-photo-framed {
+  width: 60%;
+  height: 46%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.cvrmini-photo-small {
+  width: 44%;
+  height: 34%;
+  margin: 6px auto 4px;
+}
+
+.cvrmini-band {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.cvrmini-row {
+  display: flex;
+  gap: 2px;
+}
+.cvrmini-row .cvrmini-photo { flex: 1; }
+
+.cvrmini-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 5px;
+}
+
+.cvrmini-center {
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+}
+
+.cvrmini-line {
+  height: 3px;
+  border-radius: 2px;
+  background: #8a7a5c;
+}
+
+.cvrmini-line-sm { height: 2px; opacity: 0.6; }
+.cvrmini-line-italic { background: #a3906a; }
+.cvrmini-line-on-photo { position: absolute; left: 6px; bottom: 8px; z-index: 1; background: #fdfaf3; }
+
+.cvrmini-rule {
+  width: 14px;
+  height: 1px;
+  background: var(--gold);
+}
+
+.cvrmini-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 45%;
+  background: linear-gradient(to top, rgba(10, 8, 4, 0.6), rgba(10, 8, 4, 0));
+}
+
+.cvrmini-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.cvrmini-stats { display: flex; gap: 4px; }
+.cvrmini-stats i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--gold);
+  font-style: normal;
+}
+
+.cvrmini-auto {
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(184, 146, 74, 0.55);
+  background: var(--silk);
+  box-shadow: none;
+}
+.cvrmini-auto span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.coverlite-mode-toggle {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coverlite-mode-btn.is-selected {
+  background-color: var(--gold-light);
+  border-color: var(--gold);
+}
+
+.coverlite-textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.coverlite-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: sticky;
+  top: var(--space-lg);
+}
+
+.coverlite-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coverlite-preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coverlite-face-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.coverlite-face-tab {
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  background: var(--white);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.coverlite-face-tab:hover {
+  border-color: rgba(184, 146, 74, 0.4);
+}
+
+.coverlite-face-tab.is-active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--white);
+}
+
+/* La zone d'apercu garde le ratio du format d'impression (210x297 standard) :
+   la page envoyee par le backend est calee sur 100vw/100vh de son propre
+   document, donc elle remplit toujours exactement cette zone, quelle que
+   soit sa taille — jamais de defilement, "vue plein page" garantie. */
+.coverlite-preview-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  max-height: 72vh;
+  margin: 0 auto;
+  border: 1px solid var(--gold-light);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--silk);
+}
+
+.coverlite-preview-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.coverlite-preview-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.coverlite-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  background: var(--white);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 5px 12px 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.coverlite-expand-btn:hover {
+  border-color: rgba(184, 146, 74, 0.4);
+}
+
+.coverlite-expand-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Apercu plein ecran (bouton "Agrandir") : meme contenu (srcDoc) que
+   l'apercu du panneau, juste beaucoup plus grand, pour juger du rendu
+   d'impression sans dependre de la taille de la fenetre. */
+.coverlite-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  background: rgba(20, 16, 10, 0.72);
+  animation: coverlite-lightbox-fade-in 0.15s ease-out;
+}
+
+@keyframes coverlite-lightbox-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.coverlite-lightbox-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.coverlite-lightbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.coverlite-lightbox-close {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--white);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.coverlite-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.coverlite-lightbox-stage {
+  position: relative;
+  height: min(90vh, calc(92vw * 297 / 210));
+  aspect-ratio: 210 / 297;
+  max-width: 92vw;
+  margin: 0 auto;
+  background: var(--silk);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 860px) {
+  .coverlite-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .coverlite-preview {
+    position: static;
+  }
+
+  .coverlite-preview-stage {
+    max-height: none;
   }
 }

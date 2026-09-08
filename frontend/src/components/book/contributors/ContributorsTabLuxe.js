@@ -134,6 +134,7 @@ const ContributorsTabLuxe = ({ bookId, book, onUpdateBook, bookTitle = '', onOpe
         bookTitle={bookTitle || book?.title || 'Livre'}
         activeTab="contributeurs"
         onOpenTab={onOpenTab}
+        book={book}
       />
 
       {showWelcome && !isSoloMode && (

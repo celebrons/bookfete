@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../../services/supabaseClient';
 import '../../styles/luxe-theme.css';
 import './AuthLuxe.css';
 
@@ -8,6 +9,8 @@ const buildApiBaseUrl = () => {
   const trimmed = configured.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };
+
+const DRAFT_KEY = 'createBookDraftSansIA';
 
 const RegisterLuxe = () => {
   const [email, setEmail] = useState('');
@@ -20,8 +23,26 @@ const RegisterLuxe = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // Reformule l'ecran ("Enregistrez votre livre" plutot que "Inscription")
+  // quand un livre est deja en attente de sauvegarde (brouillon laisse par
+  // CreateBookSansIA.js avant de rediriger ici) — sinon copie generique
+  // (quelqu'un arrive directement sur /register sans avoir commence de livre).
+  const [hasPendingDraft] = useState(() => Boolean(localStorage.getItem(DRAFT_KEY)));
 
   const navigate = useNavigate();
+
+  // Meme cible que LoginLuxe.js : returnTo si present (pose par
+  // CreateBookSansIA.js), sinon le tableau de bord.
+  const returnTarget = () => localStorage.getItem('returnTo') || '/dashboard';
+
+  const handleOAuth = async (provider) => {
+    setError(null);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}${returnTarget()}` }
+    });
+    if (oauthError) setError(oauthError.message);
+  };
 
   const handleRegister = async (event) => {
     event.preventDefault();
@@ -56,11 +77,25 @@ const RegisterLuxe = () => {
         throw new Error(payload?.error || 'Erreur lors de la creation du compte.');
       }
 
-      if (payload?.requiresEmailConfirmation) {
-        setSuccessMessage('Compte cree. La confirmation email est activee sur Supabase.');
-      } else {
-        setSuccessMessage('Votre compte est actif. Vous pouvez vous connecter immediatement.');
+      // Le compte est cree cote serveur (client service-role) : ca n'ouvre
+      // pas de session dans CE navigateur pour autant. On tente une
+      // connexion immediate avec les memes identifiants pour eviter un
+      // aller-retour manuel par /login — si l'email doit d'abord etre
+      // confirme, ca echoue simplement et on retombe sur l'ecran d'attente
+      // ci-dessous (rien de perdu : le brouillon reste en localStorage).
+      if (!payload?.requiresEmailConfirmation) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (!signInError) {
+          navigate(returnTarget(), { replace: true });
+          return;
+        }
       }
+
+      setSuccessMessage(
+        payload?.requiresEmailConfirmation
+          ? 'Compte cree. Confirmez votre email pour pouvoir vous connecter.'
+          : 'Votre compte est actif. Connectez-vous pour continuer.'
+      );
       setSuccess(true);
     } catch (registerError) {
       setError(registerError.message);
@@ -87,6 +122,11 @@ const RegisterLuxe = () => {
           <p className="body-text" style={{ color: 'var(--text-light)' }}>
             {successMessage || 'Compte cree avec succes.'}
           </p>
+          {hasPendingDraft && (
+            <p className="body-text" style={{ color: 'var(--text-light)' }}>
+              Votre livre est deja sauvegarde, il vous attend.
+            </p>
+          )}
           <p
             className="body-text"
             style={{
@@ -94,7 +134,7 @@ const RegisterLuxe = () => {
               marginBottom: 'var(--space-xl)'
             }}
           >
-            Vous pouvez vous connecter immediatement.
+            Connectez-vous pour continuer.
           </p>
           <button
             onClick={() => navigate('/login')}
@@ -112,12 +152,29 @@ const RegisterLuxe = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <span className="label-gold">BIENVENUE</span>
-          <h2>Inscription</h2>
-          <p>Creez votre compte utilisateur</p>
+          <span className="label-gold">{hasPendingDraft ? 'DERNIERE ETAPE' : 'BIENVENUE'}</span>
+          <h2>{hasPendingDraft ? 'Enregistrez votre livre' : 'Inscription'}</h2>
+          <p>
+            {hasPendingDraft
+              ? 'Creez un compte pour sauvegarder votre livre et le retrouver a tout moment.'
+              : 'Creez votre compte utilisateur'}
+          </p>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
+
+        <div className="auth-oauth">
+          <button type="button" className="btn btn-outline auth-oauth-btn" onClick={() => handleOAuth('google')} disabled={loading}>
+            Continuer avec Google
+          </button>
+          <button type="button" className="btn btn-outline auth-oauth-btn" onClick={() => handleOAuth('apple')} disabled={loading}>
+            Continuer avec Apple
+          </button>
+        </div>
+
+        <div className="auth-divider">
+          <span>OU CREER UN COMPTE AVEC EMAIL</span>
+        </div>
 
         <form onSubmit={handleRegister} className="auth-form">
           <div className="auth-field">

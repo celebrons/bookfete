@@ -7,7 +7,7 @@ import {
   IconBook,
   IconCheckCircle,
   IconArchive,
-  IconChapter,
+  IconPhoto,
   IconContribution,
   IconPlus
 } from './DashboardIcons';
@@ -28,9 +28,9 @@ const DashboardGeneralLuxe = () => {
   const [pageNotice, setPageNotice] = useState(null);
 
   const [stats, setStats] = useState({
-    enCours: { count: 0, elements: 0, pages: 0 },
-    termines: { count: 0, elements: 0, pages: 0 },
-    archives: { count: 0, elements: 0, pages: 0 }
+    enCours: { count: 0, photos: 0, contributions: 0 },
+    termines: { count: 0, photos: 0, contributions: 0 },
+    archives: { count: 0, photos: 0, contributions: 0 }
   });
 
   const [deleteModal, setDeleteModal] = useState({
@@ -52,8 +52,10 @@ const DashboardGeneralLuxe = () => {
     checkUser();
   }, []);
 
-  const getBookContentItemsCount = (book) => book?.content_items?.[0]?.count || 0;
-  const getBookComposedPagesCount = (book) => book?.composed_pages?.[0]?.count || 0;
+  const getBookPhotosCount = (book) => (book?.content_items || []).filter((item) => item.kind === 'photo').length;
+  const getBookContributionsCount = (book) => new Set(
+    (book?.content_items || []).map((item) => item.contribution_id).filter(Boolean)
+  ).size;
 
   const isFinalizedBook = (book) => (
     isBookLifecycleAtLeast(getBookLifecycleStatusFromBook(book), 'finalized')
@@ -91,8 +93,7 @@ const DashboardGeneralLuxe = () => {
           .from('books')
           .select(`
             *,
-            content_items:book_content_items(count),
-            composed_pages:book_pages(count)
+            content_items:book_content_items(kind, contribution_id)
           `)
           .eq('owner_id', userId)
           .eq('status', 'actif')
@@ -101,8 +102,7 @@ const DashboardGeneralLuxe = () => {
           .from('books')
           .select(`
             *,
-            content_items:book_content_items(count),
-            composed_pages:book_pages(count)
+            content_items:book_content_items(kind, contribution_id)
           `)
           .eq('owner_id', userId)
           .eq('status', 'archive')
@@ -143,15 +143,15 @@ const DashboardGeneralLuxe = () => {
       const terminesLivres = activeBooks.filter((book) => isFinalizedBook(book));
 
       const aggregate = (bookList) => {
-        let elements = 0;
-        let pages = 0;
+        let photos = 0;
+        let contributions = 0;
 
         bookList.forEach((book) => {
-          elements += getBookContentItemsCount(book);
-          pages += getBookComposedPagesCount(book);
+          photos += getBookPhotosCount(book);
+          contributions += getBookContributionsCount(book);
         });
 
-        return { elements, pages };
+        return { photos, contributions };
       };
 
       const enCoursAgg = aggregate(enCoursLivres);
@@ -161,18 +161,18 @@ const DashboardGeneralLuxe = () => {
       setStats({
         enCours: {
           count: enCoursLivres.length,
-          elements: enCoursAgg.elements,
-          pages: enCoursAgg.pages
+          photos: enCoursAgg.photos,
+          contributions: enCoursAgg.contributions
         },
         termines: {
           count: terminesLivres.length,
-          elements: terminesAgg.elements,
-          pages: terminesAgg.pages
+          photos: terminesAgg.photos,
+          contributions: terminesAgg.contributions
         },
         archives: {
           count: archivedBooksList.length,
-          elements: archivesAgg.elements,
-          pages: archivesAgg.pages
+          photos: archivesAgg.photos,
+          contributions: archivesAgg.contributions
         }
       });
     } catch (error) {
@@ -231,8 +231,8 @@ const DashboardGeneralLuxe = () => {
         return;
       }
 
-      const elementsCount = getBookContentItemsCount(archivedBook);
-      const pagesCount = getBookComposedPagesCount(archivedBook);
+      const photosCount = getBookPhotosCount(archivedBook);
+      const contributionsCount = getBookContributionsCount(archivedBook);
 
       setStats((prev) => {
         const newStats = {
@@ -243,17 +243,17 @@ const DashboardGeneralLuxe = () => {
 
         if (isFinalizedBook(archivedBook)) {
           newStats.termines.count -= 1;
-          newStats.termines.elements -= elementsCount;
-          newStats.termines.pages -= pagesCount;
+          newStats.termines.photos -= photosCount;
+          newStats.termines.contributions -= contributionsCount;
         } else {
           newStats.enCours.count -= 1;
-          newStats.enCours.elements -= elementsCount;
-          newStats.enCours.pages -= pagesCount;
+          newStats.enCours.photos -= photosCount;
+          newStats.enCours.contributions -= contributionsCount;
         }
 
         newStats.archives.count += 1;
-        newStats.archives.elements += elementsCount;
-        newStats.archives.pages += pagesCount;
+        newStats.archives.photos += photosCount;
+        newStats.archives.contributions += contributionsCount;
 
         return newStats;
       });
@@ -291,8 +291,8 @@ const DashboardGeneralLuxe = () => {
         return;
       }
 
-      const elementsCount = getBookContentItemsCount(restoredBook);
-      const pagesCount = getBookComposedPagesCount(restoredBook);
+      const photosCount = getBookPhotosCount(restoredBook);
+      const contributionsCount = getBookContributionsCount(restoredBook);
 
       setStats((prev) => {
         const newStats = {
@@ -302,17 +302,17 @@ const DashboardGeneralLuxe = () => {
         };
 
         newStats.archives.count -= 1;
-        newStats.archives.elements -= elementsCount;
-        newStats.archives.pages -= pagesCount;
+        newStats.archives.photos -= photosCount;
+        newStats.archives.contributions -= contributionsCount;
 
         if (isFinalizedBook(restoredBook)) {
           newStats.termines.count += 1;
-          newStats.termines.elements += elementsCount;
-          newStats.termines.pages += pagesCount;
+          newStats.termines.photos += photosCount;
+          newStats.termines.contributions += contributionsCount;
         } else {
           newStats.enCours.count += 1;
-          newStats.enCours.elements += elementsCount;
-          newStats.enCours.pages += pagesCount;
+          newStats.enCours.photos += photosCount;
+          newStats.enCours.contributions += contributionsCount;
         }
 
         return newStats;
@@ -352,38 +352,10 @@ const DashboardGeneralLuxe = () => {
     try {
       const bookId = deleteModal.bookId;
 
-      const { data: chapters, error: chaptersError } = await supabase
-        .from('chapters')
-        .select('id')
-        .eq('book_id', bookId);
-
-      if (chaptersError) throw chaptersError;
-
-      const chapterIds = (chapters || []).map((chapter) => chapter.id);
-
-      if (chapterIds.length > 0) {
-        const { error: contributionsError } = await supabase
-          .from('contributions')
-          .delete()
-          .in('chapter_id', chapterIds);
-
-        if (contributionsError) throw contributionsError;
-
-        const { error: invitesError } = await supabase
-          .from('chapter_invites')
-          .delete()
-          .in('chapter_id', chapterIds);
-
-        if (invitesError) throw invitesError;
-      }
-
-      const { error: deleteChaptersError } = await supabase
-        .from('chapters')
-        .delete()
-        .eq('book_id', bookId);
-
-      if (deleteChaptersError) throw deleteChaptersError;
-
+      // book_content_items et book_pages sont en "on delete cascade" sur
+      // books.id (voir phase03_data_model.sql) : rien a nettoyer manuellement
+      // pour ces deux tables. book_contributors, lui, reste un concept actif
+      // (acces/droits sur le livre), donc toujours nettoye explicitement.
       const { error: contributorsError } = await supabase
         .from('book_contributors')
         .delete()
@@ -402,8 +374,8 @@ const DashboardGeneralLuxe = () => {
 
       if (isActive) {
         const deletedBook = books.find((book) => book.id === bookId);
-        const elementsCount = getBookContentItemsCount(deletedBook);
-        const pagesCount = getBookComposedPagesCount(deletedBook);
+        const photosCount = getBookPhotosCount(deletedBook);
+        const contributionsCount = getBookContributionsCount(deletedBook);
         setBooks((prev) => prev.filter((book) => book.id !== bookId));
         setStats((prev) => {
           const newStats = {
@@ -414,28 +386,28 @@ const DashboardGeneralLuxe = () => {
 
           if (isFinalizedBook(deletedBook)) {
             newStats.termines.count -= 1;
-            newStats.termines.elements -= elementsCount;
-            newStats.termines.pages -= pagesCount;
+            newStats.termines.photos -= photosCount;
+            newStats.termines.contributions -= contributionsCount;
           } else {
             newStats.enCours.count -= 1;
-            newStats.enCours.elements -= elementsCount;
-            newStats.enCours.pages -= pagesCount;
+            newStats.enCours.photos -= photosCount;
+            newStats.enCours.contributions -= contributionsCount;
           }
 
           return newStats;
         });
       } else {
         const deletedBook = archivedBooks.find((book) => book.id === bookId);
-        const elementsCount = getBookContentItemsCount(deletedBook);
-        const pagesCount = getBookComposedPagesCount(deletedBook);
+        const photosCount = getBookPhotosCount(deletedBook);
+        const contributionsCount = getBookContributionsCount(deletedBook);
         setArchivedBooks((prev) => prev.filter((book) => book.id !== bookId));
         setStats((prev) => ({
           ...prev,
           archives: {
             ...prev.archives,
             count: prev.archives.count - 1,
-            elements: prev.archives.elements - elementsCount,
-            pages: prev.archives.pages - pagesCount
+            photos: prev.archives.photos - photosCount,
+            contributions: prev.archives.contributions - contributionsCount
           }
         }));
       }
@@ -501,8 +473,8 @@ const DashboardGeneralLuxe = () => {
             </div>
             <div className="stat-number">{stats.enCours.count}</div>
             <div className="stat-details">
-              <span className="stat-detail-item" title="Photos et textes ajoutes"><IconChapter />{stats.enCours.elements}</span>
-              <span className="stat-detail-item" title="Pages composees"><IconContribution />{stats.enCours.pages}</span>
+              <span className="stat-detail-item" title="Photos ajoutees"><IconPhoto />{stats.enCours.photos}</span>
+              <span className="stat-detail-item" title="Contributions"><IconContribution />{stats.enCours.contributions}</span>
             </div>
           </div>
 
@@ -513,8 +485,8 @@ const DashboardGeneralLuxe = () => {
             </div>
             <div className="stat-number">{stats.termines.count}</div>
             <div className="stat-details">
-              <span className="stat-detail-item" title="Photos et textes ajoutes"><IconChapter />{stats.termines.elements}</span>
-              <span className="stat-detail-item" title="Pages composees"><IconContribution />{stats.termines.pages}</span>
+              <span className="stat-detail-item" title="Photos ajoutees"><IconPhoto />{stats.termines.photos}</span>
+              <span className="stat-detail-item" title="Contributions"><IconContribution />{stats.termines.contributions}</span>
             </div>
           </div>
 
@@ -525,8 +497,8 @@ const DashboardGeneralLuxe = () => {
             </div>
             <div className="stat-number">{stats.archives.count}</div>
             <div className="stat-details">
-              <span className="stat-detail-item" title="Photos et textes ajoutes"><IconChapter />{stats.archives.elements}</span>
-              <span className="stat-detail-item" title="Pages composees"><IconContribution />{stats.archives.pages}</span>
+              <span className="stat-detail-item" title="Photos ajoutees"><IconPhoto />{stats.archives.photos}</span>
+              <span className="stat-detail-item" title="Contributions"><IconContribution />{stats.archives.contributions}</span>
             </div>
           </div>
         </div>

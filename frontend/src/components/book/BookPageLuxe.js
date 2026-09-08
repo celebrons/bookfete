@@ -1,26 +1,23 @@
 // C:\Users\USER\bookfete\frontend\src\components\book\BookPageLuxe.js
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { listOrdersByBook } from '../../services/ordersApi';
 import BookConfigLuxe from './BookConfigLuxe';
-import BookCoverDesignerLuxe from './BookCoverDesignerLuxe';
 import ContributorsTabLuxe from './contributors/ContributorsTabLuxe';
 import Loading from '../common/Loading';
-import BookWorkspaceHeader from './BookWorkspaceHeader';
 import {
-  BOOK_LIFECYCLE_ORDER,
   getBookLifecycleConfig,
   getBookLifecycleStatusFromBook,
   isBookLifecycleAtLeast,
-  normalizeBookLifecycleStatus
+  normalizeBookLifecycleStatus,
+  applyLifecycleStatus
 } from '../../utils/bookLifecycle';
 import '../../styles/luxe-theme.css';
 import './BookLuxe.css';
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
-const MAX_CHAPTERS = 12;
 const WRITING_GUIDE_STEPS = [
   {
     title: 'Edition du livre',
@@ -51,7 +48,7 @@ const WRITING_GUIDE_STEPS = [
 const TAB_HELP = {
   chapitres: 'Structure du livre, couverture/4e et travail chapitre par chapitre.',
   contributeurs: 'Ajout, suivi et gestion des personnes qui peuvent contribuer au livre.',
-  config: 'Reglages du livre: style, papier, finition, volume et prix.'
+  config: 'Titre, type d\'album et prix estime du livre.'
 };
 
 const getSoloMode = (book) => Boolean(book?.cover_config?.soloMode);
@@ -149,26 +146,6 @@ const BOOK_PREVIEW_FORMATS = [
     note: '240 x 320 mm'
   }
 ];
-const PREVIEW_FORMAT_LAYOUT_DEFAULTS = {
-  livret: {
-    textDensity: 'compact',
-    imageDensity: 'discrete',
-    lineSpacing: 'compact',
-    fontScale: 0.96
-  },
-  standard: {
-    textDensity: 'balanced',
-    imageDensity: 'balanced',
-    lineSpacing: 'balanced',
-    fontScale: 1
-  },
-  luxe: {
-    textDensity: 'airy',
-    imageDensity: 'immersive',
-    lineSpacing: 'airy',
-    fontScale: 1.04
-  }
-};
 const PREVIEW_TEXT_DENSITY_OPTIONS = [
   { id: 'airy', label: 'Aere' },
   { id: 'balanced', label: 'Standard' },
@@ -184,26 +161,6 @@ const PREVIEW_LINE_SPACING_OPTIONS = [
   { id: 'balanced', label: 'Normal', factor: 1 },
   { id: 'airy', label: 'Aere', factor: 1.16 }
 ];
-const PREVIEW_FORMAT_IMPACT = {
-  livret: 'Format compact: lecture dense, ideal pour recits courts et directs.',
-  standard: 'Format equilibre: bon compromis texte / respiration visuelle.',
-  luxe: 'Grand format: mise en page plus aeree avec presence visuelle renforcee.'
-};
-const PREVIEW_TEXT_DENSITY_IMPACT = {
-  airy: 'Plus d air entre les paragraphes, rendu editorial premium.',
-  balanced: 'Mise en page reguliere pour une lecture fluide.',
-  compact: 'Plus de texte visible par page, rythme plus soutenu.'
-};
-const PREVIEW_IMAGE_DENSITY_IMPACT = {
-  discrete: 'Photos plus discretes pour privilegier le recit.',
-  balanced: 'Equilibre visuel entre texte et photos.',
-  immersive: 'Images plus presentes pour un rendu album.'
-};
-const PREVIEW_LINE_SPACING_IMPACT = {
-  compact: 'Interligne serre, utile pour condenser le contenu.',
-  balanced: 'Interligne standard, lecture naturelle.',
-  airy: 'Interligne plus ouvert, rendu elegant et respire.'
-};
 const DEFAULT_DRAFT_LAYOUT_SETTINGS = {
   textDensity: 'balanced',
   imageDensity: 'balanced',
@@ -239,69 +196,6 @@ const normalizeDraftLayoutSettings = (rawValue) => {
     fontScale
   };
 };
-const areDraftLayoutSettingsEqual = (leftValue, rightValue) => {
-  const left = normalizeDraftLayoutSettings(leftValue);
-  const right = normalizeDraftLayoutSettings(rightValue);
-  return (
-    left.textDensity === right.textDensity
-    && left.imageDensity === right.imageDensity
-    && left.lineSpacing === right.lineSpacing
-    && left.fontScale === right.fontScale
-  );
-};
-
-const buildDraftPreviewPages = (html) => {
-  if (!html || typeof window === 'undefined') {
-    return [];
-  }
-
-  try {
-    const parser = new window.DOMParser();
-    const document = parser.parseFromString(html, 'text/html');
-    const root = document.querySelector('.draft-book') || document.body;
-    if (!root) {
-      return [];
-    }
-
-    const pages = [];
-    Array.from(root.children || []).forEach((child) => {
-      if (!(child instanceof window.HTMLElement)) {
-        return;
-      }
-
-      if (child.classList.contains('draft-book-chapter')) {
-        const chapterPages = Array.from(
-          child.querySelectorAll('.draft-book-chapter-shell > .draft-book-page')
-        );
-
-        chapterPages.forEach((page) => {
-          if (page instanceof window.HTMLElement && page.outerHTML) {
-            pages.push(page.outerHTML);
-          }
-        });
-
-        const chapterSections = Array.from(
-          child.querySelectorAll(':scope > .draft-book-section')
-        );
-        chapterSections.forEach((section) => {
-          if (section instanceof window.HTMLElement && section.outerHTML) {
-            pages.push(section.outerHTML);
-          }
-        });
-        return;
-      }
-
-      if (child.outerHTML) {
-        pages.push(child.outerHTML);
-      }
-    });
-
-    return pages.filter(Boolean);
-  } catch (_error) {
-    return [];
-  }
-};
-
 const parseChapterDraftState = (rawValue) => {
   if (!rawValue) {
     return null;
@@ -349,13 +243,8 @@ const BookPageLuxe = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('chapitres');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
-  const [isChapterWorkspaceActive, setIsChapterWorkspaceActive] = useState(false);
   const [selectedPreviewFormat, setSelectedPreviewFormat] = useState('standard');
-  const [draftReadingMode, setDraftReadingMode] = useState('horizontal');
   const [draftLayoutSettings, setDraftLayoutSettings] = useState(DEFAULT_DRAFT_LAYOUT_SETTINGS);
-  const [draftSpreadIndex, setDraftSpreadIndex] = useState(0);
-  const [generatingDraft, setGeneratingDraft] = useState(false);
-  const [draftPreview, setDraftPreview] = useState(null);
   const [pdfExportJob, setPdfExportJob] = useState(null);
   const [downloadingPdfKind, setDownloadingPdfKind] = useState('');
   const [loadingPdfPreview, setLoadingPdfPreview] = useState(false);
@@ -369,42 +258,12 @@ const BookPageLuxe = () => {
   const [updatingLifecycleStatus, setUpdatingLifecycleStatus] = useState('');
   const [hasPaidOrderAccess, setHasPaidOrderAccess] = useState(false);
   const [latestPdfOrder, setLatestPdfOrder] = useState(null);
-  const [latestBookOrder, setLatestBookOrder] = useState(null);
   const [user, setUser] = useState(null);
   const [pageNotice, setPageNotice] = useState(null);
-  const [editionGalleryRequest, setEditionGalleryRequest] = useState(0);
   const chapterIdsRef = useRef(new Set());
   const pdfExportPollRef = useRef(null);
-  const draftLayoutSaveTimeoutRef = useRef(null);
   const pdfPanelRef = useRef(null);
   const mainContentRef = useRef(null);
-  const areAllChaptersValidated = chapters.length > 0 && chapters.every(
-    (chapter) => chapter?.chapterDraft?.status === 'validated'
-  );
-  const validatedChapterCount = chapters.filter(
-    (chapter) => chapter?.chapterDraft?.status === 'validated'
-  ).length;
-  const coverConfig = (book?.cover_config && typeof book.cover_config === 'object')
-    ? book.cover_config
-    : {};
-  const backCoverConfig = (book?.back_cover_config && typeof book.back_cover_config === 'object')
-    ? book.back_cover_config
-    : {};
-  const isFrontCoverValidated = Boolean(
-    normalizeText(coverConfig.title || book?.title)
-    && normalizeText(coverConfig.recipientLine)
-    && normalizeText(coverConfig.eventLine)
-  );
-  const isBackCoverValidated = Boolean(
-    normalizeText(backCoverConfig.blurb)
-    && normalizeText(backCoverConfig.signature)
-  );
-  const isBookReadyForPreview = Boolean(
-    areAllChaptersValidated
-    && isFrontCoverValidated
-    && isBackCoverValidated
-  );
-
   useEffect(() => {
     getUser();
   }, []);
@@ -412,24 +271,23 @@ const BookPageLuxe = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search || '');
     const requestedTab = params.get('tab');
-    const requestedView = params.get('view');
 
     if (requestedTab === 'chapitres' || requestedTab === 'contributeurs' || requestedTab === 'config') {
       setActiveTab(requestedTab);
     }
-
-    if (requestedTab === 'chapitres' && requestedView === 'gallery') {
-      setEditionGalleryRequest((previous) => previous + 1);
-      if (typeof window !== 'undefined') {
-        window.requestAnimationFrame(() => {
-          scrollToMainContent();
-        });
-        window.setTimeout(() => {
-          scrollToMainContent();
-        }, 120);
-      }
-    }
   }, [location.search]);
+
+  // L'onglet "Edition" (chapitres) n'a plus de contenu propre depuis que
+  // tout se construit dans l'atelier — jamais un ecran a soi, seulement une
+  // redirection. Contributeurs/Configuration restent atteignables sans
+  // passer par ici : lien direct depuis l'atelier (BookAtelierLuxe.js) vers
+  // /book/:bookId?tab=config, qui fixe activeTab avant meme que cet effet ne
+  // s'execute (voir l'effet ci-dessus).
+  useEffect(() => {
+    if (activeTab === 'chapitres') {
+      navigate(`/book/${bookId}/atelier`, { replace: true });
+    }
+  }, [activeTab, bookId, navigate]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -492,7 +350,7 @@ const BookPageLuxe = () => {
       return undefined;
     }
 
-    if (!pdfPreviewModal.open && !draftPreview) {
+    if (!pdfPreviewModal.open) {
       return undefined;
     }
 
@@ -502,14 +360,10 @@ const BookPageLuxe = () => {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [pdfPreviewModal.open, draftPreview]);
+  }, [pdfPreviewModal.open]);
 
   useEffect(() => (
     () => {
-      if (draftLayoutSaveTimeoutRef.current) {
-        clearTimeout(draftLayoutSaveTimeoutRef.current);
-        draftLayoutSaveTimeoutRef.current = null;
-      }
       if (pdfExportPollRef.current) {
         clearInterval(pdfExportPollRef.current);
         pdfExportPollRef.current = null;
@@ -590,7 +444,6 @@ const BookPageLuxe = () => {
       ));
       setHasPaidOrderAccess(paidAccess);
       setLatestPdfOrder(latestPdfRelatedOrder || null);
-      setLatestBookOrder(latestBookLevelOrder || null);
 
       const jobId = String(latestPdfRelatedOrder?.metadata?.pdfJobId || '').trim();
       if (jobId) {
@@ -623,7 +476,6 @@ const BookPageLuxe = () => {
     } catch (error) {
       setHasPaidOrderAccess(false);
       setLatestPdfOrder(null);
-      setLatestBookOrder(null);
       return {
         paidAccess: false,
         latestPdfOrder: null,
@@ -632,102 +484,12 @@ const BookPageLuxe = () => {
     }
   };
 
-  const handlePreviewFormatChange = async (nextFormat) => {
-    const formatId = normalizePreviewFormatId(nextFormat);
-    const isSupported = Boolean(formatId);
-    if (!isSupported || formatId === selectedPreviewFormat) {
-      return;
-    }
-
-    stopPdfExportPolling();
-    setPdfExportJob(null);
-    if (pdfPreviewModal.open) {
-      closePdfPreviewModal();
-    }
-    setSelectedPreviewFormat(formatId);
-    const formatLayoutDefaults = normalizeDraftLayoutSettings(
-      PREVIEW_FORMAT_LAYOUT_DEFAULTS[formatId] || DEFAULT_DRAFT_LAYOUT_SETTINGS
-    );
-    setDraftLayoutSettings(formatLayoutDefaults);
-    setDraftSpreadIndex(0);
-    if (!book?.id) {
-      return;
-    }
-
-    try {
-      const currentCoverConfig = (book?.cover_config && typeof book.cover_config === 'object')
-        ? book.cover_config
-        : {};
-      await handleUpdateBook({
-        cover_config: {
-          ...currentCoverConfig,
-          previewFormat: formatId,
-          previewLayoutSettings: formatLayoutDefaults
-        }
-      });
-    } catch (_error) {
-      showPageNotice('Le format est applique localement. Reessayez pour l enregistrer.', 'info');
-    }
-  };
-
-  const queueDraftLayoutSettingsSave = (nextSettings) => {
-    if (!book?.id) {
-      return;
-    }
-    if (draftLayoutSaveTimeoutRef.current) {
-      clearTimeout(draftLayoutSaveTimeoutRef.current);
-      draftLayoutSaveTimeoutRef.current = null;
-    }
-    draftLayoutSaveTimeoutRef.current = setTimeout(async () => {
-      draftLayoutSaveTimeoutRef.current = null;
-      const currentCoverConfig = (book?.cover_config && typeof book.cover_config === 'object')
-        ? book.cover_config
-        : {};
-      const persistedLayout = normalizeDraftLayoutSettings(currentCoverConfig.previewLayoutSettings);
-      if (areDraftLayoutSettingsEqual(persistedLayout, nextSettings)) {
-        return;
-      }
-      try {
-        await handleUpdateBook({
-          cover_config: {
-            ...currentCoverConfig,
-            previewFormat: selectedPreviewFormat,
-            previewLayoutSettings: nextSettings
-          }
-        });
-      } catch (_error) {
-        showPageNotice('Reglage applique localement. Reessayez pour l enregistrer.', 'info');
-      }
-    }, 420);
-  };
-
-  const applyDraftLayoutSettings = (recipe) => {
-    setDraftLayoutSettings((previous) => {
-      const candidate = typeof recipe === 'function'
-        ? recipe(previous)
-        : { ...previous, ...recipe };
-      const next = normalizeDraftLayoutSettings(candidate);
-      if (areDraftLayoutSettingsEqual(previous, next)) {
-        return previous;
-      }
-      queueDraftLayoutSettingsSave(next);
-      return next;
-    });
-  };
-
   const getApiBaseUrl = () => process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const showPageNotice = (message, type = 'info') => {
     setPageNotice({ message, type });
   };
   const dismissPageNotice = () => {
     setPageNotice(null);
-  };
-
-  const stopPdfExportPolling = () => {
-    if (pdfExportPollRef.current) {
-      clearInterval(pdfExportPollRef.current);
-      pdfExportPollRef.current = null;
-    }
   };
 
   const parseFileNameFromDisposition = (disposition, fallback) => {
@@ -1081,88 +843,6 @@ const BookPageLuxe = () => {
       }))
   );
 
-  const updateChapterInState = (chapterId, updater) => {
-    setChapters((prevChapters) =>
-      normalizeChaptersForState(prevChapters.map((chapter) => {
-        if (chapter.id !== chapterId) {
-          return chapter;
-        }
-
-        return typeof updater === 'function'
-          ? updater(chapter)
-          : { ...chapter, ...updater };
-      }))
-    );
-  };
-
-  const persistChapterWorkflowState = async (chapterId, nextState) => {
-    const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
-    const existingStateContribution = Array.isArray(currentChapter?.contributions)
-      ? currentChapter.contributions.find(
-          (contribution) => contribution?.contributor_email === CHAPTER_STATE_EMAIL
-        )
-      : null;
-    let savedStateContribution = null;
-
-    if (existingStateContribution?.id) {
-      const { data, error } = await supabase
-        .from('contributions')
-        .update({
-          contributor_name: '__chapter_state__',
-          message: nextState,
-          photo_urls: [],
-          approved: true,
-          is_finalized: true,
-          needs_revision: false,
-          moderation_feedback: null
-        })
-        .eq('id', existingStateContribution.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      savedStateContribution = data;
-    } else {
-      const { data, error } = await supabase
-        .from('contributions')
-        .insert([{
-          chapter_id: chapterId,
-          contributor_name: '__chapter_state__',
-          contributor_email: CHAPTER_STATE_EMAIL,
-          message: nextState,
-          photo_urls: [],
-          approved: true,
-          is_finalized: true,
-          needs_revision: false
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      savedStateContribution = data;
-    }
-
-    updateChapterInState(chapterId, (chapter) => {
-      const contributions = Array.isArray(chapter?.contributions) ? [...chapter.contributions] : [];
-      const existingIndex = contributions.findIndex(
-        (contribution) => contribution.id === savedStateContribution.id
-      );
-
-      if (existingIndex >= 0) {
-        contributions[existingIndex] = savedStateContribution;
-      } else {
-        contributions.push(savedStateContribution);
-      }
-
-      return {
-        ...chapter,
-        contributions
-      };
-    });
-
-    return savedStateContribution;
-  };
-
   const loadBookAndChapters = async ({ silent = false } = {}) => {
     try {
       if (!silent) {
@@ -1202,215 +882,6 @@ const BookPageLuxe = () => {
     }
   };
 
-  const handleUpdateChapter = async (chapterId, updates) => {
-    try {
-      const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
-      if (currentChapter?.isChapterClosed) {
-        throw new Error('Ce chapitre est verrouille apres validation finale.');
-      }
-
-      const { status, ...chapterUpdates } = updates || {};
-      const currentChapterIndex = chapters.findIndex((chapter) => chapter.id === chapterId);
-      const safeChapterUpdates = { ...chapterUpdates };
-
-      if (
-        currentChapterIndex === 0 &&
-        Object.prototype.hasOwnProperty.call(safeChapterUpdates, 'title')
-      ) {
-        safeChapterUpdates.title = 'Introduction';
-      }
-
-      if (status === 'contributions_closed' || status === 'closed') {
-        await persistChapterWorkflowState(chapterId, status);
-
-        if (Object.keys(safeChapterUpdates).length === 0) {
-          return { workflowState: status };
-        }
-      }
-
-      if (Object.keys(safeChapterUpdates).length === 0) {
-        return null;
-      }
-
-      const { data, error } = await supabase
-        .from('chapters')
-        .update(safeChapterUpdates)
-        .eq('id', chapterId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      updateChapterInState(chapterId, (chapter) => ({ ...chapter, ...data }));
-
-      return data;
-    } catch (error) {
-      console.error('❌ Erreur mise à jour:', error);
-      showPageNotice('Erreur lors de la mise à jour du chapitre.', 'error');
-      throw error;
-    }
-  };
-
-  const handleSaveContribution = async (chapterId, contributionData) => {
-    try {
-      const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
-      if (currentChapter?.isChapterClosed) {
-        throw new Error('Ce chapitre est verrouille apres validation finale.');
-      }
-
-      const existingContribution = currentChapter?.currentUserContribution;
-      let savedContribution = null;
-
-      if (existingContribution?.id) {
-        const { data, error } = await supabase
-          .from('contributions')
-          .update({
-            message: contributionData.message,
-            photo_urls: contributionData.photo_urls,
-            is_finalized: false
-          })
-          .eq('id', existingContribution.id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        savedContribution = data;
-      } else {
-        const { data, error } = await supabase
-          .from('contributions')
-          .insert([{
-            chapter_id: chapterId,
-            ...contributionData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        savedContribution = data;
-      }
-
-      updateChapterInState(chapterId, (chapter) => {
-        const contributions = Array.isArray(chapter.contributions) ? [...chapter.contributions] : [];
-        const existingIndex = contributions.findIndex((contribution) => contribution.id === savedContribution.id);
-
-        if (existingIndex >= 0) {
-          contributions[existingIndex] = savedContribution;
-        } else {
-          contributions.push(savedContribution);
-        }
-
-        return {
-          ...chapter,
-          contributions,
-          currentUserContribution: savedContribution,
-          hasContributed: true,
-          isFinalized: Boolean(savedContribution?.is_finalized)
-        };
-      });
-
-      return savedContribution;
-    } catch (error) {
-      console.error('❌ Erreur sauvegarde contribution:', error);
-      throw error;
-    }
-  };
-
-  const handleFinalizeContribution = async (chapterId) => {
-    try {
-      const currentChapter = chapters.find((chapter) => chapter.id === chapterId);
-      if (currentChapter?.isChapterClosed) {
-        throw new Error('Ce chapitre est verrouille apres validation finale.');
-      }
-
-      const existingContribution = currentChapter?.currentUserContribution;
-
-      if (!existingContribution?.id) {
-        throw new Error('Contribution introuvable');
-      }
-
-      const { data, error } = await supabase
-        .from('contributions')
-        .update({ is_finalized: true })
-        .eq('id', existingContribution.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      updateChapterInState(chapterId, (chapter) => {
-        const contributions = Array.isArray(chapter.contributions) ? [...chapter.contributions] : [];
-        const existingIndex = contributions.findIndex((contribution) => contribution.id === data.id);
-
-        if (existingIndex >= 0) {
-          contributions[existingIndex] = data;
-        }
-
-        return {
-          ...chapter,
-          contributions,
-          currentUserContribution: data,
-          hasContributed: true,
-          isFinalized: true
-        };
-      });
-
-      return data;
-    } catch (error) {
-      console.error('❌ Erreur finalisation contribution:', error);
-      throw error;
-    }
-  };
-
-  const handleDeleteChapter = async (chapterId) => {
-    try {
-      if (chapters.length <= 4) {
-        showPageNotice('Le livre doit conserver au moins 4 chapitres.', 'info');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('chapters')
-        .delete()
-        .eq('id', chapterId);
-
-      if (error) throw error;
-
-      const remainingChapters = chapters.filter((chapter) => chapter.id !== chapterId);
-      const reorderUpdates = remainingChapters
-        .map((chapter, index) => ({
-          id: chapter.id,
-          updates: {
-            order_index: index,
-            ...(index === 0 ? { title: 'Introduction' } : {})
-          },
-          shouldUpdate:
-            chapter.order_index !== index ||
-            (index === 0 && chapter.title !== 'Introduction')
-        }))
-        .filter((chapter) => chapter.shouldUpdate);
-
-      if (reorderUpdates.length > 0) {
-        await Promise.all(
-          reorderUpdates.map(({ id, updates }) =>
-            supabase
-              .from('chapters')
-              .update(updates)
-              .eq('id', id)
-          )
-        );
-      }
-
-      setChapters(normalizeChaptersForState(remainingChapters));
-      const syncedPages = Math.max(32, remainingChapters.length * 8);
-      if (Number(book?.pages || 0) !== syncedPages) {
-        await handleUpdateBook({ pages: syncedPages });
-      }
-      showPageNotice('Chapitre supprimé.', 'success');
-    } catch (error) {
-      console.error('❌ Erreur suppression:', error);
-      showPageNotice('Erreur lors de la suppression du chapitre.', 'error');
-    }
-  };
-
   const handleUpdateBook = async (updates) => {
     try {
       const { error } = await supabase
@@ -1427,6 +898,9 @@ const BookPageLuxe = () => {
     }
   };
 
+  // Enrobe le coeur partage (utils/bookLifecycle.js: applyLifecycleStatus,
+  // extrait de cette meme fonction) avec la notification/etat de chargement
+  // propres a cet ecran — comportement inchange pour tout appelant existant.
   const setBookLifecycleStatus = async (
     nextStatus,
     { silent = false, onlyForward = false } = {}
@@ -1436,57 +910,17 @@ const BookPageLuxe = () => {
       return false;
     }
 
-    const currentStatus = getBookLifecycleStatusFromBook(book);
-    if (currentStatus === normalizedStatus) {
-      return true;
-    }
-
-    if (onlyForward && !isBookLifecycleAtLeast(normalizedStatus, currentStatus)) {
-      return false;
-    }
-
-    const currentCoverConfig = (book?.cover_config && typeof book.cover_config === 'object')
-      ? book.cover_config
-      : {};
-    const nowIso = new Date().toISOString();
-    const nextCoverConfig = {
-      ...currentCoverConfig,
-      lifecycleStatus: normalizedStatus,
-      lifecycleUpdatedAt: nowIso
-    };
-
-    if (normalizedStatus === 'preview_available' && !nextCoverConfig.previewAvailableAt) {
-      nextCoverConfig.previewAvailableAt = nowIso;
-    }
-    if (normalizedStatus === 'finalized' && !nextCoverConfig.finalPdfReadyAt) {
-      nextCoverConfig.finalPdfReadyAt = nowIso;
-    }
-    if (normalizedStatus === 'finalized' && !nextCoverConfig.finalValidatedAt) {
-      nextCoverConfig.finalValidatedAt = nowIso;
-    }
-    if (normalizedStatus === 'sent_to_printer' && !nextCoverConfig.sentToPrinterAt) {
-      nextCoverConfig.sentToPrinterAt = nowIso;
-    }
-    if (normalizedStatus === 'printed' && !nextCoverConfig.printedAt) {
-      nextCoverConfig.printedAt = nowIso;
-    }
-    if (normalizedStatus === 'shipped' && !nextCoverConfig.shippedAt) {
-      nextCoverConfig.shippedAt = nowIso;
-    }
-
     setUpdatingLifecycleStatus(normalizedStatus);
     try {
-      await handleUpdateBook({
-        cover_config: nextCoverConfig
-      });
+      const applied = await applyLifecycleStatus(normalizedStatus, { book, onUpdateBook: handleUpdateBook, onlyForward });
 
-      if (!silent) {
+      if (applied && !silent) {
         showPageNotice(
           `Etat du livre: ${getBookLifecycleConfig(normalizedStatus).label}.`,
           'success'
         );
       }
-      return true;
+      return applied;
     } catch (error) {
       if (!silent) {
         showPageNotice('Impossible de mettre a jour l etat du livre.', 'error');
@@ -1652,89 +1086,6 @@ const BookPageLuxe = () => {
     };
   }, [bookId, user, pdfExportJob?.jobId, pdfExportJob?.status]);
 
-  const draftPreviewPages = useMemo(
-    () => buildDraftPreviewPages(draftPreview?.html || ''),
-    [draftPreview?.html]
-  );
-  const draftSpreadCount = Math.max(1, Math.ceil(draftPreviewPages.length / 2));
-  const currentDraftSpreadIndex = Math.min(
-    draftSpreadIndex,
-    Math.max(0, draftSpreadCount - 1)
-  );
-  const leftDraftPageHtml = draftPreviewPages[currentDraftSpreadIndex * 2] || '';
-  const rightDraftPageHtml = draftPreviewPages[currentDraftSpreadIndex * 2 + 1] || '';
-  const canGoToPreviousSpread = currentDraftSpreadIndex > 0;
-  const canGoToNextSpread = currentDraftSpreadIndex < draftSpreadCount - 1;
-  const isHorizontalDraftMode = draftReadingMode === 'horizontal';
-  const draftPreviewHasImages = useMemo(
-    () => draftPreviewPages.some((pageHtml) => /<img[\s>]/i.test(String(pageHtml || ''))),
-    [draftPreviewPages]
-  );
-  const lineSpacingFactor = (
-    PREVIEW_LINE_SPACING_OPTIONS.find((option) => option.id === draftLayoutSettings.lineSpacing)?.factor
-    || 1
-  );
-  const draftPreviewInlineStyle = useMemo(
-    () => ({
-      '--draft-font-scale': String(draftLayoutSettings.fontScale || 1),
-      '--draft-line-height-factor': String(lineSpacingFactor)
-    }),
-    [draftLayoutSettings.fontScale, lineSpacingFactor]
-  );
-
-  const shiftDraftSpread = (direction) => {
-    setDraftSpreadIndex((previous) => {
-      const max = Math.max(0, draftSpreadCount - 1);
-      const next = previous + direction;
-      return Math.min(max, Math.max(0, next));
-    });
-  };
-
-  useEffect(() => {
-    setDraftSpreadIndex((previous) => {
-      const max = Math.max(0, draftSpreadCount - 1);
-      return Math.min(previous, max);
-    });
-  }, [draftSpreadCount]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !draftPreview) {
-      return undefined;
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setDraftPreview(null);
-        return;
-      }
-
-      if (!isHorizontalDraftMode) {
-        return;
-      }
-
-      if (event.key === 'ArrowLeft' && canGoToPreviousSpread) {
-        event.preventDefault();
-        setDraftSpreadIndex((previous) => Math.max(0, previous - 1));
-      }
-      if (event.key === 'ArrowRight' && canGoToNextSpread) {
-        event.preventDefault();
-        setDraftSpreadIndex((previous) => Math.min(draftSpreadCount - 1, previous + 1));
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [
-    draftPreview,
-    isHorizontalDraftMode,
-    canGoToPreviousSpread,
-    canGoToNextSpread,
-    draftSpreadCount
-  ]);
-
   if (loading) return <Loading message="Chargement du livre..." />;
   if (!book) return <div>Livre non trouvé</div>;
 
@@ -1742,29 +1093,6 @@ const BookPageLuxe = () => {
   const visibleGuideSteps = isSoloMode
     ? WRITING_GUIDE_STEPS.filter((step) => step.title !== 'Invitations')
     : WRITING_GUIDE_STEPS;
-  const bookLifecycleStatus = getAutomaticLifecycleStatus();
-  const hasPreviewBeenGenerated = isBookLifecycleAtLeast(bookLifecycleStatus, 'preview_available');
-  const canGenerateBookPreview = isBookReadyForPreview;
-  const previewUnavailableReason = canGenerateBookPreview
-    ? ''
-    : 'Validez chapitres + couverture + 4e avant l apercu';
-  const canFinalizeBook = (
-    hasPreviewBeenGenerated
-    && !isBookLifecycleAtLeast(bookLifecycleStatus, 'finalized')
-    && isBookReadyForPreview
-  );
-  const selectedPreviewFormatMeta = BOOK_PREVIEW_FORMATS.find(
-    (format) => format.id === selectedPreviewFormat
-  ) || BOOK_PREVIEW_FORMATS.find((format) => format.id === 'standard') || BOOK_PREVIEW_FORMATS[0];
-  const selectedTextDensityMeta = PREVIEW_TEXT_DENSITY_OPTIONS.find(
-    (option) => option.id === draftLayoutSettings.textDensity
-  ) || PREVIEW_TEXT_DENSITY_OPTIONS[1];
-  const selectedImageDensityMeta = PREVIEW_IMAGE_DENSITY_OPTIONS.find(
-    (option) => option.id === draftLayoutSettings.imageDensity
-  ) || PREVIEW_IMAGE_DENSITY_OPTIONS[1];
-  const selectedLineSpacingMeta = PREVIEW_LINE_SPACING_OPTIONS.find(
-    (option) => option.id === draftLayoutSettings.lineSpacing
-  ) || PREVIEW_LINE_SPACING_OPTIONS[1];
   const pdfExportStatusLabel = (() => {
     switch (pdfExportJob?.status) {
       case 'queued':
@@ -1780,62 +1108,8 @@ const BookPageLuxe = () => {
     }
   })();
   const isPdfReady = pdfExportJob?.status === 'ready';
-  function scrollToMainContent() {
-    if (typeof window === 'undefined' || !mainContentRef.current) {
-      return;
-    }
-
-    const top = mainContentRef.current.getBoundingClientRect().top + window.scrollY - 96;
-    window.scrollTo({
-      top: Math.max(top, 0),
-      behavior: 'smooth'
-    });
-  }
-  const forceOpenEditionGalleryDom = () => {
-    if (typeof document === 'undefined') {
-      return;
-    }
-
-    const chapterTab = document.querySelector('button.tab[data-tab="chapitres"]');
-    if (chapterTab instanceof HTMLButtonElement) {
-      chapterTab.click();
-    }
-
-    const backToStructureButton = document.querySelector('button.sidebar-gallery-btn');
-    if (backToStructureButton instanceof HTMLButtonElement) {
-      backToStructureButton.click();
-    }
-
-    const galleryLayoutButton = document.querySelector('button.edition-layout-btn[data-layout="gallery"]');
-    if (galleryLayoutButton instanceof HTMLButtonElement) {
-      galleryLayoutButton.click();
-    }
-  };
-  const openEditionGallery = () => {
-    setActiveTab('chapitres');
-    setEditionGalleryRequest((previous) => previous + 1);
-
-    const nextParams = new URLSearchParams(location.search || '');
-    nextParams.set('tab', 'chapitres');
-    nextParams.set('view', 'gallery');
-    nextParams.set('reset', String(Date.now()));
-    navigate({
-      pathname: `/book/${bookId}`,
-      search: `?${nextParams.toString()}`
-    });
-
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(forceOpenEditionGalleryDom);
-      window.setTimeout(forceOpenEditionGalleryDom, 0);
-      window.setTimeout(scrollToMainContent, 120);
-    }
-  };
   const displayBookTitle = getDisplayBookTitle(book?.title || '');
-  const useFocusedWorkspaceTopbar = (
-    (activeTab === 'chapitres' && isChapterWorkspaceActive)
-    || activeTab === 'contributeurs'
-    || activeTab === 'config'
-  );
+  const useFocusedWorkspaceTopbar = activeTab === 'contributeurs' || activeTab === 'config';
 
   return (
     <div className="book-container">
@@ -1991,27 +1265,10 @@ const BookPageLuxe = () => {
         )}
 
         {activeTab === 'chapitres' && (
-          <div className="book-edition-live">
-            <BookWorkspaceHeader
-              sectionLabel="Edition"
-              bookTitle={displayBookTitle || book?.title || ''}
-              activeTab={activeTab}
-              onOpenTab={setActiveTab}
-            />
-
-            <div className="book-edition-actions">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => navigate(`/book/${bookId}/composer`)}
-                title="Mettre en page ce livre a partir de vos photos et textes, sans IA"
-              >
-                Composer mon livre
-              </button>
-            </div>
-
-            <BookCoverDesignerLuxe book={book} onUpdateBook={handleUpdateBook} />
-          </div>
+          // Jamais visible plus d'un instant (l'effet ci-dessus redirige
+          // immediatement vers l'atelier) : simple etat de transition, plus
+          // de lanceur/bouton ici.
+          <div className="atelier-loading">Redirection vers l'atelier...</div>
         )}
 
         {activeTab === 'contributeurs' && (
@@ -2026,12 +1283,10 @@ const BookPageLuxe = () => {
 
         {activeTab === 'config' && (
           <BookConfigLuxe
-              book={book}
-              bookTitle={displayBookTitle || book?.title || ''}
-              onOpenTab={setActiveTab}
-              onUpdateBook={handleUpdateBook}
-            chaptersCount={chapters.length}
-            onOpenCoverConfig={() => setActiveTab('chapitres')}
+            book={book}
+            bookTitle={displayBookTitle || book?.title || ''}
+            onOpenTab={setActiveTab}
+            onUpdateBook={handleUpdateBook}
           />
         )}
 

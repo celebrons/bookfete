@@ -16,7 +16,14 @@
 // GET /api/books/:bookId/preview.html (ouvrable directement au navigateur,
 // sans dependance a un binaire Chrome).
 
-const DEFAULT_FORMAT = { trimWidthMm: 210, trimHeightMm: 297 }; // A4 / "standard"
+const DEFAULT_FORMAT = { trimWidthMm: 220, trimHeightMm: 280 }; // "standard" (coverFormat.js)
+
+// Polices reellement chargees dans tout le projet (verifie par grep
+// exhaustif : frontend/public/index.html, luxe-theme.css, et l'ancien
+// pipeline PDF backend/routes/books.js chargent exactement les memes) —
+// jamais d'autre police. Sans ce lien, 'Cormorant Garamond' referencee plus
+// bas retombait silencieusement sur Georgia (jamais reellement chargee).
+const GOOGLE_FONTS_LINK = '<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />';
 
 function escapeHtml(value = '') {
   return String(value)
@@ -67,49 +74,79 @@ function splitMetaFor(item, overridesByItemId) {
 // presentation" change toujours quelque chose de visible, meme quand le
 // scoring ne depart aucune egalite entre deux layouts differents pour un
 // contenu donne.
-function renderPhotoBlock(items, slug, presentationVariant = 0) {
-  const orderedItems = presentationVariant === 1 && items.length > 1 ? [...items].reverse() : items;
+// `rawItems` : items resolus POSITIONNELLEMENT (un `null`/`undefined` la ou
+// l'emplacement est vide) plutot que la liste compactee — chaque photo
+// garde sa PROPRE case dans la grille meme quand une AUTRE photo du meme
+// groupe a ete retiree (retour utilisateur : "il faut absolument que les
+// autres photos restent a leur place" — retirer la photo du haut-gauche
+// d'une grille de 4 ne doit jamais faire "remonter" les 3 autres dans une
+// grille de 3 recomposee). La taille/forme de la grille (photo-grid-N) suit
+// donc TOUJOURS rawItems.length (le nombre d'emplacements du format), pas
+// le nombre de photos reellement presentes. Un emplacement vide rend un
+// .photo-frame VIDE (memes regles CSS de positionnement/grille qu'un
+// emplacement rempli — ex. la 3e case de THREE_PHOTOS reste pleine largeur
+// meme vide — mais sans <img> : simple espace blanc, comme sur la page
+// imprimee finale, jamais un cadre pointille ou un placeholder visible —
+// ca, c'est le role du panneau d'edition, pas du rendu reel).
+function renderPhotoBlock(rawItems, slug, presentationVariant = 0) {
+  const slotCount = rawItems.length;
+  const orderedItems = presentationVariant === 1 && slotCount > 1 ? [...rawItems].reverse() : rawItems;
 
-  if (orderedItems.length === 1) {
+  if (slotCount === 1) {
+    const item = orderedItems[0];
+    if (!item) return '';
     const inset = slug === 'photo-avec-marge' || (slug === 'FULL_PHOTO' && presentationVariant === 1);
     const cls = inset ? 'block-photo photo-solo photo-inset' : 'block-photo photo-solo';
-    return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(orderedItems[0].url)}</figure>`;
+    return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url)}</figure>`;
   }
+  const cells = orderedItems.map((item) => (item ? imgFrame(item.url) : '<span class="photo-frame" aria-hidden="true"></span>'));
   const vertical = slug === 'photo-duo-vertical'
-    || (slug === 'TWO_PHOTOS' && orderedItems.length === 2 && presentationVariant === 1);
-  if (orderedItems.length === 2 && vertical) {
-    const imgs = orderedItems.map((item) => imgFrame(item.url)).join('');
-    return `<div class="block-photo photo-grid photo-grid-duo-v" data-layout="${escapeHtml(slug)}">${imgs}</div>`;
+    || (slug === 'TWO_PHOTOS' && slotCount === 2 && presentationVariant === 1);
+  if (slotCount === 2 && vertical) {
+    return `<div class="block-photo photo-grid photo-grid-duo-v" data-layout="${escapeHtml(slug)}">${cells.join('')}</div>`;
   }
-  const imgs = orderedItems.map((item) => imgFrame(item.url)).join('');
-  return `<div class="block-photo photo-grid photo-grid-${Math.min(orderedItems.length, 6)}" data-layout="${escapeHtml(slug || '')}">${imgs}</div>`;
+  return `<div class="block-photo photo-grid photo-grid-${Math.min(slotCount, 6)}" data-layout="${escapeHtml(slug || '')}">${cells.join('')}</div>`;
 }
 
-function renderTexteBlock(items, slug, overridesByItemId = {}, presentationVariant = 0) {
-  const orderedItems = presentationVariant === 1 && items.length > 1 ? [...items].reverse() : items;
-  const firstOverride = overridesByItemId[orderedItems[0]?.id];
+// `rawItems` : positionnel (voir renderPhotoBlock ci-dessus, meme principe)
+// — ne sert reellement qu'a TWO_TESTIMONIES/THREE_TESTIMONIES (plusieurs
+// cartes cote a cote, ou retirer UN temoignage ne doit jamais faire glisser
+// les autres dans une grille recomposee). ONE_TESTIMONY (1 seul
+// emplacement) et le repli generique paragraphes n'ont pas cette notion de
+// grille — aucun changement de comportement pour eux.
+function renderTexteBlock(rawItems, slug, overridesByItemId = {}, presentationVariant = 0) {
+  const slotCount = rawItems.length;
+  const orderedItems = presentationVariant === 1 && slotCount > 1 ? [...rawItems].reverse() : rawItems;
+  const firstReal = orderedItems.find(Boolean);
+  const firstOverride = overridesByItemId[firstReal?.id];
   const isSplitFragment = Boolean(firstOverride && firstOverride.splitTotal > 1);
 
   // La sous-presentation "citation" n'est proposee que pour un temoignage
   // complet (jamais un fragment d'un texte decoupe — une immense citation
   // stylisee autour d'un morceau de phrase serait trompeuse).
   const useCitation = slug === 'texte-citation' || (slug === 'ONE_TESTIMONY' && presentationVariant === 1 && !isSplitFragment);
-  if (useCitation && orderedItems.length === 1) {
-    return `<div class="block-texte texte-citation" data-layout="${escapeHtml(slug)}"><p>${escapeHtml(textFor(orderedItems[0], overridesByItemId))}</p>${splitMetaFor(orderedItems[0], overridesByItemId)}</div>`;
+  if (useCitation && slotCount === 1) {
+    if (!firstReal) return '';
+    return `<div class="block-texte texte-citation" data-layout="${escapeHtml(slug)}"><p>${escapeHtml(textFor(firstReal, overridesByItemId))}</p>${splitMetaFor(firstReal, overridesByItemId)}</div>`;
   }
 
   // TWO_TESTIMONIES / THREE_TESTIMONIES (v2) : plusieurs temoignages
   // independants sur une meme page, presentes en colonnes/cartes distinctes
-  // plutot qu'empiles comme de simples paragraphes.
-  if ((slug === 'TWO_TESTIMONIES' || slug === 'THREE_TESTIMONIES') && orderedItems.length > 1) {
+  // plutot qu'empiles comme de simples paragraphes — une carte vide (emplacement
+  // retire) reste presente mais sans styling ni texte, juste pour que les
+  // AUTRES cartes gardent leur colonne d'origine (grille CSS fixe).
+  if ((slug === 'TWO_TESTIMONIES' || slug === 'THREE_TESTIMONIES') && slotCount > 1) {
     const cards = orderedItems
-      .map((item) => `<div class="testimony-card"><p>${escapeHtml(textFor(item, overridesByItemId))}</p>${splitMetaFor(item, overridesByItemId)}</div>`)
+      .map((item) => (item
+        ? `<div class="testimony-card"><p>${escapeHtml(textFor(item, overridesByItemId))}</p>${splitMetaFor(item, overridesByItemId)}</div>`
+        : '<div aria-hidden="true"></div>'))
       .join('');
-    return `<div class="block-texte testimony-stack testimony-stack-${orderedItems.length}" data-layout="${escapeHtml(slug)}">${cards}</div>`;
+    return `<div class="block-texte testimony-stack testimony-stack-${slotCount}" data-layout="${escapeHtml(slug)}">${cards}</div>`;
   }
 
   const cls = slug === 'texte-pleine-page' || slug === 'ONE_TESTIMONY' ? 'block-texte texte-pleine' : 'block-texte';
   const paragraphs = orderedItems
+    .filter(Boolean)
     .map((item) => `<p>${escapeHtml(textFor(item, overridesByItemId))}</p>${splitMetaFor(item, overridesByItemId)}`)
     .join('');
   return `<div class="${cls}" data-layout="${escapeHtml(slug || '')}">${paragraphs}</div>`;
@@ -164,9 +201,51 @@ function renderMixteOrderedBlock(items, slug, overridesByItemId, presentationVar
   return `<div class="${cls}" data-layout="${escapeHtml(slug)}">${parts.join('')}</div>`;
 }
 
-const PHOTO_SLUGS = new Set(['FULL_PHOTO', 'TWO_PHOTOS', 'FOUR_PHOTOS']);
+// TITLE_TEXT / TITLE_TWO_PHOTOS / TITLE_FOUR_PHOTOS (atelier manuel) : le
+// premier item est toujours le titre (slot texte court en position 0, voir
+// sql/phase11_manual_layouts.sql) — meme principe positionnel que
+// renderMixteOrderedBlock, jamais un nouveau "type" de slot cote donnees.
+// `rawItems` : items resolus POSITIONNELLEMENT (un `undefined` la ou
+// l'emplacement est vide), PAS la liste compactee que renderBlock calcule
+// pour les autres mises en page — ici la position 0 est TOUJOURS le titre
+// par convention (voir plus haut : "le titre est toujours le premier item
+// du bloc"). Compacter avant d'arriver ici casserait cette convention des
+// qu'un retrait partiel touche le titre : le prochain item (une photo/un
+// texte) glisserait en position 0 et serait a tort traite comme le titre,
+// pendant que le vrai contenu restant disparaitrait du rendu (retour
+// utilisateur : "les autres elements ne restent pas a leur place").
+function renderTitleTextBlock(rawItems, slug, overridesByItemId = {}) {
+  const title = rawItems[0];
+  const body = rawItems[1];
+  const titleHtml = title ? `<h2 class="page-title">${escapeHtml(textFor(title, overridesByItemId))}</h2>` : '';
+  const bodyHtml = body
+    ? `<div class="title-text-body"><p>${escapeHtml(textFor(body, overridesByItemId))}</p>${splitMetaFor(body, overridesByItemId)}</div>`
+    : '';
+  return `<div class="block-title-text" data-layout="${escapeHtml(slug)}">${titleHtml}${bodyHtml}</div>`;
+}
+
+// Meme principe que renderTitleTextBlock ci-dessus : `rawItems[0]` est
+// TOUJOURS le titre (jamais deduit d'une liste compactee), le reste
+// (photos) reste lui aussi POSITIONNEL (voir renderPhotoBlock) — un trou
+// parmi les photos ne decale jamais le titre ET ne decale jamais les
+// AUTRES photos ; la grille garde toujours le nombre d'emplacements du
+// format (title-photos-grid-N base sur photoSlots.length, jamais sur le
+// compte reel de photos presentes), avec un .photo-frame vide pour tout
+// emplacement retire.
+function renderTitlePhotosBlock(rawItems, slug) {
+  const title = rawItems[0];
+  const photoSlots = rawItems.slice(1);
+  const titleHtml = title ? `<h2 class="page-title">${escapeHtml(title.text || '')}</h2>` : '';
+  const photosHtml = photoSlots.length > 0
+    ? `<div class="title-photos-grid title-photos-grid-${Math.min(photoSlots.length, 4)}">${photoSlots.map((item) => (item ? imgFrame(item.url) : '<span class="photo-frame" aria-hidden="true"></span>')).join('')}</div>`
+    : '';
+  return `<div class="block-title-photos" data-layout="${escapeHtml(slug)}">${titleHtml}${photosHtml}</div>`;
+}
+
+const PHOTO_SLUGS = new Set(['FULL_PHOTO', 'TWO_PHOTOS', 'THREE_PHOTOS', 'FOUR_PHOTOS']);
 const TEXTE_SLUGS = new Set(['ONE_TESTIMONY', 'TWO_TESTIMONIES', 'THREE_TESTIMONIES']);
 const MIXTE_ORDERED_SLUGS = new Set(['PHOTO_TEXT', 'TEXT_PHOTO', 'TWO_PHOTOS_TEXT']);
+const TITLE_PHOTO_SLUGS = new Set(['TITLE_TWO_PHOTOS', 'TITLE_FOUR_PHOTOS']);
 
 function renderBlock(block, itemsById, layoutsById) {
   const items = block.itemIds.map((id) => itemsById[id]).filter(Boolean);
@@ -177,9 +256,25 @@ function renderBlock(block, itemsById, layoutsById) {
   const presentationVariant = block.presentationVariant === 1 ? 1 : 0;
 
   if (slug === 'PHOTO_WITH_CAPTION') return renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant);
+  // TITLE_TEXT/TITLE_PHOTO_SLUGS : jamais la liste compactee `items` — la
+  // position 0 doit rester le titre meme quand un emplacement plus loin
+  // est vide (voir renderTitleTextBlock/renderTitlePhotosBlock ci-dessus).
+  if (slug === 'TITLE_TEXT') {
+    return renderTitleTextBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId);
+  }
+  if (TITLE_PHOTO_SLUGS.has(slug)) {
+    return renderTitlePhotosBlock(block.itemIds.map((id) => itemsById[id]), slug);
+  }
   if (MIXTE_ORDERED_SLUGS.has(slug)) return renderMixteOrderedBlock(items, slug, overridesByItemId, presentationVariant);
-  if (PHOTO_SLUGS.has(slug)) return renderPhotoBlock(items, slug, presentationVariant);
-  if (TEXTE_SLUGS.has(slug)) return renderTexteBlock(items, slug, overridesByItemId, presentationVariant);
+  // PHOTO_SLUGS/TEXTE_SLUGS : idem, positionnel — voir renderPhotoBlock/
+  // renderTexteBlock ("il faut absolument que les autres photos restent a
+  // leur place lorsque je supprime une autre photo ou un autre texte").
+  if (PHOTO_SLUGS.has(slug)) {
+    return renderPhotoBlock(block.itemIds.map((id) => itemsById[id]), slug, presentationVariant);
+  }
+  if (TEXTE_SLUGS.has(slug)) {
+    return renderTexteBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId, presentationVariant);
+  }
 
   if (block.kind === 'photo') return renderPhotoBlock(items, slug, presentationVariant);
   if (block.kind === 'texte') return renderTexteBlock(items, slug, overridesByItemId, presentationVariant);
@@ -193,11 +288,63 @@ function renderBlock(block, itemsById, layoutsById) {
   }</div>`;
 }
 
-function renderPage(page, itemsById, layoutsById, isLast) {
+// Page de separation de chapitre (Luxe uniquement — voir
+// formatComposer.js) : sobre a dessein, jamais de photo/texte reel, juste un
+// numero et un titre entre deux filets fins. `page.content` = { number,
+// title }, deja resolus par formatComposer.js (jamais invente ici — meme
+// separation decision/rendu que le reste de ce module).
+function renderChapterSeparatorPage(page, isLast) {
+  const number = escapeHtml(page.content?.number || '');
+  const title = escapeHtml(page.content?.title || '');
+  const pageClass = isLast ? 'page page-separator' : 'page page-break page-separator';
+  return `<section class="${pageClass}" data-page-index="${page.page_index}">
+    <div class="separator-inner">
+      <hr class="separator-rule" />
+      <div class="separator-number">${number}</div>
+      <div class="separator-title">${title}</div>
+      <hr class="separator-rule" />
+    </div>
+  </section>`;
+}
+
+function renderPage(page, itemsById, layoutsById, isLast, context = {}) {
+  // 1ere/4eme de couverture : pages a part, jamais composees par
+  // layoutEngine.js — deleguees a frontCoverRenderer.js/backCoverRenderer.js
+  // (voir coverComposer.js pour la decision de variante/photo). Require()
+  // differe (pas en tete de fichier) : ces deux modules importent eux-memes
+  // escapeHtml/imgFrame depuis CE fichier — un require en tete de fichier
+  // creerait un cycle qui capturerait ces deux fonctions a `undefined` cote
+  // cover renderer (le require circulaire renverrait des exports encore
+  // incomplets). Differe jusqu'au premier appel reel, ce module est deja
+  // completement charge des les deux cotes. Le reste de cette fonction
+  // (branche ci-dessous) reste inchange pour toute page interieure normale.
+  if (page.content?.kind === 'front-cover') {
+    const { renderFrontCoverPage } = require('./frontCoverRenderer');
+    return renderFrontCoverPage(page, { ...context, isLast, itemsById });
+  }
+  if (page.content?.kind === 'back-cover') {
+    const { renderBackCoverPage } = require('./backCoverRenderer');
+    return renderBackCoverPage(page, { ...context, isLast, itemsById });
+  }
+  // Page de separation de chapitre (Luxe uniquement — voir
+  // formatComposer.js, jamais pour livret/standard) : purement decorative,
+  // aucun itemId, jamais generee par layoutEngine.js lui-meme.
+  if (page.content?.kind === 'chapter-separator') {
+    return renderChapterSeparatorPage(page, isLast);
+  }
+
   const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
   const blocksHtml = blocks.map((block) => renderBlock(block, itemsById, layoutsById)).join('');
-  const pageClass = isLast ? 'page' : 'page page-break';
-  return `<section class="${pageClass}" data-page-index="${page.page_index}"><div class="page-blocks">${blocksHtml}</div></section>`;
+  // "is-luxe" : marqueur LEGER pour scoper les 2 seuls details dores qui
+  // restent sur une page ordinaire (filet sous .page-title + numero de page,
+  // voir BASE_CSS) — plus de cadre pleine page (retour utilisateur : "ne pas
+  // mettre du doré partout", un cadre sur CHAQUE page etait trop present).
+  const luxeClass = context?.format?.formatId === 'luxe' ? ' is-luxe' : '';
+  const pageClass = isLast ? `page${luxeClass}` : `page page-break${luxeClass}`;
+  const pageNumberHtml = context?.format?.formatId === 'luxe'
+    ? `<span class="page-number-luxe">${page.page_index + 1}</span>`
+    : '';
+  return `<section class="${pageClass}" data-page-index="${page.page_index}"><div class="page-blocks">${blocksHtml}</div>${pageNumberHtml}</section>`;
 }
 
 const BASE_CSS = `
@@ -206,67 +353,140 @@ const BASE_CSS = `
   .page {
     width: var(--page-width-mm);
     height: var(--page-height-mm);
-    padding: 14mm;
+    padding: calc(14mm * var(--fmt-space-scale, 1));
     background: #fffdf8;
     position: relative;
     overflow: hidden;
-    margin: 0 auto 8mm;
+    margin: 0 auto calc(8mm * var(--fmt-space-scale, 1));
   }
   .page-break { page-break-after: always; }
-  .page-blocks { display: flex; flex-direction: column; gap: 6mm; height: 100%; }
-  /* Sursampling des photos : Chrome rasterise --print-to-pdf a 96dpi fixe,
-     sans reglage en ligne de commande pour monter la resolution
-     (--force-device-scale-factor est sans effet sur ce pipeline, verifie).
-     Astuce : chaque image est mise en page 3x plus grande que son cadre
-     puis retassee via transform:scale() — le navigateur echantillonne
-     alors la source a une densite ~3x superieure avant la reduction. */
+  .page-blocks { display: flex; flex-direction: column; gap: calc(6mm * var(--fmt-space-scale, 1)); height: 100%; }
+  /* object-fit:contain (jamais cover) : l'image entiere reste toujours
+     visible, jamais recadree/tronquee pour remplir l'emplacement — la photo
+     telle qu'importee par l'utilisateur prime sur la grille. Consequence
+     acceptee : quand le ratio de l'emplacement ne correspond pas exactement
+     au ratio de la photo, des marges vides apparaissent sur les cotes
+     (fond de la page, jamais une couleur ajoutee ici) plutot que de perdre
+     une partie de l'image. Aucune perte de qualite dans ce choix : ni
+     recompression ni redimensionnement de l'original (voir storageService.js
+     — le fichier source n'est jamais retouche), seule la mise a l'echelle
+     d'affichage change. Sans astuce de sur-echantillonnage non plus :
+     l'ancienne version (image mise en page 3x plus grande puis retassee via
+     transform:scale) etait un contournement du plafond ~96dpi de l'ancien
+     pipeline PDF (routes/books.js, jamais appele par ce moteur) ; le chemin
+     PDF reellement utilise (renderPdfFromPages, capture CDP a
+     deviceScaleFactor=3) gere deja la haute resolution nativement — un seul
+     redimensionnement, ici, dans l'apercu navigateur comme dans la capture
+     PDF. */
   .photo-frame { position: relative; overflow: hidden; display: block; width: 100%; height: 100%; }
-  .photo-frame img { position: absolute; top: 0; left: 0; width: 300%; height: 300%; transform: scale(0.33333); transform-origin: top left; object-fit: cover; }
-  .block-photo, .block-texte, .block-contribution, .block-mixte { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .photo-frame img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+  .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .photo-solo { margin: 0; height: 100%; }
-  .photo-inset { padding: 8mm; background: #efe8d8; }
+  .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
   .photo-inset .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-  .photo-grid { display: grid; gap: 3mm; height: 100%; }
+  .photo-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); height: 100%; }
   .photo-grid-1 { grid-template-columns: 1fr; }
   .photo-grid-2 { grid-template-columns: 1fr 1fr; }
   .photo-grid-duo-v { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
-  .photo-grid-3, .photo-grid-4 { grid-template-columns: 1fr 1fr; }
+  /* THREE_PHOTOS (atelier manuel) : 2 photos en haut, 1 en bas pleine
+     largeur — jamais 3 colonnes egales (trop etroites, quasi illisibles sur
+     une page portrait). L'ordre des items est celui choisi par l'utilisateur
+     dans l'atelier (presentationVariant toujours 0 pour une page manuelle,
+     voir manualPageBuilder.js) : les 2 premiers vont en haut, le 3eme prend
+     toute la largeur en bas via nth-child, sans avoir besoin d'une classe
+     dediee par position cote HTML. */
+  .photo-grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .photo-grid-3 .photo-frame:nth-child(3) { grid-column: 1 / -1; }
+  .photo-grid-4 { grid-template-columns: 1fr 1fr; }
   .photo-grid-5, .photo-grid-6 { grid-template-columns: 1fr 1fr 1fr; }
   .block-texte { justify-content: center; }
-  .block-texte p { font-size: 13pt; line-height: 1.7; text-align: justify; }
+  .block-texte p { font-size: calc(13pt * var(--fmt-type-scale, 1)); line-height: 1.7; text-align: justify; }
   .texte-pleine { justify-content: flex-start; }
-  .texte-pleine p { font-size: 15pt; line-height: 1.9; }
+  .texte-pleine p { font-size: calc(15pt * var(--fmt-type-scale, 1)); line-height: 1.9; }
   .texte-citation { justify-content: center; align-items: center; text-align: center; }
-  .texte-citation p { font-style: italic; font-size: 22pt; line-height: 1.5; max-width: 80%; }
+  .texte-citation p { font-style: italic; font-size: calc(22pt * var(--fmt-type-scale, 1)); line-height: 1.5; max-width: 80%; }
   .texte-citation p::before, .texte-citation p::after { content: '"'; opacity: 0.35; }
-  .block-contribution { justify-content: center; gap: 4mm; }
+  .block-contribution { justify-content: center; gap: calc(4mm * var(--fmt-space-scale, 1)); }
   .contribution-photos { max-height: 60%; }
-  .contribution-message { font-style: italic; font-size: 12pt; text-align: center; }
-  .contribution-name { text-align: center; font-size: 10pt; letter-spacing: 0.05em; text-transform: uppercase; color: #6d6252; }
+  .contribution-message { font-style: italic; font-size: calc(12pt * var(--fmt-type-scale, 1)); text-align: center; }
+  .contribution-name { text-align: center; font-size: calc(10pt * var(--fmt-type-scale, 1)); letter-spacing: 0.05em; text-transform: uppercase; color: #6d6252; }
   .contribution-continuation { text-transform: none; letter-spacing: 0; font-style: italic; }
-  .split-marker { display: block; text-align: center; font-size: 9pt; color: #9a8f78; margin-top: 2mm; }
+  .split-marker { display: block; text-align: center; font-size: calc(9pt * var(--fmt-type-scale, 1)); color: #9a8f78; margin-top: calc(2mm * var(--fmt-space-scale, 1)); }
   /* PHOTO_WITH_CAPTION (v2) : photo pleine page + courte legende dessous. */
-  .photo-with-caption { display: flex; flex-direction: column; height: 100%; gap: 3mm; }
+  .photo-with-caption { display: flex; flex-direction: column; height: 100%; gap: calc(3mm * var(--fmt-space-scale, 1)); }
   .photo-with-caption .photo-frame { flex: 1; min-height: 0; }
-  .photo-with-caption figcaption { text-align: center; font-size: 11pt; font-style: italic; color: #4a4335; }
-  .photo-with-caption.is-framed { padding: 6mm; background: #efe8d8; }
+  .photo-with-caption figcaption { text-align: center; font-size: calc(11pt * var(--fmt-type-scale, 1)); font-style: italic; color: #4a4335; }
+  .photo-with-caption.is-framed { padding: calc(6mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
   .photo-with-caption.is-framed .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
   .photo-with-caption.is-framed figcaption { text-align: left; }
   /* TWO_TESTIMONIES / THREE_TESTIMONIES (v2) : temoignages en cartes distinctes. */
-  .testimony-stack { display: grid; gap: 5mm; height: 100%; align-content: center; }
+  .testimony-stack { display: grid; gap: calc(5mm * var(--fmt-space-scale, 1)); height: 100%; align-content: center; }
   .testimony-stack-2 { grid-template-columns: 1fr 1fr; }
   .testimony-stack-3 { grid-template-columns: 1fr 1fr 1fr; }
-  .testimony-card { padding: 4mm; background: #efe8d8; border-radius: 2mm; }
-  .testimony-card p { font-size: 11pt; line-height: 1.6; }
+  .testimony-card { padding: calc(4mm * var(--fmt-space-scale, 1)); background: #efe8d8; border-radius: 2mm; }
+  .testimony-card p { font-size: calc(11pt * var(--fmt-type-scale, 1)); line-height: 1.6; }
   /* PHOTO_TEXT / TEXT_PHOTO / TWO_PHOTOS_TEXT (v2) : ordre visuel = ordre reel des items. */
-  .mixte-ordered { display: flex; flex-direction: column; gap: 5mm; height: 100%; }
+  .mixte-ordered { display: flex; flex-direction: column; gap: calc(5mm * var(--fmt-space-scale, 1)); height: 100%; }
   .mixte-ordered .mixte-photo { flex: 1.4; min-height: 0; }
   .mixte-ordered .mixte-photo .photo-frame { height: 100%; }
   .mixte-ordered .mixte-texte { flex: 1; display: flex; align-items: center; }
-  .mixte-ordered .mixte-texte p { font-size: 12pt; line-height: 1.6; }
+  .mixte-ordered .mixte-texte p { font-size: calc(12pt * var(--fmt-type-scale, 1)); line-height: 1.6; }
   .mixte-multi-photo { flex-direction: row; flex-wrap: wrap; }
   .mixte-multi-photo .mixte-photo { flex: 1 1 45%; }
   .mixte-multi-photo .mixte-texte { flex-basis: 100%; }
+  /* TITLE_TEXT / TITLE_TWO_PHOTOS / TITLE_FOUR_PHOTOS (atelier manuel) : le
+     titre est toujours le premier item du bloc (voir renderTitleTextBlock/
+     renderTitlePhotosBlock), jamais un texte invente par le moteur. */
+  .page-title { margin: 0 0 calc(6mm * var(--fmt-space-scale, 1)); font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; font-size: calc(26pt * var(--fmt-type-scale, 1)); line-height: 1.2; text-align: center; }
+  .block-title-text { justify-content: center; }
+  .title-text-body p { font-size: calc(13pt * var(--fmt-type-scale, 1)); line-height: 1.7; text-align: justify; }
+  .block-title-photos { justify-content: flex-start; }
+  .title-photos-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); flex: 1; min-height: 0; }
+  .title-photos-grid-1 { grid-template-columns: 1fr; }
+  .title-photos-grid-2 { grid-template-columns: 1fr 1fr; }
+  .title-photos-grid-3, .title-photos-grid-4 { grid-template-columns: 1fr 1fr; }
+  /* Details dores discrets (Luxe uniquement, .page.is-luxe posee par
+     renderPage()/renderSinglePageHtml) — retour utilisateur explicite :
+     "ne pas mettre du doré partout". Un cadre pleine page sur CHAQUE page a
+     ete essaye puis retire : trop present. ll ne reste que deux details
+     RARES : un filet sous les titres de page (seulement les mises en page
+     a titre, deja peu frequentes) et un petit numero de page. Memes teintes
+     que la couverture (coverTheme.applyFormatAccent, #c19a3d/#8a6a1f),
+     codees en dur ici plutot qu'importees de coverTheme.js : ce module
+     reste une fonction de rendu pure, sans logique de theme (voir l'entete
+     du fichier) — meme raison que frontCoverRenderer.js recoit un theme
+     deja resolu plutot que de le calculer lui-meme. */
+  .page.is-luxe .page-title {
+    padding-bottom: calc(3mm * var(--fmt-space-scale, 1));
+    border-bottom: 0.75px solid #c19a3d;
+  }
+  .page-number-luxe {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(5mm * var(--fmt-space-scale, 1));
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    font-size: calc(7.5pt * var(--fmt-type-scale, 1));
+    letter-spacing: 0.08em;
+    color: #8a6a1f;
+    opacity: 0.75;
+  }
+  /* Page de separation de chapitre (Luxe uniquement — voir
+     formatComposer.js) : rare et sobre, beaucoup de blanc, deux filets fins
+     encadrant un numero et un titre en petites capitales espacees. */
+  .page-separator .separator-inner {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(6mm * var(--fmt-space-scale, 1));
+    text-align: center;
+  }
+  .separator-rule { width: calc(18mm * var(--fmt-space-scale, 1)); height: 1px; background: #c19a3d; border: none; margin: 0; }
+  .separator-number { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 400; font-size: calc(30pt * var(--fmt-type-scale, 1)); color: #241f18; }
+  .separator-title { font-family: 'Inter', sans-serif; font-size: calc(11pt * var(--fmt-type-scale, 1)); letter-spacing: 0.32em; text-transform: uppercase; color: #6d6252; }
   @media print {
     body { background: #fff; }
     .page { margin: 0; }
@@ -279,7 +499,7 @@ const BASE_CSS = `
  * @param {Array} input.pages - resultat de layoutEngine.compose() ou lecture de book_pages
  * @param {Array} input.items - book_content_items du livre (pour resoudre les itemIds des pages)
  * @param {Array} [input.layouts] - layout_definitions (pour resoudre le slug de chaque bloc et varier le rendu)
- * @param {object} [input.format] - { trimWidthMm, trimHeightMm }
+ * @param {object} [input.format] - { trimWidthMm, trimHeightMm, spaceScale?, typeScale? } (spaceScale/typeScale : voir formatDensity.js, defaut 1 si absents)
  * @returns {string} document HTML complet, autonome
  */
 function renderBookHtml(input) {
@@ -292,19 +512,32 @@ function renderBookHtml(input) {
   const itemsById = Object.fromEntries(items.map((item) => [item.id, item]));
   const layoutsById = Object.fromEntries(layouts.map((layout) => [layout.id, layout]));
   const sortedPages = [...pages].sort((a, b) => a.page_index - b.page_index);
+  const context = { book, format };
   const pagesHtml = sortedPages
-    .map((page, index) => renderPage(page, itemsById, layoutsById, index === sortedPages.length - 1))
+    .map((page, index) => renderPage(page, itemsById, layoutsById, index === sortedPages.length - 1, context))
     .join('\n');
+
+  const { COVER_BASE_CSS, FRONT_COVER_CSS } = require('./frontCoverRenderer');
+  const { BACK_COVER_CSS } = require('./backCoverRenderer');
 
   return `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(book.title || 'Aperçu du livre')}</title>
+${GOOGLE_FONTS_LINK}
 <style>
   @page { size: ${format.trimWidthMm}mm ${format.trimHeightMm}mm; margin: 0; }
-  :root { --page-width-mm: ${format.trimWidthMm}mm; --page-height-mm: ${format.trimHeightMm}mm; }
+  :root {
+    --page-width-mm: ${format.trimWidthMm}mm;
+    --page-height-mm: ${format.trimHeightMm}mm;
+    --fmt-space-scale: ${format.spaceScale ?? 1};
+    --fmt-type-scale: ${format.typeScale ?? 1};
+  }
   ${BASE_CSS}
+  ${COVER_BASE_CSS}
+  ${FRONT_COVER_CSS}
+  ${BACK_COVER_CSS}
 </style>
 </head>
 <body>
@@ -336,22 +569,48 @@ function renderSinglePageHtml(input) {
 
   const itemsById = Object.fromEntries(items.map((item) => [item.id, item]));
   const layoutsById = Object.fromEntries(layouts.map((layout) => [layout.id, layout]));
-  const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
-  const blocksHtml = blocks.map((block) => renderBlock(block, itemsById, layoutsById)).join('');
+
+  const { COVER_BASE_CSS, FRONT_COVER_CSS } = require('./frontCoverRenderer');
+  const { BACK_COVER_CSS } = require('./backCoverRenderer');
+
+  // Couverture / page de separation de chapitre : meme dispatch que
+  // renderPage/renderBookHtml, isLast toujours vrai ici (un document a une
+  // seule page n'a jamais besoin de la classe page-break, capture
+  // independante page par page).
+  let pageHtml;
+  if (page.content?.kind === 'front-cover' || page.content?.kind === 'back-cover' || page.content?.kind === 'chapter-separator') {
+    pageHtml = renderPage(page, itemsById, layoutsById, true, { book, format });
+  } else {
+    const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
+    const blocksHtml = blocks.map((block) => renderBlock(block, itemsById, layoutsById)).join('');
+    // Meme marqueur/numero de page discret que renderPage() ci-dessus (Luxe uniquement).
+    const luxeClass = format?.formatId === 'luxe' ? ' is-luxe' : '';
+    const pageNumberHtml = format?.formatId === 'luxe' ? `<span class="page-number-luxe">${page.page_index + 1}</span>` : '';
+    pageHtml = `<section class="page${luxeClass}" data-page-index="${page.page_index}"><div class="page-blocks">${blocksHtml}</div>${pageNumberHtml}</section>`;
+  }
 
   return `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(book.title || 'Page')}</title>
+${GOOGLE_FONTS_LINK}
 <style>
-  :root { --page-width-mm: ${format.trimWidthMm}mm; --page-height-mm: ${format.trimHeightMm}mm; }
+  :root {
+    --page-width-mm: ${format.trimWidthMm}mm;
+    --page-height-mm: ${format.trimHeightMm}mm;
+    --fmt-space-scale: ${format.spaceScale ?? 1};
+    --fmt-type-scale: ${format.typeScale ?? 1};
+  }
   ${BASE_CSS}
+  ${COVER_BASE_CSS}
+  ${FRONT_COVER_CSS}
+  ${BACK_COVER_CSS}
   .page { margin: 0; width: 100vw; height: 100vh; }
 </style>
 </head>
 <body>
-<section class="page" data-page-index="${page.page_index}"><div class="page-blocks">${blocksHtml}</div></section>
+${pageHtml}
 </body>
 </html>`;
 }
@@ -359,5 +618,6 @@ function renderSinglePageHtml(input) {
 module.exports = {
   renderBookHtml,
   renderSinglePageHtml,
-  escapeHtml
+  escapeHtml,
+  imgFrame
 };

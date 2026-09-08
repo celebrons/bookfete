@@ -10,6 +10,7 @@ import {
   listOrdersByBook,
   updateOrderStatus
 } from '../../services/ordersApi';
+import { estimatePrice } from '../../services/compositionApi';
 import {
   formatPriceCents,
   getOrderStatusConfig,
@@ -36,21 +37,6 @@ const DEFAULT_ADDRESS = {
   city: '',
   country: 'France',
   phone: ''
-};
-
-const computeEstimate = (book, type, quantity) => {
-  const pages = Number(book?.pages || 0);
-  const safePages = Number.isFinite(pages) && pages > 0 ? pages : 64;
-  const safeQuantity = Math.max(1, Number(quantity) || 1);
-  const printUnit = Math.max(6900, 4900 + Math.round(safePages * 85));
-  const pdfUnit = 3900;
-  let unit = pdfUnit;
-  if (type === 'print') unit = printUnit;
-  if (type === 'pack') unit = printUnit + 2000;
-  return {
-    unit,
-    total: unit * safeQuantity
-  };
 };
 
 const wait = (durationMs) => new Promise((resolve) => {
@@ -126,10 +112,21 @@ const BookCheckoutLuxe = () => {
   const [pdfJob, setPdfJob] = useState(null);
   const [downloadingKind, setDownloadingKind] = useState('');
 
-  const estimate = useMemo(
-    () => computeEstimate(book, orderType, quantity),
-    [book, orderType, quantity]
-  );
+  // Prix reel (estimatePrice/computeOrderPricing, backend/routes/orders.js)
+  // — plus jamais un calcul local reimplemente : c'est exactement le meme
+  // calcul deja utilise par Configuration et par l'Apercu final
+  // (BookPreviewFinalLuxe.js), donc jamais 3 prix divergents pour le meme
+  // livre. `total` reste 0 tant que la premiere estimation n'est pas revenue
+  // plutot que d'afficher un chiffre invente en attendant.
+  const [estimate, setEstimate] = useState({ total: 0 });
+  useEffect(() => {
+    if (!book?.id) return undefined;
+    let cancelled = false;
+    estimatePrice(book.id, { printFormat: book.print_format, pageCount: book.page_count, type: orderType, quantity })
+      .then((result) => { if (!cancelled) setEstimate({ total: result.totalCents, unit: result.unitCents }); })
+      .catch(() => { if (!cancelled) setEstimate({ total: 0 }); });
+    return () => { cancelled = true; };
+  }, [book?.id, book?.print_format, book?.page_count, orderType, quantity]);
 
   const canOrder = useMemo(
     () => isBookLifecycleAtLeast(getBookLifecycleStatusFromBook(book), 'finalized'),

@@ -350,6 +350,13 @@
   margin-bottom: 10px;
 }
 
+.dashboard-book-top-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .dashboard-book-status {
   display: inline-flex;
   align-items: center;
@@ -362,6 +369,33 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border: 1px solid transparent;
+}
+
+/* Solo / Groupe : mode de collecte du projet (book.collection_mode). */
+.dashboard-book-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  cursor: help;
+}
+
+.dashboard-book-mode-badge.is-solo {
+  color: #4f6478;
+  background: #edf2f7;
+  border-color: #c9d4df;
+}
+
+.dashboard-book-mode-badge.is-groupe {
+  color: #8b5e11;
+  background: rgba(184, 146, 74, 0.14);
+  border-color: rgba(184, 146, 74, 0.34);
 }
 
 .dashboard-book-status::before {
@@ -617,6 +651,26 @@
   font-size: 12px;
   color: var(--text-light);
 }
+
+/* "Partager le lien" (livres collaboratifs) : mis en avant, avant meme le
+   CTA principal — c'est l'action la plus utile pour ce type de livre
+   (recevoir du contenu des proches) tant que la collecte n'est pas terminee. */
+.dashboard-book-share-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  min-height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--gold);
+  background: var(--gold);
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.dashboard-book-share-btn:hover { background: var(--gold-dark, var(--gold)); opacity: 0.92; }
 
 .modal-overlay {
   position: fixed;

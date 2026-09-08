@@ -274,6 +274,7 @@ function buildPageEntry(pageIndex, layout, consumedUnits, presentationVariant) {
  * @param {Array} input.allowedSlugs - liste blanche du style choisi (vide = pas de restriction)
  * @param {string} input.profile - 'PHOTO'|'TEXTE'|'EQUILIBRE'
  * @param {string} input.seedBase
+ * @param {string} [input.mood] - ambiance de composition (voir layoutScoring.MOOD_LAYOUT_WEIGHTS), absent = comportement standard
  * @returns {{ pages: Array }}
  */
 function buildPages(input) {
@@ -282,6 +283,7 @@ function buildPages(input) {
   const allowedSlugs = Array.isArray(input.allowedSlugs) ? input.allowedSlugs : [];
   const profile = input.profile || 'EQUILIBRE';
   const seedBase = input.seedBase || 'no-template:0';
+  const mood = input.mood || undefined;
 
   const pool = allowedSlugs.length > 0
     ? layouts.filter((layout) => allowedSlugs.includes(layout.slug) || GUARANTEED_FALLBACK_SLUGS.includes(layout.slug))
@@ -308,7 +310,7 @@ function buildPages(input) {
 
     const scored = candidates.map((layout) => {
       const units = window.slice(0, consumedCount(layout, window) || 1);
-      return { layout, units, score: scoreLayoutCandidate(layout, units, { profile, rhythmState, familyCounts }) };
+      return { layout, units, score: scoreLayoutCandidate(layout, units, { profile, rhythmState, familyCounts, mood }) };
     });
 
     const maxScore = Math.max(...scored.map((entry) => entry.score));
@@ -369,6 +371,7 @@ function recommendPageCount(input = {}) {
  * @param {number} input.pageCount - nombre de pages demande pour le livre (couverture non comprise)
  * @param {number} [input.variant] - graine de regeneration (0 par defaut)
  * @param {number} [input.fixedPages] - pages fixes non composees (garde/titre)
+ * @param {string} [input.mood] - ambiance de composition, jamais persistee (voir routes/composition.js POST /compose) — absente = comportement standard, non-regressif
  * @returns {{ pages: Array<{page_index:number, layout_id:string|null, content:object}>, overflow: boolean, underflow: boolean, pageBudget: number, totalWeight: number }}
  */
 function compose(input) {
@@ -378,12 +381,13 @@ function compose(input) {
   const fixedPages = clampInt(input.fixedPages, DEFAULT_FIXED_PAGES);
   const variant = Number.isInteger(input.variant) ? input.variant : 0;
   const seedBase = `${input.template?.id || 'no-template'}:${variant}`;
+  const mood = input.mood || undefined;
 
   const pagesAvailable = Math.max(0, clampInt(input.pageCount, 0) - fixedPages);
 
   const units = buildUnitsFromItems(items);
   const { profile } = detectContentProfile(items);
-  const { pages: contentPages } = buildPages({ units, layouts, allowedSlugs, profile, seedBase });
+  const { pages: contentPages } = buildPages({ units, layouts, allowedSlugs, profile, seedBase, mood });
 
   // Le livre compte EXACTEMENT le nombre de pages que le contenu occupe,
   // jamais plus : aucune page blanche n'est jamais inseree pour atteindre un

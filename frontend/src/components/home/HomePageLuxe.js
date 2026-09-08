@@ -329,13 +329,13 @@ const homepageEvents = events.slice(0, 0).concat([
             }}>
               <Link to="/create-book" style={{ textDecoration: 'none' }}>
                 <button className="btn btn-primary" style={{ padding: '16px 40px' }}>
-                  Commencez gratuitement
+                  Créer mon livre
                 </button>
               </Link>
-              
+
               <Link to="/how-it-works" style={{ textDecoration: 'none' }}>
                 <button className="btn btn-outline" style={{ padding: '16px 40px' }}>
-                  Découvrir
+                  Comment ça marche ?
                 </button>
               </Link>
             </div>
@@ -588,7 +588,7 @@ const homepageEvents = events.slice(0, 0).concat([
               border: 'none',
               fontSize: '14px'
             }}>
-              Créer mon livre gratuitement
+              Créer mon livre
             </button>
           </Link>
 

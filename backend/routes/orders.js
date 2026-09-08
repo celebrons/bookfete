@@ -200,11 +200,30 @@ const isAddressValid = (address) => (
   Boolean(address?.fullName && address?.line1 && address?.postalCode && address?.city && address?.country)
 );
 
+// Tarif d'impression par type d'album (books.print_format, voir
+// coverFormat.js pour les 3 memes ids et leurs dimensions physiques).
+// Hypothese de travail (aucun cout d'impression reel connu a ce jour) :
+// un seul endroit a ajuster si les vrais couts different.
+const FORMAT_PRICING = {
+  livret: { baseCents: 3400, perPageCents: 60, minCents: 4900 },
+  standard: { baseCents: 4900, perPageCents: 85, minCents: 6900 },
+  luxe: { baseCents: 6900, perPageCents: 130, minCents: 9900 }
+};
+const DEFAULT_PRINT_FORMAT = 'standard';
+
+const resolveFormatPricing = (printFormat) => FORMAT_PRICING[printFormat] || FORMAT_PRICING[DEFAULT_PRINT_FORMAT];
+
+// book.page_count (pas book.pages, une colonne heritee de l'ancien flux IA
+// jamais mise a jour par le moteur de composition actuel) : la vraie valeur,
+// obligatoire pour composer le livre (voir routes/composition.js), donc le
+// seul nombre qui correspond reellement au livre imprime.
 const computeOrderPricing = ({ book, type, quantity }) => {
-  const pages = Number(book?.pages || 0);
+  const pages = Number(book?.page_count || 0);
   const safePages = Number.isFinite(pages) && pages > 0 ? pages : 64;
   const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
-  const printUnitCents = Math.max(6900, 4900 + Math.round(safePages * 85));
+  const printFormat = book?.print_format && FORMAT_PRICING[book.print_format] ? book.print_format : DEFAULT_PRINT_FORMAT;
+  const pricing = resolveFormatPricing(printFormat);
+  const printUnitCents = Math.max(pricing.minCents, pricing.baseCents + Math.round(safePages * pricing.perPageCents));
   const pdfUnitCents = 3900;
 
   let unitCents = pdfUnitCents;
@@ -220,6 +239,7 @@ const computeOrderPricing = ({ book, type, quantity }) => {
     totalCents: unitCents * safeQuantity,
     breakdown: {
       pages: safePages,
+      printFormat,
       printUnitCents,
       pdfUnitCents
     }
@@ -585,6 +605,59 @@ router.get('/book/:bookId', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/orders/book/:bookId/price-estimate?print_format=&page_count=
+// Estimation de prix en lecture seule, jamais persistee : print_format/
+// page_count passes en query *surchargent* les valeurs reelles du livre
+// pour l'estimation (Configuration peut ainsi afficher le prix de chaque
+// format avant de le choisir, et reagir a une pagination pas encore
+// sauvegardee) sans jamais ecrire en base. Reutilise computeOrderPricing
+// telle quelle : jamais une deuxieme implementation du calcul de prix.
+// Client Supabase "simple" (pas createUserScopedClient) : lecture seule,
+// deja filtree explicitement par owner_id ci-dessous, meme convention que
+// getBook() dans routes/composition.js.
+router.get('/book/:bookId/price-estimate', authenticate, async (req, res) => {
+  try {
+    const { data: book, error } = await supabase
+      .from('books')
+      .select('*')
+      .eq('id', req.params.bookId)
+      .eq('owner_id', req.user.id)
+      .single();
+
+    if (error || !book) {
+      return res.status(404).json({ error: 'Livre introuvable' });
+    }
+
+    const overriddenPageCount = req.query.page_count !== undefined ? Number(req.query.page_count) : null;
+    const mergedBook = {
+      ...book,
+      print_format: req.query.print_format || book.print_format,
+      page_count: Number.isFinite(overriddenPageCount) && overriddenPageCount > 0
+        ? overriddenPageCount
+        : book.page_count
+    };
+
+    // type/quantity optionnels (defaut 'print'/1, comportement inchange pour
+    // tout appelant existant — Configuration ne les passe jamais) : ajoutes
+    // pour que BookCheckoutLuxe.js puisse simuler le VRAI prix du type de
+    // commande et de la quantite choisis, au lieu de son propre calcul local
+    // (qui ignorait print_format et lisait la colonne morte `book.pages`).
+    const allowedTypes = ['pdf', 'print', 'pack'];
+    const type = allowedTypes.includes(req.query.type) ? req.query.type : 'print';
+    const quantity = Math.max(1, Number.parseInt(req.query.quantity, 10) || 1);
+
+    const pricing = computeOrderPricing({ book: mergedBook, type, quantity });
+    return res.json({
+      printFormat: pricing.breakdown.printFormat,
+      pageCount: pricing.breakdown.pages,
+      unitCents: pricing.unitCents,
+      totalCents: pricing.totalCents
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/:orderId', authenticate, async (req, res) => {
   try {
     const db = createUserScopedClient(req);
@@ -645,10 +718,8 @@ router.post('/', authenticate, async (req, res) => {
       title: book.title || 'Livre sans titre',
       eventType: book.event_type || null,
       recipientName: book.recipient_name || null,
-      pages: Number(book.pages || 0) || null,
-      finition: book.finition || null,
-      papier: book.papier || null,
-      styleNarratif: book.style_narratif || null,
+      pages: Number(book.page_count || 0) || null,
+      printFormat: book.print_format || 'standard',
       lifecycleStatus,
       createdAt: getNowIso()
     };
@@ -903,3 +974,4 @@ router.post('/:orderId/status', authenticate, async (req, res) => {
 
 module.exports = router;
 module.exports.handleStripeWebhook = handleStripeWebhook;
+module.exports.computeOrderPricing = computeOrderPricing;

@@ -1,170 +1,176 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import BookWorkspaceHeader from './BookWorkspaceHeader';
+import TemplateMiniPreview from './TemplateMiniPreview';
+import { listTemplates, composeBook, fetchCoverPreviewHtml } from '../../services/compositionApi';
 import './BookLuxe.css';
 import '../../styles/luxe-theme.css';
 
-const FINITIONS = [
-  { id: 'livret', label: 'Livret', description: 'Souple et leger', basePrice: 29 },
-  { id: 'classique', label: 'Classique', description: 'Rigide et elegant', basePrice: 55 },
-  { id: 'luxe', label: 'Luxe', description: 'Toile premium', basePrice: 85 }
-];
+// Centre de controle du STYLE du livre uniquement (direction artistique,
+// book_templates) + un resume de la couverture (jamais editee ici).
+//
+// FORMAT (Livret/Standard/Luxe) et PAGINATION ont demenage a l'Apercu final
+// (BookPreviewFinalLuxe.js, route /book/:bookId/apercu) : dans le nouveau
+// parcours JE CREE -> JE VERIFIE -> J'ACHETE, ce sont des choix de PRODUIT
+// (avec prix associe), pas des choix de contenu — les garder ici EN PLUS
+// aurait cree deux endroits pour regler les memes champs, source d'erreurs.
+// Le prix n'apparait donc plus du tout sur cet ecran (voir cahier des
+// charges : "le prix n'apparait qu'a l'etape finale").
+//
+// Tout changement se sauvegarde automatiquement (debounce court, comme
+// BookCoverDesignerLuxe.js) — jamais de bouton "Valider". L'apercu (recto/
+// verso, contenu reel) est reconstruit specifiquement pour cet ecran plutot
+// que partage avec BookCoverDesignerLuxe.js : ce dernier fonctionne deja et
+// n'a aucune couverture de tests frontend, un refactor partage serait un
+// risque de regression non detectable pour un gain cosmetique.
 
-const PAPIERS = [
-  { id: 'satine', label: 'Satine', description: 'Brillant et lisse', multiplier: 1.0 },
-  { id: 'mat', label: 'Mat', description: 'Doux et naturel', multiplier: 1.0 },
-  { id: 'verge_ivoire', label: 'Verge ivoire', description: 'Texture noble', multiplier: 1.15 }
-];
+const SAVE_DEBOUNCE_MS = 700;
 
-const STYLES = [
-  { id: 'poetique', label: 'Poetique', description: 'Image et emotion', multiplier: 1.0 },
-  { id: 'factuel', label: 'Factuel', description: 'Direct et clair', multiplier: 1.0 },
-  { id: 'intime', label: 'Intime', description: 'Chaleureux et personnel', multiplier: 1.0 }
-];
-
-const MIN_PAGES = 32;
-const MAX_PAGES = 96;
-const DEFAULT_PAGES_PER_CHAPTER = 8;
-const DEFAULT_PRICE_PAGES_BASELINE = 64;
-const EXTRA_PAGE_PRICE = 0.25;
-
-const normalizePaperType = (value) => (
-  value === 'verge' ? 'verge_ivoire' : (value || 'mat')
-);
-
-const clampPages = (value) => {
-  const numericValue = Number(value) || MIN_PAGES;
-  const snapped = Math.round(numericValue / DEFAULT_PAGES_PER_CHAPTER) * DEFAULT_PAGES_PER_CHAPTER;
-  return Math.max(MIN_PAGES, Math.min(MAX_PAGES, snapped));
-};
-
-const buildInitialFormData = (book, chaptersCount) => ({
+const buildInitialState = (book) => ({
   title: book?.title || '',
-  finition: book?.finition || 'classique',
-  papier: normalizePaperType(book?.papier),
-  style_narratif: book?.style_narratif || 'factuel',
-  pages: clampPages(book?.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER || 64)
+  template_id: book?.template_id || null
 });
 
-const formatEuro = (value) => Number(value || 0).toLocaleString('fr-FR', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-});
+const getStateSignature = (state) => JSON.stringify(state);
 
-const BookConfigLuxe = ({
-  book,
-  onUpdateBook,
-  bookTitle = '',
-  onOpenTab,
-  chaptersCount = 6,
-  onOpenCoverConfig
-}) => {
-  const [formData, setFormData] = useState(() => buildInitialFormData(book, chaptersCount));
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveFeedback, setSaveFeedback] = useState(null);
+// "Automatique"/"Personnalise" : jamais le detail exact du choix (pas de
+// duplication de la liste des formats de couverture ici, deja definie et
+// entretenue dans BookCoverDesignerLuxe.js) — juste de quoi confirmer que
+// rien ici ne l'a jamais touche.
+const coverChoiceLabel = (variant) => (variant && variant !== 'AUTO' ? 'Personnalise' : 'Automatique');
+
+const BookConfigLuxe = ({ book, onUpdateBook, bookTitle = '', onOpenTab }) => {
+  const [formData, setFormData] = useState(() => buildInitialState(book));
+  const [savedSignature, setSavedSignature] = useState(() => getStateSignature(buildInitialState(book)));
+  const [saveStatus, setSaveStatus] = useState('idle'); // idle | pending | saving | saved | error
+
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
+
+  const [activeFace, setActiveFace] = useState('front');
+  const [previewHtmlByFace, setPreviewHtmlByFace] = useState({ front: null, back: null });
+  const [previewError, setPreviewError] = useState('');
+  const [loadingPreview, setLoadingPreview] = useState(true);
+
+  const [recomposing, setRecomposing] = useState(false);
+  const [recomposeMessage, setRecomposeMessage] = useState('');
+
+  const saveTimeoutRef = useRef(null);
 
   useEffect(() => {
-    setFormData(buildInitialFormData(book, chaptersCount));
-  }, [book?.id, book?.title, book?.finition, book?.papier, book?.style_narratif, book?.pages, chaptersCount]);
+    const nextState = buildInitialState(book);
+    setFormData(nextState);
+    setSavedSignature(getStateSignature(nextState));
+    setSaveStatus('idle');
+  }, [book?.id, book?.title, book?.template_id]);
 
-  const selectedFinition = useMemo(
-    () => FINITIONS.find((option) => option.id === formData.finition) || FINITIONS[1],
-    [formData.finition]
-  );
-  const selectedPapier = useMemo(
-    () => PAPIERS.find((option) => option.id === formData.papier) || PAPIERS[1],
-    [formData.papier]
-  );
-  const selectedStyle = useMemo(
-    () => STYLES.find((option) => option.id === formData.style_narratif) || STYLES[1],
-    [formData.style_narratif]
-  );
+  useEffect(() => {
+    listTemplates()
+      .then((list) => setTemplates(list || []))
+      .catch(() => setTemplates([]))
+      .finally(() => setLoadingTemplates(false));
+  }, []);
 
-  const currentBookSnapshot = useMemo(
-    () => ({
-      title: book?.title || '',
-      finition: book?.finition || 'classique',
-      papier: normalizePaperType(book?.papier),
-      style_narratif: book?.style_narratif || 'factuel',
-      pages: clampPages(book?.pages || chaptersCount * DEFAULT_PAGES_PER_CHAPTER || 64)
-    }),
-    [book?.title, book?.finition, book?.papier, book?.style_narratif, book?.pages, chaptersCount]
-  );
+  const loadPreview = async () => {
+    if (!book?.id) return;
+    setLoadingPreview(true);
+    setPreviewError('');
+    try {
+      const [frontHtml, backHtml] = await Promise.all([
+        fetchCoverPreviewHtml(book.id, 'front'),
+        fetchCoverPreviewHtml(book.id, 'back')
+      ]);
+      setPreviewHtmlByFace({ front: frontHtml, back: backHtml });
+    } catch (error) {
+      setPreviewError(error.message || "Apercu indisponible pour le moment.");
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
-  const livePrice = useMemo(() => {
-    const extraPages = Math.max(0, formData.pages - DEFAULT_PRICE_PAGES_BASELINE);
-    const baseWithPages = selectedFinition.basePrice + (extraPages * EXTRA_PAGE_PRICE);
-    const withPaper = baseWithPages * selectedPapier.multiplier;
-    const withStyle = withPaper * selectedStyle.multiplier;
-    return Math.round(withStyle * 100) / 100;
-  }, [formData.pages, selectedFinition.basePrice, selectedPapier.multiplier, selectedStyle.multiplier]);
+  useEffect(() => {
+    loadPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book?.id]);
 
-  const hasPendingChanges = useMemo(() => (
-    formData.title !== currentBookSnapshot.title
-    || formData.finition !== currentBookSnapshot.finition
-    || formData.papier !== currentBookSnapshot.papier
-    || formData.style_narratif !== currentBookSnapshot.style_narratif
-    || formData.pages !== currentBookSnapshot.pages
-  ), [formData, currentBookSnapshot]);
+  const stateSignature = useMemo(() => getStateSignature(formData), [formData]);
 
   const updateField = (field, value) => {
     setFormData((previous) => ({ ...previous, [field]: value }));
-    if (saveFeedback) {
-      setSaveFeedback(null);
-    }
   };
 
-  const handlePagesChange = (newPages) => {
-    updateField('pages', clampPages(newPages));
-  };
+  const buildSavePayload = (state) => ({
+    title: state.title.trim() || book?.title || 'Livre souvenir',
+    template_id: state.template_id
+  });
 
-  const persistConfiguration = async ({ showSuccessBanner = true } = {}) => {
-    if (!hasPendingChanges) {
-      return false;
-    }
-    setIsSaving(true);
-    setSaveFeedback(null);
+  // Sauvegarde automatique en direct — meme principe que
+  // BookCoverDesignerLuxe.js : un court debounce apres chaque changement,
+  // puis rafraichit l'apercu (le Style influence le rendu de la couverture).
+  useEffect(() => {
+    if (stateSignature === savedSignature) return undefined;
 
-    const payload = {
-      title: formData.title.trim() || currentBookSnapshot.title || 'Livre souvenir',
-      finition: formData.finition,
-      papier: formData.papier,
-      style_narratif: formData.style_narratif,
-      pages: formData.pages
-    };
+    setSaveStatus('pending');
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    try {
-      await onUpdateBook(payload);
-
-      if (showSuccessBanner) {
-        setSaveFeedback({
-          type: 'success',
-          message: 'Configuration enregistree. Les donnees du livre sont a jour.'
-        });
+    saveTimeoutRef.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        await onUpdateBook(buildSavePayload(formData));
+        setSavedSignature(stateSignature);
+        setSaveStatus('saved');
+        await loadPreview();
+      } catch (error) {
+        setSaveStatus('error');
       }
-      return true;
-    } catch (error) {
-      setSaveFeedback({
-        type: 'error',
-        message: 'La validation a echoue. Merci de reessayer.'
-      });
-      throw error;
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    }, SAVE_DEBOUNCE_MS);
 
-  const handleValidate = async () => {
-    if (isSaving || !hasPendingChanges) {
-      return;
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateSignature]);
+
+  const saveStatusLabel = {
+    idle: '',
+    pending: 'Modification en cours...',
+    saving: 'Enregistrement...',
+    saved: 'Enregistre',
+    error: "Erreur d'enregistrement"
+  }[saveStatus];
+
+  // Les pages interieures deja composees ne suivent jamais automatiquement
+  // un changement de Style (acte explicite, comme dans le composeur) — ce
+  // bouton sauvegarde d'abord tout changement en attente (pour ne jamais
+  // recomposer avec des valeurs perimees), puis recompose. La pagination
+  // recomposee reste celle deja fixee sur le livre (book.page_count) —
+  // modifiable depuis l'Apercu final, pas ici.
+  const handleRecompose = async () => {
+    if (!book?.id || recomposing) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
     }
+    setRecomposing(true);
+    setRecomposeMessage('');
     try {
-      await persistConfiguration({ showSuccessBanner: true });
-    } catch (_error) {
-      // Feedback already handled.
+      if (stateSignature !== savedSignature) {
+        setSaveStatus('saving');
+        await onUpdateBook(buildSavePayload(formData));
+        setSavedSignature(stateSignature);
+        setSaveStatus('saved');
+      }
+      const result = await composeBook(book.id, 0);
+      const pageCount = Array.isArray(result.pages) ? result.pages.length : book?.page_count;
+      setRecomposeMessage(`Pages interieures recomposees (${pageCount} pages).`);
+    } catch (error) {
+      setRecomposeMessage(error?.message || 'La recomposition a echoue. Merci de reessayer.');
+    } finally {
+      setRecomposing(false);
     }
   };
 
-  const pageProgress = ((formData.pages - MIN_PAGES) / (MAX_PAGES - MIN_PAGES)) * 100;
+  const selectedTemplate = templates.find((template) => template.id === formData.template_id) || null;
+  const activePreviewHtml = previewHtmlByFace[activeFace];
 
   return (
     <div className="book-config-live">
@@ -173,17 +179,18 @@ const BookConfigLuxe = ({
         bookTitle={bookTitle || book?.title || 'Livre'}
         activeTab="config"
         onOpenTab={onOpenTab}
+        book={book}
+        subactions={saveStatusLabel && (
+          <span className={`coverlite-save-status is-${saveStatus}`}>{saveStatusLabel}</span>
+        )}
       />
 
       <div className="book-config-live-helper">
-        Ajustez les options. Le visuel et le prix se mettent a jour en direct.
+        Le style se modifie ici directement — l'apercu reagit instantanement. Le format d'impression,
+        la pagination et le prix se choisissent depuis l'Apercu final, une fois votre livre construit
+        dans l'atelier. La couverture reste inchangee quel que soit votre choix ; modifiez-la depuis
+        son propre onglet.
       </div>
-
-      {saveFeedback?.message && (
-        <div className={`luxe-feedback-banner is-${saveFeedback.type}`}>
-          <span>{saveFeedback.message}</span>
-        </div>
-      )}
 
       <div className="book-config-live-grid">
         <section className="book-config-panel">
@@ -199,124 +206,99 @@ const BookConfigLuxe = ({
           </div>
 
           <div className="book-config-group">
-            <span className="book-config-group-label">Finition</span>
-            <div className="book-config-choice-grid">
-              {FINITIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => updateField('finition', option.id)}
-                  className={`book-config-choice ${formData.finition === option.id ? 'is-selected' : ''}`}
-                >
-                  <span className="book-config-choice-title">{option.label}</span>
-                  <span className="book-config-choice-text">{option.description}</span>
-                </button>
-              ))}
+            <span className="book-config-group-label">Style (direction artistique)</span>
+            {loadingTemplates ? (
+              <p className="coverlite-hint">Chargement des styles...</p>
+            ) : (
+              <div className="book-config-choice-grid">
+                {templates.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => updateField('template_id', template.id)}
+                    className={`book-config-choice ${formData.template_id === template.id ? 'is-selected' : ''}`}
+                  >
+                    <TemplateMiniPreview template={template} />
+                    <span className="book-config-choice-title">{template.label}</span>
+                    <span className="book-config-choice-text">{template.description}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="book-config-recompose-hint">
+              <p>
+                Un changement de style ne modifie les pages interieures deja composees qu'apres
+                recomposition.
+              </p>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleRecompose}
+                disabled={recomposing || !formData.template_id || !book?.page_count}
+              >
+                {recomposing ? 'Recomposition...' : 'Recomposer les pages interieures'}
+              </button>
             </div>
+            {recomposeMessage && <p className="book-config-recompose-status">{recomposeMessage}</p>}
           </div>
 
           <div className="book-config-group">
-            <span className="book-config-group-label">Papier</span>
-            <div className="book-config-choice-grid">
-              {PAPIERS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => updateField('papier', option.id)}
-                  className={`book-config-choice ${formData.papier === option.id ? 'is-selected' : ''}`}
-                >
-                  <span className="book-config-choice-title">{option.label}</span>
-                  <span className="book-config-choice-text">{option.description}</span>
-                </button>
-              ))}
+            <span className="book-config-group-label">Couverture</span>
+            <div className="book-config-cover-summary">
+              <div className="book-config-cover-summary-line">
+                <span>Couverture</span>
+                <span className="book-config-cover-summary-tag">{coverChoiceLabel(book?.cover_overrides?.frontVariant)}</span>
+              </div>
+              <div className="book-config-cover-summary-line">
+                <span>4e de couverture</span>
+                <span className="book-config-cover-summary-tag">{coverChoiceLabel(book?.cover_overrides?.backVariant)}</span>
+              </div>
+              <button type="button" className="btn btn-outline book-config-cover-btn" onClick={() => onOpenTab?.('chapitres')}>
+                Modifier la couverture
+              </button>
             </div>
-          </div>
-
-          <div className="book-config-group">
-            <span className="book-config-group-label">Voix narrative</span>
-            <div className="book-config-choice-grid">
-              {STYLES.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => updateField('style_narratif', option.id)}
-                  className={`book-config-choice ${formData.style_narratif === option.id ? 'is-selected' : ''}`}
-                >
-                  <span className="book-config-choice-title">{option.label}</span>
-                  <span className="book-config-choice-text">{option.description}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="book-config-group">
-            <div className="book-config-pages-head">
-              <span className="book-config-group-label">Pagination</span>
-              <span className="book-config-pages-value">{formData.pages} pages</span>
-            </div>
-
-            <input
-              type="range"
-              min={MIN_PAGES}
-              max={MAX_PAGES}
-              step={DEFAULT_PAGES_PER_CHAPTER}
-              value={formData.pages}
-              onChange={(event) => handlePagesChange(event.target.value)}
-              className="book-config-slider"
-            />
-
-            <div className="book-config-pages-minmax">
-              <span>{MIN_PAGES} pages</span>
-              <span>{MAX_PAGES} pages</span>
-            </div>
-
-            <div className="book-config-progress-track">
-              <span className="book-config-progress-bar" style={{ width: `${pageProgress}%` }} />
-            </div>
-          </div>
-
-          <div className="book-config-panel-actions">
-            <span className="book-config-panel-actions-text">
-              {hasPendingChanges
-                ? 'Des changements sont en attente de validation.'
-                : 'Configuration deja synchronisee.'}
-            </span>
-            <button
-              type="button"
-              className="chapter-editor-primary-action book-config-panel-action"
-              onClick={handleValidate}
-              disabled={!hasPendingChanges || isSaving}
-            >
-              {isSaving ? 'Validation...' : 'Valider'}
-            </button>
           </div>
         </section>
 
         <aside className="book-config-preview">
-          <div className={`book-config-preview-cover is-${formData.finition}`}>
-            <div className="book-config-preview-spine" />
-            <div className="book-config-preview-content">
-              <span className="book-config-preview-chip">{selectedStyle.label}</span>
-              <h3>{formData.title || 'Titre du livre'}</h3>
-              <p>{formData.pages} pages</p>
+          <div className="coverlite-preview-head">
+            <span className="coverlite-group-label">Apercu</span>
+            <div className="coverlite-face-tabs">
+              <button
+                type="button"
+                className={`coverlite-face-tab ${activeFace === 'front' ? 'is-active' : ''}`}
+                onClick={() => setActiveFace('front')}
+              >
+                Couverture
+              </button>
+              <button
+                type="button"
+                className={`coverlite-face-tab ${activeFace === 'back' ? 'is-active' : ''}`}
+                onClick={() => setActiveFace('back')}
+              >
+                4e de couverture
+              </button>
             </div>
           </div>
 
-          <div className="book-config-preview-price-card">
-            <div className="book-config-preview-price-label">Total estime</div>
-            <div className="book-config-preview-price-value">{formatEuro(livePrice)} EUR</div>
-            <div className="book-config-preview-price-note">Mise a jour en direct</div>
+          {previewError && <div className="wizard-error">{previewError}</div>}
+
+          <div className="coverlite-preview-stage">
+            {loadingPreview && !activePreviewHtml && (
+              <p className="coverlite-hint coverlite-preview-loading">Chargement de l'apercu...</p>
+            )}
+            {activePreviewHtml && (
+              <iframe
+                title={activeFace === 'front' ? 'Apercu de la couverture' : 'Apercu de la 4e de couverture'}
+                srcDoc={activePreviewHtml}
+                className="coverlite-preview-frame"
+              />
+            )}
           </div>
 
-          <div className="book-config-preview-actions">
-            <button
-              type="button"
-              className="btn btn-outline book-config-cover-btn"
-              onClick={onOpenCoverConfig}
-              disabled={typeof onOpenCoverConfig !== 'function'}
-            >
-              Configurer couverture et 4e
-            </button>
+          <div className="book-config-preview-price-note">
+            {selectedTemplate ? `Style : ${selectedTemplate.label}` : 'Aucun style choisi'}
           </div>
         </aside>
       </div>
@@ -325,4 +307,3 @@ const BookConfigLuxe = ({
 };
 
 export default BookConfigLuxe;
-

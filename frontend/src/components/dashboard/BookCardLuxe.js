@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Tooltip from '../ui/Tooltip';
 import {
@@ -17,6 +17,24 @@ import {
 } from '../../utils/clientJourney';
 import './DashboardLuxe.css';
 
+// Libelles humains des occasions (event_type) : book.event_type stocke le
+// slug technique choisi a la creation (ex. "projet"), pas le libelle affiche
+// dans ce meme formulaire (ex. "Fin de projet") — voir EVENT_TYPE_LABELS,
+// backend/utils/bookCreationSchema.js (meme mapping, garder les deux
+// synchronises). Slug inconnu -> affiche tel quel plutot que de disparaitre.
+const EVENT_TYPE_LABELS = {
+  anniversaire: 'Anniversaire',
+  retraite: 'Retraite',
+  depart: 'Depart',
+  mariage: 'Mariage / Union',
+  naissance: 'Naissance',
+  voyage: 'Voyage / Vacances',
+  projet: 'Fin de projet',
+  famille: 'Reunion de famille',
+  custom: 'Choix libre'
+};
+const resolveEventTypeLabel = (eventType) => (eventType ? (EVENT_TYPE_LABELS[eventType] || eventType) : 'Generique');
+
 const BookCardLuxe = ({
   book,
   onArchive,
@@ -31,11 +49,31 @@ const BookCardLuxe = ({
   const journeyStatus = resolveBookJourneyStatus({ book, latestOrder });
   const journeyConfig = getJourneyStatusConfig(journeyStatus);
   const primaryAction = getJourneyPrimaryAction(journeyStatus, latestOrder);
-  const chaptersCount = book.chapters?.[0]?.count || 0;
-  const contributionsCount = book.contributions?.reduce(
-    (acc, chapter) => acc + (chapter.contributions?.[0]?.count || 0),
-    0
-  ) || 0;
+  const [shareCopied, setShareCopied] = useState(false);
+
+  // book_content_items (photos + textes), pas les anciens
+  // chapters/contributions IA — voir DashboardGeneralLuxe.js.
+  const contentItems = book.content_items || [];
+  const photosCount = contentItems.filter((item) => item.kind === 'photo').length;
+  const souvenirsCount = contentItems.filter((item) => item.kind === 'texte').length;
+
+  const isSoloProject = (book.collection_mode || 'solo') === 'solo';
+
+  const handleShareLink = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!book.share_token) return;
+    const link = `${window.location.origin}/participer/${book.share_token}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (_err) {
+      // Presse-papiers indisponible (permission/contexte non securise) :
+      // pas bloquant, l'utilisateur peut toujours copier le lien depuis la
+      // barre d'adresse s'il ouvre la page /participer/:token lui-meme.
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -55,18 +93,32 @@ const BookCardLuxe = ({
     ) {
       return `/book/${book.id}/checkout`;
     }
+    if (primaryAction.key === 'continue_editing') {
+      // Directement vers l'atelier (pages, couverture, 4e) : c'est
+      // desormais l'action d'edition principale (l'automatique reste
+      // disponible en action secondaire, depuis l'atelier lui-meme).
+      return `/book/${book.id}/atelier`;
+    }
     return `/book/${book.id}`;
   };
 
   return (
     <article className="card dashboard-book-card">
       <div className="dashboard-book-top">
-        <span
-          className={`dashboard-book-status ${journeyConfig.tone || lifecycleConfig.tone}`}
-          title={lifecycleConfig.label}
-        >
-          {journeyConfig.label || lifecycleConfig.label}
-        </span>
+        <div className="dashboard-book-top-badges">
+          <span
+            className={`dashboard-book-status ${journeyConfig.tone || lifecycleConfig.tone}`}
+            title={lifecycleConfig.label}
+          >
+            {journeyConfig.label || lifecycleConfig.label}
+          </span>
+
+          <Tooltip text={isSoloProject ? 'Projet solo : vous ajoutez vous-meme photos et textes' : 'Projet groupe : vos proches contribuent via un lien'}>
+            <span className={`dashboard-book-mode-badge ${isSoloProject ? 'is-solo' : 'is-groupe'}`}>
+              {isSoloProject ? 'Solo' : 'Groupe'}
+            </span>
+          </Tooltip>
+        </div>
 
         <div className="dashboard-book-tools">
           {autoDeleteDate && (
@@ -126,7 +178,10 @@ const BookCardLuxe = ({
         </div>
       </div>
 
-      <Link to={`/book/${book.id}`} className="dashboard-book-link">
+      {/* Directement vers l'atelier (pas vers la fiche livre/onglet Edition,
+          qui n'est plus qu'un lanceur redondant) : le premier clic depuis le
+          dashboard doit amener au travail, jamais a un ecran intermediaire. */}
+      <Link to={`/book/${book.id}/atelier`} className="dashboard-book-link">
         <div className="dashboard-book-hero-minimal">
           <div>
             <h3 className="dashboard-book-title">{book.title}</h3>
@@ -135,15 +190,22 @@ const BookCardLuxe = ({
         </div>
 
         <p className="dashboard-book-summary">
-          {chaptersCount} chapitres · {contributionsCount} contributions
+          {souvenirsCount} souvenir{souvenirsCount > 1 ? 's' : ''} · {photosCount} photo{photosCount > 1 ? 's' : ''}
+          {!isSoloProject ? ' reçue' + (photosCount > 1 ? 's' : '') : ''}
+          {book.page_count ? ` · ${book.page_count} pages` : ''}
         </p>
 
         <div className="dashboard-book-meta-inline">
-          <span>{book.finition || 'Classique'}</span>
-          <span>{book.papier || 'Mat'}</span>
-          <span>{book.event_type || 'Generique'}</span>
+          <span>{resolveEventTypeLabel(book.event_type)}</span>
+          {book.updated_at && <span>Modifié le {formatDate(book.updated_at)}</span>}
         </div>
       </Link>
+
+      {!showRestore && !isSoloProject && book.share_token && (
+        <button type="button" className="dashboard-book-share-btn" onClick={handleShareLink}>
+          {shareCopied ? 'Lien copié !' : '🔗 Partager le lien'}
+        </button>
+      )}
 
       {!showRestore && (
         <div className="dashboard-book-primary">

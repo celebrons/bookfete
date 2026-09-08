@@ -4,7 +4,8 @@ const {
   updateRhythmState,
   createFamilyCounts,
   updateFamilyCounts,
-  layoutFamily
+  layoutFamily,
+  MOOD_LAYOUT_WEIGHTS
 } = require('../../services/composition/layoutScoring');
 
 const FULL_PHOTO = { slug: 'FULL_PHOTO', kind: 'photo', capacity: { slots: [{ type: 'photo' }] } };
@@ -112,6 +113,54 @@ describe('layoutScoring.scoreLayoutCandidate', () => {
       capacity: { slots: [{ type: 'photo' }, { type: 'photo' }] }
     };
     expect(() => scoreLayoutCandidate(twoPhotosLayout, [photoUnit('p1'), photoUnit('p2')], { profile: 'PHOTO' })).not.toThrow();
+  });
+});
+
+describe('layoutScoring — ambiance (mood)', () => {
+  const units4Photos = [photoUnit('p1'), photoUnit('p2'), photoUnit('p3'), photoUnit('p4')];
+
+  it("l'absence de mood ne change aucun score (non-regression)", () => {
+    const withoutMood = scoreLayoutCandidate(FOUR_PHOTOS, units4Photos, { profile: 'PHOTO' });
+    const withUndefinedMood = scoreLayoutCandidate(FOUR_PHOTOS, units4Photos, { profile: 'PHOTO', mood: undefined });
+    expect(withUndefinedMood).toBe(withoutMood);
+  });
+
+  it("l'ambiance 'classique' ne change aucun score (identique a l'absence de mood)", () => {
+    const withoutMood = scoreLayoutCandidate(FOUR_PHOTOS, units4Photos, { profile: 'PHOTO' });
+    const withClassique = scoreLayoutCandidate(FOUR_PHOTOS, units4Photos, { profile: 'PHOTO', mood: 'classique' });
+    expect(withClassique).toBe(withoutMood);
+  });
+
+  it("'aere' favorise une photo seule sur une pleine page plutot qu'une grille dense", () => {
+    const scoreFullPhotoAere = scoreLayoutCandidate(FULL_PHOTO, [photoUnit('p1')], { profile: 'EQUILIBRE', mood: 'aere' });
+    const scoreFullPhotoNeutral = scoreLayoutCandidate(FULL_PHOTO, [photoUnit('p1')], { profile: 'EQUILIBRE' });
+    const scoreFourPhotosAere = scoreLayoutCandidate(FOUR_PHOTOS, units4Photos, { profile: 'EQUILIBRE', mood: 'aere' });
+    const scoreFourPhotosNeutral = scoreLayoutCandidate(FOUR_PHOTOS, units4Photos, { profile: 'EQUILIBRE' });
+    expect(scoreFullPhotoAere).toBeGreaterThan(scoreFullPhotoNeutral);
+    expect(scoreFourPhotosAere).toBeLessThan(scoreFourPhotosNeutral);
+  });
+
+  it("'compact' favorise une grille dense sur une photo seule (inverse d'aere)", () => {
+    const scoreFourPhotosCompact = scoreLayoutCandidate(FOUR_PHOTOS, units4Photos, { profile: 'EQUILIBRE', mood: 'compact' });
+    const scoreFourPhotosNeutral = scoreLayoutCandidate(FOUR_PHOTOS, units4Photos, { profile: 'EQUILIBRE' });
+    const scoreFullPhotoCompact = scoreLayoutCandidate(FULL_PHOTO, [photoUnit('p1')], { profile: 'EQUILIBRE', mood: 'compact' });
+    const scoreFullPhotoNeutral = scoreLayoutCandidate(FULL_PHOTO, [photoUnit('p1')], { profile: 'EQUILIBRE' });
+    expect(scoreFourPhotosCompact).toBeGreaterThan(scoreFourPhotosNeutral);
+    expect(scoreFullPhotoCompact).toBeLessThan(scoreFullPhotoNeutral);
+  });
+
+  it('un layout absent de la table de ponderation reste neutre pour toute ambiance (ex. bloc contribution)', () => {
+    const contributionLayout = { slug: 'CONTRIBUTION_STANDARD', kind: 'contribution', capacity: {} };
+    const unit = [{ key: 'c1', kind: 'contribution', itemIds: ['c1'] }];
+    Object.keys(MOOD_LAYOUT_WEIGHTS).forEach((mood) => {
+      const withMood = scoreLayoutCandidate(contributionLayout, unit, { profile: 'EQUILIBRE', mood });
+      const withoutMood = scoreLayoutCandidate(contributionLayout, unit, { profile: 'EQUILIBRE' });
+      expect(withMood).toBe(withoutMood);
+    });
+  });
+
+  it('un id de mood inconnu ne plante jamais (reste neutre)', () => {
+    expect(() => scoreLayoutCandidate(FULL_PHOTO, [photoUnit('p1')], { profile: 'EQUILIBRE', mood: 'inexistant' })).not.toThrow();
   });
 });
 
