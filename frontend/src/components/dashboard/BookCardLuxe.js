@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Tooltip from '../ui/Tooltip';
 import {
   IconArchive,
@@ -15,6 +15,7 @@ import {
   getJourneyStatusConfig,
   resolveBookJourneyStatus
 } from '../../utils/clientJourney';
+import CollectiveActivateModal from './CollectiveActivateModal';
 import './DashboardLuxe.css';
 
 // Libelles humains des occasions (event_type) : book.event_type stocke le
@@ -44,12 +45,25 @@ const BookCardLuxe = ({
   showRestore = false,
   autoDeleteDate
 }) => {
+  const navigate = useNavigate();
   const lifecycleConfig = getBookLifecycleConfig(getBookLifecycleStatusFromBook(book));
   const latestOrder = book?.latestOrder || null;
   const journeyStatus = resolveBookJourneyStatus({ book, latestOrder });
   const journeyConfig = getJourneyStatusConfig(journeyStatus);
   const primaryAction = getJourneyPrimaryAction(journeyStatus, latestOrder);
   const [shareCopied, setShareCopied] = useState(false);
+  const [showActivateModal, setShowActivateModal] = useState(false);
+
+  // book.participants : embed leger (status uniquement, voir
+  // DashboardGeneralLuxe.js) — juste de quoi afficher le resume "N/M
+  // participants" sans un appel reseau supplementaire par carte.
+  const collectiveParticipants = book.participants || [];
+  const isCollectiveActivated = Boolean(book.collective_activated_at);
+  const collectiveCompletedCount = collectiveParticipants.filter((p) => p.status === 'completed').length;
+  const collectiveTotalCount = collectiveParticipants.length;
+  const collectiveDaysRemaining = book.collective_deadline
+    ? Math.ceil((new Date(`${book.collective_deadline}T23:59:59`) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
 
   // book_content_items (photos + textes), pas les anciens
   // chapters/contributions IA — voir DashboardGeneralLuxe.js.
@@ -205,6 +219,57 @@ const BookCardLuxe = ({
         <button type="button" className="dashboard-book-share-btn" onClick={handleShareLink}>
           {shareCopied ? 'Lien copié !' : '🔗 Partager le lien'}
         </button>
+      )}
+
+      {/* Mode collectif : couche additive au-dessus du lien de partage
+          ci-dessus (jamais un remplacement) — invitations nominatives avec
+          suivi, voir BookCollectiveLuxe.js/CollectiveActivateModal.js. */}
+      {!showRestore && !isSoloProject && (
+        <div className="dashboard-book-collective">
+          {isCollectiveActivated ? (
+            <>
+              <div className="dashboard-book-collective-summary">
+                <span>👥 {collectiveCompletedCount} / {collectiveTotalCount} participant{collectiveTotalCount > 1 ? 's' : ''}</span>
+                {collectiveDaysRemaining != null && (
+                  <span>{collectiveDaysRemaining >= 0
+                    ? `⏳ ${collectiveDaysRemaining} jour${collectiveDaysRemaining > 1 ? 's' : ''} restant${collectiveDaysRemaining > 1 ? 's' : ''}`
+                    : 'Collecte terminée'}
+                  </span>
+                )}
+              </div>
+              <Link
+                to={`/book/${book.id}/collectif`}
+                className="btn btn-outline dashboard-book-collective-btn"
+                onClick={(event) => event.stopPropagation()}
+              >
+                Gérer le collectif
+              </Link>
+            </>
+          ) : (
+            <>
+              <span className="dashboard-book-collective-label">👥 Mode collectif</span>
+              <button
+                type="button"
+                className="btn btn-outline dashboard-book-collective-btn"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setShowActivateModal(true);
+                }}
+              >
+                Activer le mode collectif
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {showActivateModal && (
+        <CollectiveActivateModal
+          book={book}
+          onClose={() => setShowActivateModal(false)}
+          onActivated={() => navigate(`/book/${book.id}/collectif`)}
+        />
       )}
 
       {!showRestore && (

@@ -299,3 +299,71 @@ export const submitSharePhoto = async (token, file, { contributorName, contribut
 };
 
 export const getApiBaseUrl = buildApiBaseUrl;
+
+// --- Mode collectif (invitations nominatives, suivi, tracabilite) -----------
+// Voir backend/routes/collective.js — coexiste avec le lien de partage
+// anonyme ci-dessus (books.share_token) sans le remplacer : deux mecanismes
+// independants. Cote proprietaire (authentifie, `request`) : activation,
+// reglages, gestion des participants. Cote participant (public, par token
+// individuel, `publicRequest`/`publicRawRequest`) : accueil + contribution.
+
+export const activateCollective = (bookId, { eventTitle, message, deadline, remindersEnabled, reminderDaysBefore }) => request(
+  `/books/${bookId}/collective/activate`,
+  { method: 'POST', body: JSON.stringify({ eventTitle, message, deadline, remindersEnabled, reminderDaysBefore }) }
+);
+
+export const updateCollectiveSettings = (bookId, { eventTitle, message, deadline, remindersEnabled, reminderDaysBefore }) => request(
+  `/books/${bookId}/collective/settings`,
+  { method: 'PUT', body: JSON.stringify({ eventTitle, message, deadline, remindersEnabled, reminderDaysBefore }) }
+);
+
+export const fetchCollective = (bookId) => request(`/books/${bookId}/collective`);
+
+export const addCollectiveParticipants = (bookId, emails) => request(
+  `/books/${bookId}/collective/participants`,
+  { method: 'POST', body: JSON.stringify({ emails }) }
+);
+
+export const updateCollectiveParticipant = (bookId, participantId, { email, name }) => request(
+  `/books/${bookId}/collective/participants/${participantId}`,
+  { method: 'PUT', body: JSON.stringify({ email, name }) }
+);
+
+export const deleteCollectiveParticipant = (bookId, participantId) => request(
+  `/books/${bookId}/collective/participants/${participantId}`,
+  { method: 'DELETE' }
+);
+
+export const remindCollectiveParticipant = (bookId, participantId) => request(
+  `/books/${bookId}/collective/participants/${participantId}/remind`,
+  { method: 'POST' }
+);
+
+export const fetchCollectiveParticipantContributions = (bookId, participantId) => request(
+  `/books/${bookId}/collective/participants/${participantId}/contributions`
+);
+
+// --- Participant (public, par token individuel, sans compte) ---------------
+
+export const fetchCollectiveInvite = (token) => publicRequest(`/public/collectif/${token}`);
+
+export const submitCollectiveText = (token, text) => publicRequest(
+  `/public/collectif/${token}/text`,
+  { method: 'POST', body: JSON.stringify({ text }) }
+);
+
+export const submitCollectivePhoto = async (token, file) => {
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  const response = await publicRawRequest(`/public/collectif/${token}/photo`, {
+    method: 'POST',
+    body: formData
+  });
+  return response.json();
+};
+
+export const finishCollectiveContribution = (token) => publicRequest(
+  `/public/collectif/${token}/finish`,
+  { method: 'POST' }
+);

@@ -1,0 +1,319 @@
+/* Mode collectif — page de gestion (Invités/Contributions/Paramètres).
+   Cahier des charges §12 : minimaliste, premium, beaucoup d'espace blanc,
+   accents dorés très subtils — mêmes tokens que le reste du produit
+   (--gold/--ink/--text-light, .btn/.input-luxe deja globaux). */
+
+.collective-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  color: var(--text-light);
+  font-family: var(--font-primary);
+}
+
+.collective-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-lg) var(--space-md) 80px;
+}
+
+.collective-back-link {
+  display: inline-block;
+  margin-bottom: var(--space-md);
+  color: var(--text-light);
+  font-size: 13px;
+  text-decoration: none;
+}
+.collective-back-link:hover { color: var(--gold); }
+
+/* --- Bandeau du haut ---------------------------------------------------- */
+.collective-header {
+  text-align: center;
+  padding-bottom: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid rgba(223, 216, 201, 0.7);
+}
+
+.collective-header-eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.collective-header-title {
+  margin: 0 0 10px;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.collective-header-count {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.collective-progress-bar {
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto 14px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(184, 146, 74, 0.14);
+  overflow: hidden;
+}
+.collective-progress-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 999px;
+  transition: width 300ms ease;
+}
+
+.collective-header-stats {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+}
+
+.collective-header-deadline {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+/* --- Onglets ------------------------------------------------------------ */
+.collective-tabs {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid rgba(223, 216, 201, 0.7);
+}
+.collective-tabs button {
+  padding: 10px 4px 12px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-light);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition-fast);
+}
+.collective-tabs button:hover { color: var(--ink); }
+.collective-tabs button.is-active {
+  color: var(--ink);
+  border-bottom-color: var(--gold);
+}
+
+.collective-tab-panel { display: flex; flex-direction: column; gap: var(--space-md); }
+
+.collective-empty {
+  text-align: center;
+  color: var(--text-light);
+  font-size: 14px;
+  padding: var(--space-lg) 0;
+}
+
+/* --- Invités ------------------------------------------------------------ */
+.collective-invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--space-md);
+  background: rgba(184, 146, 74, 0.04);
+  border: 1px solid rgba(184, 146, 74, 0.18);
+  border-radius: 12px;
+}
+.collective-invite-form .btn { align-self: flex-start; }
+
+.collective-participant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.collective-participant-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 12px;
+  background: var(--white);
+}
+
+.collective-participant-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.collective-participant-status {
+  flex: none;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.collective-participant-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.collective-participant-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.collective-participant-email {
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.collective-participant-counts {
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.collective-participant-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.collective-participant-actions .btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  min-height: 0;
+}
+
+.collective-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.collective-icon-btn:hover { border-color: var(--gold); color: var(--gold); }
+.collective-icon-btn.is-danger:hover { border-color: #b42318; color: #b42318; }
+.collective-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- Contributions -------------------------------------------------------- */
+.collective-contributions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.collective-contribution-block {
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.collective-contribution-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  background: var(--white);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.collective-contribution-header span:last-child {
+  font-weight: 500;
+  color: var(--text-light);
+}
+
+.collective-contribution-detail {
+  padding: var(--space-md);
+  background: rgba(184, 146, 74, 0.04);
+  border-top: 1px solid rgba(223, 216, 201, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.collective-contribution-item img {
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 8px;
+  display: block;
+}
+
+.collective-contribution-text {
+  margin: 0;
+  font-style: italic;
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.collective-contribution-date {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+/* --- Paramètres ----------------------------------------------------------- */
+.collective-settings-form { max-width: 480px; }
+.collective-settings-note {
+  margin-top: 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-light);
+}
+
+/* Reprend les memes petites classes que la modale d'activation
+   (DashboardLuxe.css:.modal-form-field/.modal-checkbox-field) — dupliquees
+   ici plutot qu'importees depuis un autre dossier (meme convention deja
+   etablie dans ce projet, ex. FORMAT_DIMENSIONS_MM). */
+.modal-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.modal-form-field em { font-weight: 500; font-style: italic; color: var(--text-light); }
+
+.modal-checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: var(--space-md);
+  font-size: 13px;
+  color: var(--text-light);
+  cursor: pointer;
+}
+.modal-checkbox-field input { margin-top: 2px; accent-color: var(--gold); }

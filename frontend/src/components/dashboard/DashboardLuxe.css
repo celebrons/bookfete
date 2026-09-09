@@ -672,6 +672,49 @@
 }
 .dashboard-book-share-btn:hover { background: var(--gold-dark, var(--gold)); opacity: 0.92; }
 
+/* Mode collectif — couche additive sous "Partager le lien", jamais un
+   remplacement (voir BookCardLuxe.js). Sobre (fond neutre, pas de dorure
+   pleine largeur comme le bouton de partage) : c'est une INFORMATION de
+   suivi avant tout, pas l'action la plus frequente de la carte. */
+.dashboard-book-collective {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(184, 146, 74, 0.06);
+  border: 1px solid rgba(184, 146, 74, 0.18);
+}
+
+.dashboard-book-collective-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dashboard-book-collective-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.dashboard-book-collective-summary span:last-child {
+  font-weight: 500;
+  color: var(--text-light);
+}
+
+.dashboard-book-collective-btn {
+  flex: none;
+  padding: 6px 14px;
+  font-size: 11px;
+  min-height: 0;
+  white-space: nowrap;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -775,6 +818,36 @@
 .modal-btn-delete:hover:not(:disabled) {
   background: #971b12;
 }
+
+.modal-btn-primary {
+  background: var(--gold);
+  color: var(--white);
+}
+.modal-btn-primary:hover:not(:disabled) { background: var(--gold-dark, var(--gold)); opacity: 0.92; }
+
+/* Formulaires en modale (mode collectif notamment) — un label + un champ
+   input-luxe, empile, espace regulier entre chaque champ. */
+.modal-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.modal-form-field em { font-weight: 500; font-style: italic; color: var(--text-light); }
+
+.modal-checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: var(--space-md);
+  font-size: 13px;
+  color: var(--text-light);
+  cursor: pointer;
+}
+.modal-checkbox-field input { margin-top: 2px; accent-color: var(--gold); }
 
 @media (max-width: 1024px) {
   .stats-grid {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { PageZoomStage, ZoomControls } from '../../common/PageZoomStage';
 
 // Colonne centrale de l'atelier : le livre sous forme de vraies pages, en
 // double-page — feuilletage COUVERTURE -> pages interieures -> 4E DE
@@ -12,14 +13,15 @@ import React, { useEffect, useState } from 'react';
 // voit exactement ce qu'il obtiendra. Le plateau de travail, lui, affiche
 // les pages retassees pour tenir dans l'espace disponible (partage avec les
 // colonnes gauche/droite) — pas a l'echelle reelle d'impression. Le bouton
-// "Taille reelle" (barre de navigation, toujours visible) ouvre le meme
+// "Voir à l'échelle" (barre de navigation, toujours visible) ouvre le meme
 // contenu (meme srcDoc, aucun nouvel appel reseau) dans un calque plein
-// ecran, dimensionne en VRAIE taille d'impression (mm reels convertis en
-// px, TOUJOURS a l'echelle 1 — jamais retassee/reduite/agrandie) — quitte a
-// devoir defiler si l'ecran est plus petit que le format. Repli deliberé
-// sur cette version apres 2 tentatives de "remplir l'ecran" (retour
-// utilisateur : la mise a l'echelle, meme corrigee, "ne convenait pas") —
-// voir RealSizePage plus bas pour l'historique complet.
+// ecran base sur PageZoomStage (voir common/PageZoomStage.js) : le livre
+// garde TOUJOURS ses vraies proportions, mis a l'echelle automatiquement
+// pour remplir l'espace disponible (jamais de scrollbar, jamais deforme),
+// avec un zoom/panoramique libre par-dessus cet ajustement — refonte
+// complete du 2026-09-09 ("cahier des charges REFONTE UX DES APERCUS"), qui
+// remplace l'ancienne mecanique "taille reelle stricte + defilement" (voir
+// l'historique detaille dans PageZoomStage.js et la memoire du projet).
 
 function ExpandIcon() {
   return (
@@ -63,66 +65,26 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
 }
 
 // Alignees sur backend/services/composition/coverFormat.js (COVER_FORMATS)
-// — a garder synchronisees a la main si l'un des deux change. "Voir en
-// taille reelle" n'a de sens que si la taille affichee EST la vraie taille
-// du format choisi — un livret affiche a la taille d'un standard serait
-// trompeur, pas juste approximatif.
+// — a garder synchronisees a la main si l'un des deux change. "Voir a
+// l'echelle" n'a de sens que si les PROPORTIONS affichees sont celles du
+// format choisi — un livret affiche avec les proportions d'un standard
+// serait trompeur, pas juste approximatif.
 const FORMAT_DIMENSIONS_MM = {
   livret: { widthMm: 170, heightMm: 170 }, // carre, voir coverFormat.js
   standard: { widthMm: 220, heightMm: 280 },
   luxe: { widthMm: 240, heightMm: 320 }
 };
 
-// Conversion physique standard (96dpi de reference), la meme que celle
-// implicitement appliquee par l'unite CSS `mm` utilisee avant ce calcul JS.
+// Conversion physique standard (96dpi de reference) — sert uniquement a
+// donner a PageZoomStage des dimensions de CONTENU coherentes entre elles
+// (le rapport largeur/hauteur compte, pas la justesse physique a l'ecran :
+// voir le renommage "Voir a l'echelle", cahier des charges §3 — "22cm CSS
+// ne correspond pas forcement a 22cm physiques selon le DPI de l'ecran").
 const PX_PER_MM = 96 / 25.4;
 
-// Historique de cette fonction, dans l'ordre (pour ne pas refaire les memes
-// aller-retours) :
-//  1. Taille reelle stricte + defilement si trop grand pour l'ecran
-//     (.atelier-realsize-stage en overflow:auto, scrollbar doree fine).
-//  2. Retour utilisateur "je veux voir ca sans scroll" -> mise a l'echelle
-//     JS pour tenir dans l'ecran, plafonnee a 1 (jamais plus grand que le
-//     vrai format papier).
-//  3. Retour utilisateur "tjrs petit" -> plafond retire, remplissait tout
-//     l'ecran disponible (au-dela de la taille physique si besoin).
-//  4. BUG TROUVE (capture d'ecran a l'appui) : donner directement une
-//     largeur/hauteur reduite/agrandie a l'<iframe> ne "zoome" pas son
-//     contenu comme une photo — le document interieur SE REDIMENSIONNE
-//     (100vw/100vh redevient la taille de l'iframe), alors que le CSS de la
-//     page (pageRenderer.js/frontCoverRenderer.js) dimensionne le texte en
-//     `pt`/`mm`, des unites PHYSIQUES independantes de la taille de
-//     l'iframe — un titre en 34pt reste 34pt, mais a l'interieur d'un
-//     "100vh" retreci il prend proportionnellement plus de place et se
-//     fait tronquer. Corrige avec transform:scale() (zoom optique reel,
-//     jamais de reflow) plutot qu'un redimensionnement direct.
-//  5. Retour utilisateur, apres avoir revu (4) corrigee : "ca ne me
-//     convient pas [...] remettre les scroll discrets" — l'idee meme de
-//     "remplir/reduire l'ecran" est abandonnee, retour a (1) ci-dessous.
-//     Comme l'echelle est de nouveau TOUJOURS 1 ici, le bug de (4) ne peut
-//     de toute facon plus se produire (rien n'est jamais redimensionne).
-//     Le principe du correctif (4) — taille naturelle + transform:scale(),
-//     jamais un redimensionnement direct de l'iframe — reste a reappliquer
-//     si un futur calque doit reellement changer d'echelle
-//     (BookPreviewFinalLuxe.js notamment a probablement le meme bug latent,
-//     jamais signale ni verifie).
-function RealSizePage({ html, label, widthPx, heightPx }) {
-  return (
-    <div className="atelier-realsize-page">
-      <span className="atelier-realsize-page-label">{label}</span>
-      {html ? (
-        <iframe
-          title={label}
-          srcDoc={html}
-          className="atelier-realsize-frame"
-          style={{ width: `${widthPx}px`, height: `${heightPx}px` }}
-        />
-      ) : (
-        <div className="atelier-page-placeholder" />
-      )}
-    </div>
-  );
-}
+// Interstice entre les deux pages d'une double-page — sert aussi de largeur
+// a la "tranche" decorative (.atelier-zoom-spine) qui simule la reliure.
+const SPREAD_GAP_PX = 16;
 
 function AtelierBookView({
   viewKind, // 'cover' | 'spread' | 'back-cover'
@@ -145,24 +107,30 @@ function AtelierBookView({
   // seul que draftLayoutSlug/draftSlotItemIds (BookAtelierLuxe.js)
   // decrivent, deposer sur l'autre cote modifierait la mauvaise page.
   overlay,
-  // Format d'impression choisi (book.print_format) : determine la vraie
-  // taille affichee par "Voir en taille reelle" (RealSizePage) — absent
-  // ou inconnu replie sur "standard", jamais une erreur.
+  // Format d'impression choisi (book.print_format) : determine les vraies
+  // proportions affichees par "Voir a l'echelle" — absent ou inconnu replie
+  // sur "standard", jamais une erreur.
   printFormat
 }) {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
-  const realSizeDimensions = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
-  // Meme ratio que "Voir en taille reelle", applique cette fois au plateau
+  const [zoom, setZoom] = useState('fit');
+  const formatDimensions = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
+  // Meme ratio que "Voir a l'echelle", applique cette fois au plateau
   // reduit (.atelier-page-pane) : le rendu de la page (pageRenderer.js)
   // s'etire toujours en 100vw/100vh dans son iframe, donc c'est la forme de
   // CE conteneur qui doit porter le vrai ratio du format choisi, sinon le
   // plateau parait identique quel que soit le format (meme bug que l'Apercu
   // final, corrige ici pour rester coherent).
-  const pageAspectRatio = `${realSizeDimensions.widthMm} / ${realSizeDimensions.heightMm}`;
+  const pageAspectRatio = `${formatDimensions.widthMm} / ${formatDimensions.heightMm}`;
 
   // Echap pour fermer + bloque le defilement de la page derriere, meme
   // principe deja etabli pour AtelierGenerateModal/l'ancienne loupe de
-  // BookCoverDesignerLuxe.js.
+  // BookCoverDesignerLuxe.js. Masque aussi l'en-tete global (retour
+  // utilisateur : "ça fait gagner de l'espace") via une classe sur <body>
+  // (voir Layout.css : body.has-fullscreen-viewer .site-header) — l'en-tete
+  // vit tout en haut de l'arbre (Layout.js, hors de portee directe d'ici),
+  // c'est le seul point d'accroche simple sans faire remonter un etat React
+  // jusque-la pour un besoin purement cosmetique.
   useEffect(() => {
     if (!isFullscreenOpen) return undefined;
     const handleKeyDown = (event) => {
@@ -171,21 +139,34 @@ function AtelierBookView({
     document.addEventListener('keydown', handleKeyDown);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    document.body.classList.add('has-fullscreen-viewer');
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      document.body.classList.remove('has-fullscreen-viewer');
     };
   }, [isFullscreenOpen]);
 
   const hasContentToExpand = viewKind === 'spread' ? Boolean(leftHtml || rightHtml) : Boolean(singleHtml);
 
-  // Taille reelle stricte (echelle 1, toujours) — voir l'historique complet
-  // dans le commentaire de RealSizePage plus haut. Simple conversion
-  // mm -> px, aucun calcul d'ajustement a l'ecran necessaire : la zone
-  // defile (.atelier-realsize-stage, overflow:auto + scrollbar fine doree)
-  // si le format ne tient pas entierement dans la fenetre.
-  const realSizeWidthPx = realSizeDimensions.widthMm * PX_PER_MM;
-  const realSizeHeightPx = realSizeDimensions.heightMm * PX_PER_MM;
+  // Dimensions NATURELLES (mm -> px) transmises a PageZoomStage — c'est LUI
+  // qui calcule l'echelle d'ajustement et l'applique globalement (voir
+  // common/PageZoomStage.js). Une double-page complete additionne les deux
+  // pages ET l'interstice entre elles : PageZoomStage doit connaitre la
+  // largeur REELLE du duo pour calculer un ajustement correct, pas juste
+  // celle d'une page.
+  const pageWidthPx = formatDimensions.widthMm * PX_PER_MM;
+  const pageHeightPx = formatDimensions.heightMm * PX_PER_MM;
+  const isSpreadWithBothPages = viewKind === 'spread' && rightPageNumber != null;
+  const contentWidthPx = isSpreadWithBothPages ? pageWidthPx * 2 + SPREAD_GAP_PX : pageWidthPx;
+  const contentHeightPx = pageHeightPx;
+
+  // Cle de remontage : change a chaque page/vue differente, pour (1)
+  // reinitialiser le panoramique (PageZoomStage.resetPanKey, voir ce
+  // fichier) et (2) rejouer la transition douce d'apparition
+  // (.atelier-zoom-page-change, cahier des charges §7 "transition douce
+  // lors du changement de page").
+  const pageChangeKey = viewKind === 'spread' ? `spread-${leftPageNumber}` : viewKind;
 
   return (
     <div className="atelier-book-view">
@@ -250,10 +231,10 @@ function AtelierBookView({
             className="atelier-realsize-toggle-btn"
             onClick={() => setIsFullscreenOpen(true)}
             disabled={!hasContentToExpand}
-            title="Voir le rendu reel, taille d'impression"
+            title="Voir à l'échelle — proportions et dimensions d'impression respectées"
           >
             <ExpandIcon />
-            <span>Taille reelle</span>
+            <span>Voir à l'échelle</span>
           </button>
         </div>
       </div>
@@ -266,13 +247,26 @@ function AtelierBookView({
         // toujours a cliquer DANS le panneau). Plus de stopPropagation nulle
         // part : un clic sur la page reelle elle-meme ne ferme jamais quand
         // meme, car c'est un <iframe> — son contenu est un document separe,
-        // un clic dedans ne remonte jamais jusqu'ici. La croix reste geree en
-        // plus (redondant avec le clic sur le calque, mais explicite/accessible).
+        // un clic dedans ne remonte jamais jusqu'ici (et un clic qui suit un
+        // panoramique est avale par PageZoomStage lui-meme). La croix reste
+        // geree en plus (redondant avec le clic sur le calque, mais
+        // explicite/accessible).
         <div className="atelier-realsize-backdrop" onClick={() => setIsFullscreenOpen(false)}>
+          {/* Pas de stopPropagation ICI (deliberement — voir le commentaire
+              plus haut) : un clic sur le calque en dehors du livre doit
+              toujours fermer, y compris sur l'espace vide autour du livre
+              a l'interieur du plateau de zoom. Seuls les CONTROLES
+              cliquables du bas (nav/zoom, ci-dessous) stoppent la
+              propagation individuellement — sans ca, cliquer sur "Suivante"
+              ou "+" fermerait aussi le calque. */}
           <div className="atelier-realsize-panel">
             <div className="atelier-realsize-head">
               <span>
-                {navLabel} — taille reelle ({realSizeDimensions.widthMm} × {realSizeDimensions.heightMm} mm)
+                {navLabel} — Voir à l'échelle
+                {/* Cahier des charges §3 : "taille reelle" est trompeur sur
+                    ecran (22cm CSS != 22cm physiques selon le DPI) — cette
+                    formule remplace l'ancien affichage brut des mm. */}
+                <span className="atelier-realsize-hint"> · Proportions et dimensions d'impression respectées</span>
               </span>
               <button
                 type="button"
@@ -283,39 +277,65 @@ function AtelierBookView({
                 ×
               </button>
             </div>
-            <div className="atelier-realsize-stage">
-              {viewKind === 'spread' ? (
-                <>
-                  <RealSizePage html={leftHtml} label={`Page ${leftPageNumber}`} widthPx={realSizeWidthPx} heightPx={realSizeHeightPx} />
-                  {rightPageNumber != null && <RealSizePage html={rightHtml} label={`Page ${rightPageNumber}`} widthPx={realSizeWidthPx} heightPx={realSizeHeightPx} />}
-                </>
-              ) : (
-                <RealSizePage html={singleHtml} label={viewKind === 'cover' ? 'Couverture' : '4e de couverture'} widthPx={realSizeWidthPx} heightPx={realSizeHeightPx} />
-              )}
+
+            <div className="atelier-realsize-stage-wrap">
+              <PageZoomStage
+                contentWidthPx={contentWidthPx}
+                contentHeightPx={contentHeightPx}
+                zoom={zoom}
+                onZoomChange={setZoom}
+                resetPanKey={pageChangeKey}
+              >
+                {viewKind === 'spread' ? (
+                  <div className="atelier-zoom-spread atelier-zoom-page-change" key={pageChangeKey}>
+                    {leftHtml ? (
+                      <iframe title={`Page ${leftPageNumber}`} srcDoc={leftHtml} className="atelier-zoom-frame" />
+                    ) : (
+                      <div className="atelier-page-placeholder" />
+                    )}
+                    {isSpreadWithBothPages && <span className="atelier-zoom-spine" aria-hidden="true" />}
+                    {rightPageNumber != null && (
+                      rightHtml ? (
+                        <iframe title={`Page ${rightPageNumber}`} srcDoc={rightHtml} className="atelier-zoom-frame" />
+                      ) : (
+                        <div className="atelier-page-placeholder" />
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <div className="atelier-zoom-single atelier-zoom-page-change" key={pageChangeKey}>
+                    {singleHtml ? (
+                      <iframe
+                        title={viewKind === 'cover' ? 'Couverture' : '4e de couverture'}
+                        srcDoc={singleHtml}
+                        className="atelier-zoom-frame"
+                      />
+                    ) : (
+                      <div className="atelier-page-placeholder" />
+                    )}
+                  </div>
+                )}
+              </PageZoomStage>
             </div>
-            {/* Naviguer sans quitter le calque (retour utilisateur : "il faut
-                des fleches pour naviguer lorsque on est dessus") — memes
-                onPrevious/onNext que la barre de navigation principale.
-                stopPropagation obligatoire : sans lui, le clic remonterait
-                jusqu'au calque et le fermerait au lieu de changer de page
-                (voir le commentaire plus haut sur la fermeture au clic). */}
-            <div className="atelier-realsize-nav">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={(event) => { event.stopPropagation(); onPrevious(); }}
-                disabled={!canGoPrevious}
-              >
-                ‹ Précédente
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={(event) => { event.stopPropagation(); onNext(); }}
-                disabled={!canGoNext}
-              >
-                Suivante ›
-              </button>
+
+            {/* Naviguer/zoomer sans quitter le calque (retour utilisateur :
+                "il faut des fleches pour naviguer lorsque on est dessus") —
+                memes onPrevious/onNext que la barre de navigation
+                principale. stopPropagation sur tout le bloc (pas bouton par
+                bouton) : sans lui, cliquer "Suivante" ou "+" fermerait
+                aussi le calque (voir le commentaire plus haut sur la
+                fermeture au clic exterieur). */}
+            <div className="atelier-realsize-footer" onClick={(event) => event.stopPropagation()}>
+              <div className="atelier-realsize-nav">
+                <button type="button" className="btn btn-outline" onClick={onPrevious} disabled={!canGoPrevious}>
+                  ‹ Précédente
+                </button>
+                <span className="atelier-realsize-nav-label">{navLabel}</span>
+                <button type="button" className="btn btn-outline" onClick={onNext} disabled={!canGoNext}>
+                  Suivante ›
+                </button>
+              </div>
+              <ZoomControls zoom={zoom} onZoomChange={setZoom} />
             </div>
           </div>
         </div>

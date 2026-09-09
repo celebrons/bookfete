@@ -580,7 +580,7 @@
   width: calc(50% - 2px);
 }
 
-/* --- "Taille reelle" (bouton dans la barre de nav, calque) ------------- */
+/* --- "Voir a l'echelle" (bouton dans la barre de nav, calque) ---------- */
 /* Deplace hors du coin de page (retour utilisateur : bouton trop discret,
    "le rendre plus visible/permanent" avant "Terminer mon livre") — vit
    maintenant dans .atelier-book-nav, toujours au meme endroit quelle que
@@ -607,23 +607,28 @@
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: rgba(20, 16, 10, 0.75);
+  background: rgba(20, 16, 10, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-md);
 }
 
+/* Plus de max-width (retour utilisateur : "sur un grand ecran, le livre
+   doit devenir beaucoup plus grand qu'actuellement") — PageZoomStage
+   calcule l'ajustement a partir de l'espace REELLEMENT disponible, donc lui
+   laisser toute la largeur de l'ecran profite directement au livre affiche,
+   sans autre effet de bord. */
 .atelier-realsize-panel {
   width: 100%;
   height: 100%;
-  max-width: 1400px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
 .atelier-realsize-head {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -632,70 +637,109 @@
   font-size: 13px;
   font-weight: 600;
 }
+.atelier-realsize-hint {
+  font-weight: 500;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.55);
+}
 
-/* Repli sur la taille reelle stricte (echelle 1 toujours, voir
-   RealSizePage/AtelierBookView.js pour l'historique complet des allers-
-   retours sur ce point) : la/les page(s) sont dimensionnees en VRAIS mm
-   convertis en px, jamais retassees — la zone defile (overflow:auto) si le
-   format ne tient pas entierement a l'ecran, avec une scrollbar fine et
-   doree plutot que la scrollbar grise par defaut du navigateur (retour
-   utilisateur d'une passe precedente : "moche", "pas luxe"). */
-.atelier-realsize-stage {
+/* Zone remplie par PageZoomStage (common/PageZoomStage.js) — flex:1 +
+   min-height:0 obligatoires : sans min-height:0, un enfant flex ne peut pas
+   se reduire sous la hauteur de son contenu, ce qui empecherait
+   PageZoomStage de mesurer un espace reellement CONTRAINT et casserait le
+   calcul d'ajustement. */
+.atelier-realsize-stage-wrap {
   flex: 1;
-  overflow: auto;
-  display: flex;
-  gap: 10px;
-  padding: var(--space-lg);
+  min-height: 0;
   background: rgba(255, 255, 255, 0.04);
   border-radius: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--gold) rgba(255, 255, 255, 0.08);
 }
-.atelier-realsize-stage::-webkit-scrollbar { width: 8px; height: 8px; }
-.atelier-realsize-stage::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.08); border-radius: 999px; }
-.atelier-realsize-stage::-webkit-scrollbar-thumb { background-color: var(--gold); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
-.atelier-realsize-stage::-webkit-scrollbar-thumb:hover { background-color: #cda668; }
-.atelier-realsize-stage::-webkit-scrollbar-corner { background: transparent; }
 
-.atelier-realsize-page {
-  flex-shrink: 0;
-  /* `margin:auto 0` (pas align-items:center sur le parent) : centre la page
-     quand elle tient dans la hauteur disponible, mais se reduit proprement
-     a 0 (au lieu de rogner le haut de facon inaccessible au scroll) des que
-     le contenu depasse et doit defiler — piege classique d'un flex
-     align-items:center combine a overflow:auto. */
-  margin: auto 0;
+/* Double-page : les deux iframes sont des enfants flex (flex:1, meme
+   largeur chacune par construction — voir SPREAD_GAP_PX/contentWidthPx
+   dans AtelierBookView.js) separes par la "tranche" decorative
+   (.atelier-zoom-spine), pas par un gap CSS (le gap ferait deux
+   interstices au lieu d'un, desynchronisant la largeur reelle du contenu
+   de celle calculee cote JS). */
+.atelier-zoom-spread {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+.atelier-zoom-spread iframe,
+.atelier-zoom-spread .atelier-page-placeholder {
+  flex: 1 1 0;
+  height: 100%;
+  min-width: 0;
+}
+/* Simule une reliure : un fin degrade sombre au centre, jamais un trait
+   dur (cahier des charges §7 : "separation centrale realiste"). */
+.atelier-zoom-spine {
+  flex: 0 0 16px;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.18) 35%,
+    rgba(0, 0, 0, 0.32) 50%,
+    rgba(0, 0, 0, 0.18) 65%,
+    rgba(0, 0, 0, 0) 100%
+  );
 }
 
-.atelier-realsize-page-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
+.atelier-zoom-single {
+  width: 100%;
+  height: 100%;
+}
+.atelier-zoom-single iframe,
+.atelier-zoom-single .atelier-page-placeholder {
+  width: 100%;
+  height: 100%;
 }
 
-/* Navigation dans le calque (retour utilisateur : naviguer sans devoir
-   fermer/rouvrir) — meme disposition que .preview-final-fullscreen-nav
-   (BookPreviewFinalLuxe.css), pour rester coherent entre les deux calques
-   plein ecran du produit. */
-.atelier-realsize-nav {
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: center;
-  gap: var(--space-md);
-}
-.atelier-realsize-nav .btn { background: rgba(255, 255, 255, 0.92); }
-
-.atelier-realsize-frame {
+.atelier-zoom-frame {
   display: block;
   border: none;
   background: #fff;
   box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.55);
+}
+
+/* Transition douce a chaque changement de page (cahier des charges §7) —
+   rejouee a chaque remontage (key={pageChangeKey} sur l'element porteur de
+   cette classe, voir AtelierBookView.js). */
+@keyframes atelierZoomPageChange {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+.atelier-zoom-page-change { animation: atelierZoomPageChange 220ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .atelier-zoom-page-change { animation: none; }
+}
+
+/* Navigation + zoom, regroupees dans un seul bloc "pied" qui stoppe la
+   propagation du clic (voir AtelierBookView.js) — meme disposition que
+   .preview-final-fullscreen-nav (BookPreviewFinalLuxe.css), pour rester
+   coherent entre les deux calques plein ecran du produit. */
+.atelier-realsize-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.atelier-realsize-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+.atelier-realsize-nav .btn { background: rgba(255, 255, 255, 0.92); }
+.atelier-realsize-nav-label {
+  min-width: 140px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
 }
 .atelier-page-pane.is-selectable { cursor: pointer; }
 /* Page en cours de modification : bordure epaisse + halo, sans ambiguite

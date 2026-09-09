@@ -10,6 +10,7 @@ import {
   chooseFormat
 } from '../../services/compositionApi';
 import { applyLifecycleStatus } from '../../utils/bookLifecycle';
+import { PageZoomStage, ZoomControls } from '../common/PageZoomStage';
 import '../../styles/luxe-theme.css';
 import './BookPreviewFinalLuxe.css';
 
@@ -47,16 +48,21 @@ const PX_PER_MM = 96 / 25.4;
 // BUG CORRIGE (retour utilisateur, capture d'ecran a l'appui — cadre dore de
 // la couverture Luxe qui deborde/se decale, titre tronque) : donner
 // directement une largeur/hauteur au <iframe> (via CSS aspect-ratio+
-// max-width en mode normal, ou fullscreenBoxPx en pixels en plein ecran) ne
-// "zoome" pas son contenu comme une photo — le document a l'interieur SE
-// REDIMENSIONNE (100vw/100vh devient la taille du cadre), alors que le CSS
-// de la page (pageRenderer.js/frontCoverRenderer.js/coverTheme.js) place le
-// texte ET les ornements (ex. le cadre dore du Luxe) en unites PHYSIQUES
-// (`pt`/`mm`), independantes de la taille du cadre. Un cadre plus petit que
-// la vraie taille du format fait deborder ce contenu absolu — exactement le
-// meme bug diagnostique et corrige dans l'atelier (AtelierBookView.js:
-// RealSizePage), applique ici aux DEUX apercus (carte normale ET plein
-// ecran, signales tous les deux par l'utilisateur).
+// max-width) ne "zoome" pas son contenu comme une photo — le document a
+// l'interieur SE REDIMENSIONNE (100vw/100vh devient la taille du cadre),
+// alors que le CSS de la page (pageRenderer.js/frontCoverRenderer.js/
+// coverTheme.js) place le texte ET les ornements (ex. le cadre dore du
+// Luxe) en unites PHYSIQUES (`pt`/`mm`), independantes de la taille du
+// cadre. Un cadre plus petit que la vraie taille du format fait deborder ce
+// contenu absolu — exactement le meme bug diagnostique et corrige dans
+// l'atelier (voir common/PageZoomStage.js pour la version generale de ce
+// meme principe).
+//
+// Utilise uniquement pour la PETITE carte normale (pas le plein ecran,
+// passe a PageZoomStage depuis la refonte du 2026-09-09 — voir plus bas) :
+// sa taille vient de la mise en page CSS (aspect-ratio+max-width,
+// responsive a la colonne/au format), pas d'un calcul JS explicite comme
+// PageZoomStage, donc ce composant garde sa propre mesure locale.
 //
 // Fix : le <iframe> garde TOUJOURS sa taille naturelle reelle
 // (naturalWidthPx/naturalHeightPx, la vraie conversion mm->px du format) ;
@@ -64,12 +70,8 @@ const PX_PER_MM = 96 / 25.4;
 // redimensionne visuellement pour tenir dans l'espace REELLEMENT rendu par
 // SON PROPRE wrapper — mesure via ResizeObserver, le composant possede et
 // mesure son propre wrapper (pas besoin que le parent gere un ref externe :
-// plusieurs instances independantes, normal/plein ecran/gauche/droite,
-// cohabitent sans jamais se marcher dessus). Le wrapper lui-meme garde son
-// dimensionnement CSS existant, inchange (aspect-ratio+max-width en mode
-// normal, largeur/hauteur en pixels via fullscreenBoxPx en plein ecran) —
-// ce composant n'a pas besoin de savoir laquelle des deux logiques a decide
-// de sa taille, seulement la taille REELLEMENT obtenue.
+// plusieurs instances independantes, gauche/droite/single, cohabitent sans
+// jamais se marcher dessus).
 //
 // Deux niveaux, pas un seul : le wrapper EXTERIEUR (wrapClassName, taille
 // CSS/JS inchangee) reste overflow:visible — `children` (la tranche du
@@ -99,9 +101,10 @@ function ScaledPageFrame({ html, title, naturalWidthPx, naturalHeightPx, wrapCla
     // uniquement sur la largeur agrandissait alors le contenu au-dela de
     // ce que la hauteur reelle pouvait montrer, coupant le bas de la page
     // (titre/sous-titre) par le overflow:hidden du clip. Fix : "contain
-    // fit" classique, le plus petit des deux ratios (largeur ET hauteur),
-    // comme fullscreenBoxPx plus bas — la page entiere reste toujours
-    // visible, quitte a laisser un espace vide sur un des deux axes.
+    // fit" classique, le plus petit des deux ratios (largeur ET hauteur) —
+    // meme principe que PageZoomStage (common/PageZoomStage.js) — la page
+    // entiere reste toujours visible, quitte a laisser un espace vide sur
+    // un des deux axes.
     const measure = () => {
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
@@ -217,8 +220,9 @@ export default function BookPreviewFinalLuxe() {
   // envoye a l'iframe (pageRenderer.js: renderSinglePageHtml) etire toujours
   // la page en 100vw/100vh, donc lui seul ne montrera jamais la difference
   // entre livret/standard/luxe. Utilise pour l'apercu reduit (CSS
-  // aspect-ratio) ; le plein ecran, lui, calcule sa taille en pixels (voir
-  // fullscreenBoxPx plus bas) plutot que de deriver ce ratio en CSS.
+  // aspect-ratio) ; le plein ecran, lui, passe directement les dimensions
+  // naturelles en px a PageZoomStage (voir plus bas), qui mesure l'espace
+  // reellement disponible plutot que de deriver ce ratio en CSS.
   const currentFormatMeta = PRINT_FORMATS.find((format) => format.id === currentFormat) || PRINT_FORMATS[1];
   const pageAspectRatio = `${currentFormatMeta.widthMm} / ${currentFormatMeta.heightMm}`;
   // Vraie taille naturelle du format (mm -> px) — voir ScaledPageFrame plus
@@ -332,65 +336,29 @@ export default function BookPreviewFinalLuxe() {
     const previousHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
+    // Masque l'en-tete global (retour utilisateur : "ça fait gagner de
+    // l'espace") — voir Layout.css (body.has-fullscreen-viewer .site-header)
+    // et le meme ajout cote atelier (AtelierBookView.js) pour le detail.
+    document.body.classList.add('has-fullscreen-viewer');
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.classList.remove('has-fullscreen-viewer');
     };
   }, [isFullscreen, goPrevious, goNext]);
 
-  // Taille du calque plein ecran calculee en PIXELS, pas laissee a une
-  // combinaison CSS (aspect-ratio + flex + budgets en vh) : un scroll
-  // restait visible malgre deux passes de reglages CSS — calcul explicite
-  // ici pour ne plus dependre d'une interaction CSS incertaine entre
-  // navigateurs. "Contain fit" classique : la page (ou le duo de pages en
-  // mode livre) est mise a l'echelle pour tenir ENTIEREMENT dans l'espace
-  // reellement disponible (fenetre moins l'entete/la nav/les marges),
-  // jamais plus grande — exactement ce qui garantit qu'aucun scroll n'est
-  // plus jamais necessaire. useLayoutEffect (pas useEffect) : calcule avant
-  // la premiere peinture du calque, sinon un cadre 0x0 serait visible une
-  // fraction de seconde a l'ouverture.
-  const [fullscreenBoxPx, setFullscreenBoxPx] = useState({ width: 0, height: 0 });
-  useLayoutEffect(() => {
-    if (!isFullscreen) return undefined;
-
-    // Entete (~30px) + 2 espacements de 10px + nav (~44px) + marges du
-    // calque (2 x --space-lg = 2 x 40px = 80px) = ~174px reellement occupes
-    // — marge volontairement large (220px) au-dessus de cette estimation :
-    // mieux vaut un peu d'espace vide qu'un pixel de trop qui rametterait
-    // un scroll (signale a deux reprises avec des marges plus serrees).
-    const CHROME_HEIGHT_PX = 220;
-    const HORIZONTAL_MARGIN_RATIO = 0.92; // ~4% de marge de chaque cote
-    const SPREAD_GAP_PX = 4;
-    const ratioWtoH = currentFormatMeta.widthMm / currentFormatMeta.heightMm;
-
-    const computeBox = () => {
-      const availableHeight = Math.max(200, window.innerHeight - CHROME_HEIGHT_PX);
-      const availableWidth = window.innerWidth * HORIZONTAL_MARGIN_RATIO;
-
-      if (viewKind === 'spread') {
-        const pageWidthFromHeight = availableHeight * ratioWtoH;
-        const totalWidthFromHeight = pageWidthFromHeight * 2 + SPREAD_GAP_PX;
-        if (totalWidthFromHeight <= availableWidth) {
-          setFullscreenBoxPx({ width: pageWidthFromHeight, height: availableHeight });
-        } else {
-          const pageWidth = (availableWidth - SPREAD_GAP_PX) / 2;
-          setFullscreenBoxPx({ width: pageWidth, height: pageWidth / ratioWtoH });
-        }
-      } else {
-        const widthFromHeight = availableHeight * ratioWtoH;
-        if (widthFromHeight <= availableWidth) {
-          setFullscreenBoxPx({ width: widthFromHeight, height: availableHeight });
-        } else {
-          setFullscreenBoxPx({ width: availableWidth, height: availableWidth / ratioWtoH });
-        }
-      }
-    };
-
-    computeBox();
-    window.addEventListener('resize', computeBox);
-    return () => window.removeEventListener('resize', computeBox);
-  }, [isFullscreen, viewKind, currentFormatMeta.widthMm, currentFormatMeta.heightMm]);
+  // Ajustement/zoom/panoramique du plein ecran : entierement delegue a
+  // PageZoomStage (common/PageZoomStage.js, partage avec l'atelier) depuis
+  // la refonte du 2026-09-09 ("cahier des charges REFONTE UX DES APERCUS")
+  // — remplace l'ancien calcul JS "contain fit" fait a la main ici (deux
+  // passes de reglages avant d'aboutir a un calcul par pixels, lui-meme
+  // remplace maintenant par un ResizeObserver + zoom controle). zoom
+  // persiste deliberement d'une page a l'autre (voir PageZoomStage.js) : un
+  // useState simple suffit, pas de logique de reinitialisation ici.
+  const [zoom, setZoom] = useState('fit');
+  const SPREAD_GAP_PX = 16;
+  const naturalSpreadWidthPx = naturalPageWidthPx * 2 + SPREAD_GAP_PX;
 
   // Recompose (contenu non verrouille) + persiste immediatement (voir
   // formatComposer.js — meme principe "pas de bouton Valider" que le reste
@@ -432,6 +400,11 @@ export default function BookPreviewFinalLuxe() {
         ? `Pages ${leftPageIndex + 1}-${rightPageIndex + 1} / ${totalPages}`
         : `Page ${leftPageIndex + 1} / ${totalPages}`;
   const hasCurrentContent = viewKind === 'spread' ? Boolean(leftHtml || rightHtml) : Boolean(singleHtml);
+  const isFullscreenSpreadWithBothPages = viewKind === 'spread' && rightPageIndex != null;
+  const fullscreenContentWidthPx = isFullscreenSpreadWithBothPages ? naturalSpreadWidthPx : naturalPageWidthPx;
+  // Cle de remontage : reinitialise le panoramique (PageZoomStage) et
+  // rejoue la transition douce d'apparition a chaque page/format different.
+  const fullscreenPageChangeKey = `${currentFormat}-${viewKind}-${leftPageIndex}`;
 
   if (loading) {
     return <div className="atelier-loading">Chargement de votre livre...</div>;
@@ -569,57 +542,72 @@ export default function BookPreviewFinalLuxe() {
       </div>
 
       {isFullscreen && (
+        // Fermeture au clic n'importe ou dans le calque, SAUF sur les
+        // controles du bas (nav/zoom, stopPropagation dediee) — meme
+        // principe que l'atelier ("Voir a l'echelle", AtelierBookView.js),
+        // applique ici pour la premiere fois (l'ancien stopPropagation sur
+        // tout le panneau, retire, empechait "cliquer a cote pour fermer"
+        // de fonctionner, meme bug que celui deja corrige cote atelier).
         <div className="preview-final-fullscreen-backdrop" onClick={() => setIsFullscreen(false)}>
-          <div className="preview-final-fullscreen-panel" onClick={(event) => event.stopPropagation()}>
+          <div className="preview-final-fullscreen-panel">
             <div className="preview-final-fullscreen-head">
-              <span>{viewLabel}</span>
+              {/* Reprend volontairement le meme message d'accueil que le
+                  titre de la page (voir <h1> plus haut) plutot que la
+                  position de page (deja affichee en bas) — le livre est le
+                  centre de l'experience, pas la chrome (cahier des charges
+                  §6 : "reduire fortement les elements d'interface"). */}
+              <span>Votre livre est prêt</span>
               <button type="button" className="atelier-modal-close" onClick={() => setIsFullscreen(false)} aria-label="Fermer">×</button>
             </div>
             {loadingPage && <p className="preview-final-loading is-on-dark">Chargement de la page...</p>}
-            {viewKind === 'spread' ? (
-              <div className="preview-final-fullscreen-spread" style={{ height: `${fullscreenBoxPx.height}px` }}>
-                <ScaledPageFrame
-                  key={`${currentFormat}-left`}
-                  html={leftHtml}
-                  title="Page gauche"
-                  naturalWidthPx={naturalPageWidthPx}
-                  naturalHeightPx={naturalPageHeightPx}
-                  wrapClassName="preview-final-fullscreen-frame-wrap"
-                  wrapStyle={{ width: `${fullscreenBoxPx.width}px`, height: `${fullscreenBoxPx.height}px` }}
-                  frameClassName="preview-final-fullscreen-frame"
-                />
-                {rightPageIndex != null && (
-                  <ScaledPageFrame
-                    key={`${currentFormat}-right`}
-                    html={rightHtml}
-                    title="Page droite"
-                    naturalWidthPx={naturalPageWidthPx}
-                    naturalHeightPx={naturalPageHeightPx}
-                    wrapClassName="preview-final-fullscreen-frame-wrap"
-                    wrapStyle={{ width: `${fullscreenBoxPx.width}px`, height: `${fullscreenBoxPx.height}px` }}
-                    frameClassName="preview-final-fullscreen-frame"
-                  />
+
+            <div className="preview-final-fullscreen-stage-wrap">
+              <PageZoomStage
+                contentWidthPx={fullscreenContentWidthPx}
+                contentHeightPx={naturalPageHeightPx}
+                zoom={zoom}
+                onZoomChange={setZoom}
+                resetPanKey={fullscreenPageChangeKey}
+              >
+                {viewKind === 'spread' ? (
+                  <div className="preview-final-zoom-spread preview-final-zoom-page-change" key={fullscreenPageChangeKey}>
+                    {leftHtml ? (
+                      <iframe title="Page gauche" srcDoc={leftHtml} className="preview-final-zoom-frame" />
+                    ) : (
+                      <div className="atelier-page-placeholder" />
+                    )}
+                    {isFullscreenSpreadWithBothPages && <span className="preview-final-zoom-spine" aria-hidden="true" />}
+                    {rightPageIndex != null && (
+                      rightHtml ? (
+                        <iframe title="Page droite" srcDoc={rightHtml} className="preview-final-zoom-frame" />
+                      ) : (
+                        <div className="atelier-page-placeholder" />
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <div className="preview-final-zoom-single preview-final-zoom-page-change" key={fullscreenPageChangeKey}>
+                    {singleHtml ? (
+                      <iframe title="Aperçu plein écran" srcDoc={singleHtml} className="preview-final-zoom-frame" />
+                    ) : (
+                      <div className="atelier-page-placeholder" />
+                    )}
+                  </div>
                 )}
+              </PageZoomStage>
+            </div>
+
+            <div className="preview-final-fullscreen-footer" onClick={(event) => event.stopPropagation()}>
+              <div className="preview-final-fullscreen-nav">
+                <button type="button" className="btn btn-outline" onClick={goPrevious} disabled={!canGoPrevious}>
+                  ‹ Précédent
+                </button>
+                <span className="preview-final-fullscreen-nav-label">{viewLabel}</span>
+                <button type="button" className="btn btn-outline" onClick={goNext} disabled={!canGoNext}>
+                  Suivant ›
+                </button>
               </div>
-            ) : (
-              <ScaledPageFrame
-                key={`${currentFormat}-single`}
-                html={singleHtml}
-                title="Aperçu plein écran"
-                naturalWidthPx={naturalPageWidthPx}
-                naturalHeightPx={naturalPageHeightPx}
-                wrapClassName="preview-final-fullscreen-frame-wrap"
-                wrapStyle={{ width: `${fullscreenBoxPx.width}px`, height: `${fullscreenBoxPx.height}px` }}
-                frameClassName="preview-final-fullscreen-frame"
-              />
-            )}
-            <div className="preview-final-fullscreen-nav">
-              <button type="button" className="btn btn-outline" onClick={goPrevious} disabled={!canGoPrevious}>
-                ‹ Précédent
-              </button>
-              <button type="button" className="btn btn-outline" onClick={goNext} disabled={!canGoNext}>
-                Suivant ›
-              </button>
+              <ZoomControls zoom={zoom} onZoomChange={setZoom} />
             </div>
           </div>
         </div>

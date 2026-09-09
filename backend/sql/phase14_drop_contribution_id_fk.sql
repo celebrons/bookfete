@@ -1,0 +1,37 @@
+-- Phase 14 — retire la contrainte de cle etrangere sur
+-- book_content_items.contribution_id.
+--
+-- Bug signale par l'utilisateur (2026-09-09) : ajouter un souvenir via le
+-- lien de partage collaboratif ("lien envoye aux invites") echoue avec
+-- 'insert or update on table "book_content_items" violates foreign key
+-- constraint "book_content_items_contribution_id_fkey"'.
+--
+-- Cause : phase03_data_model.sql pose `contribution_id uuid references
+-- public.contributions(id)` — une vraie cle etrangere, pensee pour
+-- l'ANCIEN systeme d'invitation par chapitre (inviteController.js), qui
+-- cree bien une ligne `contributions` complete (contributor_email,
+-- moderation approved/is_finalized/needs_revision...) avant tout contenu.
+-- Le NOUVEAU lien de partage (routes/composition.js :
+-- POST /api/public/share/:token/text|photo, voir aussi
+-- [[entry-funnel-redesign-status]]) n'utilise PAS ce systeme — deliberement
+-- ("Deliberately NOT reused", meme memoire) : `contribution_id` y est un
+-- UUID genere cote client (une fois par visite), utilise UNIQUEMENT comme
+-- cle de regroupement pour la mise en page (layoutEngine.buildUnitsFromItems),
+-- jamais insere dans `contributions` — le nom du contributeur, lui, va
+-- directement dans metadata.contributor_name. Ce flux n'a donc jamais pu
+-- satisfaire la contrainte : chaque contribution via ce lien echouait.
+--
+-- Fix : retire la contrainte (le systeme d'invitation par chapitre continue
+-- de fonctionner a l'identique, il cree deja de vraies lignes `contributions`
+-- et n'a jamais eu besoin de la contrainte pour ca) — book_content_items
+-- garde la colonne et son index (book_content_items_contribution_idx),
+-- seule la VERIFICATION stricte disparait. Si un vrai suivi/moderation des
+-- contributions du lien de partage est souhaite plus tard, le bon chemin
+-- sera de creer une ligne `contributions` correspondante depuis
+-- routes/composition.js, pas de retablir cette contrainte a l'aveugle.
+--
+-- 100% additif dans son effet (ne supprime aucune donnee), rejouable sans
+-- risque. A executer une fois dans l'editeur SQL Supabase.
+
+alter table public.book_content_items
+  drop constraint if exists book_content_items_contribution_id_fkey;

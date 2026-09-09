@@ -394,33 +394,26 @@
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgba(20, 16, 10, 0.78);
+  background: rgba(20, 16, 10, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-lg);
-  /* Filet de securite (retour utilisateur : un scroll restait possible en
-     plein ecran) : meme si le budget de hauteur ci-dessous (voir
-     .preview-final-fullscreen-frame-wrap) est mal calcule sur un cas
-     extreme, rien ne doit jamais deborder du calque plutot que faire
-     defiler la page derriere — voir aussi le blocage de <body>/<html> dans
-     BookPreviewFinalLuxe.js pendant que ce calque est ouvert. */
+  padding: var(--space-md);
   overflow: hidden;
 }
 
-/* Hauteur NATURELLE (pas de height:100%) : la taille de la page vient
-   desormais d'un calcul JS en pixels (fullscreenBoxPx, voir
-   BookPreviewFinalLuxe.js) qui mesure reellement l'espace disponible —
-   le panneau n'a donc plus besoin de s'etirer lui-meme, il se contente
-   d'empiler entete + page + nav a leur taille naturelle, et le calque
-   (.preview-final-fullscreen-backdrop, deja align-items/justify-content:
-   center) centre ce bloc entier. */
+/* Occupe tout l'espace disponible dans le calque : c'est PageZoomStage
+   (common/PageZoomStage.js), a l'interieur, qui calcule l'ajustement a
+   partir de cet espace REELLEMENT mesure (ResizeObserver) — plus de
+   max-width/max-height devinees a l'avance ici (retour utilisateur, cahier
+   des charges §4/§8 : "sur un grand ecran, le livre doit devenir beaucoup
+   plus grand qu'actuellement", "aucune scrollbar visible"). */
 .preview-final-fullscreen-panel {
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 10px;
-  max-width: 94vw;
 }
 
 .preview-final-fullscreen-head {
@@ -446,57 +439,101 @@
   text-align: center;
 }
 
-/* Taille calculee en PIXELS par BookPreviewFinalLuxe.js (fullscreenBoxPx),
-   posee en style inline sur ces deux classes — deux tentatives en CSS pure
-   (budget en vh, puis flex+aspect-ratio) laissaient encore un scroll
-   visible selon le navigateur/l'ecran ; un calcul JS explicite ("contain
-   fit" classique : le duo ou la page seule est mis a l'echelle pour tenir
-   ENTIEREMENT dans l'espace reellement mesure, jamais plus) supprime toute
-   ambiguite. Les valeurs ci-dessous ne sont qu'un REPLI, utilise seulement
-   avant que fullscreenBoxPx soit calcule (une fraction de seconde a
-   l'ouverture, via useLayoutEffect) — l'inline gagne toujours ensuite. */
-.preview-final-fullscreen-frame-wrap {
-  position: relative;
-  max-width: 88vw;
-  max-height: 80vh;
-  aspect-ratio: 220 / 280;
-  animation: previewFormatFadeIn 220ms ease;
-  /* overflow reste visible (voir .scaled-page-frame-clip, le niveau qui
-     coupe reellement l'iframe) ; box-shadow deplace ici depuis
-     .preview-final-fullscreen-frame (evite d'etre coupe par le clip). */
-  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.6);
-}
-@media (prefers-reduced-motion: reduce) {
-  .preview-final-fullscreen-frame-wrap { animation: none; }
+/* Zone remplie par PageZoomStage — flex:1 + min-height:0 obligatoires (voir
+   .atelier-realsize-stage-wrap, BookAtelierLuxe.css, meme raison exacte :
+   sans min-height:0 un enfant flex ne peut pas se reduire sous la hauteur
+   de son contenu, ce qui empeche PageZoomStage de mesurer un espace
+   reellement contraint). */
+.preview-final-fullscreen-stage-wrap {
+  flex: 1;
+  min-height: 0;
 }
 
-/* Mode livre en plein ecran : deux pages cote a cote. */
-.preview-final-fullscreen-spread {
+/* Double-page : deux iframes flex:1 (meme largeur chacune, par
+   construction — voir SPREAD_GAP_PX/fullscreenContentWidthPx dans
+   BookPreviewFinalLuxe.js) separees par la "tranche" decorative
+   (.preview-final-zoom-spine), jamais un gap CSS (creerait deux
+   interstices au lieu d'un, desynchronisant la largeur reelle du contenu
+   de celle calculee cote JS). */
+.preview-final-zoom-spread {
   display: flex;
-  gap: 4px;
-  max-width: 92vw;
-  max-height: 80vh;
+  width: 100%;
+  height: 100%;
 }
-.preview-final-fullscreen-spread .preview-final-fullscreen-frame-wrap {
-  max-width: none;
+.preview-final-zoom-spread iframe,
+.preview-final-zoom-spread .atelier-page-placeholder {
+  flex: 1 1 0;
+  height: 100%;
+  min-width: 0;
+}
+/* Simule une reliure : un fin degrade sombre au centre, jamais un trait dur
+   (cahier des charges §7 : "separation centrale realiste"). */
+.preview-final-zoom-spine {
+  flex: 0 0 16px;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.18) 35%,
+    rgba(0, 0, 0, 0.32) 50%,
+    rgba(0, 0, 0, 0.18) 65%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.preview-final-zoom-single {
+  width: 100%;
+  height: 100%;
+}
+.preview-final-zoom-single iframe,
+.preview-final-zoom-single .atelier-page-placeholder {
+  width: 100%;
+  height: 100%;
 }
 
 /* Voir .preview-final-frame plus haut : meme raison (taille naturelle +
-   transform:scale(), jamais un redimensionnement direct). box-shadow
-   deplace sur le wrapper ci-dessus pour la meme raison. */
-.preview-final-fullscreen-frame {
+   transform:scale() global applique par PageZoomStage, jamais un
+   redimensionnement direct de l'iframe). */
+.preview-final-zoom-frame {
   display: block;
   border: none;
   background: var(--white);
   border-radius: 6px;
-  /* transform-origin par defaut (center), voir .preview-final-frame plus
-     haut pour le pourquoi. */
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.6);
 }
 
-.preview-final-fullscreen-nav {
+/* Transition douce a chaque changement de page (cahier des charges §7) —
+   rejouee a chaque remontage (key={fullscreenPageChangeKey}). */
+@keyframes previewFinalZoomPageChange {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+.preview-final-zoom-page-change { animation: previewFinalZoomPageChange 220ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .preview-final-zoom-page-change { animation: none; }
+}
+
+/* Navigation + zoom, regroupees dans un seul bloc "pied" qui stoppe la
+   propagation du clic (voir BookPreviewFinalLuxe.js : sans ca, cliquer
+   "Suivant" ou "+" fermerait aussi le calque). */
+.preview-final-fullscreen-footer {
   flex: 0 0 auto;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.preview-final-fullscreen-nav {
+  display: flex;
+  align-items: center;
   justify-content: center;
   gap: var(--space-md);
 }
 .preview-final-fullscreen-nav .btn { background: rgba(255, 255, 255, 0.92); }
+.preview-final-fullscreen-nav-label {
+  min-width: 140px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
+}

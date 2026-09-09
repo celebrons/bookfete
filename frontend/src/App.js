@@ -24,6 +24,8 @@ import BookPreviewFinalLuxe from './components/book/BookPreviewFinalLuxe';
 import InvitationPageLuxe from './components/contributeur/InvitationPageLuxe';
 import TokenContributePageLuxe from './components/contributeur/TokenContributePageLuxe';
 import BookShareJoinLuxe from './components/contributeur/BookShareJoinLuxe';
+import CollectiveParticipateLuxe from './components/contributeur/CollectiveParticipateLuxe';
+import BookCollectiveLuxe from './components/book/collective/BookCollectiveLuxe';
 import AccountSpaceLuxe from './components/account/AccountSpaceLuxe';
 import BookCheckoutLuxe from './components/orders/BookCheckoutLuxe';
 import OrdersLuxe from './components/orders/OrdersLuxe';
@@ -91,6 +93,7 @@ function App() {
 		  <Route path="/invite/:token" element={<InvitationPageLuxe />} />
 		  <Route path="/contribute/:token" element={<TokenContributePageLuxe />} />
 		  <Route path="/participer/:token" element={<BookShareJoinLuxe />} />
+		  <Route path="/collectif/:token" element={<CollectiveParticipateLuxe />} />
 
 
 
@@ -124,6 +127,12 @@ function App() {
           <Route path="/book/:bookId/apercu" element={
             <ProtectedRoute>
               <BookPreviewFinalLuxe />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/book/:bookId/collectif" element={
+            <ProtectedRoute>
+              <BookCollectiveLuxe />
             </ProtectedRoute>
           } />
 

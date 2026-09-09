@@ -8,6 +8,20 @@
   flex: 1;
 }
 
+/* Masque l'en-tete global (logo/menu) pendant qu'un visualiseur plein ecran
+   est ouvert (atelier "Voir a l'echelle", Apercu final) — retour
+   utilisateur : gagner l'espace vertical qu'occupe cette barre plutot que
+   de la laisser visible par-dessus le calque (elle a un z-index tres eleve,
+   voir HeaderLuxe.js:.site-header, plus haut que les calques eux-memes).
+   `display:none` (pas juste visuellement recouverte) : retire aussi ses
+   liens du parcours clavier/lecteur d'ecran pendant que le calque capture
+   l'attention. La classe est posee/retiree sur <body> par les composants
+   eux-memes (AtelierBookView.js/BookPreviewFinalLuxe.js), au meme endroit
+   que le blocage existant du defilement de la page derriere. */
+body.has-fullscreen-viewer .site-header {
+  display: none;
+}
+
 /* Header */
 .header {
   background: white;

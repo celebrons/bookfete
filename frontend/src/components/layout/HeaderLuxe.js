@@ -41,13 +41,16 @@ const HeaderLuxe = () => {
   };
 
   return (
-    <header style={{
-      backgroundColor: 'var(--white)',
-      borderBottom: 'var(--border-fine)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 1000
-    }}>
+    <header
+      className="site-header"
+      style={{
+        backgroundColor: 'var(--white)',
+        borderBottom: 'var(--border-fine)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000
+      }}
+    >
       <div className="container-luxe" style={{
         display: 'flex',
         justifyContent: 'space-between',

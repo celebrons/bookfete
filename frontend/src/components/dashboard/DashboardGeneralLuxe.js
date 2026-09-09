@@ -93,7 +93,8 @@ const DashboardGeneralLuxe = () => {
           .from('books')
           .select(`
             *,
-            content_items:book_content_items(kind, contribution_id)
+            content_items:book_content_items(kind, contribution_id),
+            participants:book_participants(status)
           `)
           .eq('owner_id', userId)
           .eq('status', 'actif')
@@ -102,7 +103,8 @@ const DashboardGeneralLuxe = () => {
           .from('books')
           .select(`
             *,
-            content_items:book_content_items(kind, contribution_id)
+            content_items:book_content_items(kind, contribution_id),
+            participants:book_participants(status)
           `)
           .eq('owner_id', userId)
           .eq('status', 'archive')
