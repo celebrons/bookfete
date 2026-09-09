@@ -8,39 +8,39 @@ const HowItWorksLuxe = () => {
   const steps = [
     {
       number: '1️⃣',
-      title: 'Créez votre projet',
-      description: 'Choisissez votre événement (anniversaire, mariage, départ...) et donnez un titre à votre livre.',
+      title: 'Créez votre projet, seul ou à plusieurs',
+      description: 'Choisissez votre occasion (anniversaire, mariage, départ...), donnez un titre à votre livre, et décidez si vous le composez seul ou en mode collectif.',
       time: '1 minute',
       highlight: 'Aucune inscription requise pour commencer'
     },
     {
       number: '2️⃣',
-      title: 'Ajoutez vos photos et vos textes',
-      description: 'Importez vos photos et écrivez vos souvenirs directement dans l\'éditeur, à votre rythme.',
+      title: 'Réunissez vos souvenirs',
+      description: 'Importez vos photos et écrivez vos textes directement dans l\'atelier. En mode collectif, invitez vos proches par un lien individuel : chacun ajoute ses souvenirs, sans créer de compte.',
       time: '10 minutes',
       highlight: 'Vous gardez la main sur chaque mot et chaque image'
     },
     {
       number: '3️⃣',
-      title: 'Choisissez le style',
-      description: 'Sélectionnez une mise en page (finition, papier, style narratif) et le nombre de pages. L\'aperçu se met à jour en direct.',
-      time: '5 minutes',
-      highlight: 'Mise en page automatique, sans IA'
+      title: 'Composez votre livre',
+      description: 'Choisissez une mise en page pour chaque page dans l\'atelier, ou laissez la composition automatique s\'en charger. L\'aperçu se met à jour en direct, à l\'identique du rendu final.',
+      time: '10 minutes',
+      highlight: 'Mise en page automatique ou manuelle, sans IA'
     },
     {
       number: '4️⃣',
-      title: 'Composez et commandez',
-      description: 'Générez l\'aperçu de votre livre, validez, commandez et recevez-le chez vous en 2 semaines.',
+      title: 'Choisissez le format et commandez',
+      description: 'Comparez les 3 formats (Livret, Standard, Luxe) avec un aperçu réel et le prix affiché en direct, validez votre commande, et recevez votre livre chez vous en 2 semaines.',
       time: '5 minutes',
-      highlight: 'Qualité d\'impression professionnelle'
+      highlight: 'Prix affiché immédiatement, sans surprise'
     }
   ];
 
   const features = [
     {
-      icon: '🎨',
-      title: 'Styles personnalisables',
-      description: 'Choisissez la finition, le papier et le ton de votre livre parmi plusieurs styles pensés pour chaque type d\'événement.'
+      icon: '👥',
+      title: 'Créez à plusieurs',
+      description: 'Invitez vos proches par un lien individuel : chacun ajoute ses photos et ses souvenirs sans créer de compte, et vous suivez qui a contribué.'
     },
     {
       icon: '📸',
@@ -49,23 +49,23 @@ const HowItWorksLuxe = () => {
     },
     {
       icon: '✨',
-      title: 'Mise en page luxueuse',
-      description: 'Typographie élégante, marges généreuses, papiers premium. Votre livre a l\'allure d\'un véritable ouvrage d\'éditeur.'
+      title: 'Trois formats, une vraie identité chacun',
+      description: 'Livret, Standard ou Luxe : chaque format a sa propre taille, son papier et sa mise en page, du plus simple au plus premium — pas juste une même page redimensionnée.'
     },
     {
       icon: '🖊️',
       title: 'Vous restez l\'auteur',
-      description: 'Aucun texte n\'est généré à votre place : c\'est vous qui écrivez, le moteur se charge uniquement de la mise en page.'
+      description: 'Aucun texte n\'est généré à votre place : que vous écriviez seul ou que vos proches contribuent, c\'est toujours vous qui écrivez.'
     },
     {
       icon: '👁️',
       title: 'Aperçu en direct',
-      description: 'Visualisez votre livre au fil de la composition et ajustez le style ou le nombre de pages avant de commander.'
+      description: 'Visualisez votre livre au fil de la composition, à l\'échelle réelle, et ajustez la mise en page ou le format avant de commander.'
     },
     {
       icon: '📄',
-      title: 'Export PDF',
-      description: 'Téléchargez un aperçu PDF de votre livre a tout moment, avant meme de passer commande.'
+      title: 'Impression ou version PDF',
+      description: 'Au moment de la commande, choisissez de recevoir votre livre imprimé, en PDF numérique, ou les deux.'
     }
   ];
 
@@ -100,8 +100,12 @@ const HowItWorksLuxe = () => {
       answer: "Oui, vous pouvez importer autant de photos que vous le souhaitez. Elles sont optimisées automatiquement pour une qualité d'impression parfaite."
     },
     {
+      question: "👥 Comment mes proches peuvent-ils contribuer ?",
+      answer: "Activez le mode collectif : invitez vos proches par email, chacun reçoit un lien personnel pour ajouter ses photos et ses souvenirs, sans créer de compte. Vous suivez qui a contribué, relancez les retardataires, et pouvez fixer une date limite de participation."
+    },
+    {
       question: "🖊️ Qui écrit les textes du livre ?",
-      answer: "Vous. Aucun contenu n'est généré automatiquement : le moteur de mise en page place vos photos et vos textes dans le style choisi."
+      answer: "Vous — et vos proches s'ils contribuent. Aucun contenu n'est généré automatiquement : le moteur se charge uniquement de la mise en page de ce que vous écrivez."
     },
     {
       question: "💳 Comment fonctionne le paiement ?",
@@ -125,7 +129,7 @@ const HowItWorksLuxe = () => {
           <span className="label-gold">DÉCOUVRIR</span>
           <h1>✨ Comment ça marche ?</h1>
           <p className="hero-description">
-            Créez un livre unique en 4 étapes simples, sans aucune compétence technique. Vos photos, vos textes, votre style.
+            Créez un livre unique en 4 étapes simples, seul ou à plusieurs, sans aucune compétence technique. Vos photos, vos textes, votre format.
           </p>
           
           <div className="hero-stats">

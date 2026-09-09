@@ -10,6 +10,16 @@ const PDFDocument = require('pdfkit');
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+// Pipeline sans-IA (phase03/04) reutilisee pour le PDF final post-commande —
+// voir routes/composition.js (preview.pdf) pour l'implementation d'origine ;
+// generateFinalBookPdfFiles() ci-dessous route dessus au lieu du pipeline
+// chapitres/brouillons legacy (chaque livre sans-IA a zero chapitre).
+const bookContentService = require('../services/composition/bookContentService');
+const templateCatalog = require('../services/composition/templateCatalog');
+const coverComposer = require('../services/composition/coverComposer');
+const pdfService = require('../services/composition/pdfService');
+const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../services/composition/coverFormat');
+const { resolveFormatDensity } = require('../services/composition/formatDensity');
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
@@ -283,6 +293,18 @@ function normalizePreviewFormat(value) {
   return PREVIEW_FORMATS[canonical] ? canonical : '';
 }
 
+// Format reel (sans-IA) utilise pour le rendu du PDF final, derive de
+// book.print_format via coverFormat.js/formatDensity.js — memes source et
+// fonction que routes/composition.js:resolveRenderFormat (dupliquee ici,
+// meme convention deja etablie dans ce fichier). A NE PAS confondre avec
+// resolveBookPreviewFormat()/PREVIEW_FORMATS ci-dessous, qui restent du
+// systeme d'apercu chapitres legacy (dimensions perimees, ex. livret
+// 148x210mm ici contre 170x170mm reel) — non utilise pour le rendu final.
+function resolveRenderFormat(formatId) {
+  const normalized = Object.prototype.hasOwnProperty.call(COVER_FORMATS, formatId) ? formatId : DEFAULT_COVER_FORMAT_ID;
+  return { formatId: normalized, ...resolveCoverFormat(formatId), ...resolveFormatDensity(formatId) };
+}
+
 function resolveBookPreviewFormat(book, requestedFormat = '') {
   const requested = normalizePreviewFormat(requestedFormat);
   if (requested) {
@@ -524,10 +546,22 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
   try {
     const db = supabase;
     const bookId = req.params.id;
-    const { book, config, chapters } = await loadOwnedBookChapterContext({
-      bookId,
-      ownerId: req.user.id
-    });
+    const { data: book, error: bookError } = await db
+      .from('books')
+      .select('*')
+      .eq('id', bookId)
+      .eq('owner_id', req.user.id)
+      .single();
+
+    if (bookError || !book) {
+      return res.status(404).json({ error: 'Livre introuvable' });
+    }
+
+    // Note : previewFormat/previewLayoutSettings ci-dessous restent calcules
+    // et stockes (metadonnees de commande, reponse JSON) pour compatibilite,
+    // mais ne pilotent plus le rendu du PDF final — voir
+    // generateFinalBookPdfFiles(), qui derive le format reel de
+    // book.print_format via resolveRenderFormat().
     const previewFormat = resolveBookPreviewFormat(book, req.body?.previewFormat);
     const previewLayoutSettings = normalizePreviewLayoutSettings(
       req.body?.previewLayoutSettings || book?.cover_config?.previewLayoutSettings,
@@ -539,37 +573,6 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       || req.body?.forceRegenerate === 1
       || req.body?.forceRegenerate === '1'
     );
-
-    const chaptersWithDrafts = (chapters || []).map((chapter) => ({
-      chapter,
-      draft: extractChapterDraftState(chapter)
-    }));
-    const frameTexts = {
-      introduction: buildBookFrameFallbackText({ book, chaptersWithDrafts, outputType: 'introduction' }),
-      conclusion: buildBookFrameFallbackText({ book, chaptersWithDrafts, outputType: 'conclusion' })
-    };
-    const incompleteCount = chaptersWithDrafts.filter(
-      ({ draft }) => draft?.status !== 'validated'
-    ).length;
-
-    if (!chaptersWithDrafts.length) {
-      return res.status(400).json({
-        error: 'Aucun chapitre disponible pour generer le PDF final'
-      });
-    }
-
-    if (incompleteCount > 0) {
-      return res.status(400).json({
-        error: `Tous les chapitres doivent etre valides avant l export PDF (${incompleteCount} restant(s))`
-      });
-    }
-
-    const coverValidation = getBookCoverValidationState(book);
-    if (!coverValidation.isBookCoverValidated) {
-      return res.status(400).json({
-        error: 'La couverture et la 4e de couverture doivent etre validees avant l export PDF final.'
-      });
-    }
 
     const requestedOrderId = cleanText(req.body?.orderId, 120);
     let targetOrder = null;
@@ -733,10 +736,7 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
 
     processPdfExportJob({
       jobId,
-      book,
-      chaptersWithDrafts,
-      previewFormat,
-      previewLayoutSettings
+      book
     }).catch((error) => {
       console.error('Erreur pipeline export PDF:', error);
     });
@@ -1861,33 +1861,15 @@ async function recoverMissingPdfExportJob({
     }
   }
 
-  const { book, chapters } = await loadOwnedBookChapterContext({
-    bookId,
-    ownerId
-  });
-  const chaptersWithDrafts = (chapters || []).map((chapter) => ({
-    chapter,
-    draft: extractChapterDraftState(chapter)
-  }));
-  const incompleteCount = chaptersWithDrafts.filter(
-    ({ draft }) => draft?.status !== 'validated'
-  ).length;
+  const { data: book, error: bookLoadError } = await db
+    .from('books')
+    .select('*')
+    .eq('id', bookId)
+    .eq('owner_id', ownerId)
+    .single();
 
-  if (!chaptersWithDrafts.length) {
-    throw buildPdfExportPrerequisiteError('Aucun chapitre disponible pour generer le PDF final');
-  }
-
-  if (incompleteCount > 0) {
-    throw buildPdfExportPrerequisiteError(
-      `Tous les chapitres doivent etre valides avant l export PDF (${incompleteCount} restant(s))`
-    );
-  }
-
-  const coverValidation = getBookCoverValidationState(book);
-  if (!coverValidation.isBookCoverValidated) {
-    throw buildPdfExportPrerequisiteError(
-      'La couverture et la 4e de couverture doivent etre validees avant l export PDF final.'
-    );
+  if (bookLoadError || !book) {
+    throw buildPdfExportPrerequisiteError('Livre introuvable');
   }
 
   const previewFormat = resolveBookPreviewFormat(
@@ -1952,10 +1934,7 @@ async function recoverMissingPdfExportJob({
 
   processPdfExportJob({
     jobId: recoveredJobId,
-    book,
-    chaptersWithDrafts,
-    previewFormat,
-    previewLayoutSettings
+    book
   }).catch((error) => {
     console.error('Erreur regeneration job export PDF:', error);
   });
@@ -1965,10 +1944,7 @@ async function recoverMissingPdfExportJob({
 
 async function processPdfExportJob({
   jobId,
-  book,
-  chaptersWithDrafts,
-  previewFormat,
-  previewLayoutSettings
+  book
 }) {
   const queuedJob = pdfExportJobs.get(jobId);
   if (!queuedJob) {
@@ -1983,10 +1959,7 @@ async function processPdfExportJob({
   try {
     const files = await generateFinalBookPdfFiles({
       book,
-      chaptersWithDrafts,
-      jobId,
-      previewFormat,
-      previewLayoutSettings
+      jobId
     });
     const readyJob = pdfExportJobs.get(jobId);
     if (!readyJob) {
@@ -2062,66 +2035,50 @@ function deletePdfExportFiles(job) {
   });
 }
 
-async function generateFinalBookPdfFiles({
-  book,
-  chaptersWithDrafts,
-  jobId,
-  previewFormat,
-  previewLayoutSettings
-}) {
-  await fsp.mkdir(PDF_EXPORT_DIR, { recursive: true });
+// Pipeline sans-IA (voir routes/composition.js:preview.pdf, meme sequence
+// exacte) : contenu reel du livre (book_content_items/pages) + template +
+// format d'impression choisi -> pages composees -> capture Chrome headless
+// page par page (pdfService.js). Remplace l'ancien pipeline chapitres/HTML
+// (generateFinalBookPdfFileFromHtml/-Legacy ci-dessous, desormais orphelins
+// mais laisses en place — voir leur commentaire).
+async function generateFinalBookPdfFiles({ book, jobId }) {
   const safeBookName = normalizePdfFileName(cleanText(book?.title, 120), 'livre');
-  const finalPath = path.join(PDF_EXPORT_DIR, `${safeBookName}-${jobId}-livre-final.pdf`);
-  const resolvedPreviewFormat = resolveBookPreviewFormat(book, previewFormat);
-  const rendererMode = String(process.env.PDF_RENDERER_MODE || 'browser').toLowerCase();
-  const shouldUseBrowserRenderer = rendererMode !== 'legacy' && rendererMode !== 'pdfkit';
-  let rendererUsed = shouldUseBrowserRenderer ? 'browser' : 'legacy';
+  const [interiorPages, items, layouts, template] = await Promise.all([
+    bookContentService.listPages(book.id),
+    bookContentService.listContentItems(book.id),
+    templateCatalog.listActiveLayouts(),
+    book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null)
+  ]);
 
-  if (shouldUseBrowserRenderer) {
-    try {
-      await generateFinalBookPdfFileFromHtml({
-        finalPath,
-        book,
-        chaptersWithDrafts,
-        frameTexts,
-        jobId,
-        previewFormat: resolvedPreviewFormat,
-        previewLayoutSettings
-      });
-    } catch (browserError) {
-      const strictBrowserMode = rendererMode === 'browser-strict';
-      if (strictBrowserMode) {
-        throw browserError;
-      }
+  const format = resolveRenderFormat(book.print_format);
+  const pages = coverComposer.composeCoversIntoPages({ book, items, template, interiorPages, format });
 
-      console.error('Generation PDF navigateur indisponible, fallback PDFKit:', browserError);
-      rendererUsed = 'legacy';
-      await generateFinalBookPdfFileLegacy({
-        filePath: finalPath,
-        book,
-        chaptersWithDrafts,
-        previewFormat: resolvedPreviewFormat
-      });
-    }
-  } else {
-    await generateFinalBookPdfFileLegacy({
-      filePath: finalPath,
-      book,
-      chaptersWithDrafts,
-      previewFormat: resolvedPreviewFormat
-    });
-    rendererUsed = 'legacy';
-  }
+  const pdfPath = await pdfService.renderPdfFromPages({
+    book,
+    pages,
+    items,
+    layouts,
+    format,
+    fileBaseName: `${safeBookName}-${jobId}-livre-final`
+  });
 
   return {
-    renderer: rendererUsed,
+    renderer: 'browser',
     final: {
-      path: finalPath,
+      path: pdfPath,
       fileName: `${safeBookName}-livre-final.pdf`
     }
   };
 }
 
+// ORPHELIN depuis le passage de generateFinalBookPdfFiles() au pipeline
+// sans-IA ci-dessus (plus aucun appelant dans ce fichier) : pipeline PDF
+// legacy base sur les chapitres/brouillons (loadOwnedBookChapterContext).
+// Laisse en place plutot que supprime — convention du projet pour le code
+// mort dans ce fichier — au cas ou une reprise future du modele chapitres
+// serait souhaitee. Idem pour resolvePdfBrowserPath/renderPdfFromHtmlWithBrowser/
+// buildPrintableBookHtmlDocument/renderValidatedBookPreviewHtml/
+// generateFinalBookPdfFileLegacy plus bas, tous uniquement appeles depuis ici.
 async function generateFinalBookPdfFileFromHtml({
   finalPath,
   book,
