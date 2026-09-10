@@ -7,42 +7,50 @@
 //
 // Dimensions choisies pour ressembler a de vrais formats d'impression
 // (livret agrafe / album standard librairie / edition luxe grand format).
-// Livret est CARRE (170x170mm) — decision explicite revenue sur un choix
-// precedent "portrait pour les 3" : un carre est la difference de silhouette
-// la plus immediate possible entre formats, bien plus qu'une variation de
-// ratio portrait. Standard/Luxe restent portrait (deja realistes). Le ratio
-// d'affichage est calcule dynamiquement partout ou il compte (atelier,
-// apercu final — voir pageAspectRatio/FORMAT_DIMENSIONS_MM cote frontend),
-// donc un format carre n'a rien de plus a preparer cote rendu. safeMarginMm
-// s'ecarte volontairement entre formats (pas seulement les dimensions) :
-// c'est ce qui rend la couverture visuellement dense (livret) ou aeree/
-// luxueuse (luxe) — voir aussi coverTheme.applyFormatAccent pour l'habillage
-// dore du Luxe. Ces valeurs ont ETE alignees avec l'ancien pipeline PDF
-// (backend/routes/books.js, PREVIEW_FORMATS) a la creation de ce fichier,
-// mais divergent volontairement depuis : PREVIEW_FORMATS sert encore de
-// vraies commandes payees sur l'ancien flux (voir memoire du projet) et ne
-// doit jamais etre touche/aligne sur celui-ci. pageRenderer.js
-// (DEFAULT_FORMAT) reste lui aligne sur "standard" ci-dessous — a verifier
-// s'il change encore.
+//
+// 2026-09-09 — REALIGNEES sur le catalogue reel Gelato (integration
+// imprimeur en cours de test, voir backend/services/printing/gelatoCatalog.js
+// et memoire "gelato-integration-status") : Gelato n'imprime QUE les tailles
+// listees dans son catalogue produit, en 2 catalogues distincts (couverture
+// souple / rigide) qui partagent les tailles 20x20cm et 21x28cm — nos
+// anciennes valeurs (170x170 / 220x280 / 240x320mm) ne correspondaient a
+// AUCUN produit reel, impossible a faire imprimer tel quel. Nouvelle
+// repartition (confirmee avec l'utilisateur) :
+//   - livret   : 20x20cm carre, couverture SOUPLE (Gelato soft-cover-photobooks)
+//   - standard : 21x28cm portrait, couverture SOUPLE (Gelato soft-cover-photobooks)
+//   - luxe     : 21x28cm portrait, couverture RIGIDE (Gelato hard-cover-photobooks)
+//     — MEME gabarit que standard : la distinction Luxe se joue desormais sur
+//     la matiere (rigide) + les finitions deja existantes (dorure, marges,
+//     papier ivoire — voir coverTheme.applyFormatAccent), pas sur la taille.
+// Le ratio d'affichage est calcule dynamiquement partout ou il compte
+// (atelier, apercu final — voir pageAspectRatio/FORMAT_DIMENSIONS_MM cote
+// frontend, duplique dans AtelierBookView.js/AtelierLayoutPanel.js/
+// AtelierPageFilmstrip.js/BookPreviewFinalLuxe.js — les 4 a tenir synchrones
+// avec ce fichier). safeMarginMm reste volontairement different entre
+// formats malgre standard/luxe qui partagent maintenant le meme trim : c'est
+// ce qui garde une composition plus aeree/luxueuse pour Luxe a taille egale.
+// PREVIEW_FORMATS (backend/routes/books.js) reste un vestige de l'ancien
+// pipeline chapitres, desormais mort (voir generateFinalBookPdfFiles) — ne
+// jamais s'aligner dessus.
 //
 // Fonctions/constantes pures, aucun acces reseau/disque.
 
 const COVER_FORMATS = {
   livret: {
-    trimWidthMm: 170,
-    trimHeightMm: 170,
+    trimWidthMm: 200,
+    trimHeightMm: 200,
     bleedMm: 0,
     safeMarginMm: 8
   },
   standard: {
-    trimWidthMm: 220,
+    trimWidthMm: 210,
     trimHeightMm: 280,
     bleedMm: 0,
     safeMarginMm: 15
   },
   luxe: {
-    trimWidthMm: 240,
-    trimHeightMm: 320,
+    trimWidthMm: 210,
+    trimHeightMm: 280,
     bleedMm: 0,
     safeMarginMm: 26
   }

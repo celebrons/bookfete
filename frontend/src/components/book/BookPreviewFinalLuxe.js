@@ -31,10 +31,16 @@ import './BookPreviewFinalLuxe.css';
 // `spine` pilote uniquement le visuel de tranche cote client (voir
 // .preview-final-format-spine dans le CSS) — aucune donnee serveur
 // equivalente, purement descriptif (souple/rigide/rigide premium).
+// 2026-09-09 : realigne sur le catalogue reel Gelato (voir l'en-tete de
+// backend/services/composition/coverFormat.js) — Standard et Luxe partagent
+// maintenant le meme gabarit (21x28cm) ; Luxe se distingue par la
+// couverture RIGIDE (Gelato hard-cover-photobooks) au lieu de la taille.
+// spine/coverLabel mis a jour en consequence : Standard redevient "souple"
+// (etait etiquete "rigide" avant que la vraie distinction imprimeur existe).
 const PRINT_FORMATS = [
-  { id: 'livret', label: 'Livret', tagline: 'Simple & élégant', description: 'Un format carré et léger pour conserver vos souvenirs.', dimensions: '17 × 17 cm', widthMm: 170, heightMm: 170, spine: 'soft', coverLabel: 'couverture souple' },
-  { id: 'standard', label: 'Standard', badge: '⭐', tagline: 'Le livre souvenir', description: 'Le meilleur équilibre entre qualité et prix.', dimensions: '22 × 28 cm', widthMm: 220, heightMm: 280, spine: 'rigid', coverLabel: 'couverture rigide' },
-  { id: 'luxe', label: 'Luxe', tagline: 'Premium & intemporel', description: 'Une finition haut de gamme pour un livre à conserver ou à offrir.', dimensions: '24 × 32 cm', widthMm: 240, heightMm: 320, spine: 'premium', coverLabel: 'couverture rigide premium' }
+  { id: 'livret', label: 'Livret', tagline: 'Simple & élégant', description: 'Un format carré et léger pour conserver vos souvenirs.', dimensions: '20 × 20 cm', widthMm: 200, heightMm: 200, spine: 'soft', coverLabel: 'couverture souple' },
+  { id: 'standard', label: 'Standard', badge: '⭐', tagline: 'Le livre souvenir', description: 'Le meilleur équilibre entre qualité et prix.', dimensions: '21 × 28 cm', widthMm: 210, heightMm: 280, spine: 'soft', coverLabel: 'couverture souple' },
+  { id: 'luxe', label: 'Luxe', tagline: 'Premium & intemporel', description: 'Une finition haut de gamme pour un livre à conserver ou à offrir.', dimensions: '21 × 28 cm', widthMm: 210, heightMm: 280, spine: 'premium', coverLabel: 'couverture rigide' }
 ];
 
 const normalizePrintFormat = (value) => (
@@ -244,7 +250,7 @@ export default function BookPreviewFinalLuxe() {
     if (!book?.id) return;
     try {
       const { formats } = await getFormatOptions(book.id);
-      setFormatOptions(Object.fromEntries((formats || []).map((entry) => [entry.formatId, entry.pageCount])));
+      setFormatOptions(Object.fromEntries((formats || []).map((entry) => [entry.formatId, entry])));
     } catch (_err) {
       // Silencieux : les cartes affichent alors "…" a la place du nombre de
       // pages plutot que de bloquer tout l'ecran pour un souci secondaire.
@@ -261,7 +267,7 @@ export default function BookPreviewFinalLuxe() {
     if (!book?.id || Object.keys(formatOptions).length === 0) return undefined;
     let cancelled = false;
     Promise.all(PRINT_FORMATS.map((format) => {
-      const pageCount = formatOptions[format.id];
+      const pageCount = formatOptions[format.id]?.pageCount;
       if (!pageCount) return Promise.resolve([format.id, null]);
       return estimatePrice(book.id, { printFormat: format.id, pageCount })
         .then((result) => [format.id, result.unitCents])
@@ -374,8 +380,11 @@ export default function BookPreviewFinalLuxe() {
       const { book: updatedBook } = await chooseFormat(bookId, formatId);
       setBook((previous) => ({ ...previous, ...updatedBook }));
       loadFormatOptions();
-    } catch (_err) {
-      setError('Impossible de changer le format.');
+    } catch (err) {
+      // Remonte le vrai message serveur (ex. "Il faut ajouter du contenu
+      // pour atteindre 28 pages minimum...") plutot qu'un message generique
+      // qui cacherait la vraie raison du blocage.
+      setError(err?.message || 'Impossible de changer le format.');
     } finally {
       setSwitchingFormat(false);
     }
@@ -502,14 +511,29 @@ export default function BookPreviewFinalLuxe() {
             <span className="preview-final-sidebar-label">Format</span>
             <div className="preview-final-format-list">
               {PRINT_FORMATS.map((format) => {
-                const formatPageCount = formatOptions[format.id];
+                const formatOption = formatOptions[format.id];
+                const formatPageCount = formatOption?.pageCount;
+                // meetsMinimum/meetsMaximum absents (options pas encore
+                // chargees) : jamais bloquant par defaut, seulement une fois
+                // qu'on SAIT que le contenu est hors bornes (voir
+                // routes/composition.js: GET /format-options).
+                const belowMinimum = formatOption?.meetsMinimum === false;
+                const aboveMaximum = formatOption?.meetsMaximum === false;
+                const outOfRange = belowMinimum || aboveMaximum;
                 return (
                   <button
                     key={format.id}
                     type="button"
-                    className={`preview-final-format-card ${currentFormat === format.id ? 'is-selected' : ''}`}
+                    className={`preview-final-format-card ${currentFormat === format.id ? 'is-selected' : ''} ${outOfRange ? 'is-below-minimum' : ''}`}
                     onClick={() => handleChooseFormat(format.id)}
-                    disabled={switchingFormat}
+                    disabled={switchingFormat || outOfRange}
+                    title={
+                      belowMinimum
+                        ? `Ajoutez du contenu pour atteindre le minimum imprimable (${formatPageCount} page${formatPageCount > 1 ? 's' : ''} actuellement).`
+                        : aboveMaximum
+                          ? `Retirez du contenu pour repasser sous le maximum imprimable (${formatPageCount} pages actuellement).`
+                          : undefined
+                    }
                   >
                     <span
                       className={`preview-final-format-spine is-${format.spine}`}
@@ -523,7 +547,13 @@ export default function BookPreviewFinalLuxe() {
                     <span className="preview-final-format-pagecount">
                       {formatPageCount != null ? `${formatPageCount} pages` : '…'}
                     </span>
-                    <span className="preview-final-format-price">{formatEuro(pricesByFormat[format.id])}</span>
+                    {belowMinimum ? (
+                      <span className="preview-final-format-warning">Pas assez de contenu pour ce format</span>
+                    ) : aboveMaximum ? (
+                      <span className="preview-final-format-warning">Trop de contenu pour ce format</span>
+                    ) : (
+                      <span className="preview-final-format-price">{formatEuro(pricesByFormat[format.id])}</span>
+                    )}
                   </button>
                 );
               })}

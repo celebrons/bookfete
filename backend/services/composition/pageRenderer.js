@@ -16,7 +16,7 @@
 // GET /api/books/:bookId/preview.html (ouvrable directement au navigateur,
 // sans dependance a un binaire Chrome).
 
-const DEFAULT_FORMAT = { trimWidthMm: 220, trimHeightMm: 280 }; // "standard" (coverFormat.js)
+const DEFAULT_FORMAT = { trimWidthMm: 210, trimHeightMm: 280 }; // "standard" (coverFormat.js) — realigne 2026-09-09, voir son en-tete
 
 // Polices reellement chargees dans tout le projet (verifie par grep
 // exhaustif : frontend/public/index.html, luxe-theme.css, et l'ancien
@@ -34,10 +34,35 @@ function escapeHtml(value = '') {
     .replace(/'/g, '&#39;');
 }
 
-// Cadre d'image sursamplee (voir .photo-frame dans BASE_CSS) : a utiliser
+// Bornes du zoom manuel (voir imgFrame ci-dessous) — exportees en bas de
+// fichier et reutilisees telles quelles par routes/composition.js
+// (sanitizePhotoAdjustments), source unique, jamais dupliquees a la main.
+const PHOTO_ZOOM_MIN = 1;
+const PHOTO_ZOOM_MAX = 2.5;
+
+function clamp(value, min, max) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return Math.min(max, Math.max(min, num));
+}
+
+// Cadre d'image (voir .photo-frame dans BASE_CSS) : a utiliser
 // systematiquement a la place d'un <img> brut pour toute photo du livre.
-function imgFrame(url) {
-  return `<span class="photo-frame"><img src="${escapeHtml(url || '')}" alt="" /></span>`;
+// `adjustment` (optionnel) : { focalX, focalY, zoom, fitMode } issu de
+// content.photoAdjustments (voir routes/composition.js PUT .../manual) —
+// absent pour tout appel existant (couvertures via frontCoverRenderer.js/
+// backCoverRenderer.js, ou toute page interieure jamais ajustee a la main) :
+// les valeurs par defaut ci-dessous (centre, zoom 1) reproduisent alors
+// exactement l'ancien rendu "cover centre", donc aucun appelant existant
+// n'a besoin d'etre modifie pour rester correct.
+function imgFrame(url, adjustment) {
+  const fitMode = adjustment?.fitMode === 'contain' ? 'contain' : 'cover';
+  const focalX = clamp(adjustment?.focalX, 0, 1) ?? 0.5;
+  const focalY = clamp(adjustment?.focalY, 0, 1) ?? 0.5;
+  const zoom = clamp(adjustment?.zoom, PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX) ?? 1;
+  const cls = fitMode === 'contain' ? 'photo-frame is-contain' : 'photo-frame';
+  const style = `--fx:${Math.round(focalX * 1000) / 10}%;--fy:${Math.round(focalY * 1000) / 10}%;--zoom:${zoom};`;
+  return `<span class="${cls}"><img src="${escapeHtml(url || '')}" alt="" style="${style}" /></span>`;
 }
 
 // Fragment de texte affiche pour cet item : le texte reel de l'item, sauf si
@@ -88,7 +113,7 @@ function splitMetaFor(item, overridesByItemId) {
 // meme vide — mais sans <img> : simple espace blanc, comme sur la page
 // imprimee finale, jamais un cadre pointille ou un placeholder visible —
 // ca, c'est le role du panneau d'edition, pas du rendu reel).
-function renderPhotoBlock(rawItems, slug, presentationVariant = 0) {
+function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsByItemId = {}) {
   const slotCount = rawItems.length;
   const orderedItems = presentationVariant === 1 && slotCount > 1 ? [...rawItems].reverse() : rawItems;
 
@@ -97,9 +122,9 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0) {
     if (!item) return '';
     const inset = slug === 'photo-avec-marge' || (slug === 'FULL_PHOTO' && presentationVariant === 1);
     const cls = inset ? 'block-photo photo-solo photo-inset' : 'block-photo photo-solo';
-    return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url)}</figure>`;
+    return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url, adjustmentsByItemId[item.id])}</figure>`;
   }
-  const cells = orderedItems.map((item) => (item ? imgFrame(item.url) : '<span class="photo-frame" aria-hidden="true"></span>'));
+  const cells = orderedItems.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>'));
   const vertical = slug === 'photo-duo-vertical'
     || (slug === 'TWO_PHOTOS' && slotCount === 2 && presentationVariant === 1);
   if (slotCount === 2 && vertical) {
@@ -152,7 +177,7 @@ function renderTexteBlock(rawItems, slug, overridesByItemId = {}, presentationVa
   return `<div class="${cls}" data-layout="${escapeHtml(slug || '')}">${paragraphs}</div>`;
 }
 
-function renderContributionBlock(items, slug, overridesByItemId = {}, presentationVariant = 0) {
+function renderContributionBlock(items, slug, overridesByItemId = {}, presentationVariant = 0, adjustmentsByItemId = {}) {
   const photos = items.filter((item) => item.kind === 'photo');
   const textes = items.filter((item) => item.kind === 'texte');
   const orderedPhotos = presentationVariant === 1 && photos.length > 1 ? [...photos].reverse() : photos;
@@ -160,7 +185,7 @@ function renderContributionBlock(items, slug, overridesByItemId = {}, presentati
 
   const photosHtml = orderedPhotos.length > 0
     ? `<div class="contribution-photos photo-grid photo-grid-${Math.min(orderedPhotos.length, 4)}">${orderedPhotos
-        .map((item) => imgFrame(item.url))
+        .map((item) => imgFrame(item.url, adjustmentsByItemId[item.id]))
         .join('')}</div>`
     : '';
   const textHtml = textes
@@ -173,10 +198,10 @@ function renderContributionBlock(items, slug, overridesByItemId = {}, presentati
 
 // PHOTO_WITH_CAPTION (v2) : une photo pleine page avec une courte legende.
 // Sous-presentation : legende centree (defaut) ou alignee/encadree (variant).
-function renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant = 0) {
+function renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant = 0, adjustmentsByItemId = {}) {
   const photo = items.find((item) => item.kind === 'photo');
   const caption = items.find((item) => item.kind === 'texte');
-  const photoHtml = photo ? imgFrame(photo.url) : '';
+  const photoHtml = photo ? imgFrame(photo.url, adjustmentsByItemId[photo.id]) : '';
   const captionHtml = caption ? `<figcaption>${escapeHtml(textFor(caption, overridesByItemId))}</figcaption>` : '';
   const cls = presentationVariant === 1 ? 'block-photo photo-with-caption is-framed' : 'block-photo photo-with-caption';
   return `<figure class="${cls}" data-layout="${escapeHtml(slug)}">${photoHtml}${captionHtml}</figure>`;
@@ -188,11 +213,11 @@ function renderPhotoWithCaption(items, slug, overridesByItemId, presentationVari
 // reordonne pour le choix du contenu). Le variant de presentation, lui, peut
 // inverser cet ordre VISUELLEMENT (ex. PHOTO_TEXT prend alors l'allure de
 // TEXT_PHOTO) — un simple effet de mise en page, le contenu place ne change pas.
-function renderMixteOrderedBlock(items, slug, overridesByItemId, presentationVariant = 0) {
+function renderMixteOrderedBlock(items, slug, overridesByItemId, presentationVariant = 0, adjustmentsByItemId = {}) {
   const orderedItems = presentationVariant === 1 ? [...items].reverse() : items;
   const parts = orderedItems.map((item) => {
     if (item.kind === 'photo') {
-      return `<div class="mixte-photo">${imgFrame(item.url)}</div>`;
+      return `<div class="mixte-photo">${imgFrame(item.url, adjustmentsByItemId[item.id])}</div>`;
     }
     return `<div class="mixte-texte"><p>${escapeHtml(textFor(item, overridesByItemId))}</p>${splitMetaFor(item, overridesByItemId)}</div>`;
   });
@@ -232,12 +257,12 @@ function renderTitleTextBlock(rawItems, slug, overridesByItemId = {}) {
 // format (title-photos-grid-N base sur photoSlots.length, jamais sur le
 // compte reel de photos presentes), avec un .photo-frame vide pour tout
 // emplacement retire.
-function renderTitlePhotosBlock(rawItems, slug) {
+function renderTitlePhotosBlock(rawItems, slug, adjustmentsByItemId = {}) {
   const title = rawItems[0];
   const photoSlots = rawItems.slice(1);
   const titleHtml = title ? `<h2 class="page-title">${escapeHtml(title.text || '')}</h2>` : '';
   const photosHtml = photoSlots.length > 0
-    ? `<div class="title-photos-grid title-photos-grid-${Math.min(photoSlots.length, 4)}">${photoSlots.map((item) => (item ? imgFrame(item.url) : '<span class="photo-frame" aria-hidden="true"></span>')).join('')}</div>`
+    ? `<div class="title-photos-grid title-photos-grid-${Math.min(photoSlots.length, 4)}">${photoSlots.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>')).join('')}</div>`
     : '';
   return `<div class="block-title-photos" data-layout="${escapeHtml(slug)}">${titleHtml}${photosHtml}</div>`;
 }
@@ -247,7 +272,10 @@ const TEXTE_SLUGS = new Set(['ONE_TESTIMONY', 'TWO_TESTIMONIES', 'THREE_TESTIMON
 const MIXTE_ORDERED_SLUGS = new Set(['PHOTO_TEXT', 'TEXT_PHOTO', 'TWO_PHOTOS_TEXT']);
 const TITLE_PHOTO_SLUGS = new Set(['TITLE_TWO_PHOTOS', 'TITLE_FOUR_PHOTOS']);
 
-function renderBlock(block, itemsById, layoutsById) {
+// `adjustmentsByItemId` : { [itemId]: {focalX, focalY, zoom, fitMode} },
+// source unique = page.content.photoAdjustments (voir renderPage/
+// renderSinglePageHtml) — jamais reconstruit ici, propage seulement.
+function renderBlock(block, itemsById, layoutsById, adjustmentsByItemId = {}) {
   const items = block.itemIds.map((id) => itemsById[id]).filter(Boolean);
   if (items.length === 0) return '';
 
@@ -255,7 +283,7 @@ function renderBlock(block, itemsById, layoutsById) {
   const overridesByItemId = Object.fromEntries((block.textOverrides || []).map((override) => [override.itemId, override]));
   const presentationVariant = block.presentationVariant === 1 ? 1 : 0;
 
-  if (slug === 'PHOTO_WITH_CAPTION') return renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant);
+  if (slug === 'PHOTO_WITH_CAPTION') return renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant, adjustmentsByItemId);
   // TITLE_TEXT/TITLE_PHOTO_SLUGS : jamais la liste compactee `items` — la
   // position 0 doit rester le titre meme quand un emplacement plus loin
   // est vide (voir renderTitleTextBlock/renderTitlePhotosBlock ci-dessus).
@@ -263,27 +291,27 @@ function renderBlock(block, itemsById, layoutsById) {
     return renderTitleTextBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId);
   }
   if (TITLE_PHOTO_SLUGS.has(slug)) {
-    return renderTitlePhotosBlock(block.itemIds.map((id) => itemsById[id]), slug);
+    return renderTitlePhotosBlock(block.itemIds.map((id) => itemsById[id]), slug, adjustmentsByItemId);
   }
-  if (MIXTE_ORDERED_SLUGS.has(slug)) return renderMixteOrderedBlock(items, slug, overridesByItemId, presentationVariant);
+  if (MIXTE_ORDERED_SLUGS.has(slug)) return renderMixteOrderedBlock(items, slug, overridesByItemId, presentationVariant, adjustmentsByItemId);
   // PHOTO_SLUGS/TEXTE_SLUGS : idem, positionnel — voir renderPhotoBlock/
   // renderTexteBlock ("il faut absolument que les autres photos restent a
   // leur place lorsque je supprime une autre photo ou un autre texte").
   if (PHOTO_SLUGS.has(slug)) {
-    return renderPhotoBlock(block.itemIds.map((id) => itemsById[id]), slug, presentationVariant);
+    return renderPhotoBlock(block.itemIds.map((id) => itemsById[id]), slug, presentationVariant, adjustmentsByItemId);
   }
   if (TEXTE_SLUGS.has(slug)) {
     return renderTexteBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId, presentationVariant);
   }
 
-  if (block.kind === 'photo') return renderPhotoBlock(items, slug, presentationVariant);
+  if (block.kind === 'photo') return renderPhotoBlock(items, slug, presentationVariant, adjustmentsByItemId);
   if (block.kind === 'texte') return renderTexteBlock(items, slug, overridesByItemId, presentationVariant);
-  if (block.kind === 'contribution') return renderContributionBlock(items, slug, overridesByItemId, presentationVariant);
+  if (block.kind === 'contribution') return renderContributionBlock(items, slug, overridesByItemId, presentationVariant, adjustmentsByItemId);
   // 'mixte' ou inconnu, sans slug reconnu ci-dessus : repli generique
   // photo(s) puis texte(s), pour tout layout heritage non catalogue.
   const photos = items.filter((item) => item.kind === 'photo');
   const textes = items.filter((item) => item.kind === 'texte');
-  return `<div class="block-mixte">${photos.length ? renderPhotoBlock(photos, slug, presentationVariant) : ''}${
+  return `<div class="block-mixte">${photos.length ? renderPhotoBlock(photos, slug, presentationVariant, adjustmentsByItemId) : ''}${
     textes.length ? renderTexteBlock(textes, slug, overridesByItemId, presentationVariant) : ''
   }</div>`;
 }
@@ -334,7 +362,11 @@ function renderPage(page, itemsById, layoutsById, isLast, context = {}) {
   }
 
   const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
-  const blocksHtml = blocks.map((block) => renderBlock(block, itemsById, layoutsById)).join('');
+  // photoAdjustments : ajustement manuel (deplacer/zoomer, voir routes/
+  // composition.js PUT .../manual) par itemId, propre a CETTE page — un
+  // meme itemId ne peut de toute facon apparaitre que sur une seule page.
+  const adjustmentsByItemId = page.content?.photoAdjustments || {};
+  const blocksHtml = blocks.map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId)).join('');
   // "is-luxe" : marqueur LEGER pour scoper les 2 seuls details dores qui
   // restent sur une page ordinaire (filet sous .page-title + numero de page,
   // voir BASE_CSS) — plus de cadre pleine page (retour utilisateur : "ne pas
@@ -361,25 +393,37 @@ const BASE_CSS = `
   }
   .page-break { page-break-after: always; }
   .page-blocks { display: flex; flex-direction: column; gap: calc(6mm * var(--fmt-space-scale, 1)); height: 100%; }
-  /* object-fit:contain (jamais cover) : l'image entiere reste toujours
-     visible, jamais recadree/tronquee pour remplir l'emplacement — la photo
-     telle qu'importee par l'utilisateur prime sur la grille. Consequence
-     acceptee : quand le ratio de l'emplacement ne correspond pas exactement
-     au ratio de la photo, des marges vides apparaissent sur les cotes
-     (fond de la page, jamais une couleur ajoutee ici) plutot que de perdre
-     une partie de l'image. Aucune perte de qualite dans ce choix : ni
-     recompression ni redimensionnement de l'original (voir storageService.js
-     — le fichier source n'est jamais retouche), seule la mise a l'echelle
-     d'affichage change. Sans astuce de sur-echantillonnage non plus :
-     l'ancienne version (image mise en page 3x plus grande puis retassee via
-     transform:scale) etait un contournement du plafond ~96dpi de l'ancien
-     pipeline PDF (routes/books.js, jamais appele par ce moteur) ; le chemin
-     PDF reellement utilise (renderPdfFromPages, capture CDP a
-     deviceScaleFactor=3) gere deja la haute resolution nativement — un seul
-     redimensionnement, ici, dans l'apercu navigateur comme dans la capture
-     PDF. */
+  /* object-fit:cover (jamais contain) par defaut, decision utilisateur
+     explicite (2026-09-10, cahier des charges "PhotoSlot") : une photo doit
+     remplir 100% de son emplacement, jamais flotter avec des marges vides
+     au milieu d'un grand cadre. Le prix accepte est le recadrage quand le
+     ratio de la photo ne correspond pas exactement a celui de l'emplacement
+     — normal et attendu (le moteur de composition choisit deja
+     l'emplacement dont la FORME se rapproche le plus du ratio reel de la
+     photo avant meme d'arriver ici, voir layoutScoring.js/PHOTO_SLOT_RATIOS
+     — ce recadrage reste donc en general leger). --fx/--fy (point focal,
+     0-100%) et --zoom (>=1) sont poses en style inline PAR IMAGE par
+     imgFrame() ci-dessus, a partir de content.photoAdjustments — absents
+     (photo jamais ajustee a la main), ils valent 50%/50%/1 : cover centre,
+     identique visuellement a une photo qui n'a jamais ete touchee.
+     .is-contain (classe posee par imgFrame quand fitMode==='contain') est
+     l'echappatoire reservee a un futur layout EXPLICITEMENT artistique
+     (cadre blanc/Polaroid volontaire) — aucun layout ne l'utilise
+     aujourd'hui, le hook existe pret a l'emploi. Meme non-perte de qualite
+     qu'avant : ni recompression ni redimensionnement de l'original (voir
+     storageService.js), seule la mise a l'echelle/le point d'ancrage
+     d'affichage changent — et c'est le MEME rendu, ici, dans l'apercu
+     navigateur et dans la capture PDF (pdfService.js capture ce HTML tel
+     quel), donc aucune divergence possible entre apercu et PDF final/Gelato. */
   .photo-frame { position: relative; overflow: hidden; display: block; width: 100%; height: 100%; }
-  .photo-frame img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+  .photo-frame img {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: var(--fx, 50%) var(--fy, 50%);
+    transform: scale(var(--zoom, 1));
+    transform-origin: var(--fx, 50%) var(--fy, 50%);
+  }
+  .photo-frame.is-contain img { object-fit: contain; transform: none; }
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .photo-solo { margin: 0; height: 100%; }
   .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
@@ -582,7 +626,8 @@ function renderSinglePageHtml(input) {
     pageHtml = renderPage(page, itemsById, layoutsById, true, { book, format });
   } else {
     const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
-    const blocksHtml = blocks.map((block) => renderBlock(block, itemsById, layoutsById)).join('');
+    const adjustmentsByItemId = page.content?.photoAdjustments || {};
+    const blocksHtml = blocks.map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId)).join('');
     // Meme marqueur/numero de page discret que renderPage() ci-dessus (Luxe uniquement).
     const luxeClass = format?.formatId === 'luxe' ? ' is-luxe' : '';
     const pageNumberHtml = format?.formatId === 'luxe' ? `<span class="page-number-luxe">${page.page_index + 1}</span>` : '';
@@ -619,5 +664,7 @@ module.exports = {
   renderBookHtml,
   renderSinglePageHtml,
   escapeHtml,
-  imgFrame
+  imgFrame,
+  PHOTO_ZOOM_MIN,
+  PHOTO_ZOOM_MAX
 };

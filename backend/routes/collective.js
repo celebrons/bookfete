@@ -402,7 +402,7 @@ router.post('/api/public/collectif/:token/text', resolveParticipantByToken, asyn
 router.post(
   '/api/public/collectif/:token/photo',
   resolveParticipantByToken,
-  upload.single('photo'),
+  upload.uploadSinglePhoto('photo'),
   async (req, res) => {
     try {
       if (isDeadlinePassed(req.book)) {

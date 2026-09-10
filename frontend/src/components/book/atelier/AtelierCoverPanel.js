@@ -157,6 +157,38 @@ function FormatGallery({ formats, selectedId, onSelect }) {
   );
 }
 
+// Galerie de choix de photo (recto ET verso, meme composant — retour
+// utilisateur 2026-09-10 : "pareil pour la 4e de couverture"). "Automatique"
+// laisse le systeme choisir/decider si une photo doit meme apparaitre.
+function CoverPhotoPicker({ photos, loading, selectedId, onSelect }) {
+  if (loading) return <p className="coverlite-hint">Chargement des photos...</p>;
+  return (
+    <>
+      <div className="coverlite-photo-grid">
+        <button
+          type="button"
+          className={`coverlite-photo-option is-auto ${!selectedId ? 'is-selected' : ''}`}
+          onClick={() => onSelect(null)}
+          title="Laisser le systeme choisir la meilleure photo"
+        >
+          <span>Automatique</span>
+        </button>
+        {photos.map((photo) => (
+          <button
+            key={photo.id}
+            type="button"
+            className={`coverlite-photo-option ${selectedId === photo.id ? 'is-selected' : ''}`}
+            onClick={() => onSelect(photo.id)}
+          >
+            <img src={photo.metadata?.thumbnailUrl || photo.url} alt="" />
+          </button>
+        ))}
+      </div>
+      {photos.length === 0 && <p className="coverlite-hint">Ajoutez des photos pour pouvoir en choisir une ici.</p>}
+    </>
+  );
+}
+
 const buildInitialState = (book) => {
   const overrides = (book?.cover_overrides && typeof book.cover_overrides === 'object') ? book.cover_overrides : {};
   const closingPhraseMode = ['custom', 'none'].includes(overrides.closingPhraseMode) ? overrides.closingPhraseMode : 'auto';
@@ -174,6 +206,10 @@ const buildInitialState = (book) => {
     frontVariant,
     backVariant,
     frontPhotoId: overrides.frontPhotoId || null,
+    // Photo de 4e de couverture (retour utilisateur, 2026-09-10 : "permettre
+    // de modifier la photo de la 4e de couverture") — meme principe que
+    // frontPhotoId, cote verso (voir coverComposer.js: composeBackCover).
+    backPhotoId: overrides.backPhotoId || null,
     subtitle: normalizeText(overrides.subtitle),
     dateLabel: normalizeText(overrides.dateLabel),
     closingPhraseMode,
@@ -245,6 +281,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved }) {
             frontVariant: formState.frontVariant,
             backVariant: formState.backVariant,
             frontPhotoId: formState.frontPhotoId || null,
+            backPhotoId: formState.backPhotoId || null,
             subtitle: formState.subtitle,
             dateLabel: formState.dateLabel,
             closingPhraseMode: formState.closingPhraseMode,
@@ -276,6 +313,11 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved }) {
   }[saveStatus];
 
   const showPhotoPicker = formState.frontVariant !== 'COVER_MINIMAL';
+  // Verso : une photo n'apparait jamais pour BACK_MINIMAL/BACK_STATS forces
+  // explicitement (choix assume de ne PAS en montrer, voir coverComposer.js
+  // resolveForcedBackComposition) — le picker n'a de sens que pour AUTO
+  // (peut resoudre vers une photo) ou BACK_PHOTO_STATS force.
+  const showBackPhotoPicker = formState.backVariant === 'AUTO' || formState.backVariant === 'BACK_PHOTO_STATS';
 
   return (
     <aside className="atelier-layout-panel atelier-cover-panel">
@@ -320,33 +362,12 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved }) {
           {showPhotoPicker && (
             <div className="coverlite-group">
               <span className="coverlite-group-label">Photo de couverture</span>
-              {loadingPhotos ? (
-                <p className="coverlite-hint">Chargement des photos...</p>
-              ) : (
-                <div className="coverlite-photo-grid">
-                  <button
-                    type="button"
-                    className={`coverlite-photo-option is-auto ${!formState.frontPhotoId ? 'is-selected' : ''}`}
-                    onClick={() => updateField('frontPhotoId', null)}
-                    title="Laisser le systeme choisir la meilleure photo"
-                  >
-                    <span>Automatique</span>
-                  </button>
-                  {photos.map((photo) => (
-                    <button
-                      key={photo.id}
-                      type="button"
-                      className={`coverlite-photo-option ${formState.frontPhotoId === photo.id ? 'is-selected' : ''}`}
-                      onClick={() => updateField('frontPhotoId', photo.id)}
-                    >
-                      <img src={photo.metadata?.thumbnailUrl || photo.url} alt="" />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {!loadingPhotos && photos.length === 0 && (
-                <p className="coverlite-hint">Ajoutez des photos pour pouvoir en choisir une ici.</p>
-              )}
+              <CoverPhotoPicker
+                photos={photos}
+                loading={loadingPhotos}
+                selectedId={formState.frontPhotoId}
+                onSelect={(id) => updateField('frontPhotoId', id)}
+              />
             </div>
           )}
 
@@ -417,6 +438,22 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved }) {
               onSelect={(id) => updateField('backVariant', id)}
             />
           </div>
+
+          {/* Photo de 4e de couverture (retour utilisateur, 2026-09-10 :
+              "pareil pour la 4e de couverture") — jusqu'ici seul le recto
+              avait ce controle, meme composant/meme principe ici
+              (cover_overrides.backPhotoId, voir coverComposer.js). */}
+          {showBackPhotoPicker && (
+            <div className="coverlite-group">
+              <span className="coverlite-group-label">Photo de 4e de couverture</span>
+              <CoverPhotoPicker
+                photos={photos}
+                loading={loadingPhotos}
+                selectedId={formState.backPhotoId}
+                onSelect={(id) => updateField('backPhotoId', id)}
+              />
+            </div>
+          )}
 
           <div className="coverlite-group">
             <span className="coverlite-group-label">Phrase de 4e de couverture</span>

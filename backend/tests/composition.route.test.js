@@ -16,7 +16,12 @@ jest.mock('../config/supabase', () => {
           owner_id: 'owner-test-1',
           title: 'Mon livre',
           template_id: 'tpl-1',
-          page_count: 24,
+          // 48 (pas 24) : depuis le plancher imprimable Gelato (28 pages
+          // minimum, 2026-09-09 — voir layoutEngine.MIN_PRINTABLE_PAGES),
+          // POST /compose bloque desormais (422) tout resultat sous ce
+          // seuil. Un budget genereux ici evite aussi overflow===true une
+          // fois les ~32 items ajoutes plus bas (book_content_items).
+          page_count: 48,
           collection_mode: 'solo'
         },
         { id: 'book-test-2', owner_id: 'someone-else', title: "Livre d'un autre" },
@@ -42,7 +47,16 @@ jest.mock('../config/supabase', () => {
           owner_id: 'owner-test-1',
           title: 'Livre atelier manuel',
           template_id: 'tpl-1',
-          page_count: 2,
+          // 32 (pas 2) : idem book-test-1, plancher imprimable Gelato.
+          page_count: 32,
+          collection_mode: 'solo'
+        },
+        {
+          id: 'book-test-8',
+          owner_id: 'owner-test-1',
+          title: 'Livre avec assez de contenu (changement de format)',
+          template_id: 'tpl-1',
+          page_count: 48,
           collection_mode: 'solo'
         },
         {
@@ -101,8 +115,56 @@ jest.mock('../config/supabase', () => {
       book_content_items: [
         { id: 'item-1', book_id: 'book-test-1', source: 'upload', kind: 'photo', url: 'https://cdn.test/1.jpg', display_order: 0 },
         { id: 'item-5-photo', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5.jpg', display_order: 0 },
-        { id: 'item-5-text', book_id: 'book-test-5', source: 'upload', kind: 'texte', text: 'Un souvenir.', display_order: 1 }
-      ],
+        { id: 'item-5-text', book_id: 'book-test-5', source: 'upload', kind: 'texte', text: 'Un souvenir.', display_order: 1 },
+        // Dediees a GET /print-quality-check (voir plus bas) : metadata.width/
+        // height reellement bas/haut pour obtenir un DPI effectif sans
+        // ambiguite une fois placees en FULL_PHOTO (lay-1) sur un format
+        // standard (~182x252mm de zone utile).
+        { id: 'item-5-photo-lowres', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-lowres.jpg', display_order: 2, metadata: { width: 100, height: 100 } },
+        { id: 'item-5-photo-hires', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-hires.jpg', display_order: 3, metadata: { width: 4000, height: 3000 } }
+      ]
+        // 32 photos supplementaires sur book-test-1 : template tpl-1
+        // n'autorise que FULL_PHOTO (1 photo/page, voir allowed_layouts
+        // plus bas), donc ~1 photo == ~1 page composee — largement de quoi
+        // depasser le plancher imprimable Gelato (28 pages, voir
+        // layoutEngine.MIN_PRINTABLE_PAGES) sans depasser page_count:48
+        // (evite overflow===true, teste explicitement plus bas).
+        .concat(Array.from({ length: 32 }, (_, index) => ({
+          id: `item-1-bulk-${index}`,
+          book_id: 'book-test-1',
+          source: 'upload',
+          kind: 'photo',
+          url: `https://cdn.test/1-bulk-${index}.jpg`,
+          display_order: index + 1
+        })))
+        // 30 photos supplementaires sur book-test-5, EN PLUS de
+        // item-5-photo/item-5-text (celles-ci restent les seules
+        // verrouillees manuellement dans les tests "page verrouillee
+        // survit..." — le pool restant doit a lui seul depasser 28 pages
+        // une fois la page verrouillee exclue, voir formatComposer.js).
+        .concat(Array.from({ length: 30 }, (_, index) => ({
+          id: `item-5-bulk-${index}`,
+          book_id: 'book-test-5',
+          source: 'upload',
+          kind: 'photo',
+          url: `https://cdn.test/5-bulk-${index}.jpg`,
+          display_order: index + 2
+        })))
+        // book-test-8 : livre dedie au test de changement de format sur un
+        // livre initialement SANS page interieure persistee (book_pages
+        // vide au depart), mais avec assez de contenu reel pour composer
+        // au dessus du plancher imprimable — book-test-3 reste, lui,
+        // volontairement VIDE de tout contenu (voir plus bas : test
+        // "preview.html sur un livre sans aucune page interieure...", qui
+        // depend justement de book-test-3 n'ayant jamais rien compose).
+        .concat(Array.from({ length: 32 }, (_, index) => ({
+          id: `item-8-bulk-${index}`,
+          book_id: 'book-test-8',
+          source: 'upload',
+          kind: 'photo',
+          url: `https://cdn.test/8-bulk-${index}.jpg`,
+          display_order: index
+        }))),
       book_pages: []
     },
     { userId: 'owner-test-1', userEmail: 'organisateur@test.local' }
@@ -201,7 +263,10 @@ describe('routes/composition', () => {
         .get(`/api/books/${BOOK_ID}/content-items`)
         .set('Authorization', 'Bearer valid-token');
       expect(list.status).toBe(200);
-      expect(list.body).toHaveLength(1);
+      // 1 (item-1) + 32 items en vrac ajoutes pour depasser le plancher
+      // imprimable Gelato dans les tests de composition plus bas (voir
+      // book_content_items en tete de fichier).
+      expect(list.body).toHaveLength(33);
 
       const created = await request(app)
         .post(`/api/books/${BOOK_ID}/content-items`)
@@ -235,6 +300,18 @@ describe('routes/composition', () => {
         .post(`/api/books/${BOOK_ID}/content-items/photo`)
         .set('Authorization', 'Bearer valid-token');
       expect(response.status).toBe(400);
+    });
+
+    it('refuse une photo trop volumineuse avec un message JSON clair en francais (pas la page HTML brute de multer/Express)', async () => {
+      const oversized = Buffer.alloc(21 * 1024 * 1024, 1); // > 20 Mo (limite, voir middleware/upload.js)
+      const response = await request(app)
+        .post(`/api/books/${BOOK_ID}/content-items/photo`)
+        .set('Authorization', 'Bearer valid-token')
+        .attach('photo', oversized, 'trop-grande.jpg');
+
+      expect(response.status).toBe(413);
+      expect(response.body.error).toMatch(/volumineuse/i);
+      expect(response.body.error).toMatch(/20 Mo/);
     });
 
     it("refuse l'upload sur le livre d'un autre proprietaire", async () => {
@@ -422,12 +499,17 @@ describe('routes/composition', () => {
     });
 
     it('recompose, persiste et met a jour print_format/page_count du livre', async () => {
-      // book-test-3 (pas BOOK_ID) : le mock partage son etat entre tous les
-      // tests de ce fichier (pas de reset entre chaque `it`) — muter
-      // BOOK_ID.print_format ici casserait les tests plus bas qui supposent
-      // encore BOOK_ID au format "standard" par defaut (ex. cover-preview.html).
+      // book-test-8 (pas BOOK_ID, pas book-test-3) : le mock partage son etat
+      // entre tous les tests de ce fichier (pas de reset entre chaque `it`) —
+      // muter BOOK_ID.print_format ici casserait les tests plus bas qui
+      // supposent encore BOOK_ID au format "standard" par defaut (ex.
+      // cover-preview.html) ; book-test-3, lui, doit rester SANS contenu
+      // compose (voir le test "preview.html sur un livre sans aucune page
+      // interieure..." plus bas, qui en depend) — book-test-8 est dedie a
+      // ce test-ci, avec assez de contenu pour depasser le plancher
+      // imprimable (28 pages, voir layoutEngine.MIN_PRINTABLE_PAGES).
       const response = await request(app)
-        .post(`/api/books/book-test-3/format`)
+        .post(`/api/books/book-test-8/format`)
         .set('Authorization', 'Bearer valid-token')
         .send({ formatId: 'luxe' });
 
@@ -543,12 +625,12 @@ describe('routes/composition', () => {
       expect(standard.text).toContain('--cvr-safe-margin:15mm');
     });
 
-    it('cover-preview.html du format Livret est CARRE (170x170mm), pas portrait', async () => {
+    it('cover-preview.html du format Livret est CARRE (200x200mm), pas portrait', async () => {
       const response = await request(app)
         .get(`/api/books/book-test-4/cover-preview.html`)
         .set('Authorization', 'Bearer valid-token');
-      expect(response.text).toContain('--page-width-mm: 170mm');
-      expect(response.text).toContain('--page-height-mm: 170mm');
+      expect(response.text).toContain('--page-width-mm: 200mm');
+      expect(response.text).toContain('--page-height-mm: 200mm');
     });
 
     it('cover-preview.html du format Luxe affiche le cadre dore (has-gold-frame) SUR LA PAGE ELLE-MEME, pas les autres formats', async () => {
@@ -768,6 +850,123 @@ describe('routes/composition', () => {
       expect(page0.locked).toBe(true);
       expect(page0.layout_id).toBe('lay-mixte');
       expect(page0.content.itemIds).toEqual(['item-5-photo', 'item-5-text']);
+    });
+
+    // Cahier des charges "PhotoSlot" (2026-09-10, Phase B) : ajustement
+    // manuel (point focal/zoom) sauvegarde avec la page.
+    it('sauvegarde photoAdjustments avec la page (focalX/focalY/zoom valides)', async () => {
+      const response = await request(app)
+        .put('/api/books/book-test-5/pages/3/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          layoutId: 'lay-1',
+          itemIds: ['item-5-photo'],
+          photoAdjustments: { 'item-5-photo': { focalX: 0.2, focalY: 0.9, zoom: 1.8, fitMode: 'cover' } }
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.content.photoAdjustments).toEqual({
+        'item-5-photo': { focalX: 0.2, focalY: 0.9, zoom: 1.8, fitMode: 'cover' }
+      });
+    });
+
+    it('borne un zoom hors limites plutot que de le refuser (jamais bloquant)', async () => {
+      const response = await request(app)
+        .put('/api/books/book-test-5/pages/3/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          layoutId: 'lay-1',
+          itemIds: ['item-5-photo'],
+          photoAdjustments: { 'item-5-photo': { zoom: 99 } }
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.content.photoAdjustments['item-5-photo'].zoom).toBe(2.5); // PHOTO_ZOOM_MAX
+    });
+
+    it('ignore silencieusement un itemId etranger a cette page dans photoAdjustments', async () => {
+      const response = await request(app)
+        .put('/api/books/book-test-5/pages/3/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          layoutId: 'lay-1',
+          itemIds: ['item-5-photo'],
+          photoAdjustments: { 'item-5-photo': { zoom: 1.2 }, 'item-etranger': { zoom: 2 } }
+        });
+
+      expect(response.status).toBe(200);
+      expect(Object.keys(response.body.content.photoAdjustments)).toEqual(['item-5-photo']);
+    });
+
+    it("n'ajoute pas de champ photoAdjustments quand aucun n'est fourni (retro-compatible)", async () => {
+      const response = await request(app)
+        .put('/api/books/book-test-5/pages/3/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-1', itemIds: ['item-5-photo'] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.content.photoAdjustments).toBeUndefined();
+    });
+  });
+
+  describe('GET /api/books/:bookId/print-quality-check', () => {
+    it('refuse une requete sans authentification', async () => {
+      const response = await request(app).get('/api/books/book-test-5/print-quality-check');
+      expect(response.status).toBe(401);
+    });
+
+    it('signale une photo basse resolution placee en FULL_PHOTO (grand cadre), jamais bloquant', async () => {
+      await request(app)
+        .put('/api/books/book-test-5/pages/5/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-1', itemIds: ['item-5-photo-lowres'] });
+
+      const response = await request(app)
+        .get('/api/books/book-test-5/print-quality-check')
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      const flagged = response.body.lowQualityPhotos.find(
+        (entry) => entry.pageIndex === 5 && entry.itemId === 'item-5-photo-lowres'
+      );
+      expect(flagged).toBeDefined();
+      expect(['attention', 'faible']).toContain(flagged.level);
+      expect(flagged.label.toLowerCase()).not.toContain('dpi'); // jamais le mot DPI affiche (§10)
+    });
+
+    it('ne signale pas une photo haute resolution dans le meme type de cadre', async () => {
+      await request(app)
+        .put('/api/books/book-test-5/pages/6/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-1', itemIds: ['item-5-photo-hires'] });
+
+      const response = await request(app)
+        .get('/api/books/book-test-5/print-quality-check')
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      const flagged = response.body.lowQualityPhotos.find(
+        (entry) => entry.pageIndex === 6 && entry.itemId === 'item-5-photo-hires'
+      );
+      expect(flagged).toBeUndefined();
+    });
+
+    it('lit le zoom manuel stocke sans planter (formule verifiee separement dans photoQualityEngine.test.js)', async () => {
+      await request(app)
+        .put('/api/books/book-test-5/pages/7/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          layoutId: 'lay-1',
+          itemIds: ['item-5-photo-hires'],
+          photoAdjustments: { 'item-5-photo-hires': { zoom: 2.5 } }
+        });
+
+      const response = await request(app)
+        .get('/api/books/book-test-5/print-quality-check')
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body.lowQualityPhotos)).toBe(true);
     });
   });
 });

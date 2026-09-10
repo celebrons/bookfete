@@ -57,12 +57,14 @@ function FormatGallery({ layouts, selectedSlug, onChoose }) {
 
 // Alignees sur backend/services/composition/coverFormat.js (COVER_FORMATS)
 // — meme constante deja dupliquee a la main dans AtelierBookView.js/
-// BookPreviewFinalLuxe.js (convention deja etablie dans ce projet pour ces
-// petites tables format -> dimensions, plutot qu'un import partage).
+// AtelierPageFilmstrip.js/BookPreviewFinalLuxe.js (convention deja etablie
+// dans ce projet pour ces petites tables format -> dimensions, plutot qu'un
+// import partage). 2026-09-09 : realignees sur le catalogue reel Gelato,
+// voir l'en-tete de coverFormat.js.
 const FORMAT_DIMENSIONS_MM = {
-  livret: { widthMm: 170, heightMm: 170 },
-  standard: { widthMm: 220, heightMm: 280 },
-  luxe: { widthMm: 240, heightMm: 320 }
+  livret: { widthMm: 200, heightMm: 200 },
+  standard: { widthMm: 210, heightMm: 280 },
+  luxe: { widthMm: 210, heightMm: 280 }
 };
 
 // Miniature FIDELE AU FORMAT choisi (retour utilisateur : les vignettes
@@ -87,6 +89,19 @@ function LayoutFormatMiniature({ layout, slotItems, printFormat, selectedSidebar
   // rendu du parent, meme sans changement reel : aurait desarme la
   // confirmation en permanence, avant meme le second clic).
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState(null);
+
+  // Meme correction que AtelierPageOverlay.js (retour utilisateur : "il doit
+  // disparaitre quand je clique ailleurs meme en dehors du livre") — un clic
+  // dont la cible n'est pas a l'interieur d'un emplacement de CETTE
+  // miniature annule la confirmation en attente.
+  useEffect(() => {
+    if (pendingRemoveIndex == null) return undefined;
+    function handleOutsideClick(event) {
+      if (!event.target.closest('.atelier-format-slot')) setPendingRemoveIndex(null);
+    }
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [pendingRemoveIndex]);
 
   const { handleDrop, handleClick } = makeSlotHandlers({
     onAssignSlot,

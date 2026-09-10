@@ -112,6 +112,29 @@ async function replaceBookPages(bookId, pages = []) {
   return listPages(bookId);
 }
 
+// Ajoute `count` pages VIDES a la fin du livre, sans toucher aux pages
+// existantes (verrouillees ou non) — geste explicite de l'utilisateur (voir
+// routes/composition.js: POST /pages/extend, bouton "+2" du filmstrip
+// atelier), distinct de la recomposition automatique : celle-ci ne pad
+// jamais artificiellement (voir layoutEngine.compose), mais un utilisateur
+// qui choisit consciemment d'agrandir son livre n'est pas dans ce cas —
+// meme distinction que le principe deja documente ailleurs dans ce fichier.
+async function appendEmptyPages(bookId, count) {
+  const existing = await listPages(bookId);
+  const startIndex = existing.length;
+  const newRows = Array.from({ length: count }, (_, offset) => ({
+    book_id: bookId,
+    page_index: startIndex + offset,
+    layout_id: null,
+    content: {}
+  }));
+
+  const { error } = await supabase.from('book_pages').insert(newRows);
+  if (error) throw error;
+
+  return listPages(bookId);
+}
+
 async function upsertPage(bookId, pageIndex, payload = {}) {
   const { data, error } = await supabase
     .from('book_pages')
@@ -133,5 +156,6 @@ module.exports = {
   deleteContentItem,
   listPages,
   replaceBookPages,
+  appendEmptyPages,
   upsertPage
 };

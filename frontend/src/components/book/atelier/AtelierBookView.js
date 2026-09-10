@@ -34,6 +34,40 @@ function ExpandIcon() {
   );
 }
 
+// Calque cliquable pose sur la couverture/4e de couverture (retour
+// utilisateur, 2026-09-10 : "permettre de modifier la photo... en cliquant
+// sur l'image... idealement modifier directement sur les pages") — meme
+// principe que AtelierPageOverlay.js pour les pages interieures (selection
+// dans "Mes souvenirs" puis clic pour assigner), mais un seul grand
+// emplacement (toute la page), pas une grille de slots. L'iframe en dessous
+// a pointer-events:none (BookAtelierLuxe.css), le clic passe donc
+// naturellement a travers jusqu'ici.
+function CoverPhotoOverlay({ onAssign, selectedSidebarItem }) {
+  if (!onAssign) return null;
+  const isPhotoSelected = selectedSidebarItem?.kind === 'photo';
+  const hint = isPhotoSelected
+    ? 'Cliquer pour utiliser cette photo'
+    : 'Sélectionnez une photo dans "Mes souvenirs", puis cliquez ici';
+  return (
+    <div
+      className={`atelier-cover-photo-overlay ${isPhotoSelected ? 'is-armed' : ''}`}
+      onClick={(event) => { event.stopPropagation(); if (isPhotoSelected) onAssign(selectedSidebarItem.id); }}
+      title={hint}
+    >
+      <span className="atelier-cover-photo-overlay-hint">{hint}</span>
+    </div>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 // isSelected = "c'est la page en cours de modification" (celle que
 // draftLayoutSlug/draftSlotItemIds decrivent). Differenciation forte
 // deliberee (badge + assombrissement de l'autre page) pour qu'il soit
@@ -69,10 +103,14 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
 // l'echelle" n'a de sens que si les PROPORTIONS affichees sont celles du
 // format choisi — un livret affiche avec les proportions d'un standard
 // serait trompeur, pas juste approximatif.
+// 2026-09-09 : realigne sur le catalogue reel Gelato — voir le commentaire
+// d'en-tete de backend/services/composition/coverFormat.js (source de
+// verite) pour le detail. Luxe partage desormais le meme gabarit que
+// Standard (21x28cm) — seule la couverture (rigide) differe.
 const FORMAT_DIMENSIONS_MM = {
-  livret: { widthMm: 170, heightMm: 170 }, // carre, voir coverFormat.js
-  standard: { widthMm: 220, heightMm: 280 },
-  luxe: { widthMm: 240, heightMm: 320 }
+  livret: { widthMm: 200, heightMm: 200 }, // carre, voir coverFormat.js
+  standard: { widthMm: 210, heightMm: 280 },
+  luxe: { widthMm: 210, heightMm: 280 }
 };
 
 // Conversion physique standard (96dpi de reference) — sert uniquement a
@@ -110,7 +148,12 @@ function AtelierBookView({
   // Format d'impression choisi (book.print_format) : determine les vraies
   // proportions affichees par "Voir a l'echelle" — absent ou inconnu replie
   // sur "standard", jamais une erreur.
-  printFormat
+  printFormat,
+  // Assignation directe de la photo de couverture/4e en cliquant sur l'image
+  // (voir CoverPhotoOverlay ci-dessus) — absent -> aucun calque affiche
+  // (repli neutre, ex. si jamais utilise sans cette fonctionnalite branchee).
+  onAssignCoverPhoto,
+  selectedSidebarItem
 }) {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const [zoom, setZoom] = useState('fit');
@@ -171,14 +214,53 @@ function AtelierBookView({
   return (
     <div className="atelier-book-view">
       <div className="atelier-book-stage">
+        {/* Raccourci "Voir à l'échelle" (retour utilisateur : "un petit oeil
+            sur le coin haut droit du livre") — en plus du bouton de la barre
+            de navigation ci-dessous (deja deplace la depuis un coin de page
+            lors d'une passe precedente, garde tel quel), pas a sa place :
+            deux acces au meme calque, l'un permanent/explicite en bas, l'un
+            rapide/discret directement sur la page. */}
+        <button
+          type="button"
+          className="atelier-book-stage-eye"
+          onClick={() => setIsFullscreenOpen(true)}
+          disabled={!hasContentToExpand}
+          title="Voir à l'échelle"
+          aria-label="Voir à l'échelle"
+        >
+          <EyeIcon />
+        </button>
+
         {loading && <p className="atelier-hint atelier-book-loading">Chargement de la page...</p>}
 
         {viewKind === 'cover' && (
-          <PagePane html={singleHtml} pageLabel="Couverture" selectable={false} aspectRatio={pageAspectRatio} />
+          <PagePane
+            html={singleHtml}
+            pageLabel="Couverture"
+            selectable={false}
+            aspectRatio={pageAspectRatio}
+            overlay={(
+              <CoverPhotoOverlay
+                onAssign={onAssignCoverPhoto ? (itemId) => onAssignCoverPhoto('front', itemId) : null}
+                selectedSidebarItem={selectedSidebarItem}
+              />
+            )}
+          />
         )}
 
         {viewKind === 'back-cover' && (
-          <PagePane html={singleHtml} pageLabel="4e de couverture" selectable={false} aspectRatio={pageAspectRatio} />
+          <PagePane
+            html={singleHtml}
+            pageLabel="4e de couverture"
+            selectable={false}
+            aspectRatio={pageAspectRatio}
+            overlay={(
+              <CoverPhotoOverlay
+                onAssign={onAssignCoverPhoto ? (itemId) => onAssignCoverPhoto('back', itemId) : null}
+                selectedSidebarItem={selectedSidebarItem}
+              />
+            )}
+          />
         )}
 
         {viewKind === 'spread' && (

@@ -90,3 +90,45 @@ describe('storageService.uploadFile — miniature/preview, original jamais modif
     expect(uploadCalls).toHaveLength(1); // seul l'original (invalide) part vers Storage
   });
 });
+
+// Cahier des charges "PhotoSlot" (2026-09-10, §12) : "corriger correctement
+// l'orientation EXIF". Ne doit reencoder QUE quand une rotation est
+// reellement necessaire — sinon la garantie "original jamais retouche"
+// ci-dessus (cas sans tag EXIF Orientation, le plus courant) resterait
+// fausse.
+describe("storageService.uploadFile — correction d'orientation EXIF", () => {
+  it("une photo avec un tag EXIF Orientation (rotation necessaire) est physiquement corrigee avant l'upload", async () => {
+    // orientation 6 = "tourner de 90° pour afficher correctement" (cas
+    // classique photo prise telephone en portrait) : les dimensions RAW
+    // sont 300x200 (paysage) mais l'affichage correct est 200x300 (portrait)
+    // — sharp(...).rotate() doit produire un fichier dont les dimensions
+    // reelles refletent deja cette rotation (plus besoin du tag ensuite).
+    const raw = await sharp({ create: { width: 300, height: 200, channels: 3, background: { r: 50, g: 60, b: 70 } } })
+      .jpeg()
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    const file = { originalname: 'portrait.jpg', mimetype: 'image/jpeg', buffer: raw };
+
+    const result = await uploadFile('contribution-photos', file, 'book-1');
+
+    expect(result.success).toBe(true);
+    const originalCall = uploadCalls.find((call) => call.fileName === result.fileName);
+    expect(originalCall.buffer).not.toBe(raw); // reencode : reference differente, attendu ici
+    const dims = sizeOf(originalCall.buffer);
+    expect(dims.width).toBe(200); // dimensions physiquement corrigees
+    expect(dims.height).toBe(300);
+    expect(dims.orientation === undefined || dims.orientation === 1).toBe(true); // tag remis a plat
+    expect(result.width).toBe(200);
+    expect(result.height).toBe(300);
+  });
+
+  it("une photo sans tag EXIF Orientation n'est jamais reencodee (meme garantie que le test ci-dessus)", async () => {
+    const original = await makeJpegBuffer(400, 300);
+    const file = { originalname: 'normale.jpg', mimetype: 'image/jpeg', buffer: original };
+
+    const result = await uploadFile('contribution-photos', file, 'book-1');
+
+    const originalCall = uploadCalls.find((call) => call.fileName === result.fileName);
+    expect(originalCall.buffer).toBe(original);
+  });
+});

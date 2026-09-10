@@ -18,7 +18,14 @@ const SCORING_WEIGHTS = {
   fit: 3,
   profile: 2,
   lengthFit: 2,
-  orientation: 1,
+  // 2026-09-10 : 1 -> 2.5 en meme temps que scoreOrientation devient une
+  // vraie mesure d'adequation ratio photo<->emplacement (voir plus bas) —
+  // au poids 1 d'origine (simple coherence grossiere d'orientation entre
+  // photos), le signal etait trop faible pour peser face a rhythmPenalty
+  // (poids 4) des qu'une rupture de rythme etait aussi en jeu. Reste
+  // volontairement sous rhythmPenalty : une photo mal calee ne doit jamais
+  // forcer 5 pages identiques d'affilee.
+  orientation: 2.5,
   rhythmPenalty: 4,
   balance: 1,
   mood: 2
@@ -170,13 +177,98 @@ function scoreLengthFit(layout, units) {
   return textSlots === 0 ? 0.5 : score / textSlots;
 }
 
-// --- orientation : bonus doux si les photos consommees partagent une
-// orientation coherente pour un layout multi-photos. Jamais bloquant : une
-// orientation inconnue (photo pas encore sondee) reste neutre.
-function scoreOrientation(layout, units) {
+// --- orientation/adequation photo<->emplacement --------------------------
+// 2026-09-10 : retour utilisateur — certaines photos laissent des marges
+// vides dans leur emplacement (object-fit:contain, jamais de recadrage/
+// deformation, voir pageRenderer.js — comportement delibere, "la photo
+// prime sur la grille"). Un remplissage total sans jamais rogner n'est
+// possible que si la forme de l'emplacement correspond deja a celle de la
+// photo — donc le seul levier reel est d'ameliorer le CHOIX de mise en page
+// et l'ordre d'attribution pour que chaque photo tombe plus souvent dans un
+// emplacement de forme proche de la sienne. Avant cette passe, ce facteur
+// ne comparait QUE la coherence d'orientation ENTRE plusieurs photos d'un
+// meme layout (jamais rien pour un layout a une seule photo, comme
+// FULL_PHOTO/PHOTO_WITH_CAPTION — pourtant les plus frequents et les plus
+// visibles en cas d'ecart) ; il compare desormais le ratio REEL de chaque
+// photo (metadata.ratio, deja sonde a l'upload, voir storageService.js) au
+// ratio ATTENDU de son emplacement precis.
+
+// Ratio largeur/hauteur approximatif de chaque emplacement photo, par slug
+// de layout et position de slot dans capacity.slots — derive de la vraie
+// geometrie CSS (pageRenderer.js: .photo-grid-N/.title-photos-grid-N),
+// jamais une mesure au pixel pres (les marges/le titre font varier la
+// hauteur reelle disponible) : un nudge de scoring, pas une contrainte
+// dure — voir slotRatioScore, jamais 0 brutal, une penalite progressive.
+// 'page' est resolu dynamiquement via PAGE_RATIO_BY_FORMAT (le format
+// choisi) plutot qu'une valeur fixe, pour FULL_PHOTO/PHOTO_WITH_CAPTION qui
+// occupent (quasi) toute la page.
+const PHOTO_SLOT_RATIOS = {
+  FULL_PHOTO: ['page'],
+  PHOTO_WITH_CAPTION: ['page'],
+  TWO_PHOTOS: [0.38, 0.38], // moitie largeur, pleine hauteur -> tres vertical
+  THREE_PHOTOS: [0.95, 0.95, 1.9], // 2 cases quasi carrees + 1 case large en bas (grid-column:1/-1)
+  FOUR_PHOTOS: [0.95, 0.95, 0.95, 0.95], // grille 2x2, cases quasi carrees
+  TITLE_TWO_PHOTOS: [1.3, 1.3], // meme grille que TWO_PHOTOS mais hauteur reduite par le titre au dessus -> plus large que haut
+  TITLE_FOUR_PHOTOS: [1.1, 1.1, 1.1, 1.1]
+};
+
+// Ratio de la page elle-meme par format (voir coverFormat.js — dupliquee
+// ici plutot qu'importee : meme convention deja etablie dans ce projet pour
+// une petite table de constantes qui ne doit jamais creer de dependance
+// circulaire entre modules "moteur pur"). standard/luxe partagent deja le
+// meme trim (210x280mm) depuis l'alignement Gelato du 2026-09-09.
+const PAGE_RATIO_BY_FORMAT = {
+  livret: 1, // 200x200mm, carre
+  standard: 210 / 280,
+  luxe: 210 / 280
+};
+const DEFAULT_PAGE_RATIO = PAGE_RATIO_BY_FORMAT.standard; // repli non-regressif si formatId absent (ex. appelant qui ne le passe pas encore)
+
+function resolvePageRatio(formatId) {
+  return PAGE_RATIO_BY_FORMAT[formatId] ?? DEFAULT_PAGE_RATIO;
+}
+
+// Score de proximite entre le ratio reel d'une photo et le ratio attendu de
+// son emplacement — 1 = ratio identique, decroit progressivement (jamais de
+// chute brutale a 0 pour un petit ecart). log() rend l'ecart symetrique :
+// une photo 2x trop large et une photo 2x trop etroite pour son emplacement
+// sont penalisees pareil, pas juste "plus large que prevu" traite differemment
+// de "plus etroit que prevu".
+function slotRatioScore(photoRatio, slotRatio) {
+  if (!photoRatio || !slotRatio) return null; // donnee manquante -> ignore ce slot (neutre), jamais bloquant
+  const diff = Math.abs(Math.log(photoRatio / slotRatio));
+  return Math.max(0, 1 - diff);
+}
+
+function scoreOrientation(layout, units, context = {}) {
   const slots = layout.capacity?.slots;
   if (!Array.isArray(slots)) return 0;
 
+  const expectedRatios = PHOTO_SLOT_RATIOS[layout.slug];
+  if (expectedRatios) {
+    const pageRatio = resolvePageRatio(context.formatId);
+    let total = 0;
+    let count = 0;
+    slots.forEach((slot, index) => {
+      if (slot.type !== 'photo') return;
+      const unit = units[index];
+      const expected = expectedRatios[index];
+      if (!unit?.ratio || expected == null) return; // photo pas encore sondee, ou layout hors table pour cette position -> neutre
+      const slotRatio = expected === 'page' ? pageRatio : expected;
+      const slotScore = slotRatioScore(unit.ratio, slotRatio);
+      if (slotScore == null) return;
+      total += slotScore;
+      count += 1;
+    });
+    if (count > 0) return total / count;
+    // Aucune donnee exploitable (aucune photo encore sondee) : repli
+    // ci-dessous, meme comportement qu'avant cette passe.
+  }
+
+  // Repli — layout hors table (ex. contribution/manuel) ou aucun ratio
+  // numerique disponible : comportement d'origine, coherence grossiere
+  // d'orientation (paysage/portrait/carre) entre les photos d'un meme
+  // layout multi-photos.
   const photoUnits = slots
     .map((slot, index) => (slot.type === 'photo' ? units[index] : null))
     .filter(Boolean);
@@ -256,7 +348,7 @@ function updateFamilyCounts(counts, chosenLayout) {
 /**
  * @param {object} layout
  * @param {Array} units - unites consommees si ce layout est choisi
- * @param {object} context - { profile, rhythmState, familyCounts }
+ * @param {object} context - { profile, rhythmState, familyCounts, formatId }
  * @returns {number}
  */
 function scoreLayoutCandidate(layout, units, context = {}) {
@@ -266,7 +358,7 @@ function scoreLayoutCandidate(layout, units, context = {}) {
   const fit = scoreFit(layout, units);
   const profileScore = scoreProfile(layout, profile);
   const lengthFit = scoreLengthFit(layout, units);
-  const orientation = scoreOrientation(layout, units);
+  const orientation = scoreOrientation(layout, units, context);
   const balance = scoreBalance(layout, context);
   const penalty = rhythmPenalty(layout, rhythmState);
   const mood = scoreMood(layout, context.mood);
@@ -291,5 +383,8 @@ module.exports = {
   layoutFamily,
   SCORING_WEIGHTS,
   PROFILE_TARGETS,
-  MOOD_LAYOUT_WEIGHTS
+  MOOD_LAYOUT_WEIGHTS,
+  PHOTO_SLOT_RATIOS,
+  PAGE_RATIO_BY_FORMAT,
+  slotRatioScore
 };

@@ -140,3 +140,7 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Dumps d'exploration API imprimeur (Gelato) — donnees non sensibles mais
+# pas utiles a versionner, regenerees a la demande
+backend/scripts/.gelato-catalog-dump.json

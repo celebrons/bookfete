@@ -14,7 +14,8 @@ import {
   uploadPhoto,
   addTextItem,
   deleteContentItem,
-  getRecommendedPageCount
+  getRecommendedPageCount,
+  extendBookPages
 } from '../../../services/compositionApi';
 import AtelierSidebar from './AtelierSidebar';
 import AtelierBookView from './AtelierBookView';
@@ -73,6 +74,14 @@ export default function BookAtelierLuxe() {
   const [activeCategory, setActiveCategory] = useState(null);
   const [draftLayoutSlug, setDraftLayoutSlug] = useState(null);
   const [draftSlotItemIds, setDraftSlotItemIds] = useState([]);
+  // Ajustement manuel de cadrage (focalX/focalY/zoom) : { [itemId]: {...} },
+  // meme forme que content.photoAdjustments cote backend. L'UI dediee
+  // ("Ajuster") a ete retiree (retour utilisateur 2026-09-10 : "ne sert a
+  // rien") mais ce brouillon reste charge/re-sauvegarde tel quel a chaque
+  // sauvegarde de page — jamais ecrase silencieusement si une page porte
+  // deja un ajustement enregistre avant ce retrait (voir l'effet de
+  // sauvegarde plus bas). Reste toujours {} pour toute nouvelle page.
+  const [draftPhotoAdjustments, setDraftPhotoAdjustments] = useState({});
 
   const [coverHtml, setCoverHtml] = useState(null);
   const [backCoverHtml, setBackCoverHtml] = useState(null);
@@ -92,6 +101,7 @@ export default function BookAtelierLuxe() {
 
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [sidebarAddError, setSidebarAddError] = useState('');
+  const [addingPages, setAddingPages] = useState(false);
 
   // Force un rechargement de l'apercu de la vue courante meme quand
   // viewIndex ne change pas (ex. sauvegarde de couverture, generation
@@ -268,6 +278,7 @@ export default function BookAtelierLuxe() {
     if (currentPageIndex == null) {
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
+      setDraftPhotoAdjustments({});
       return;
     }
     const pageRow = pages.find((page) => page.page_index === currentPageIndex);
@@ -277,9 +288,11 @@ export default function BookAtelierLuxe() {
     if (atelierLayout && Array.isArray(pageRow.content?.itemIds) && pageRow.content.itemIds.length === atelierLayout.slots.length) {
       setDraftLayoutSlug(atelierLayout.slug);
       setDraftSlotItemIds(pageRow.content.itemIds);
+      setDraftPhotoAdjustments(pageRow.content?.photoAdjustments || {});
     } else {
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
+      setDraftPhotoAdjustments({});
     }
     setActiveCategory(null);
     setSelectedSidebarItem(null);
@@ -339,8 +352,12 @@ export default function BookAtelierLuxe() {
     // au moindre retrait (retour utilisateur : "le modele est inutilisable").
     // pageRenderer.js ignore deja les null (blocks[].itemIds.map(...).
     // filter(Boolean) a l'affichage) : les garder ici ne casse rien au rendu.
+    // photoAdjustments compare AUSSI (cahier des charges "PhotoSlot") : sans
+    // ca, ajuster une photo sans toucher aux emplacements (meme itemIds)
+    // serait a tort considere "deja sauvegarde" et jamais persiste.
     const alreadySaved = Array.isArray(pageRow?.content?.itemIds)
-      && JSON.stringify(pageRow.content.itemIds) === JSON.stringify(draftSlotItemIds);
+      && JSON.stringify(pageRow.content.itemIds) === JSON.stringify(draftSlotItemIds)
+      && JSON.stringify(pageRow.content?.photoAdjustments || {}) === JSON.stringify(draftPhotoAdjustments);
     if (alreadySaved) return undefined;
 
     const realLayout = layouts.find((entry) => entry.slug === draftLayoutSlug);
@@ -352,13 +369,14 @@ export default function BookAtelierLuxe() {
 
     const kind = realLayout.kind === 'photo' || realLayout.kind === 'texte' ? realLayout.kind : 'mixte';
     const persistPromise = isComplete
-      ? saveManualPage(book.id, currentPageIndex, { layoutId: realLayout.id, itemIds: draftSlotItemIds })
+      ? saveManualPage(book.id, currentPageIndex, { layoutId: realLayout.id, itemIds: draftSlotItemIds, photoAdjustments: draftPhotoAdjustments })
       : updatePageContent(book.id, currentPageIndex, {
           layoutId: realLayout.id,
           content: {
             kind,
             itemIds: draftSlotItemIds,
-            blocks: [{ itemIds: draftSlotItemIds, kind, layoutId: realLayout.id, presentationVariant: 0 }]
+            blocks: [{ itemIds: draftSlotItemIds, kind, layoutId: realLayout.id, presentationVariant: 0 }],
+            photoAdjustments: draftPhotoAdjustments
           },
           locked: true
         });
@@ -377,13 +395,14 @@ export default function BookAtelierLuxe() {
       });
 
     return () => { cancelled = true; };
-  }, [draftLayoutSlug, draftSlotItemIds, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
+  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
 
   const handleChooseLayout = (slug) => {
     const atelierLayout = findAtelierLayout(slug);
     if (!atelierLayout) return;
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(new Array(atelierLayout.slots.length).fill(null));
+    setDraftPhotoAdjustments({});
   };
 
   const handleAssignSlot = (slotIndex, itemId) => {
@@ -396,11 +415,25 @@ export default function BookAtelierLuxe() {
   };
 
   const handleRemoveSlot = (slotIndex) => {
+    const removedItemId = draftSlotItemIds[slotIndex];
     setDraftSlotItemIds((previous) => {
       const next = [...previous];
       next[slotIndex] = null;
       return next;
     });
+    // L'ajustement suit l'itemId, pas l'emplacement : un item retire n'a
+    // plus de raison de garder son reglage (s'il est replace ailleurs, il
+    // repart d'un cadrage automatique neutre — plus simple et previsible
+    // que de le faire "voyager" d'un emplacement a un autre potentiellement
+    // tres different en forme).
+    if (removedItemId) {
+      setDraftPhotoAdjustments((previous) => {
+        if (!previous[removedItemId]) return previous;
+        const next = { ...previous };
+        delete next[removedItemId];
+        return next;
+      });
+    }
   };
 
   const handleClearPage = async () => {
@@ -412,6 +445,7 @@ export default function BookAtelierLuxe() {
       setPages((previous) => previous.filter((page) => page.page_index !== currentPageIndex));
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
+      setDraftPhotoAdjustments({});
       setSaveStatus('idle');
       await refreshPagePreview(currentPageIndex);
     } catch (err) {
@@ -439,6 +473,26 @@ export default function BookAtelierLuxe() {
     if (viewKind === 'cover') setCoverHtml(null);
     else if (viewKind === 'back-cover') setBackCoverHtml(null);
     setRefreshToken((previous) => previous + 1);
+  };
+
+  // Assignation directe de la photo de couverture/4e en cliquant sur
+  // l'image (retour utilisateur, 2026-09-10 : "idealement modifier
+  // directement sur les pages") — ecrit cover_overrides.frontPhotoId/
+  // backPhotoId directement (meme colonne, meme forme que
+  // AtelierCoverPanel.js), sans passer par son brouillon/debounce local :
+  // ce dernier se resynchronise tout seul via son effet sur
+  // book?.cover_overrides (voir AtelierCoverPanel.js). handleUpdateBook met
+  // deja `book` a jour localement, donc cet effet se redeclenche
+  // naturellement — aucune duplication d'etat a maintenir ici.
+  const handleAssignCoverPhoto = async (face, itemId) => {
+    const field = face === 'front' ? 'frontPhotoId' : 'backPhotoId';
+    try {
+      await handleUpdateBook({ cover_overrides: { ...(book?.cover_overrides || {}), [field]: itemId } });
+      handleCoverSaved();
+      setSelectedSidebarItem(null);
+    } catch (_err) {
+      // Non bloquant (meme philosophie que le reste de l'atelier) : l'utilisateur peut reessayer.
+    }
   };
 
   const handleUploadPhotos = async (files) => {
@@ -482,13 +536,14 @@ export default function BookAtelierLuxe() {
   };
 
   // Ouvre la modale de generation en verifiant d'abord si le contenu reel
-  // suffit a atteindre le palier minimum (16 pages, PAGE_COUNT_TIERS[0] cote
-  // backend voir layoutEngine.js) SANS duplication — le moteur ne repete
-  // jamais une photo/un texte pour "boucher les trous" (voir
+  // suffit a atteindre le palier minimum (28 pages, PAGE_COUNT_TIERS[0] cote
+  // backend voir layoutEngine.js — 2026-09-09 : minimum imprimable Gelato,
+  // etait 16 avant integration imprimeur) SANS duplication — le moteur ne
+  // repete jamais une photo/un texte pour "boucher les trous" (voir
   // layoutEngine.compose, garanti par des tests dedies), donc un contenu
-  // trop maigre pour 16 pages doit etre signale plutot que de generer un
+  // trop maigre pour 28 pages doit etre signale plutot que de generer un
   // livre presente comme fini alors qu'il ne l'est pas.
-  const MIN_AUTO_PAGES = 16;
+  const MIN_AUTO_PAGES = 28;
   const openGenerateModal = async () => {
     if (!book?.id) return;
     setGenerateError('');
@@ -556,6 +611,26 @@ export default function BookAtelierLuxe() {
     }
   };
 
+  // Agrandir volontairement le livre (bouton "+2" du filmstrip) — jamais une
+  // recomposition, jamais touche aux pages existantes (voir
+  // routes/composition.js: POST /pages/extend). Meme mecanique de
+  // rafraichissement que handleGenerate ci-dessus (pages + book.page_count +
+  // refreshToken).
+  const handleAddPages = async () => {
+    if (!book?.id || addingPages) return;
+    setAddingPages(true);
+    try {
+      const { book: updatedBook, pages: freshPages } = await extendBookPages(book.id, 2);
+      setBook((previous) => ({ ...previous, ...updatedBook }));
+      setPages(freshPages || []);
+      setRefreshToken((previous) => previous + 1);
+    } catch (err) {
+      setError(err.message || "Impossible d'ajouter des pages.");
+    } finally {
+      setAddingPages(false);
+    }
+  };
+
   const canGoPrevious = viewIndex > 0;
   const canGoNext = viewIndex < lastViewIndex;
 
@@ -602,6 +677,8 @@ export default function BookAtelierLuxe() {
       onAssignSlot={handleAssignSlot}
       onRemoveSlot={handleRemoveSlot}
       selectedSidebarItem={selectedSidebarItem}
+      photoAdjustments={draftPhotoAdjustments}
+      printFormat={book?.print_format}
     />
   ) : null;
 
@@ -710,6 +787,8 @@ export default function BookAtelierLuxe() {
             navLabel={navLabel}
             overlay={pageOverlay}
             printFormat={book.print_format}
+            onAssignCoverPhoto={handleAssignCoverPhoto}
+            selectedSidebarItem={selectedSidebarItem}
           />
 
           {viewKind === 'spread' ? (
@@ -721,7 +800,7 @@ export default function BookAtelierLuxe() {
               slotItems={draftSlotItems}
               onAssignSlot={handleAssignSlot}
               onRemoveSlot={handleRemoveSlot}
-              onChangeFormat={() => { setDraftLayoutSlug(null); setDraftSlotItemIds([]); }}
+              onChangeFormat={() => { setDraftLayoutSlug(null); setDraftSlotItemIds([]); setDraftPhotoAdjustments({}); }}
               selectedSidebarItem={selectedSidebarItem}
               onClearPage={handleClearPage}
               hasContent={hasContent}
@@ -747,6 +826,8 @@ export default function BookAtelierLuxe() {
           activeTarget={viewKind === 'cover' ? 'cover' : viewKind === 'back-cover' ? 'back-cover' : currentPageIndex}
           printFormat={book.print_format}
           onSelect={goToFilmstripTarget}
+          onAddPages={handleAddPages}
+          addingPages={addingPages}
         />
       ) : null}
 
@@ -763,6 +844,8 @@ export default function BookAtelierLuxe() {
         onClose={() => setIsFinishModalOpen(false)}
         stats={finishStats}
         onContinue={() => navigate(`/book/${bookId}/apercu`)}
+        bookId={book?.id}
+        onViewPage={goToFilmstripTarget}
       />
     </div>
   );

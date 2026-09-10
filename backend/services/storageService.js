@@ -19,6 +19,35 @@ function probeImageDimensions(buffer) {
   }
 }
 
+// Corrige l'orientation EXIF a l'upload (cahier des charges "PhotoSlot",
+// 2026-09-10, §12) : une photo prise telephone/appareil en portrait est
+// souvent stockee en pixels "paysage" + un tag EXIF Orientation indiquant
+// la rotation a appliquer a l'affichage. sharp(...).rotate() (sans
+// argument) applique cette rotation PHYSIQUEMENT aux pixels et remet le tag
+// a 1 — necessaire car les derivees (thumbnail/preview ci-dessous,
+// retaillees par sharp) ne respectent pas automatiquement l'EXIF d'origine
+// une fois redimensionnees, contrairement a un <img> affiche brut.
+//
+// Ne reencode QUE si une correction est reellement necessaire (tag EXIF
+// Orientation present et different de 1, sonde via sizeOf — image-size
+// expose deja ce champ, aucune dependance supplementaire) : concilie ceci
+// avec la garantie preexistante "l'original n'est jamais retouche" (voir
+// storageService.test.js) pour le cas courant ou aucune rotation n'est
+// necessaire — seules les photos qui en ont reellement besoin sont
+// reencodees. Jamais bloquant : en cas d'echec (format non reconnu,
+// fichier corrompu...), on retombe sur le buffer d'origine tel quel plutot
+// que de faire echouer tout l'upload — meme philosophie que resizeImage
+// ci-dessous.
+async function normalizeOrientation(buffer) {
+  try {
+    const probe = sizeOf(buffer);
+    if (!probe?.orientation || probe.orientation === 1) return buffer;
+    return await sharp(buffer).rotate().toBuffer();
+  } catch (_error) {
+    return buffer;
+  }
+}
+
 // Miniature (grille "Mes souvenirs") et version intermediaire (affichage
 // dans l'atelier une fois une photo placee) : deux tailles, jamais
 // l'original. L'original uploade par uploadFile() n'est JAMAIS retouche —
@@ -70,9 +99,15 @@ const uploadFile = async (bucket, file, folder = '') => {
     const baseName = uuidv4();
     const fileName = `${folder}/${baseName}.${fileExt}`;
 
+    // Buffer orientation-corrige (voir normalizeOrientation ci-dessus) :
+    // c'est CELUI-LA qui devient "l'original" stocke, et c'est CELUI-LA qui
+    // alimente la sonde de dimensions + les deux derivees juste en dessous
+    // — un seul point de correction, tout le reste du pipeline en herite.
+    const originalBuffer = await normalizeOrientation(file.buffer);
+
     const { error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file.buffer, {
+      .upload(fileName, originalBuffer, {
         contentType: file.mimetype,
         cacheControl: '3600'
       });
@@ -83,7 +118,7 @@ const uploadFile = async (bucket, file, folder = '') => {
       .from(bucket)
       .getPublicUrl(fileName);
 
-    const dimensions = probeImageDimensions(file.buffer);
+    const dimensions = probeImageDimensions(originalBuffer);
 
     // Echec de generation d'une variante (format non reconnu par sharp,
     // etc.) : jamais bloquant, thumbnailUrl/previewUrl restent simplement
@@ -92,8 +127,8 @@ const uploadFile = async (bucket, file, folder = '') => {
     // silencieusement sur l'URL originale (meme convention que
     // orientation/ratio/width/height, deja optionnels).
     const [thumbnailUrl, previewUrl] = await Promise.all([
-      uploadResizedVariant(bucket, `${folder}/${baseName}_thumb.jpg`, file.buffer, THUMBNAIL_MAX_PX, THUMBNAIL_QUALITY),
-      uploadResizedVariant(bucket, `${folder}/${baseName}_preview.jpg`, file.buffer, PREVIEW_MAX_PX, PREVIEW_QUALITY)
+      uploadResizedVariant(bucket, `${folder}/${baseName}_thumb.jpg`, originalBuffer, THUMBNAIL_MAX_PX, THUMBNAIL_QUALITY),
+      uploadResizedVariant(bucket, `${folder}/${baseName}_preview.jpg`, originalBuffer, PREVIEW_MAX_PX, PREVIEW_QUALITY)
     ]);
 
     return {

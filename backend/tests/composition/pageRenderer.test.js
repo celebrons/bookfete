@@ -1,7 +1,7 @@
 // Tests unitaires du rendu HTML (fonction pure) : structure des pages,
 // echappement HTML, repli propre quand le livre n'a pas encore de pages.
 
-const { renderBookHtml, escapeHtml } = require('../../services/composition/pageRenderer');
+const { renderBookHtml, escapeHtml, PHOTO_ZOOM_MAX } = require('../../services/composition/pageRenderer');
 
 // Le <style> (en <head>) contient les noms de classes CSS eux-memes : toute
 // recherche de "ce qui a ete rendu" doit se limiter au <body>, sous peine de
@@ -18,16 +18,75 @@ describe('escapeHtml', () => {
   });
 });
 
-describe('renderBookHtml — cadrage des photos (jamais de recadrage)', () => {
-  it("utilise object-fit:contain (l'image entiere reste toujours visible), jamais cover (qui recadrerait)", () => {
+// Cahier des charges "PhotoSlot" (2026-09-10) : bascule volontaire de
+// contain -> cover par defaut ("une photo doit remplir 100% de son
+// emplacement"), avec point focal/zoom manuels optionnels et une
+// echappatoire "contain" reservee a un futur layout explicitement
+// artistique. Voir atelier-manual-editor-status.md pour l'historique de la
+// decision inverse (session precedente) que cette passe remplace.
+describe('renderBookHtml — remplissage du cadre (cover par defaut)', () => {
+  function pageWithPhoto(adjustment) {
+    const content = { kind: 'photo', blocks: [{ kind: 'photo', itemIds: ['photo-1'] }] };
+    if (adjustment) content.photoAdjustments = { 'photo-1': adjustment };
+    return { page_index: 0, content };
+  }
+
+  it('utilise object-fit:cover par defaut (remplit le cadre), jamais contain', () => {
     const html = renderBookHtml({
       book: {},
       items: [{ id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
-      pages: [{ page_index: 0, content: { kind: 'photo', blocks: [{ kind: 'photo', itemIds: ['photo-1'] }] } }]
+      pages: [pageWithPhoto()]
     });
     expect(html).toContain('.photo-frame img');
-    expect(html).toContain('object-fit: contain');
-    expect(html).not.toContain('object-fit: cover');
+    expect(html).toContain('object-fit: cover');
+  });
+
+  it('sans ajustement, le point focal/zoom par defaut sont neutres (centre, zoom 1 — visuellement identique a avant)', () => {
+    const html = renderBookHtml({
+      book: {},
+      items: [{ id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
+      pages: [pageWithPhoto()]
+    });
+    const body = bodyOf(html);
+    expect(body).toContain('--fx:50%;--fy:50%;--zoom:1;');
+    expect(body).not.toContain('is-contain');
+  });
+
+  it('applique le point focal et le zoom stockes dans content.photoAdjustments', () => {
+    const html = renderBookHtml({
+      book: {},
+      items: [{ id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
+      pages: [pageWithPhoto({ focalX: 0.2, focalY: 0.8, zoom: 1.5 })]
+    });
+    const body = bodyOf(html);
+    expect(body).toContain('--fx:20%;--fy:80%;--zoom:1.5;');
+  });
+
+  it('borne le zoom a PHOTO_ZOOM_MAX meme si une valeur excessive est stockee (defense en profondeur)', () => {
+    const html = renderBookHtml({
+      book: {},
+      items: [{ id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
+      pages: [pageWithPhoto({ zoom: 99 })]
+    });
+    expect(bodyOf(html)).toContain(`--zoom:${PHOTO_ZOOM_MAX};`);
+  });
+
+  it('fitMode:"contain" (echappatoire template artistique explicite, §18) pose la classe is-contain', () => {
+    const html = renderBookHtml({
+      book: {},
+      items: [{ id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
+      pages: [pageWithPhoto({ fitMode: 'contain' })]
+    });
+    expect(bodyOf(html)).toContain('class="photo-frame is-contain"');
+    expect(html).toContain('.photo-frame.is-contain img { object-fit: contain; transform: none; }');
+  });
+
+  it("n'introduit aucune regression sur les couvertures (frontCoverRenderer.js appelle imgFrame sans ajustement)", () => {
+    // Repro minimale de l'appel reel (voir frontCoverRenderer.js) : la classe
+    // de base doit rester exactement 'photo-frame' (le .replace() qui y
+    // ajoute cvr-bias-portrait cherche cette chaine exacte).
+    const { imgFrame } = require('../../services/composition/pageRenderer');
+    expect(imgFrame('https://cdn.test/cover.jpg')).toContain('class="photo-frame"');
   });
 });
 
@@ -46,7 +105,7 @@ describe('renderBookHtml', () => {
 
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('<title>Mon livre</title>');
-    expect(html).toContain('@page { size: 220mm 280mm; margin: 0; }'); // DEFAULT_FORMAT = "standard" (coverFormat.js)
+    expect(html).toContain('@page { size: 210mm 280mm; margin: 0; }'); // DEFAULT_FORMAT = "standard" (coverFormat.js)
   });
 
   it('rend une page par entree de pages, dans l\'ordre de page_index', () => {

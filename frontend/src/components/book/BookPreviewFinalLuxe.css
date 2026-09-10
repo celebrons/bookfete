@@ -375,6 +375,27 @@
   white-space: nowrap;
 }
 
+/* Format sous le minimum imprimable (28 pages, voir GET /format-options:
+   meetsMinimum) : carte desactivee plutot qu'un clic qui echoue apres coup —
+   meme esprit que le blocage deja en place sur la generation automatique
+   (AtelierGenerateModal). */
+.preview-final-format-card.is-below-minimum {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.preview-final-format-card.is-below-minimum:hover { border-color: rgba(223, 216, 201, 0.9); }
+.preview-final-format-warning {
+  grid-row: 1 / span 5;
+  grid-column: 2;
+  align-self: center;
+  max-width: 90px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #b42318;
+  text-align: right;
+}
+
 .preview-final-total-price {
   margin: 0;
   font-size: 24px;

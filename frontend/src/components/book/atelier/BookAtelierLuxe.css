@@ -141,6 +141,27 @@
   color: var(--gold);
 }
 
+/* Ajouter des pages (voir AtelierPageFilmstrip.js) — meme gabarit que les
+   vignettes de page, style dedie (icone + fond doux) pour bien se distinguer
+   d'une page reelle. */
+.atelier-filmstrip-add {
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1.5px dashed var(--gold);
+  background: rgba(184, 146, 74, 0.08);
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-filmstrip-add:hover { background: rgba(184, 146, 74, 0.16); }
+.atelier-filmstrip-add:disabled { opacity: 0.6; cursor: progress; }
+
 /* --- "Terminer mon livre" (bas de page) + verification --------------- */
 
 .atelier-finish-bar {
@@ -171,6 +192,20 @@
 }
 .atelier-finish-checklist li.is-ok { color: #1f7a3d; }
 .atelier-finish-checklist li.is-warning { color: #b45f13; }
+
+/* Lien "Voir les photos concernees" (cahier des charges "PhotoSlot", §20) —
+   un <button> stylise en lien, coherent avec le texte d'avertissement
+   environnant plutot qu'un bouton .btn separe qui alourdirait la liste. */
+.atelier-finish-quality-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.atelier-finish-quality-link:hover { color: var(--ink); }
 
 /* --- Explications de prise en main (AtelierOnboarding) ------------------ */
 
@@ -534,6 +569,30 @@
   justify-content: center;
 }
 
+/* Raccourci "Voir a l'echelle" directement sur le livre (retour utilisateur,
+   2026-09-10) — discret, coin superieur droit, en plus du bouton de la
+   barre de navigation (voir plus bas, .atelier-realsize-toggle-btn). */
+.atelier-book-stage-eye {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(184, 146, 74, 0.4);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(36, 31, 24, 0.18);
+  transition: var(--transition-fast);
+}
+.atelier-book-stage-eye:hover { border-color: var(--gold); color: var(--gold); background: var(--white); }
+.atelier-book-stage-eye:disabled { opacity: 0.35; cursor: default; }
+
 .atelier-book-loading {
   position: absolute;
   top: 8px;
@@ -813,6 +872,37 @@
   pointer-events: none;
 }
 
+/* Calque cliquable sur la couverture/4e de couverture (retour utilisateur,
+   2026-09-10) — voir CoverPhotoOverlay dans AtelierBookView.js. Couvre toute
+   la page (pas de geometrie de grille a suivre, un seul emplacement photo
+   conceptuel), toujours cliquable (contrairement a .atelier-page-overlay
+   ci-dessus, qui laisse passer les clics entre ses emplacements) : ici,
+   n'importe ou sur la page assigne la photo selectionnee. */
+.atelier-cover-photo-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 10%;
+  transition: var(--transition-fast);
+}
+.atelier-cover-photo-overlay.is-armed:hover { background: rgba(184, 146, 74, 0.14); }
+.atelier-cover-photo-overlay-hint {
+  opacity: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  background: rgba(36, 31, 24, 0.75);
+  padding: 6px 14px;
+  border-radius: 999px;
+  text-align: center;
+  transition: var(--transition-fast);
+}
+.atelier-cover-photo-overlay:hover .atelier-cover-photo-overlay-hint { opacity: 1; }
+
 .atelier-overlay-slot {
   position: absolute;
   pointer-events: auto;
@@ -834,6 +924,7 @@
   background: transparent;
   align-items: flex-end;
   justify-content: flex-end;
+  gap: 4px;
   padding: 0 6px 6px 0;
 }
 .atelier-overlay-slot.is-filled:hover { background: rgba(36, 31, 24, 0.22); }
@@ -841,7 +932,7 @@
 /* Retrait a deux temps (retour utilisateur : jamais de retrait direct au
    clic) — meme mecanisme que le panneau "Mise en page", voir
    .atelier-format-slot.is-pending-remove. Toujours visible (pas seulement
-   au survol, contrairement a .atelier-overlay-slot-remove) : l'utilisateur
+   au survol, contrairement a .atelier-overlay-slot-actions) : l'utilisateur
    vient de cliquer, il doit voir tout de suite qu'une confirmation est
    attendue, meme si le curseur ne "survole" plus rien de precis ensuite. */
 .atelier-overlay-slot.is-pending-remove {
@@ -862,20 +953,55 @@
   pointer-events: none;
 }
 
-.atelier-overlay-slot-remove {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--white);
-  background: rgba(36, 31, 24, 0.65);
-  padding: 2px 7px;
-  border-radius: 999px;
+/* Croix "retirer" + oeil "voir en taille reelle" (retour utilisateur,
+   2026-09-11 : "afficher une x pour supprimer et un petit oeil pour voir la
+   photo en taille reelle") — reveles au survol, cote a cote en bas a droite
+   de la photo (meme coin que l'ancien badge texte "Retirer" qu'ils
+   remplacent). pointer-events:auto explicite (contrairement au badge
+   qualite, purement decoratif) : ce sont de vrais boutons cliquables. */
+.atelier-overlay-slot-actions {
+  display: flex;
+  gap: 4px;
   opacity: 0;
   pointer-events: none;
   transition: var(--transition-fast);
 }
-.atelier-overlay-slot.is-filled:hover .atelier-overlay-slot-remove { opacity: 1; }
+.atelier-overlay-slot.is-filled:hover .atelier-overlay-slot-actions { opacity: 1; pointer-events: auto; }
+
+.atelier-overlay-slot-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  color: var(--white);
+  transition: var(--transition-fast);
+}
+.atelier-overlay-slot-view-btn { background: rgba(36, 31, 24, 0.65); }
+.atelier-overlay-slot-view-btn:hover { background: rgba(36, 31, 24, 0.85); }
+.atelier-overlay-slot-remove-btn { background: rgba(180, 35, 24, 0.75); }
+.atelier-overlay-slot-remove-btn:hover { background: #b42318; }
+
+/* Badge qualite (§19) : toujours visible (contrairement aux actions
+   ci-dessus, revelees au survol) — c'est un signal d'etat, pas une action,
+   il doit se voir d'un coup d'oeil sans avoir a survoler chaque photo. Coin
+   superieur-gauche pour ne jamais chevaucher les actions (coin
+   inferieur-droit). */
+.atelier-overlay-slot-quality {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 13px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  padding: 3px 5px;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(36, 31, 24, 0.25);
+}
 
 .atelier-overlay-slot-confirm {
   font-size: 9px;
@@ -889,6 +1015,45 @@
   border-radius: 999px;
   pointer-events: none;
 }
+
+/* --- Apercu plein ecran d'une photo (AtelierPhotoLightbox) -------------- */
+/* z-index au-dessus de .atelier-realsize-backdrop (70) par prudence, meme
+   si les deux calques ne devraient jamais coexister en pratique. */
+.atelier-photo-lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: rgba(10, 8, 5, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  cursor: zoom-out;
+}
+.atelier-photo-lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.6);
+  cursor: default;
+}
+.atelier-photo-lightbox-close {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--white);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-photo-lightbox-close:hover { background: rgba(255, 255, 255, 0.22); }
 
 .atelier-page-frame {
   display: block;
@@ -1184,8 +1349,9 @@
   transition: var(--transition-fast);
 }
 /* "Retirer" au survol, a la place de la coche (meme espace, en surimpression
-   — voir inset:0 ci-dessous) — meme principe que .atelier-overlay-slot-remove
-   (l'incrustation sur la page). */
+   — voir inset:0 ci-dessous) — meme principe que les actions au survol de
+   .atelier-overlay-slot-actions (l'incrustation sur la page), en plus
+   sommaire ici (pas de croix/oeil dedies, juste ce libelle). */
 .atelier-format-slot-remove {
   position: absolute;
   inset: 0;

@@ -39,7 +39,28 @@ const {
 
 const DEFAULT_FIXED_PAGES = 2; // garde + page de titre (la couverture est un document a part)
 // Paliers retenus (cahier des charges v2) : 16 / 24 / 32 / 48 / 64 pages.
-const PAGE_COUNT_TIERS = [16, 24, 32, 48, 64];
+// 2026-09-09 : 16 et 24 RETIRES — en dessous du minimum imprimable chez
+// Gelato (integration imprimeur en cours de test, voir
+// backend/services/printing/gelatoCatalog.js) : tous les produits
+// photobooks du catalogue reel n'acceptent qu'entre 28 et 200 pages, par pas
+// de 2, verifie via l'API (voir memoire "gelato-integration-status"). 28
+// devient donc le nouveau plancher.
+const PAGE_COUNT_TIERS = [28, 32, 48, 64];
+// Alias semantique de PAGE_COUNT_TIERS[0] : plancher DUR applique partout ou
+// un nombre de pages est sur le point d'etre PERSISTE (POST /compose, POST
+// /format — voir routes/composition.js), pas seulement suggere. Choix
+// utilisateur confirme 2026-09-09 : en dessous de ce plancher, le systeme
+// BLOQUE et demande plus de contenu plutot que de completer avec des pages
+// vides — coherent avec la regle deja en place dans compose() ci-dessous
+// ("aucune page blanche n'est jamais inseree pour atteindre un palier").
+const MIN_PRINTABLE_PAGES = PAGE_COUNT_TIERS[0];
+// Plafond DUR symetrique — Gelato n'imprime aucun produit photobook
+// au-dela de 200 pages interieures, verifie via l'API sur tous les
+// formats (voir memoire "gelato-integration-status"). Sans ce garde, un
+// livre a contenu tres abondant pouvait composer/persister un nombre de
+// pages qui ne serait bloque qu'au moment d'une vraie commande — trop
+// tard pour que l'utilisateur retire du contenu sereinement.
+const MAX_PRINTABLE_PAGES = 200;
 
 // Layouts qui doivent TOUJOURS exister, etre actifs, et rester utilisables
 // meme si la liste blanche du style choisi (allowed_layouts) ne les contient
@@ -182,7 +203,14 @@ function buildUnitsFromItems(items) {
       itemIds: block.itemIds,
       order: block.order,
       weight: block.weight,
-      orientation: itemsById[block.itemIds[0]]?.metadata?.orientation || null
+      orientation: itemsById[block.itemIds[0]]?.metadata?.orientation || null,
+      // Ratio numerique largeur/hauteur (voir storageService.js:
+      // probeImageDimensions) — deja sonde a l'upload, jamais utilise avant
+      // le scoring d'adequation photo<->emplacement ci-dessous
+      // (layoutScoring.js: scoreOrientation) : orientation seule (paysage/
+      // portrait/carre) ne distingue pas un panorama tres large d'une photo
+      // 4:3 classique, toutes deux "paysage".
+      ratio: itemsById[block.itemIds[0]]?.metadata?.ratio || null
     });
   }
 
@@ -275,6 +303,7 @@ function buildPageEntry(pageIndex, layout, consumedUnits, presentationVariant) {
  * @param {string} input.profile - 'PHOTO'|'TEXTE'|'EQUILIBRE'
  * @param {string} input.seedBase
  * @param {string} [input.mood] - ambiance de composition (voir layoutScoring.MOOD_LAYOUT_WEIGHTS), absent = comportement standard
+ * @param {string} [input.formatId] - 'livret'|'standard'|'luxe' (voir layoutScoring.scoreOrientation), absent = ratio de page par defaut (standard/luxe)
  * @returns {{ pages: Array }}
  */
 function buildPages(input) {
@@ -284,6 +313,7 @@ function buildPages(input) {
   const profile = input.profile || 'EQUILIBRE';
   const seedBase = input.seedBase || 'no-template:0';
   const mood = input.mood || undefined;
+  const formatId = input.formatId || undefined;
 
   const pool = allowedSlugs.length > 0
     ? layouts.filter((layout) => allowedSlugs.includes(layout.slug) || GUARANTEED_FALLBACK_SLUGS.includes(layout.slug))
@@ -310,7 +340,7 @@ function buildPages(input) {
 
     const scored = candidates.map((layout) => {
       const units = window.slice(0, consumedCount(layout, window) || 1);
-      return { layout, units, score: scoreLayoutCandidate(layout, units, { profile, rhythmState, familyCounts, mood }) };
+      return { layout, units, score: scoreLayoutCandidate(layout, units, { profile, rhythmState, familyCounts, mood, formatId }) };
     });
 
     const maxScore = Math.max(...scored.map((entry) => entry.score));
@@ -372,6 +402,7 @@ function recommendPageCount(input = {}) {
  * @param {number} [input.variant] - graine de regeneration (0 par defaut)
  * @param {number} [input.fixedPages] - pages fixes non composees (garde/titre)
  * @param {string} [input.mood] - ambiance de composition, jamais persistee (voir routes/composition.js POST /compose) — absente = comportement standard, non-regressif
+ * @param {string} [input.formatId] - 'livret'|'standard'|'luxe' (voir layoutScoring.scoreOrientation, adequation photo<->emplacement) — absent = ratio de page par defaut
  * @returns {{ pages: Array<{page_index:number, layout_id:string|null, content:object}>, overflow: boolean, underflow: boolean, pageBudget: number, totalWeight: number }}
  */
 function compose(input) {
@@ -382,12 +413,13 @@ function compose(input) {
   const variant = Number.isInteger(input.variant) ? input.variant : 0;
   const seedBase = `${input.template?.id || 'no-template'}:${variant}`;
   const mood = input.mood || undefined;
+  const formatId = input.formatId || undefined;
 
   const pagesAvailable = Math.max(0, clampInt(input.pageCount, 0) - fixedPages);
 
   const units = buildUnitsFromItems(items);
   const { profile } = detectContentProfile(items);
-  const { pages: contentPages } = buildPages({ units, layouts, allowedSlugs, profile, seedBase, mood });
+  const { pages: contentPages } = buildPages({ units, layouts, allowedSlugs, profile, seedBase, mood, formatId });
 
   // Le livre compte EXACTEMENT le nombre de pages que le contenu occupe,
   // jamais plus : aucune page blanche n'est jamais inseree pour atteindre un
@@ -420,5 +452,7 @@ module.exports = {
   pickDeterministic,
   DEFAULT_FIXED_PAGES,
   PAGE_COUNT_TIERS,
+  MIN_PRINTABLE_PAGES,
+  MAX_PRINTABLE_PAGES,
   GUARANTEED_FALLBACK_SLUGS
 };

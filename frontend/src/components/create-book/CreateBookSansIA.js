@@ -54,8 +54,10 @@ export default function CreateBookSansIA() {
     // utilisable immediatement (il refuse de s'ouvrir sans page_count) —
     // jamais impose au client : page_count_mode absent = 'auto' par defaut
     // (BookConfigLuxe.js), qui recalculera ce nombre depuis le contenu reel
-    // des que l'utilisateur passe par Configuration.
-    page_count: 16,
+    // des que l'utilisateur passe par Configuration. 2026-09-09 : 28 (pas
+    // 16) — minimum reellement imprimable chez Gelato, voir
+    // backend/services/composition/layoutEngine.js PAGE_COUNT_TIERS.
+    page_count: 28,
     ...(values.mode === 'solo' && values.subtitle.trim()
       ? { cover_overrides: { subtitle: values.subtitle.trim() } }
       : {}),

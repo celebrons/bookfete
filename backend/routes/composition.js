@@ -22,6 +22,8 @@ const { resolveFormatDensity } = require('../services/composition/formatDensity'
 const { composeBookForFormat } = require('../services/composition/formatComposer');
 const { buildManualPageContent } = require('../services/composition/manualPageBuilder');
 const { MOOD_LAYOUT_WEIGHTS } = require('../services/composition/layoutScoring');
+const photoQualityEngine = require('../services/composition/photoQualityEngine');
+const { PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX } = pageRenderer;
 
 // Fusionne dimensions (coverFormat.js) + densite (formatDensity.js) en UN
 // objet `format`, transmis tel quel a pageRenderer.js/coverComposer.js — ces
@@ -30,6 +32,39 @@ const { MOOD_LAYOUT_WEIGHTS } = require('../services/composition/layoutScoring')
 function resolveRenderFormat(formatId) {
   const normalized = Object.prototype.hasOwnProperty.call(COVER_FORMATS, formatId) ? formatId : DEFAULT_COVER_FORMAT_ID;
   return { formatId: normalized, ...resolveCoverFormat(formatId), ...resolveFormatDensity(formatId) };
+}
+
+function clamp01(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? Math.min(1, Math.max(0, num)) : null;
+}
+
+// Nettoie { [itemId]: {focalX, focalY, zoom, fitMode} } venu du client (voir
+// AtelierPhotoAdjustModal.js, pas encore construit a ce stade du chantier
+// "PhotoSlot") avant de l'attacher a content.photoAdjustments — jamais
+// bloquant (une entree invalide est simplement ignoree, pas une erreur 400)
+// et jamais d'itemId etranger a CETTE page (validIds = les itemIds reels du
+// bloc sauvegarde). Les bornes du zoom viennent de pageRenderer.js
+// (PHOTO_ZOOM_MIN/MAX) — source unique, voir son entete.
+function sanitizePhotoAdjustments(raw, validItemIds) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const validSet = new Set(validItemIds);
+  const cleaned = {};
+  Object.entries(raw).forEach(([itemId, adjustment]) => {
+    if (!validSet.has(itemId) || !adjustment || typeof adjustment !== 'object') return;
+    const focalX = clamp01(adjustment.focalX);
+    const focalY = clamp01(adjustment.focalY);
+    const zoomNum = Number(adjustment.zoom);
+    const zoom = Number.isFinite(zoomNum) ? Math.min(PHOTO_ZOOM_MAX, Math.max(PHOTO_ZOOM_MIN, zoomNum)) : PHOTO_ZOOM_MIN;
+    const fitMode = adjustment.fitMode === 'contain' ? 'contain' : 'cover';
+    cleaned[itemId] = {
+      focalX: focalX ?? 0.5,
+      focalY: focalY ?? 0.5,
+      zoom,
+      fitMode
+    };
+  });
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
 
 // Bucket Supabase Storage reutilise (deja utilise par le parcours contributeur
@@ -154,7 +189,7 @@ router.post(
   '/api/books/:bookId/content-items/photo',
   authenticate,
   requireOwnedBook,
-  upload.single('photo'),
+  upload.uploadSinglePhoto('photo'),
   async (req, res) => {
     try {
       if (!req.file) {
@@ -279,7 +314,7 @@ router.post('/api/public/share/:token/text', resolveBookByShareToken, async (req
 router.post(
   '/api/public/share/:token/photo',
   resolveBookByShareToken,
-  upload.single('photo'),
+  upload.uploadSinglePhoto('photo'),
   async (req, res) => {
     try {
       if (!req.file) {
@@ -393,8 +428,34 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
       layouts,
       pageCount: book.page_count,
       variant,
-      mood
+      mood,
+      // Adequation photo<->emplacement (voir layoutScoring.scoreOrientation) :
+      // le ratio de la page (carre pour livret, portrait pour standard/luxe)
+      // fait partie du calcul pour les emplacements pleine page.
+      formatId: book.print_format
     });
+
+    // Plancher DUR (choix utilisateur confirme 2026-09-09) : en dessous de
+    // layoutEngine.MIN_PRINTABLE_PAGES (minimum imprimable Gelato), on
+    // BLOQUE plutot que de completer avec des pages vides — coherent avec la
+    // regle deja en place dans compose() lui-meme ("jamais de remplissage
+    // artificiel"). Le frontend gate deja ce cas cote atelier
+    // (BookAtelierLuxe.js: MIN_AUTO_PAGES + AtelierGenerateModal), ce garde
+    // serveur est le filet de securite pour tout appelant direct de cette route.
+    if (result.pages.length < layoutEngine.MIN_PRINTABLE_PAGES) {
+      return res.status(422).json({
+        error: `Il faut ajouter du contenu pour atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum (votre contenu actuel remplit environ ${result.pages.length} page${result.pages.length > 1 ? 's' : ''}). Ajoutez des photos ou des souvenirs, puis reessayez.`
+      });
+    }
+
+    // Plafond symetrique (voir layoutEngine.MAX_PRINTABLE_PAGES) : au-dela,
+    // aucun produit imprimable chez Gelato — mieux vaut le signaler ici
+    // qu'au moment d'une vraie commande.
+    if (result.pages.length > layoutEngine.MAX_PRINTABLE_PAGES) {
+      return res.status(422).json({
+        error: `Votre contenu remplit environ ${result.pages.length} pages, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`
+      });
+    }
 
     const pages = await bookContentService.replaceBookPages(book.id, result.pages);
     res.json({ pages, overflow: result.overflow, underflow: result.underflow, pageBudget: result.pageBudget });
@@ -419,12 +480,24 @@ router.get('/api/books/:bookId/format-options', authenticate, requireOwnedBook, 
       bookContentService.listPages(book.id)
     ]);
 
+    // meetsMinimum : permet au frontend d'avertir/desactiver une carte AVANT
+    // le clic plutot que de laisser l'utilisateur decouvrir le blocage apres
+    // coup (voir POST /format ci-dessus, meme plancher).
     const formats = Object.keys(COVER_FORMATS).map((formatId) => {
       const { pageCount } = composeBookForFormat({ items, existingPages, template, layouts, formatId });
-      return { formatId, pageCount };
+      return {
+        formatId,
+        pageCount,
+        meetsMinimum: pageCount >= layoutEngine.MIN_PRINTABLE_PAGES,
+        meetsMaximum: pageCount <= layoutEngine.MAX_PRINTABLE_PAGES
+      };
     });
 
-    res.json({ formats });
+    res.json({
+      formats,
+      minPrintablePages: layoutEngine.MIN_PRINTABLE_PAGES,
+      maxPrintablePages: layoutEngine.MAX_PRINTABLE_PAGES
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -455,6 +528,25 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, async (
     ]);
 
     const { pages: formatPages, pageCount } = composeBookForFormat({ items, existingPages, template, layouts, formatId });
+
+    // Meme plancher dur que POST /compose (voir son commentaire) — ce chemin
+    // n'avait JUSQU'ICI aucune protection : un livre a contenu maigre
+    // pouvait changer de format et se retrouver avec moins de pages que le
+    // minimum imprimable Gelato, sans le moindre avertissement.
+    if (pageCount < layoutEngine.MIN_PRINTABLE_PAGES) {
+      return res.status(422).json({
+        error: `Il faut ajouter du contenu pour atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum avec ce format (votre contenu actuel remplit environ ${pageCount} page${pageCount > 1 ? 's' : ''}). Ajoutez des photos ou des souvenirs, puis reessayez.`
+      });
+    }
+
+    // Plafond symetrique (voir layoutEngine.MAX_PRINTABLE_PAGES / son
+    // commentaire dans POST /compose ci-dessus).
+    if (pageCount > layoutEngine.MAX_PRINTABLE_PAGES) {
+      return res.status(422).json({
+        error: `Votre contenu remplit environ ${pageCount} pages avec ce format, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`
+      });
+    }
+
     const pages = await bookContentService.replaceBookPages(book.id, formatPages);
 
     const { data: updatedBook, error: updateError } = await supabase
@@ -570,6 +662,42 @@ router.get('/api/books/:bookId/preview.pdf', authenticate, requireOwnedBook, asy
   }
 });
 
+// POST /api/books/:bookId/pages/extend
+// Ajoute des pages VIDES a la fin du livre (bouton "+2" du filmstrip
+// atelier) — jamais une recomposition, jamais touche aux pages existantes.
+// Body optionnel { count } (defaut 2, doit rester pair — meme contrainte de
+// palier que le catalogue imprimeur Gelato, voir
+// backend/services/printing/gelatoCatalog.js pageStep). Geste EXPLICITE de
+// l'utilisateur, distinct du plancher automatique de POST /compose et
+// /format ci-dessus (qui bloquent plutot que de padder — voir leurs
+// commentaires) : agrandir son livre volontairement n'est pas le "remplissage
+// artificiel" que ces routes refusent.
+router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const { book } = req;
+    const requestedCount = Number(req.body?.count);
+    const count = Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : 2;
+    if (count % 2 !== 0) {
+      return res.status(400).json({ error: 'Le nombre de pages ajoutees doit etre pair.' });
+    }
+
+    const pages = await bookContentService.appendEmptyPages(book.id, count);
+    const newPageCount = pages.length;
+
+    const { data: updatedBook, error: updateError } = await supabase
+      .from('books')
+      .update({ page_count: newPageCount, updated_at: new Date().toISOString() })
+      .eq('id', book.id)
+      .select()
+      .single();
+    if (updateError) throw updateError;
+
+    res.json({ book: updatedBook, pages });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // PUT /api/books/:bookId/pages/:pageIndex
 // Edition manuelle d'une page (ex. verrouillage) sans repasser par le moteur.
 router.put('/api/books/:bookId/pages/:pageIndex', authenticate, requireOwnedBook, async (req, res) => {
@@ -667,6 +795,13 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
     const resolvedItems = itemIds.map((id) => itemsById[id]);
 
     const content = buildManualPageContent({ layout, items: resolvedItems });
+    // photoAdjustments (optionnel, cahier des charges "PhotoSlot" 2026-09-10) :
+    // ajustement manuel (deplacer/zoomer, voir AtelierPhotoAdjustModal.js)
+    // par itemId, attache APRES buildManualPageContent (qui l'ignore —
+    // hors de son perimetre de validation structurelle photo/texte).
+    const photoAdjustments = sanitizePhotoAdjustments(req.body?.photoAdjustments, itemIds);
+    if (photoAdjustments) content.photoAdjustments = photoAdjustments;
+
     const data = await bookContentService.upsertPage(book.id, pageIndex, {
       layout_id: layout.id,
       content,
@@ -675,6 +810,78 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
     res.json(data);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message });
+  }
+});
+
+// GET /api/books/:bookId/print-quality-check
+// Controle qualite pre-commande (cahier des charges "PhotoSlot", §20/21) :
+// pour chaque photo reellement placee sur une page, resout la taille
+// physique (mm) de son emplacement (photoQualityEngine.resolveSlotSizeMm,
+// via le slug du layout choisi) puis le DPI effectif compte tenu d'un
+// ajustement manuel eventuel (zoom stocke dans content.photoAdjustments).
+// Jamais bloquant, jamais d'erreur pour une photo/slot non reconnu par la
+// table (silencieusement ignoree — voir photoQualityEngine.resolveSlotSizeMm)
+// : ce controle est une aide, pas une validation stricte.
+router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const { book } = req;
+    const [pages, items, layouts] = await Promise.all([
+      bookContentService.listPages(book.id),
+      bookContentService.listContentItems(book.id),
+      templateCatalog.listActiveLayouts()
+    ]);
+
+    const itemsById = Object.fromEntries(items.map((item) => [item.id, item]));
+    const layoutsById = Object.fromEntries(layouts.map((layout) => [layout.id, layout]));
+
+    let photosCount = 0;
+    const lowQualityPhotos = [];
+
+    pages.forEach((page) => {
+      const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
+      const adjustmentsByItemId = page.content?.photoAdjustments || {};
+      blocks.forEach((block) => {
+        const layout = layoutsById[block.layoutId];
+        const slug = layout?.slug;
+        const slots = layout?.capacity?.slots;
+        if (!slug || !Array.isArray(slots)) return;
+
+        (block.itemIds || []).forEach((itemId, slotIndex) => {
+          const item = itemId ? itemsById[itemId] : null;
+          if (!item || item.kind !== 'photo') return;
+          photosCount += 1;
+
+          const frame = photoQualityEngine.resolveSlotSizeMm(slug, slotIndex, book.print_format);
+          const width = item.metadata?.width;
+          const height = item.metadata?.height;
+          if (!frame || !width || !height) return; // donnee manquante -> pas evalue, jamais bloquant
+
+          const adjustment = adjustmentsByItemId[itemId];
+          const dpi = photoQualityEngine.computeEffectiveDpi({
+            imageWidthPx: width,
+            imageHeightPx: height,
+            frameWidthMm: frame.widthMm,
+            frameHeightMm: frame.heightMm,
+            zoom: adjustment?.zoom
+          });
+          if (dpi == null) return;
+
+          const quality = photoQualityEngine.describeQuality(dpi);
+          if (quality.level === 'attention' || quality.level === 'faible') {
+            lowQualityPhotos.push({ pageIndex: page.page_index, itemId, ...quality });
+          }
+        });
+      });
+    });
+
+    res.json({
+      pagesCount: pages.length,
+      photosCount,
+      lowQualityPhotos,
+      allGood: lowQualityPhotos.length === 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

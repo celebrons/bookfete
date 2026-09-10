@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>mon livre souvenir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --page-width-mm: 210mm;
+    --page-height-mm: 280mm;
+    --fmt-space-scale: 1;
+    --fmt-type-scale: 1;
+  }
+  
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Georgia', 'Cormorant Garamond', serif; color: #241f18; background: #f4f0e6; }
+  .page {
+    width: var(--page-width-mm);
+    height: var(--page-height-mm);
+    padding: calc(14mm * var(--fmt-space-scale, 1));
+    background: #fffdf8;
+    position: relative;
+    overflow: hidden;
+    margin: 0 auto calc(8mm * var(--fmt-space-scale, 1));
+  }
+  .page-break { page-break-after: always; }
+  .page-blocks { display: flex; flex-direction: column; gap: calc(6mm * var(--fmt-space-scale, 1)); height: 100%; }
+  /* object-fit:contain (jamais cover) : l'image entiere reste toujours
+     visible, jamais recadree/tronquee pour remplir l'emplacement — la photo
+     telle qu'importee par l'utilisateur prime sur la grille. Consequence
+     acceptee : quand le ratio de l'emplacement ne correspond pas exactement
+     au ratio de la photo, des marges vides apparaissent sur les cotes
+     (fond de la page, jamais une couleur ajoutee ici) plutot que de perdre
+     une partie de l'image. Aucune perte de qualite dans ce choix : ni
+     recompression ni redimensionnement de l'original (voir storageService.js
+     — le fichier source n'est jamais retouche), seule la mise a l'echelle
+     d'affichage change. Sans astuce de sur-echantillonnage non plus :
+     l'ancienne version (image mise en page 3x plus grande puis retassee via
+     transform:scale) etait un contournement du plafond ~96dpi de l'ancien
+     pipeline PDF (routes/books.js, jamais appele par ce moteur) ; le chemin
+     PDF reellement utilise (renderPdfFromPages, capture CDP a
+     deviceScaleFactor=3) gere deja la haute resolution nativement — un seul
+     redimensionnement, ici, dans l'apercu navigateur comme dans la capture
+     PDF. */
+  .photo-frame { position: relative; overflow: hidden; display: block; width: 100%; height: 100%; }
+  .photo-frame img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+  .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .photo-solo { margin: 0; height: 100%; }
+  .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
+  .photo-inset .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  .photo-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); height: 100%; }
+  .photo-grid-1 { grid-template-columns: 1fr; }
+  .photo-grid-2 { grid-template-columns: 1fr 1fr; }
+  .photo-grid-duo-v { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  /* THREE_PHOTOS (atelier manuel) : 2 photos en haut, 1 en bas pleine
+     largeur — jamais 3 colonnes egales (trop etroites, quasi illisibles sur
+     une page portrait). L'ordre des items est celui choisi par l'utilisateur
+     dans l'atelier (presentationVariant toujours 0 pour une page manuelle,
+     voir manualPageBuilder.js) : les 2 premiers vont en haut, le 3eme prend
+     toute la largeur en bas via nth-child, sans avoir besoin d'une classe
+     dediee par position cote HTML. */
+  .photo-grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .photo-grid-3 .photo-frame:nth-child(3) { grid-column: 1 / -1; }
+  .photo-grid-4 { grid-template-columns: 1fr 1fr; }
+  .photo-grid-5, .photo-grid-6 { grid-template-columns: 1fr 1fr 1fr; }
+  .block-texte { justify-content: center; }
+  .block-texte p { font-size: calc(13pt * var(--fmt-type-scale, 1)); line-height: 1.7; text-align: justify; }
+  .texte-pleine { justify-content: flex-start; }
+  .texte-pleine p { font-size: calc(15pt * var(--fmt-type-scale, 1)); line-height: 1.9; }
+  .texte-citation { justify-content: center; align-items: center; text-align: center; }
+  .texte-citation p { font-style: italic; font-size: calc(22pt * var(--fmt-type-scale, 1)); line-height: 1.5; max-width: 80%; }
+  .texte-citation p::before, .texte-citation p::after { content: '"'; opacity: 0.35; }
+  .block-contribution { justify-content: center; gap: calc(4mm * var(--fmt-space-scale, 1)); }
+  .contribution-photos { max-height: 60%; }
+  .contribution-message { font-style: italic; font-size: calc(12pt * var(--fmt-type-scale, 1)); text-align: center; }
+  .contribution-name { text-align: center; font-size: calc(10pt * var(--fmt-type-scale, 1)); letter-spacing: 0.05em; text-transform: uppercase; color: #6d6252; }
+  .contribution-continuation { text-transform: none; letter-spacing: 0; font-style: italic; }
+  .split-marker { display: block; text-align: center; font-size: calc(9pt * var(--fmt-type-scale, 1)); color: #9a8f78; margin-top: calc(2mm * var(--fmt-space-scale, 1)); }
+  /* PHOTO_WITH_CAPTION (v2) : photo pleine page + courte legende dessous. */
+  .photo-with-caption { display: flex; flex-direction: column; height: 100%; gap: calc(3mm * var(--fmt-space-scale, 1)); }
+  .photo-with-caption .photo-frame { flex: 1; min-height: 0; }
+  .photo-with-caption figcaption { text-align: center; font-size: calc(11pt * var(--fmt-type-scale, 1)); font-style: italic; color: #4a4335; }
+  .photo-with-caption.is-framed { padding: calc(6mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
+  .photo-with-caption.is-framed .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  .photo-with-caption.is-framed figcaption { text-align: left; }
+  /* TWO_TESTIMONIES / THREE_TESTIMONIES (v2) : temoignages en cartes distinctes. */
+  .testimony-stack { display: grid; gap: calc(5mm * var(--fmt-space-scale, 1)); height: 100%; align-content: center; }
+  .testimony-stack-2 { grid-template-columns: 1fr 1fr; }
+  .testimony-stack-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .testimony-card { padding: calc(4mm * var(--fmt-space-scale, 1)); background: #efe8d8; border-radius: 2mm; }
+  .testimony-card p { font-size: calc(11pt * var(--fmt-type-scale, 1)); line-height: 1.6; }
+  /* PHOTO_TEXT / TEXT_PHOTO / TWO_PHOTOS_TEXT (v2) : ordre visuel = ordre reel des items. */
+  .mixte-ordered { display: flex; flex-direction: column; gap: calc(5mm * var(--fmt-space-scale, 1)); height: 100%; }
+  .mixte-ordered .mixte-photo { flex: 1.4; min-height: 0; }
+  .mixte-ordered .mixte-photo .photo-frame { height: 100%; }
+  .mixte-ordered .mixte-texte { flex: 1; display: flex; align-items: center; }
+  .mixte-ordered .mixte-texte p { font-size: calc(12pt * var(--fmt-type-scale, 1)); line-height: 1.6; }
+  .mixte-multi-photo { flex-direction: row; flex-wrap: wrap; }
+  .mixte-multi-photo .mixte-photo { flex: 1 1 45%; }
+  .mixte-multi-photo .mixte-texte { flex-basis: 100%; }
+  /* TITLE_TEXT / TITLE_TWO_PHOTOS / TITLE_FOUR_PHOTOS (atelier manuel) : le
+     titre est toujours le premier item du bloc (voir renderTitleTextBlock/
+     renderTitlePhotosBlock), jamais un texte invente par le moteur. */
+  .page-title { margin: 0 0 calc(6mm * var(--fmt-space-scale, 1)); font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; font-size: calc(26pt * var(--fmt-type-scale, 1)); line-height: 1.2; text-align: center; }
+  .block-title-text { justify-content: center; }
+  .title-text-body p { font-size: calc(13pt * var(--fmt-type-scale, 1)); line-height: 1.7; text-align: justify; }
+  .block-title-photos { justify-content: flex-start; }
+  .title-photos-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); flex: 1; min-height: 0; }
+  .title-photos-grid-1 { grid-template-columns: 1fr; }
+  .title-photos-grid-2 { grid-template-columns: 1fr 1fr; }
+  .title-photos-grid-3, .title-photos-grid-4 { grid-template-columns: 1fr 1fr; }
+  /* Details dores discrets (Luxe uniquement, .page.is-luxe posee par
+     renderPage()/renderSinglePageHtml) — retour utilisateur explicite :
+     "ne pas mettre du doré partout". Un cadre pleine page sur CHAQUE page a
+     ete essaye puis retire : trop present. ll ne reste que deux details
+     RARES : un filet sous les titres de page (seulement les mises en page
+     a titre, deja peu frequentes) et un petit numero de page. Memes teintes
+     que la couverture (coverTheme.applyFormatAccent, #c19a3d/#8a6a1f),
+     codees en dur ici plutot qu'importees de coverTheme.js : ce module
+     reste une fonction de rendu pure, sans logique de theme (voir l'entete
+     du fichier) — meme raison que frontCoverRenderer.js recoit un theme
+     deja resolu plutot que de le calculer lui-meme. */
+  .page.is-luxe .page-title {
+    padding-bottom: calc(3mm * var(--fmt-space-scale, 1));
+    border-bottom: 0.75px solid #c19a3d;
+  }
+  .page-number-luxe {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(5mm * var(--fmt-space-scale, 1));
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    font-size: calc(7.5pt * var(--fmt-type-scale, 1));
+    letter-spacing: 0.08em;
+    color: #8a6a1f;
+    opacity: 0.75;
+  }
+  /* Page de separation de chapitre (Luxe uniquement — voir
+     formatComposer.js) : rare et sobre, beaucoup de blanc, deux filets fins
+     encadrant un numero et un titre en petites capitales espacees. */
+  .page-separator .separator-inner {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(6mm * var(--fmt-space-scale, 1));
+    text-align: center;
+  }
+  .separator-rule { width: calc(18mm * var(--fmt-space-scale, 1)); height: 1px; background: #c19a3d; border: none; margin: 0; }
+  .separator-number { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 400; font-size: calc(30pt * var(--fmt-type-scale, 1)); color: #241f18; }
+  .separator-title { font-family: 'Inter', sans-serif; font-size: calc(11pt * var(--fmt-type-scale, 1)); letter-spacing: 0.32em; text-transform: uppercase; color: #6d6252; }
+  @media print {
+    body { background: #fff; }
+    .page { margin: 0; }
+  }
+
+  
+  .page.cvr-page { padding: 0; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .cvr-safe { box-sizing: border-box; position: relative; z-index: 2; padding: var(--cvr-safe-margin, 15mm); }
+  .cvr-band { display: flex; flex-direction: column; justify-content: center; }
+  .cvr-photo-zone, .cvr-photo-full { position: relative; overflow: hidden; }
+  .cvr-photo-zone .photo-frame, .cvr-photo-full .photo-frame { width: 100%; height: 100%; }
+  .cvr-photo-full { position: absolute; inset: 0; height: 100% !important; }
+  .photo-frame.cvr-bias-portrait img { object-position: center 30%; }
+  .cvr-multi-pair { display: flex; gap: 2mm; }
+  .cvr-multi-pair .photo-frame { width: 100%; height: 100%; }
+  .cvr-title { margin: 0; font-family: var(--cvr-title-font); font-weight: var(--cvr-title-weight, 500); font-style: var(--cvr-title-style, normal); color: var(--cvr-ink); line-height: 1.1; text-wrap: balance; }
+  .cvr-title-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+  .cvr-title-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+  .cvr-title-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+  .cvr-kicker { margin: 0 0 3mm; font-family: var(--cvr-secondary-font); font-size: 9.5pt; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cvr-accent); }
+  .cvr-subtitle { margin: 4mm 0 0; font-family: var(--cvr-secondary-font); font-style: italic; color: var(--cvr-ink); opacity: 0.85; }
+  .cvr-date { margin: 4mm 0 0; font-family: var(--cvr-secondary-font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--cvr-ink); opacity: 0.7; }
+  .cvr-rule { width: calc(16mm * var(--fmt-space-scale, 1)); height: 1px; background: var(--cvr-accent); margin: 5mm 0; border: none; }
+  .cvr-brand { font-family: var(--cvr-secondary-font); font-size: 8pt; letter-spacing: 0.22em; text-transform: uppercase; color: var(--cvr-accent); opacity: 0.75; text-align: center; }
+  /* Cadre dore (Luxe uniquement — coverTheme.applyFormatAccent) : double
+     filet en surimpression, inset depuis le bord reel de la page (pas
+     depuis --cvr-safe-margin, pour rester visible meme sur une variante
+     "photo pleine page" ou --cvr-safe n'entoure pas tout le contenu).
+     z-index au-dessus du scrim (COVER_SCRIM=1) et de la photo, sous rien —
+     c'est la derniere couche. */
+  .cvr-page.has-gold-frame::before,
+  .cvr-page.has-gold-frame::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    z-index: 3;
+    border-style: solid;
+  }
+  .cvr-page.has-gold-frame::before {
+    inset: calc(5mm * var(--fmt-space-scale, 1));
+    border-width: 1.4px;
+    border-color: var(--cvr-accent-deep, var(--cvr-accent));
+  }
+  .cvr-page.has-gold-frame::after {
+    inset: calc(6.6mm * var(--fmt-space-scale, 1));
+    border-width: 0.6px;
+    border-color: var(--cvr-accent);
+    opacity: 0.65;
+  }
+  /* Embossage discret du titre (Luxe uniquement) : ombre claire en haut a
+     gauche + ombre sombre en bas a droite, illusion d'un titre presse dans
+     la matiere plutot qu'imprime dessus. N'a de sens que sur un fond clair
+     (l'ivoire du Luxe) — jamais applique ailleurs. Selecteur descendant
+     (pas .cvr-title.is-embossed) : la classe is-embossed est posee sur la
+     <section> (voir themeOrnamentClasses), le titre est rendu plus loin a
+     l'interieur par les fonctions par variante (renderCoverMinimal etc.) —
+     jamais les deux classes sur le meme element. */
+  .cvr-page.is-embossed .cvr-title {
+    text-shadow: -0.3px -0.3px 0.4px rgba(255, 255, 255, 0.65), 0.4px 0.4px 0.6px rgba(60, 48, 30, 0.35);
+  }
+
+  
+  .cvr-minimal-stack { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding-bottom: 8%; }
+  .cvr-scrim {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+    background: linear-gradient(to top, rgba(10,8,4,0.72) 0%, rgba(10,8,4,0.46) 38%, rgba(10,8,4,0) 100%);
+    z-index: 1;
+  }
+  .cvr-on-photo { position: absolute; left: 0; right: 0; bottom: 0; }
+  .cvr-title-on-photo { color: #fdfaf3; text-shadow: 0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35); }
+  .cvr-on-photo .cvr-subtitle, .cvr-on-photo .cvr-date { color: #fdfaf3; }
+  .cvr-on-photo .cvr-kicker { color: #e9dcb8; }
+  /* COVER_SPLIT (v3) : photo pleine hauteur a gauche, panneau de texte a droite. */
+  .cvr-split { display: flex; flex-direction: row; height: 100%; }
+  .cvr-split-photo { flex: 0 0 55%; position: relative; overflow: hidden; }
+  .cvr-split-photo .photo-frame { width: 100%; height: 100%; }
+  .cvr-split-text { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  /* COVER_FRAMED (v3) : photo encadree, marge genereuse, titre en dessous. */
+  .cvr-framed-stack { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8mm; }
+  .cvr-framed-photo { margin: 0; width: 66%; aspect-ratio: 3 / 4; padding: 6mm; background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.14); box-shadow: 0 2px 14px rgba(0,0,0,0.08); box-sizing: border-box; }
+  .cvr-framed-photo .photo-frame { width: 100%; height: 100%; }
+  .cvr-framed-text { max-width: 80%; }
+  .cvr-framed-text .cvr-title { text-align: center; }
+  .cvr-framed-text .cvr-subtitle, .cvr-framed-text .cvr-date { text-align: center; }
+
+  
+  .cvr-back-stack { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .cvr-back-spacer { flex: 1; }
+  .cvr-back-phrase { margin: 0; max-width: 65%; font-family: var(--cvr-title-font); font-style: italic; color: var(--cvr-ink); line-height: 1.5; }
+  .cvr-back-phrase-solo { font-size: 16pt; }
+  .cvr-back-stats { margin: 4mm 0 0; font-family: var(--cvr-secondary-font); color: var(--cvr-ink); letter-spacing: 0.02em; }
+  .cvr-back-stats .cvr-dot { color: var(--cvr-accent); padding: 0 1mm; }
+  .cvr-back-photo { margin: 0 0 6mm; width: 55%; height: 28%; padding: 8mm; background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.12); box-shadow: 0 2px 10px rgba(0,0,0,0.08); box-sizing: border-box; }
+  .cvr-back-photo .photo-frame { width: 100%; height: 100%; }
+  .cvr-back-brand { margin-top: 4mm; }
+
+  .page { margin: 0; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<section class="page" data-page-index="5"><div class="page-blocks"><figure class="block-photo photo-solo" data-layout="FULL_PHOTO"><span class="photo-frame"><img src="https://zlzbrucekzfmtioempek.supabase.co/storage/v1/object/public/contribution-photos/46083726-f72e-44ac-b8c0-6c58ab7948bd/4ddac23c-4d70-4884-bc78-c11e9f295ccb.jpg" alt="" /></span></figure></div></section>
+</body>
+</html>

@@ -18,11 +18,12 @@ import React, { useEffect, useRef } from 'react';
 
 // Alignees sur les memes constantes que AtelierBookView.js/AtelierLayoutPanel.js
 // (convention deja etablie dans ce projet pour ces petites tables format ->
-// dimensions plutot qu'un import partage).
+// dimensions plutot qu'un import partage). 2026-09-09 : realignees sur le
+// catalogue reel Gelato, voir l'en-tete de coverFormat.js.
 const FORMAT_DIMENSIONS_MM = {
-  livret: { widthMm: 170, heightMm: 170 },
-  standard: { widthMm: 220, heightMm: 280 },
-  luxe: { widthMm: 240, heightMm: 320 }
+  livret: { widthMm: 200, heightMm: 200 },
+  standard: { widthMm: 210, heightMm: 280 },
+  luxe: { widthMm: 210, heightMm: 280 }
 };
 
 const STATUS_LABEL = { complete: 'Page complete', partial: 'Page en cours', empty: 'Page vide', cover: '' };
@@ -53,7 +54,7 @@ function FilmstripCell({ target, label, status, isActive, aspectRatio, onSelect 
   );
 }
 
-function AtelierPageFilmstrip({ pageStatuses, activeTarget, printFormat, onSelect }) {
+function AtelierPageFilmstrip({ pageStatuses, activeTarget, printFormat, onSelect, onAddPages, addingPages }) {
   const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
   const aspectRatio = `${dims.widthMm} / ${dims.heightMm}`;
 
@@ -82,6 +83,22 @@ function AtelierPageFilmstrip({ pageStatuses, activeTarget, printFormat, onSelec
           onSelect={onSelect}
         />
       ))}
+      {/* Agrandir volontairement le livre (jamais automatique — voir
+          routes/composition.js: POST /pages/extend) : 2 pages a la fois,
+          meme palier que le catalogue imprimeur (Gelato n'accepte que des
+          nombres pairs de pages). */}
+      {onAddPages && (
+        <button
+          type="button"
+          className="atelier-filmstrip-add"
+          style={{ aspectRatio }}
+          onClick={onAddPages}
+          disabled={addingPages}
+          title="Ajouter 2 pages vides a la fin du livre"
+        >
+          {addingPages ? '…' : '+2'}
+        </button>
+      )}
       <div className="atelier-filmstrip-sep" aria-hidden="true" />
       <FilmstripCell
         target="back-cover"

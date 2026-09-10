@@ -3,6 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const { submitPrintOrderToGelato } = require('../services/printing/gelatoOrderService');
 let Stripe = null;
 
 try {
@@ -435,6 +436,41 @@ const persistStripePaymentForOrder = async ({
   return updatedOrder;
 };
 
+// Declenche la soumission Gelato pour une commande Impression/Pack qui
+// vient d'etre payee — jamais bloquant pour la reponse HTTP (fire-and-forget,
+// meme principe que la generation PDF existante plus bas dans ce fichier
+// cote frontend) : idempotent via gelatoOrderService (verifie
+// order.metadata.gelatoOrderId), donc sans risque a appeler plusieurs fois
+// pour la meme commande (webhook + route de confirmation peuvent toutes
+// deux declencher ce chemin). N'agit que sur 'print'/'pack' — jamais 'pdf'.
+const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
+  const type = String(order?.type || '').toLowerCase();
+  if (type !== 'print' && type !== 'pack') return;
+
+  (async () => {
+    try {
+      const { data: book, error: bookError } = await db
+        .from('books')
+        .select('*')
+        .eq('id', order.book_id)
+        .single();
+      if (bookError || !book) {
+        console.error('Soumission Gelato: livre introuvable pour la commande', order.id);
+        return;
+      }
+
+      const result = await submitPrintOrderToGelato({ db: supabase, book, order, ownerEmail });
+      if (result.error) {
+        console.error('Soumission Gelato echouee pour la commande', order.id, ':', result.error);
+      } else if (!result.skipped) {
+        console.log(`Commande Gelato ${result.gelatoOrderType} creee (${result.gelatoOrderId}) pour la commande Celebrons ${order.id}`);
+      }
+    } catch (error) {
+      console.error('Erreur inattendue lors de la soumission Gelato pour la commande', order.id, ':', error.message);
+    }
+  })();
+};
+
 const isForwardLifecycleTransition = (currentStatus, nextStatus) => (
   getLifecycleRank(nextStatus) >= getLifecycleRank(currentStatus)
 );
@@ -560,6 +596,11 @@ const handleStripeWebhook = async (req, res) => {
       source: 'webhook',
       eventId: event?.id || ''
     });
+
+    // Webhook = server-side, le point le plus fiable pour declencher la
+    // soumission Gelato (independant du navigateur du client, contrairement
+    // a la route de confirmation ci-dessous) — voir triggerGelatoSubmissionIfNeeded.
+    triggerGelatoSubmissionIfNeeded({ db: supabase, order: updatedOrder });
 
     return res.json({
       received: true,
@@ -890,6 +931,11 @@ router.post('/:orderId/stripe/confirm', authenticate, async (req, res) => {
       session,
       source: 'confirm'
     });
+
+    // Filet de securite si le webhook n'est pas encore arrive (ou n'est pas
+    // configure en local) — idempotent cote gelatoOrderService, donc sans
+    // risque de doublon si le webhook la declenche aussi.
+    triggerGelatoSubmissionIfNeeded({ db, order: updatedOrder, ownerEmail: req.user.email });
 
     return res.json(getApiSafeOrder(updatedOrder));
   } catch (error) {

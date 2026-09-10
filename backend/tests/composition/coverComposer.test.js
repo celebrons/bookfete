@@ -513,6 +513,74 @@ describe('coverComposer.composeBackCover — format force explicitement (backVar
   });
 });
 
+// Retour utilisateur (2026-09-10) : "permettre de modifier la photo de la
+// 4e de couverture" — jusqu'ici seul le recto avait une surcharge de photo
+// (frontPhotoId), meme principe applique ici a cover_overrides.backPhotoId.
+describe('coverComposer.composeBackCover — surcharge de la photo (backPhotoId)', () => {
+  it('backPhotoId valide force cette photo, meme sous le seuil "correct"', () => {
+    const items = [greatPhoto('p1'), weakPhoto('p2'), textItem('t1')];
+    const back = composeBackCover({
+      book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backPhotoId: 'p2' } },
+      items, template: TEMPLATE, format: FORMAT,
+      frontCoverItemIds: ['p1']
+    });
+    expect(back.content.variant).toBe('BACK_PHOTO_STATS');
+    expect(back.content.itemIds).toEqual(['p2']);
+  });
+
+  it('backPhotoId orphelin (photo supprimee depuis) retombe silencieusement sur la selection automatique', () => {
+    const items = [greatPhoto('p1'), mediumPhoto('p2'), textItem('t1')];
+    const back = composeBackCover({
+      book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backPhotoId: 'photo-disparue' } },
+      items, template: TEMPLATE, format: FORMAT,
+      frontCoverItemIds: ['p1']
+    });
+    expect(back.content.variant).toBe('BACK_PHOTO_STATS');
+    expect(back.content.itemIds).toEqual(['p2']);
+  });
+
+  it('backPhotoId qui pointe vers la photo DEJA utilisee en couverture est ignore (jamais de concurrence avec le recto)', () => {
+    const items = [greatPhoto('p1'), mediumPhoto('p2'), textItem('t1')];
+    const back = composeBackCover({
+      book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backPhotoId: 'p1' } },
+      items, template: TEMPLATE, format: FORMAT,
+      frontCoverItemIds: ['p1'] // p1 exclue du pool de la 4e, backPhotoId='p1' ne peut donc pas y correspondre
+    });
+    expect(back.content.itemIds).not.toContain('p1');
+  });
+
+  it('backPhotoId + backVariant BACK_PHOTO_STATS combines : utilise exactement la photo choisie', () => {
+    const items = [greatPhoto('p1'), weakPhoto('p2'), textItem('t1')];
+    const back = composeBackCover({
+      book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backVariant: 'BACK_PHOTO_STATS', backPhotoId: 'p2' } },
+      items, template: TEMPLATE, format: FORMAT,
+      frontCoverItemIds: ['p1']
+    });
+    expect(back.content.variant).toBe('BACK_PHOTO_STATS');
+    expect(back.content.itemIds).toEqual(['p2']);
+  });
+
+  it('backPhotoId sans variante forcee affiche quand meme une photo (meme principe que le recto)', () => {
+    const items = [mediumPhoto('p1'), textItem('t1')];
+    const back = composeBackCover({
+      book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backPhotoId: 'p1' } },
+      items, template: TEMPLATE, format: FORMAT,
+      frontCoverItemIds: []
+    });
+    expect(back.content.variant).toBe('BACK_PHOTO_STATS');
+    expect(back.content.itemIds).toEqual(['p1']);
+  });
+
+  it('backPhotoId sans statistiques disponibles -> repli sur BACK_MINIMAL (rien a afficher, meme regle que l\'automatique)', () => {
+    const back = composeBackCover({
+      book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backPhotoId: 'p1' } },
+      items: [], template: TEMPLATE, format: FORMAT
+    });
+    expect(back.content.variant).toBe('BACK_MINIMAL');
+    expect(back.content.itemIds).toEqual([]);
+  });
+});
+
 describe('coverComposer.composeCoversIntoPages', () => {
   it('place la couverture en premiere page et la 4e en derniere, pages interieures intactes entre les deux', () => {
     const interiorPages = [

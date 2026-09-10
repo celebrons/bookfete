@@ -32,6 +32,7 @@ const path = require('path');
 const { execFile, spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 const PDFDocument = require('pdfkit');
+const sharp = require('sharp');
 const pageRenderer = require('./pageRenderer');
 
 const PDF_PREVIEW_DIR = path.join(__dirname, '..', '..', 'tmp', 'composition-preview');
@@ -234,7 +235,32 @@ async function waitForImages(cdp) {
  * la source concrete de la degradation visible signalee sur les livres
  * generes. Retourne un tableau de Buffer PNG, dans l'ordre de `pages`.
  */
-async function capturePagesAsImages({ book, pages, items, layouts, format }) {
+// scale : override ponctuel de SCREENSHOT_SCALE (defaut = qualite de
+// production normale, comportement inchange si omis) — ajoute le
+// 2026-09-10 pour un diagnostic Gelato (PDF 28 pages a l'echelle normale
+// = 66 Mo, au dessus de la limite 50 Mo du bucket print-files/du plan
+// Supabase) ; jamais utilise par le pipeline de production reel
+// (routes/composition.js), qui n'a pas besoin de reduire la qualite —
+// c'est le vrai probleme a resoudre avant d'aller en production avec de
+// longs livres, pas une astuce a generaliser silencieusement.
+//
+// bleedMm : fond perdu ajoute par-dessus la taille de trim (defaut 0 =
+// comportement inchange pour tous les appelants existants — le PDF grand
+// public telechargeable depuis une commande, routes/books.js, n'en a
+// structurellement pas besoin, ce n'est jamais envoye a un imprimeur tel
+// quel). Ajoute le 2026-09-10 suite a un vrai rejet Gelato ("Document page
+// dimension matches the product size but does not include bleeds — 216x286mm
+// attendu contre 210x280mm fourni pour du 21x28cm, soit 3mm de chaque
+// cote"). Aucune mise en page de ce projet n'est conçue pour deborder
+// intentionnellement jusqu'au bord (voir pageRenderer.js/coverTheme.js,
+// aucune notion de bleed nulle part dans leur CSS) — plutot que de
+// redessiner chaque layout, la marge est ajoutee APRES capture en etirant
+// les pixels du bord vers l'exterieur (sharp, extendWith:'mirror') : la
+// zone de fond perdu n'est jamais vue une fois le livre massicote a la
+// bonne taille, une extension en miroir suffit a eviter un liseret blanc
+// au bord si la coupe n'est pas parfaitement precise — c'est exactement
+// le role du bleed, pas une zone destinee a etre visible.
+async function capturePagesAsImages({ book, pages, items, layouts, format, scale = SCREENSHOT_SCALE, bleedMm = 0 }) {
   const browserPath = resolveBrowserPath();
   if (!browserPath) {
     throw new Error(
@@ -265,7 +291,7 @@ async function capturePagesAsImages({ book, pages, items, layouts, format }) {
     await cdp.call('Emulation.setDeviceMetricsOverride', {
       width: widthPx,
       height: heightPx,
-      deviceScaleFactor: SCREENSHOT_SCALE,
+      deviceScaleFactor: scale,
       mobile: false
     });
     await cdp.call('Page.enable', {});
@@ -281,7 +307,28 @@ async function capturePagesAsImages({ book, pages, items, layouts, format }) {
       await waitForImages(cdp);
 
       const shot = await cdp.call('Page.captureScreenshot', { format: 'png' });
-      imageBuffers.push(Buffer.from(shot.data, 'base64'));
+      const rawBuffer = Buffer.from(shot.data, 'base64');
+
+      if (bleedMm > 0) {
+        // meme echelle px/mm que la capture elle-meme (mmToPx utilise un
+        // ratio fixe 96/25.4, applique ici cote CSS-px puis multiplie par
+        // `scale` — la capture est deja a deviceScaleFactor=scale, donc ses
+        // pixels reels valent mmToPx(mm)*scale).
+        const bleedPx = Math.round(mmToPx(bleedMm) * scale);
+        // compressionLevel/effort au maximum : les reglages PNG par defaut
+        // de sharp produisent un fichier ~2x PLUS GROS que le PNG d'origine
+        // (capture Chrome, deja bien compresse) — verifie empiriquement le
+        // 2026-09-10 (2,9 Mo -> 5,8 Mo en reglages par defaut, -> 0,9 Mo au
+        // maximum) en cherchant a resoudre le depassement de la limite 50 Mo
+        // du bucket. Plus lent, mais l'ecart est trop important pour l'ignorer.
+        const bled = await sharp(rawBuffer)
+          .extend({ top: bleedPx, bottom: bleedPx, left: bleedPx, right: bleedPx, extendWith: 'mirror' })
+          .png({ compressionLevel: 9, effort: 10 })
+          .toBuffer();
+        imageBuffers.push(bled);
+      } else {
+        imageBuffers.push(rawBuffer);
+      }
     }
 
     cdp.close();
@@ -296,10 +343,15 @@ async function capturePagesAsImages({ book, pages, items, layouts, format }) {
 // en un seul PDF, chaque image couvrant exactement la page au format
 // physique demande. pdfkit detecte automatiquement PNG vs JPEG a la lecture
 // des octets, donc fonctionne sans changement pour les deux formats.
-function assemblePdfFromImages(imageBuffers, format, outputPath) {
+//
+// bleedMm : doit correspondre exactement a celui passe a
+// capturePagesAsImages (sinon les images, deja plus grandes que le trim,
+// seraient re-compressees dans une page PDF trop petite) — chaque cote de
+// la page PDF finale s'agrandit de bleedMm.
+function assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm = 0) {
   return new Promise((resolve, reject) => {
-    const pageWidthPt = format.trimWidthMm * MM_TO_PT;
-    const pageHeightPt = format.trimHeightMm * MM_TO_PT;
+    const pageWidthPt = (format.trimWidthMm + bleedMm * 2) * MM_TO_PT;
+    const pageHeightPt = (format.trimHeightMm + bleedMm * 2) * MM_TO_PT;
     const doc = new PDFDocument({ autoFirstPage: false });
     const stream = fs.createWriteStream(outputPath);
 
@@ -334,17 +386,20 @@ function assemblePdfFromImages(imageBuffers, format, outputPath) {
  */
 async function renderPdfFromPages(input) {
   const format = input.format || { trimWidthMm: 210, trimHeightMm: 297 };
+  const bleedMm = input.bleedMm || 0;
   const imageBuffers = await capturePagesAsImages({
     book: input.book,
     pages: input.pages,
     items: input.items,
     layouts: input.layouts,
-    format
+    format,
+    scale: input.scale,
+    bleedMm
   });
 
   await fsp.mkdir(PDF_PREVIEW_DIR, { recursive: true });
   const outputPath = path.join(PDF_PREVIEW_DIR, `${input.fileBaseName || 'book'}-${Date.now()}.pdf`);
-  await assemblePdfFromImages(imageBuffers, format, outputPath);
+  await assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm);
   return outputPath;
 }
 
@@ -352,5 +407,11 @@ module.exports = {
   resolveBrowserPath,
   renderPdfFromHtml,
   renderPdfFromPages,
+  // capturePagesAsImages/SCREENSHOT_SCALE exportes le 2026-09-09 pour
+  // services/printing/gelatoCoverComposer.js (couverture wraparound Gelato,
+  // capture front/back cover a la taille exacte des panneaux imprimeur —
+  // meme primitive, format juste different de celui d'un livre standard).
+  capturePagesAsImages,
+  SCREENSHOT_SCALE,
   PDF_PREVIEW_DIR
 };

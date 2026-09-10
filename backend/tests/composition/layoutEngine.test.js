@@ -352,7 +352,7 @@ describe('layoutEngine.compose — la regeneration change toujours quelque chose
 });
 
 describe('layoutEngine.recommendPageCount', () => {
-  it('recommande un palier parmi PAGE_COUNT_TIERS = [16, 24, 32, 48, 64]', () => {
+  it('recommande un palier parmi PAGE_COUNT_TIERS', () => {
     const items = Array.from({ length: 20 }, (_, i) => photoItem(`p${i}`, i));
     const { recommended } = recommendPageCount({ items, template: TEMPLATE, layouts: LAYOUTS });
     expect(PAGE_COUNT_TIERS).toContain(recommended);

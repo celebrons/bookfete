@@ -79,7 +79,7 @@ function composeBookForFormat(input = {}) {
   const allowedSlugs = Array.isArray(template?.allowed_layouts) ? template.allowed_layouts : [];
   const seedBase = `${template?.id || 'no-template'}:format:${input.formatId || 'standard'}`;
   const { pages: rawComposedPages } = units.length > 0
-    ? buildPages({ units, layouts, allowedSlugs, profile, seedBase, mood })
+    ? buildPages({ units, layouts, allowedSlugs, profile, seedBase, mood, formatId: input.formatId })
     : { pages: [] };
   const composedPages = withChapterSeparators(rawComposedPages, input.formatId);
 

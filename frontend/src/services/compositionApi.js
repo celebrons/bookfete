@@ -230,6 +230,13 @@ export const chooseFormat = (bookId, formatId) => request(`/books/${bookId}/form
   body: JSON.stringify({ formatId })
 });
 
+// Ajoute des pages vides a la fin du livre (bouton "+2" du filmstrip
+// atelier) — voir routes/composition.js: POST /pages/extend.
+export const extendBookPages = (bookId, count = 2) => request(`/books/${bookId}/pages/extend`, {
+  method: 'POST',
+  body: JSON.stringify({ count })
+});
+
 // --- Atelier de creation personnalisee (edition manuelle page par page) -----
 
 export const listPages = (bookId) => request(`/books/${bookId}/pages`);
@@ -247,9 +254,16 @@ export const fetchInteriorPagePreviewHtml = async (bookId, pageIndex) => {
 // dans l'ordre des emplacements du format choisi. Toujours verrouillee
 // (locked=true) cote serveur — jamais ecrasee par une recomposition
 // automatique ulterieure (voir manualPageBuilder.js).
-export const saveManualPage = (bookId, pageIndex, { layoutId, itemIds }) => request(
+// photoAdjustments (optionnel, cahier des charges "PhotoSlot" 2026-09-10) :
+// { [itemId]: {focalX, focalY, zoom, fitMode} } — l'UI dediee pour le
+// regler a la main a ete retiree (retour utilisateur : "ne sert a rien"),
+// mais le champ reste transmis tel quel (toujours vide en pratique
+// desormais) pour ne jamais ecraser silencieusement un ajustement deja
+// enregistre. Nettoye/borne cote backend (routes/composition.js:
+// sanitizePhotoAdjustments), jamais besoin de validation ici.
+export const saveManualPage = (bookId, pageIndex, { layoutId, itemIds, photoAdjustments }) => request(
   `/books/${bookId}/pages/${pageIndex}/manual`,
-  { method: 'PUT', body: JSON.stringify({ layoutId, itemIds }) }
+  { method: 'PUT', body: JSON.stringify({ layoutId, itemIds, photoAdjustments }) }
 );
 
 // Vide une page (retour a l'etat vierge, deverrouillee) : reutilise la route
@@ -272,6 +286,12 @@ export const updatePageContent = (bookId, pageIndex, { layoutId, content, locked
   `/books/${bookId}/pages/${pageIndex}`,
   { method: 'PUT', body: JSON.stringify({ layout_id: layoutId, content, locked }) }
 );
+
+// Controle qualite d'impression (cahier des charges "PhotoSlot", 2026-09-10,
+// §20/21) — utilise par AtelierFinishModal a l'ouverture ("Terminer mon
+// livre"), un seul appel, jamais bloquant. { pagesCount, photosCount,
+// lowQualityPhotos:[{pageIndex,itemId,level,dpi,emoji,label}], allGood }.
+export const getPrintQualityCheck = (bookId) => request(`/books/${bookId}/print-quality-check`);
 
 // --- Lien de partage collaboratif (public, sans compte) ---------------------
 // Voir backend/routes/composition.js (GET/POST /api/public/share/:token) —

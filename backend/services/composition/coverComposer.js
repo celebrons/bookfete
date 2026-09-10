@@ -226,7 +226,7 @@ function composeFrontCover({ book, items, template, format }) {
 // Resout la composition (variante + photo) pour un format de verso force
 // explicitement (cover_overrides.backVariant). Meme philosophie que
 // resolveForcedFrontComposition : jamais d'erreur, degradation gracieuse.
-function resolveForcedBackComposition(forcedVariant, { statsLine, ranked }) {
+function resolveForcedBackComposition(forcedVariant, { statsLine, ranked, overridden }) {
   if (!statsLine) {
     // BACK_STATS/BACK_PHOTO_STATS sans statistiques disponibles n'ont rien a
     // afficher : meme regle que l'arbre automatique (statsLine vide ->
@@ -242,10 +242,16 @@ function resolveForcedBackComposition(forcedVariant, { statsLine, ranked }) {
     return { variant: 'BACK_STATS', photoItem: null };
   }
 
-  // BACK_PHOTO_STATS : prefere une photo "acceptable" comme l'arbre
-  // automatique (jamais la meilleure — jamais en concurrence avec le
-  // recto) ; a defaut, un choix explicite doit tout de meme afficher une
-  // photo si le livre en a au moins une (meme principe que le recto).
+  // BACK_PHOTO_STATS : une photo choisie explicitement (surcharge,
+  // cover_overrides.backPhotoId) est toujours utilisee telle quelle, meme
+  // principe que overrides.frontPhotoId cote recto — jamais rejetee meme
+  // sous le seuil "acceptable". Sinon, repli sur l'arbre automatique :
+  // prefere une photo "acceptable" (jamais la meilleure — jamais en
+  // concurrence avec le recto) ; a defaut, un choix explicite doit tout de
+  // meme afficher une photo si le livre en a au moins une.
+  if (overridden) {
+    return { variant: 'BACK_PHOTO_STATS', photoItem: overridden.item };
+  }
   if (ranked.length === 0) {
     return { variant: 'BACK_STATS', photoItem: null };
   }
@@ -277,20 +283,35 @@ function composeBackCover({ book, items, template, format, frontCoverItemIds = [
   const phrase = resolveClosingPhrase(book, overrides);
   const forcedVariant = resolveForcedBackVariant(overrides);
 
+  // Photo de la 4e : jamais celle du recto (exclusion appliquee une seule
+  // fois ici, reutilisee par les deux branches ci-dessous — ne doit jamais
+  // concurrencer la couverture, choix manuel inclus).
+  const ranked = rankPhotos(items, format).filter((entry) => !frontCoverItemIds.includes(entry.item.id));
+  // Photo choisie explicitement par l'utilisateur (surcharge,
+  // cover_overrides.backPhotoId — meme principe que overrides.frontPhotoId
+  // cote recto, voir composeFrontCover) : repli silencieux sur la selection
+  // automatique si l'id ne correspond plus a rien (photo supprimee, ou
+  // c'est justement la photo du recto).
+  const overridden = overrides.backPhotoId
+    ? ranked.find((entry) => entry.item.id === overrides.backPhotoId)
+    : null;
+
   let variant;
   let photoItem;
 
   if (forcedVariant) {
-    const ranked = rankPhotos(items, format).filter((entry) => !frontCoverItemIds.includes(entry.item.id));
-    ({ variant, photoItem } = resolveForcedBackComposition(forcedVariant, { statsLine, ranked }));
+    ({ variant, photoItem } = resolveForcedBackComposition(forcedVariant, { statsLine, ranked, overridden }));
+  } else if (overridden && statsLine) {
+    // Une photo choisie a la main exprime deja l'intention d'afficher une
+    // photo, meme sans variante forcee explicitement — meme principe que le
+    // recto (voir composeFrontCover : `else if (overridden)`).
+    variant = 'BACK_PHOTO_STATS';
+    photoItem = overridden.item;
   } else {
     variant = 'BACK_MINIMAL';
     photoItem = null;
 
     if (statsLine) {
-      // Photo de la 4e : jamais celle du recto, toujours la moins bien classee
-      // parmi les acceptables (ne doit jamais concurrencer la couverture).
-      const ranked = rankPhotos(items, format).filter((entry) => !frontCoverItemIds.includes(entry.item.id));
       const acceptable = ranked.filter((entry) => entry.score >= COVER_PHOTO_THRESHOLDS.good);
 
       if (acceptable.length > 0) {
