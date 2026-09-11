@@ -287,7 +287,7 @@ async function waitForImages(cdp) {
 // bonne taille, une extension en miroir suffit a eviter un liseret blanc
 // au bord si la coupe n'est pas parfaitement precise — c'est exactement
 // le role du bleed, pas une zone destinee a etre visible.
-async function capturePagesAsImages({ book, pages, items, layouts, format, scale = SCREENSHOT_SCALE, bleedMm = 0 }) {
+async function capturePagesAsImages({ book, pages, items, layouts, format, scale = SCREENSHOT_SCALE, bleedMm = 0, onProgress }) {
   const browserPath = await resolveBrowserPath();
   if (!browserPath) {
     throw new Error(
@@ -323,7 +323,28 @@ async function capturePagesAsImages({ book, pages, items, layouts, format, scale
     });
     await cdp.call('Page.enable', {});
 
-    const imageBuffers = [];
+    // Progression REELLE (2026-09-11) : la capture haute resolution coute
+    // plusieurs secondes par page, l'appelant doit pouvoir dire ou il en est
+    // plutot qu'afficher une animation decorative. Jamais bloquant : une
+    // erreur dans le rapport de progression ne doit pas faire echouer un
+    // rendu. Compte les pages CAPTUREES (et non encodees) : c'est ce que
+    // l'utilisateur attend, et l'encodage est desormais differe (ci-dessous).
+    const reportProgress = (done) => {
+      if (typeof onProgress !== 'function') return;
+      try {
+        onProgress({ done, total: pages.length });
+      } catch (_error) {
+        // ignore
+      }
+    };
+
+    // Une promesse par page, dans l'ordre de `pages`. L'encodage PNG du fond
+    // perdu (sharp) n'est PLUS attendu avant de passer a la page suivante :
+    // il tourne pendant que Chrome charge et capture la page d'apres.
+    // Mesure du 2026-09-11 sur un livre reel : navigation+capture ~6 s/page
+    // et encodage ~5 s/page s'additionnaient ; en les recouvrant, le cout de
+    // l'encodage disparait presque entierement du temps total.
+    const encodeTasks = [];
     for (const page of pages) {
       const html = pageRenderer.renderSinglePageHtml({ book, page, items, layouts, format });
       const htmlPath = path.join(PDF_PREVIEW_DIR, `${stamp}-page-${page.page_index}.html`);
@@ -342,24 +363,49 @@ async function capturePagesAsImages({ book, pages, items, layouts, format, scale
         // `scale` — la capture est deja a deviceScaleFactor=scale, donc ses
         // pixels reels valent mmToPx(mm)*scale).
         const bleedPx = Math.round(mmToPx(bleedMm) * scale);
-        // compressionLevel/effort au maximum : les reglages PNG par defaut
-        // de sharp produisent un fichier ~2x PLUS GROS que le PNG d'origine
-        // (capture Chrome, deja bien compresse) — verifie empiriquement le
-        // 2026-09-10 (2,9 Mo -> 5,8 Mo en reglages par defaut, -> 0,9 Mo au
-        // maximum) en cherchant a resoudre le depassement de la limite 50 Mo
-        // du bucket. Plus lent, mais l'ecart est trop important pour l'ignorer.
-        const bled = await sharp(rawBuffer)
+        // compressionLevel 9 : les reglages PNG par defaut de sharp
+        // produisent un fichier ~2x PLUS GROS que le PNG d'origine (capture
+        // Chrome, deja bien compresse) — verifie empiriquement le 2026-09-10
+        // (2,9 Mo -> 5,8 Mo en reglages par defaut, -> 0,9 Mo au maximum) en
+        // cherchant a resoudre le depassement de la limite 50 Mo du bucket.
+        //
+        // effort 6 et non 10 : mesure du 2026-09-11 sur une page reelle du
+        // livre 5197b1ff, les deux donnent EXACTEMENT le meme fichier
+        // (2,12 Mo) mais effort 10 met 9,5 s contre 5,2 s. Au-dela de 6,
+        // l'effort supplementaire ne gagne plus un octet ici : c'est du
+        // temps depense pour rien. (effort 4 descendrait a 3,7 s mais
+        // remonterait le fichier a 2,35 Mo — refuse, la limite du bucket
+        // est la contrainte qui a dicte ces reglages.)
+        //
+        // Volontairement PAS attendu ici : la promesse part dans encodeTasks
+        // et s'execute pendant la capture de la page suivante.
+        const task = sharp(rawBuffer)
           .extend({ top: bleedPx, bottom: bleedPx, left: bleedPx, right: bleedPx, extendWith: 'mirror' })
-          .png({ compressionLevel: 9, effort: 10 })
+          .png({ compressionLevel: 9, effort: 6 })
           .toBuffer();
-        imageBuffers.push(bled);
+        // Sans ce `catch` neutre, un echec d'encodage non encore attendu
+        // remonterait en unhandledRejection. L'erreur reste portee par
+        // `task`, que le Promise.all final attend bel et bien.
+        task.catch(() => {});
+        // Au plus deux encodages en vol : on attend celui d'il y a deux
+        // pages avant d'en lancer un nouveau, pour que les buffers bruts
+        // (3 a 7 Mo chacun) ne s'accumulent pas en memoire sur un livre de
+        // 30 pages — la marge est etroite sur l'instance Render (512 Mo).
+        if (encodeTasks.length >= 2) {
+          await encodeTasks[encodeTasks.length - 2];
+        }
+        encodeTasks.push(task);
       } else {
-        imageBuffers.push(rawBuffer);
+        encodeTasks.push(Promise.resolve(rawBuffer));
       }
+      reportProgress(encodeTasks.length);
     }
 
+    // Ferme l'onglet AVANT d'attendre les derniers encodages : toutes les
+    // captures sont faites, garder Chrome connecte pendant que sharp finit
+    // ne servirait qu'a occuper de la memoire.
     cdp.close();
-    return imageBuffers;
+    return await Promise.all(encodeTasks);
   } finally {
     child.kill();
     await Promise.all(tempHtmlPaths.map((p) => fsp.unlink(p).catch(() => {})));

@@ -1,0 +1,131 @@
+/* Frise de suivi de production (voir StepTracking.js). */
+.tracking-timeline {
+  list-style: none;
+  margin: var(--space-md) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tracking-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 8px 2px;
+  color: var(--text-light);
+  font-size: 13.5px;
+}
+
+/* Trait vertical reliant les etapes — s'arrete avant la derniere. */
+.tracking-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 26px;
+  bottom: -4px;
+  width: 1px;
+  background: rgba(36, 31, 24, 0.16);
+}
+
+.tracking-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  border: 2px solid rgba(36, 31, 24, 0.2);
+  background: var(--white);
+  flex: none;
+  z-index: 1;
+}
+
+.tracking-step.is-done .tracking-dot { border-color: #1f7a3d; background: #1f7a3d; }
+.tracking-step.is-done .tracking-label { color: var(--ink); }
+
+.tracking-step.is-current .tracking-dot {
+  border-color: var(--gold);
+  background: var(--gold);
+  box-shadow: 0 0 0 4px rgba(184, 146, 74, 0.18);
+}
+.tracking-step.is-current .tracking-label { color: var(--ink); font-weight: 700; }
+
+.tracking-carrier {
+  margin: 0 0 var(--space-sm);
+  font-size: 13.5px;
+  color: var(--text-light);
+}
+.tracking-carrier a { color: var(--gold); }
+
+.tracking-test-block {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid rgba(223, 216, 201, 0.9);
+}
+.tracking-test-block h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+/* Barre de progression de la generation du fichier d'impression
+   (voir GelatoProgress dans StepTracking.js). Le pourcentage affiche est
+   REEL (pages rendues / total) ; les phases sans decompte utilisent une
+   barre indeterminee plutot qu'un chiffre invente. */
+.gelato-progress { margin-top: var(--space-sm); }
+
+.gelato-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+.gelato-progress-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+  flex: none;
+}
+
+.gelato-progress-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(36, 31, 24, 0.1);
+  overflow: hidden;
+}
+
+.gelato-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--gold);
+  transition: width 0.4s ease;
+}
+
+/* Phase sans decompte : va-et-vient continu, aucune promesse chiffree. */
+.gelato-progress-bar.is-indeterminate .gelato-progress-fill {
+  width: 35%;
+  animation: gelato-progress-slide 1.5s ease-in-out infinite;
+}
+
+@keyframes gelato-progress-slide {
+  0% { margin-left: -35%; }
+  100% { margin-left: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gelato-progress-bar.is-indeterminate .gelato-progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+.gelato-progress-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-light);
+}

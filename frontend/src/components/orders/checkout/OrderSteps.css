@@ -1,0 +1,85 @@
+/* Frise d'etapes du parcours de commande (voir OrderSteps.js) — memes
+   tokens que le reste du theme luxe, aucune nouvelle identite visuelle. */
+.order-steps {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.order-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Trait de liaison entre deux etapes : purement decoratif. */
+.order-step + .order-step::before {
+  content: '';
+  width: 18px;
+  height: 1px;
+  background: rgba(36, 31, 24, 0.18);
+  flex: none;
+}
+
+.order-step-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 6px 4px;
+  font: inherit;
+  text-align: left;
+  color: var(--text-light);
+}
+button.order-step-inner { cursor: pointer; }
+button.order-step-inner:hover .order-step-label { color: var(--ink); }
+
+.order-step-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(36, 31, 24, 0.2);
+  font-size: 12.5px;
+  font-weight: 700;
+  flex: none;
+  transition: var(--transition-fast);
+}
+
+.order-step-label {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-step.is-done .order-step-index {
+  border-color: #1f7a3d;
+  background: #1f7a3d;
+  color: var(--white);
+}
+
+.order-step.is-current .order-step-index {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: var(--white);
+}
+.order-step.is-current .order-step-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .order-step + .order-step::before { display: none; }
+  .order-step-label { font-size: 12px; }
+}

@@ -53,16 +53,38 @@ async function buildGelatoPrintReadyPdf({
   gelatoProductUid,
   pageCount,
   outputPath,
-  scale
+  scale,
+  // Progression REELLE (2026-09-11) : la generation dure plusieurs minutes
+  // (~15 s par page), l'appelant doit pouvoir l'afficher. Optionnel : sans
+  // callback, comportement strictement inchange.
+  onProgress
 }) {
+  const report = (phase, done = 0, total = 0) => {
+    if (typeof onProgress !== 'function') return;
+    try {
+      onProgress({ phase, done, total });
+    } catch (_error) {
+      // Jamais bloquant : un rapport de progression ne doit pas casser un rendu.
+    }
+  };
+
+  report('cover');
   const { buffer: coverBuffer, dims } = await composeGelatoWraparoundCover({
     book, items, template, format, gelatoProductUid, pageCount
   });
   const fullSheetSize = dims.wraparoundInsideSize || dims.bleedSize;
 
   const realPages = interiorPages.map((page, index) => ({ ...page, page_index: index }));
+  report('pages', 0, realPages.length);
   const interiorImages = await pdfService.capturePagesAsImages({
-    book, pages: realPages, items, layouts, format, scale, bleedMm: GELATO_BLEED_MM
+    book,
+    pages: realPages,
+    items,
+    layouts,
+    format,
+    scale,
+    bleedMm: GELATO_BLEED_MM,
+    onProgress: ({ done, total }) => report('pages', done, total)
   });
 
   // dims.pagesCount = le VRAI total interieur exige par Gelato pour ce
@@ -84,6 +106,7 @@ async function buildGelatoPrintReadyPdf({
   const coverWidthPt = fullSheetSize.width * MM_TO_PT;
   const coverHeightPt = fullSheetSize.height * MM_TO_PT;
 
+  report('assembling', interiorImages.length, interiorImages.length);
   await new Promise((resolve, reject) => {
     const doc = new PDFDocument({ autoFirstPage: false });
     const stream = fs.createWriteStream(outputPath);

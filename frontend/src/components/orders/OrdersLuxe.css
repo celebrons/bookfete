@@ -359,3 +359,35 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Parcours en 4 ecrans (2026-09-11) ---------------------------------- */
+/* Navigation entre les ecrans de SAISIE (produit/livraison) — disparait des
+   qu'une commande existe : l'etape est alors imposee par son etat reel. */
+.orders-step-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: var(--space-md);
+}
+
+/* Rappel de l'adresse de livraison dans le recapitulatif avant paiement. */
+.orders-recap-address {
+  margin: var(--space-md) 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--silk);
+}
+.orders-recap-address span {
+  display: block;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+.orders-recap-address p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink);
+}

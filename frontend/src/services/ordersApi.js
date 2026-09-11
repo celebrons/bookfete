@@ -124,4 +124,9 @@ export const sendOrderToGelatoTest = (orderId) => request(`/orders/${orderId}/ge
   method: 'POST'
 });
 
+// Suivi REEL de production : interroge l'imprimeur (voir
+// backend/routes/orders.js GET /:orderId/tracking). Renvoie toujours
+// quelque chose d'affichable, meme si Gelato est injoignable (`stale`).
+export const getOrderTracking = (orderId) => request(`/orders/${orderId}/tracking`);
+
 export const getApiBaseUrl = buildApiBaseUrl;

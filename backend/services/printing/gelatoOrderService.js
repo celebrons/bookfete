@@ -70,7 +70,7 @@ function isGelatoLiveOrdersEnabled() {
  * @param {object} input - { db, book, order, ownerEmail }
  * @returns {Promise<{skipped:boolean, gelatoOrderId?:string, gelatoOrderType?:string, error?:string}>}
  */
-async function submitPrintOrderToGelato({ db, book, order, ownerEmail }) {
+async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgress }) {
   if (order?.metadata?.gelatoOrderId) {
     return { skipped: true, reason: 'already_submitted', gelatoOrderId: order.metadata.gelatoOrderId };
   }
@@ -101,10 +101,16 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail }) {
       book, items, layouts, template, format, interiorPages,
       gelatoProductUid: gelatoProduct.productUid,
       pageCount,
-      outputPath
+      outputPath,
+      onProgress
     });
 
+    // Phases restantes apres le rendu : l'envoi du fichier puis la creation
+    // de la commande. Courtes par rapport au rendu, mais annoncees pour que
+    // l'utilisateur ne voie pas la barre figee a 100% sans explication.
+    if (typeof onProgress === 'function') onProgress({ phase: 'uploading' });
     const fileUrl = await uploadPrintFile(built.outputPath, `orders/${order.id}/print-ready.pdf`);
+    if (typeof onProgress === 'function') onProgress({ phase: 'submitting' });
 
     const isLive = isGelatoLiveOrdersEnabled();
     const payload = gelatoClient.buildOrderPayload({

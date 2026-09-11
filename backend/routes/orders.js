@@ -4,6 +4,8 @@ const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const { submitPrintOrderToGelato, isGelatoLiveOrdersEnabled } = require('../services/printing/gelatoOrderService');
+const gelatoClient = require('../services/printing/gelatoClient');
+const gelatoTracking = require('../services/printing/gelatoTracking');
 let Stripe = null;
 
 try {
@@ -27,6 +29,23 @@ const ORDER_STATUSES = new Set([
   'cancelled',
   'failed'
 ]);
+// Ordre de progression d'une commande — miroir de ORDER_STATUS_SEQUENCE
+// (frontend/src/utils/orderWorkflow.js), meme convention de duplication
+// assumee que les autres petites tables partagees de ce projet. Sert au
+// suivi de production a ne jamais faire RECULER un statut (voir
+// GET /:orderId/tracking). 'draft'/'cancelled'/'failed' sont hors sequence
+// a dessein : ce ne sont pas des etapes d'avancement.
+const ORDER_STATUS_SEQUENCE = [
+  'awaiting_payment',
+  'paid',
+  'pdf_generating',
+  'pdf_ready',
+  'print_queued',
+  'sent_to_printer',
+  'printed',
+  'shipped',
+  'delivered'
+];
 const ORDER_STATUS_REQUIRES_PAID = new Set([
   'pdf_generating',
   'pdf_ready',
@@ -521,15 +540,37 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Livre introuvable' });
     }
 
-    // Deja envoye : reponse immediate, rien a relancer (idempotence deja
-    // assuree par le service, on l'expose juste tout de suite ici).
-    if (order.metadata?.gelatoOrderId) {
+    // Deja envoye ? L'idempotence de gelatoOrderService est indexee sur la
+    // COMMANDE, alors que le format d'impression vit sur le LIVRE : apres un
+    // changement de format (ou toute modification du livre), renvoyer un test
+    // est precisement ce qu'on veut — sinon l'utilisateur recoit "deja
+    // envoye" et ne peut plus rien tester (retour utilisateur 2026-09-11).
+    //
+    // Un BROUILLON est donc rejouable ; une vraie commande (issue du chemin
+    // paiement, orderType 'order') ne l'est JAMAIS : la reprendre
+    // reimprimerait et refacturerait.
+    const previousGelatoOrderId = order.metadata?.gelatoOrderId || null;
+    const previousOrderType = order.metadata?.gelatoOrderType || 'draft';
+
+    if (previousGelatoOrderId && previousOrderType !== 'draft') {
       return res.json({
         status: 'done',
         skipped: true,
-        gelatoOrderId: order.metadata.gelatoOrderId,
-        gelatoOrderType: order.metadata.gelatoOrderType || 'draft'
+        gelatoOrderId: previousGelatoOrderId,
+        gelatoOrderType: previousOrderType
       });
+    }
+
+    if (previousGelatoOrderId) {
+      // Menage chez Gelato : le brouillon precedent n'a plus de raison
+      // d'exister et encombrerait le tableau de bord a chaque essai. Best
+      // effort — un echec de suppression ne doit jamais empecher le nouvel
+      // envoi (le pire cas est un brouillon orphelin, sans consequence).
+      try {
+        await gelatoClient.deleteOrder(previousGelatoOrderId);
+      } catch (error) {
+        console.warn('Suppression du brouillon Gelato precedent impossible', previousGelatoOrderId, ':', error.message);
+      }
     }
 
     // ASYNCHRONE, volontairement (mesure 2026-09-11 : ~15 s par page pour
@@ -540,17 +581,94 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
     // on repond tout de suite, et le client suit l'avancement en relisant
     // la commande (meme principe que l'export PDF deja en place).
     const startedAt = getNowIso();
+    const initialProgress = { phase: 'starting', done: 0, total: 0, updatedAt: startedAt };
+
+    // Prix RECALCULE sur l'etat actuel du livre (2026-09-11, demande
+    // utilisateur : "il faut recalculer et renvoyer avec le vrai prix meme
+    // pour le test"). Le produit envoye a Gelato est resolu depuis
+    // book.print_format au moment de l'envoi : sans ce recalcul, une
+    // commande testee apres un changement de format afficherait encore le
+    // prix et la pagination de l'ancien format — incoherent avec ce qui
+    // part reellement en production. Meme fonction que la creation de
+    // commande (computeOrderPricing), jamais un second calcul parallele.
+    const refreshedPricing = computeOrderPricing({
+      book,
+      type,
+      quantity: order.quantity || 1
+    });
+
+    // Metadonnees remises a zero pour ce nouvel essai : sans effacer
+    // gelatoOrderId, le garde-fou d'idempotence de gelatoOrderService
+    // court-circuiterait immediatement la soumission. L'ancien brouillon est
+    // ARCHIVE (jamais perdu silencieusement) : utile pour retrouver ce qui a
+    // ete envoye lors des essais precedents.
+    const previousDrafts = Array.isArray(order.metadata?.gelatoPreviousDrafts)
+      ? order.metadata.gelatoPreviousDrafts
+      : [];
+    const baseMetadata = {
+      ...(order.metadata || {}),
+      gelatoOrderId: null,
+      gelatoOrderType: null,
+      gelatoFileUrl: null,
+      gelatoError: null,
+      gelatoTestStartedAt: startedAt,
+      ...(previousGelatoOrderId
+        ? {
+          gelatoPreviousDrafts: [
+            ...previousDrafts,
+            { gelatoOrderId: previousGelatoOrderId, replacedAt: startedAt, printFormat: book.print_format }
+          ]
+        }
+        : {})
+    };
+
     await supabase
       .from('orders')
       .update({
-        metadata: { ...(order.metadata || {}), gelatoTestStartedAt: startedAt, gelatoError: null },
+        // Le prix et l'instantane suivent le livre reellement envoye.
+        unit_cents: refreshedPricing.unitCents,
+        total_cents: refreshedPricing.totalCents,
+        quantity: refreshedPricing.quantity,
+        snapshot: {
+          ...(order.snapshot || {}),
+          printFormat: book.print_format || 'standard',
+          pages: Number(book.page_count || 0) || null,
+          repricedAt: startedAt
+        },
+        metadata: {
+          ...baseMetadata,
+          pricing: refreshedPricing.breakdown,
+          gelatoProgress: initialProgress
+        },
         updated_at: startedAt
       })
       .eq('id', order.id);
 
+    // L'objet transmis au service doit refleter ce reset, sinon il verrait
+    // encore l'ancien gelatoOrderId (il recoit `order`, pas la ligne relue).
+    const orderForSubmission = { ...order, metadata: baseMetadata };
+
+    // Progression persistee en base : c'est le seul moyen pour le client de
+    // suivre un travail qui dure plusieurs minutes dans un processus
+    // detache. Ecriture "au fil de l'eau" mais peu frequente en pratique
+    // (une page rendue toutes les ~15 s), donc pas de limitation
+    // supplementaire necessaire. Jamais bloquant : une ecriture de
+    // progression qui echoue ne doit pas interrompre la generation.
+    const writeProgress = (progress) => {
+      supabase
+        .from('orders')
+        .update({
+          metadata: { ...baseMetadata, pricing: refreshedPricing.breakdown, gelatoProgress: { ...progress, updatedAt: getNowIso() } }
+        })
+        .eq('id', order.id)
+        .then(() => {}, () => {});
+    };
+
     (async () => {
       try {
-        const result = await submitPrintOrderToGelato({ db: supabase, book, order, ownerEmail: req.user.email });
+        const result = await submitPrintOrderToGelato({
+          db: supabase, book, order: orderForSubmission, ownerEmail: req.user.email, onProgress: writeProgress
+        });
         if (result.error) {
           console.error('Envoi de test Gelato echoue pour la commande', order.id, ':', result.error);
         } else {
@@ -566,6 +684,102 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
     })();
 
     return res.status(202).json({ status: 'started', startedAt });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/orders/:orderId/tracking
+// Suivi REEL de production (2026-09-11) : interroge Gelato pour savoir ou en
+// est vraiment la commande (en production / imprimee / expediee + numero de
+// suivi), la ou l'application se contentait jusqu'ici d'afficher un statut
+// local qui n'avancait jamais tout seul pour une commande imprimee.
+//
+// Deux garanties :
+//  - le statut n'est persiste QUE s'il AVANCE (comparaison via
+//    ORDER_STATUS_SEQUENCE) : un aller-retour d'API ne peut jamais faire
+//    reculer une commande deja expediee ;
+//  - jamais bloquant : si Gelato est injoignable ou renvoie un statut
+//    inconnu, on renvoie le dernier etat connu avec `stale: true` plutot
+//    qu'une erreur (l'ecran de suivi doit toujours afficher quelque chose).
+router.get('/:orderId/tracking', authenticate, async (req, res) => {
+  try {
+    const db = createUserScopedClient(req);
+    const { data: order, error: orderError } = await db
+      .from('orders')
+      .select('*')
+      .eq('id', req.params.orderId)
+      .eq('owner_id', req.user.id)
+      .single();
+
+    if (orderError || !order) {
+      return res.status(404).json({ error: 'Commande introuvable' });
+    }
+
+    const gelatoOrderId = order.metadata?.gelatoOrderId || null;
+    const localState = {
+      status: order.status,
+      gelatoOrderId,
+      gelatoStatus: order.metadata?.gelatoFulfillmentStatus || null,
+      tracking: order.metadata?.tracking || { carrier: null, code: null, url: null },
+      updatedAt: order.updated_at || null
+    };
+
+    // Commande PDF, ou impression pas encore soumise a l'imprimeur : rien a
+    // demander a Gelato, l'etat local EST l'etat reel.
+    if (!gelatoOrderId) {
+      return res.json({ ...localState, source: 'local', stale: false });
+    }
+
+    let gelatoOrder = null;
+    try {
+      gelatoOrder = await gelatoClient.getOrder(gelatoOrderId);
+    } catch (error) {
+      console.error('Suivi Gelato indisponible pour la commande', order.id, ':', error.message);
+      return res.json({ ...localState, source: 'cache', stale: true });
+    }
+
+    const rawStatus = gelatoTracking.readGelatoFulfillmentStatus(gelatoOrder);
+    const mappedStatus = gelatoTracking.mapGelatoStatus(rawStatus);
+    const tracking = gelatoTracking.extractTracking(gelatoOrder);
+
+    // Avancee seulement : un statut inconnu (mappedStatus null) ou anterieur
+    // laisse la commande exactement ou elle est.
+    const currentRank = ORDER_STATUS_SEQUENCE.indexOf(order.status);
+    const nextRank = mappedStatus ? ORDER_STATUS_SEQUENCE.indexOf(mappedStatus) : -1;
+    const shouldAdvance = mappedStatus && nextRank > -1 && nextRank > currentRank;
+
+    const nowIso = getNowIso();
+    const nextMetadata = {
+      ...(order.metadata || {}),
+      gelatoFulfillmentStatus: rawStatus || null,
+      gelatoCheckedAt: nowIso,
+      tracking
+    };
+
+    const { data: updated } = await supabase
+      .from('orders')
+      .update({
+        ...(shouldAdvance ? { status: mappedStatus } : {}),
+        metadata: nextMetadata,
+        updated_at: nowIso
+      })
+      .eq('id', order.id)
+      .select('*')
+      .single();
+
+    return res.json({
+      status: updated?.status || (shouldAdvance ? mappedStatus : order.status),
+      gelatoOrderId,
+      gelatoStatus: rawStatus || null,
+      // Signale explicitement un statut que nous ne savons pas traduire :
+      // l'ecran affiche alors la chaine brute plutot que d'inventer.
+      gelatoStatusUnknown: Boolean(rawStatus && !mappedStatus),
+      tracking,
+      updatedAt: nowIso,
+      source: 'gelato',
+      stale: false
+    });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

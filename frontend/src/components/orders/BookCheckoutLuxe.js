@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import {
@@ -8,17 +8,16 @@ import {
   getOrderById,
   getApiBaseUrl,
   getGelatoStatus,
+  getOrderTracking,
   listOrdersByBook,
   sendOrderToGelatoTest,
   updateOrderStatus
 } from '../../services/ordersApi';
 import { estimatePrice } from '../../services/compositionApi';
-import {
-  formatPriceCents,
-  getOrderStatusConfig,
-  includesPdf,
-  includesPrint
-} from '../../utils/orderWorkflow';
+// formatPriceCents/getOrderStatusConfig ne sont plus utilises ICI : ils ont
+// suivi les blocs d'affichage dans checkout/ (StepProduct, StepPayment,
+// StepTracking), qui sont desormais seuls responsables du rendu.
+import { includesPdf, includesPrint } from '../../utils/orderWorkflow';
 import {
   getBookLifecycleStatusFromBook,
   isBookLifecycleAtLeast
@@ -28,6 +27,11 @@ import {
   getJourneyStatusConfig,
   resolveBookJourneyStatus
 } from '../../utils/clientJourney';
+import OrderSteps from './checkout/OrderSteps';
+import StepProduct from './checkout/StepProduct';
+import StepAddress from './checkout/StepAddress';
+import StepPayment from './checkout/StepPayment';
+import StepTracking from './checkout/StepTracking';
 import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
 
@@ -116,6 +120,7 @@ const BookCheckoutLuxe = () => {
   // mode production desactive). Voir backend/routes/orders.js.
   const [gelatoStatus, setGelatoStatus] = useState(null);
   const [gelatoSending, setGelatoSending] = useState(false);
+  const [gelatoProgress, setGelatoProgress] = useState(null);
   const [gelatoResult, setGelatoResult] = useState(null);
   const [gelatoError, setGelatoError] = useState('');
   const [pdfJob, setPdfJob] = useState(null);
@@ -158,6 +163,15 @@ const BookCheckoutLuxe = () => {
     String(latestOrder?.status || '').toLowerCase() === 'awaiting_payment'
   );
   const checkoutFormLocked = hasPendingPaymentOrder;
+
+  // --- Parcours en 4 ecrans (2026-09-11) -----------------------------------
+  // L'etape n'est PAS une navigation libre : elle est derivee de l'etat reel
+  // de la commande (voir derivedStep plus bas). `manualStep` ne sert qu'a
+  // avancer/reculer AVANT le paiement ; des qu'une commande existe, l'etat
+  // reel reprend la main.
+  const [manualStep, setManualStep] = useState(0);
+  const [tracking, setTracking] = useState(null);
+  const [loadingTracking, setLoadingTracking] = useState(false);
   const effectiveOrderType = checkoutFormLocked
     ? String(latestOrder?.type || orderType).toLowerCase()
     : orderType;
@@ -167,6 +181,39 @@ const BookCheckoutLuxe = () => {
   const effectiveQuantity = checkoutFormLocked
     ? Math.max(1, Number(latestOrder?.quantity || quantity || 1))
     : quantity;
+  const effectiveUnit = checkoutFormLocked
+    ? Number(latestOrder?.unit_cents || estimate.unit || 0)
+    : (estimate.unit || 0);
+
+  // Etapes affichees : l'adresse disparait completement pour une commande
+  // PDF (rien a livrer) — jamais une etape grisee qu'on n'atteindra pas.
+  const steps = useMemo(() => {
+    const list = [{ key: 'product', label: 'Produit' }];
+    if (includesPrint(effectiveOrderType)) list.push({ key: 'address', label: 'Livraison' });
+    list.push({ key: 'payment', label: 'Paiement' });
+    list.push({ key: 'tracking', label: 'Suivi' });
+    return list;
+  }, [effectiveOrderType]);
+
+  const addressComplete = useMemo(() => (
+    ['fullName', 'line1', 'postalCode', 'city', 'country']
+      .every((field) => String(address?.[field] || '').trim().length > 0)
+  ), [address]);
+
+  // Etape REELLE : une commande payee renvoie au suivi (sans retour possible),
+  // une commande en attente de paiement renvoie a l'ecran paiement. Tant
+  // qu'aucune commande n'existe, l'utilisateur avance librement dans les
+  // etapes de saisie.
+  const derivedStep = useMemo(() => {
+    const indexOfKey = (key) => steps.findIndex((step) => step.key === key);
+    const status = String(latestOrder?.status || '').toLowerCase();
+    if (latestOrder && status !== 'awaiting_payment') return indexOfKey('tracking');
+    if (hasPendingPaymentOrder) return indexOfKey('payment');
+    return Math.min(manualStep, indexOfKey('payment'));
+  }, [latestOrder, hasPendingPaymentOrder, manualStep, steps]);
+
+  const currentStepKey = steps[derivedStep]?.key || 'product';
+  const isTrackingStep = currentStepKey === 'tracking';
 
   useEffect(() => {
     const loadData = async () => {
@@ -514,6 +561,9 @@ const BookCheckoutLuxe = () => {
       try {
         const fresh = await getOrderById(orderId);
         const meta = fresh?.metadata || {};
+        // Progression REELLE ecrite par le serveur au fil du rendu (phase +
+        // pages rendues / total) — voir backend/routes/orders.js.
+        if (meta.gelatoProgress) setGelatoProgress(meta.gelatoProgress);
         if (meta.gelatoOrderId) {
           setGelatoResult({ gelatoOrderId: meta.gelatoOrderId, gelatoOrderType: meta.gelatoOrderType || 'draft' });
           return;
@@ -529,11 +579,43 @@ const BookCheckoutLuxe = () => {
     setGelatoError("L'envoi est toujours en cours apres 15 minutes. Rechargez la page pour voir ou il en est.");
   };
 
+  // Suivi reel : charge a l'affichage de l'ecran de suivi, rafraichi a la
+  // demande, et automatiquement tant que la commande n'est pas dans un etat
+  // terminal — jamais de sondage infini.
+  const refreshTracking = useCallback(async (orderId) => {
+    if (!orderId) return;
+    setLoadingTracking(true);
+    try {
+      const result = await getOrderTracking(orderId);
+      setTracking(result);
+      if (result?.status && result.status !== latestOrder?.status) {
+        setLatestOrder((previous) => (previous ? { ...previous, status: result.status } : previous));
+      }
+    } catch (_err) {
+      // Jamais bloquant : l'ecran affiche le dernier etat connu.
+    } finally {
+      setLoadingTracking(false);
+    }
+  }, [latestOrder?.status]);
+
+  useEffect(() => {
+    if (!isTrackingStep || !latestOrder?.id) return undefined;
+    refreshTracking(latestOrder.id);
+
+    const terminal = ['delivered', 'cancelled', 'failed'];
+    if (terminal.includes(String(latestOrder.status || '').toLowerCase())) return undefined;
+
+    const timer = setInterval(() => refreshTracking(latestOrder.id), 60000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTrackingStep, latestOrder?.id]);
+
   const sendToGelatoTest = async () => {
     if (!latestOrder?.id) return;
     setGelatoSending(true);
     setGelatoError('');
     setGelatoResult(null);
+    setGelatoProgress({ phase: 'starting', done: 0, total: 0 });
     try {
       const started = await sendOrderToGelatoTest(latestOrder.id);
       if (started?.status === 'done' || started?.gelatoOrderId) {
@@ -950,6 +1032,14 @@ const BookCheckoutLuxe = () => {
           </div>
         </header>
 
+        {/* Frise du parcours : retour en arriere autorise uniquement sur les
+            etapes de saisie, et seulement tant qu'aucune commande n'existe. */}
+        <OrderSteps
+          steps={steps}
+          currentStep={derivedStep}
+          onGoToStep={latestOrder ? null : setManualStep}
+        />
+
         {notice?.message && (
           <div className={`orders-notice is-${notice.type || 'info'}`}>
             {notice.message}
@@ -967,153 +1057,86 @@ const BookCheckoutLuxe = () => {
           </div>
         )}
 
+        {/* Les 4 ecrans du parcours (2026-09-11) : un seul est affiche a la
+            fois. La logique reste ici, seuls les blocs d'affichage vivent
+            dans checkout/ — voir OrderSteps pour la frise. */}
         <section className="orders-grid">
-          <article className="orders-panel">
-            <h2>{checkoutFormLocked ? '1. Commande en attente' : '1. Choix du produit'}</h2>
-            <div className="product-choice-grid">
-              {[
-                { key: 'pdf', title: 'PDF seul', note: 'Telechargement uniquement' },
-                { key: 'print', title: 'Livre imprime', note: 'Impression + livraison' },
-                { key: 'pack', title: 'Pack PDF + imprime', note: 'Les deux versions' }
-              ].map((choice) => (
-                <button
-                  key={choice.key}
-                  type="button"
-                  className={`product-choice ${effectiveOrderType === choice.key ? 'is-active' : ''}`}
-                  onClick={() => {
-                    if (!checkoutFormLocked) {
-                      setOrderType(choice.key);
-                    }
-                  }}
-                  disabled={checkoutFormLocked}
-                >
-                  <strong>{choice.title}</strong>
-                  <span>{choice.note}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="orders-field">
-              <label htmlFor="quantity">Quantite</label>
-              <input
-                id="quantity"
-                type="number"
-                min="1"
-                max="20"
-                className="input-luxe"
-                value={effectiveQuantity}
-                onChange={(event) => setQuantity(Number(event.target.value || 1))}
-                disabled={checkoutFormLocked}
-              />
-            </div>
-          </article>
-
-          {includesPrint(effectiveOrderType) && (
-            <article className="orders-panel">
-              <h2>2. Adresse de livraison</h2>
-              <div className="orders-form-grid">
-                <input className="input-luxe" name="fullName" value={address.fullName} onChange={setAddressField} placeholder="Nom complet" disabled={checkoutFormLocked} />
-                <input className="input-luxe" name="line1" value={address.line1} onChange={setAddressField} placeholder="Adresse" disabled={checkoutFormLocked} />
-                <input className="input-luxe" name="line2" value={address.line2} onChange={setAddressField} placeholder="Complement" disabled={checkoutFormLocked} />
-                <input className="input-luxe" name="postalCode" value={address.postalCode} onChange={setAddressField} placeholder="Code postal" disabled={checkoutFormLocked} />
-                <input className="input-luxe" name="city" value={address.city} onChange={setAddressField} placeholder="Ville" disabled={checkoutFormLocked} />
-                <input className="input-luxe" name="country" value={address.country} onChange={setAddressField} placeholder="Pays" disabled={checkoutFormLocked} />
-                <input className="input-luxe" name="phone" value={address.phone} onChange={setAddressField} placeholder="Telephone" disabled={checkoutFormLocked} />
-              </div>
-            </article>
+          {currentStepKey === 'product' && (
+            <StepProduct
+              orderType={effectiveOrderType}
+              onChangeType={setOrderType}
+              quantity={effectiveQuantity}
+              onChangeQuantity={setQuantity}
+              locked={checkoutFormLocked}
+              unitCents={effectiveUnit}
+              totalCents={effectiveTotal}
+            />
           )}
 
-          {gelatoStatus?.testAvailable && latestOrder && includesPrint(String(latestOrder.type || '')) && (
-            <article className="orders-panel">
-              <h2>Envoi de test a l'imprimeur</h2>
-              <p className="orders-disclaimer">
-                Envoie ce livre a Gelato en <strong>brouillon</strong> : le vrai fichier d'impression est genere
-                et depose chez l'imprimeur, mais rien n'est facture ni imprime. Aucun paiement n'est necessaire.
-                La generation prend plusieurs minutes (chaque page est rendue en haute resolution) : laissez
-                cette page ouverte, le resultat s'affiche des qu'il est pret.
-              </p>
-              <button
-                type="button"
-                className="btn btn-outline"
-                disabled={gelatoSending}
-                onClick={sendToGelatoTest}
-              >
-                {gelatoSending ? 'Envoi en cours (plusieurs minutes)...' : 'Envoyer a Gelato (test)'}
-              </button>
-              {gelatoResult && (
-                <p className="orders-disclaimer">
-                  {gelatoResult.skipped
-                    ? `Deja envoye pour cette commande (${gelatoResult.gelatoOrderId}).`
-                    : `Brouillon cree chez Gelato : ${gelatoResult.gelatoOrderId}. Retrouvez-le dans votre tableau de bord Gelato.`}
-                </p>
+          {currentStepKey === 'address' && (
+            <StepAddress
+              address={address}
+              onChangeField={setAddressField}
+              locked={checkoutFormLocked}
+              incomplete={!addressComplete}
+            />
+          )}
+
+          {currentStepKey === 'payment' && (
+            <StepPayment
+              orderType={effectiveOrderType}
+              quantity={effectiveQuantity}
+              unitCents={effectiveUnit}
+              totalCents={effectiveTotal}
+              address={address}
+              bookTitle={book?.title}
+              onPay={hasPendingPaymentOrder ? payPendingOrder : submitOrder}
+              submitting={submitting}
+              canPay={canOrder}
+              stripeEnabled={stripeTestEnabled}
+              hasPendingPaymentOrder={hasPendingPaymentOrder}
+            />
+          )}
+
+          {currentStepKey === 'tracking' && (
+            <StepTracking
+              order={latestOrder}
+              tracking={tracking}
+              loadingTracking={loadingTracking}
+              onRefreshTracking={() => refreshTracking(latestOrder?.id)}
+              onDownloadPdf={downloadPdfFile}
+              downloadingKind={downloadingKind}
+              gelatoTestAvailable={Boolean(gelatoStatus?.testAvailable)}
+              gelatoSending={gelatoSending}
+              gelatoProgress={gelatoProgress}
+              gelatoResult={gelatoResult}
+              gelatoError={gelatoError}
+              onSendGelatoTest={sendToGelatoTest}
+            />
+          )}
+
+          {/* Navigation entre les ecrans de SAISIE uniquement : une fois la
+              commande creee, l'etape est imposee par son etat reel. */}
+          {!latestOrder && (
+            <div className="orders-step-nav">
+              {derivedStep > 0 && (
+                <button type="button" className="btn btn-outline" onClick={() => setManualStep(derivedStep - 1)}>
+                  Retour
+                </button>
               )}
-              {gelatoError && <p className="orders-error">{gelatoError}</p>}
-            </article>
-          )}
-
-          <article className="orders-panel">
-            <h2>{includesPrint(effectiveOrderType) ? '3' : '2'}. Paiement et execution</h2>
-            <div className="orders-summary">
-              <div>
-                <span>Produit</span>
-                <strong>{effectiveOrderType === 'pdf' ? 'PDF seul' : effectiveOrderType === 'print' ? 'Livre imprime' : 'Pack PDF + imprime'}</strong>
-              </div>
-              <div>
-                <span>Total</span>
-                <strong>{formatPriceCents(effectiveTotal)}</strong>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={submitting || !canOrder || !stripeTestEnabled}
-              onClick={hasPendingPaymentOrder ? payPendingOrder : submitOrder}
-            >
-              {submitting
-                ? 'Traitement...'
-                : hasPendingPaymentOrder
-                  ? 'Payer la commande en attente'
-                  : 'Payer avec Stripe (test)'}
-            </button>
-            <p className="orders-disclaimer">
-              {stripeTestEnabled
-                ? hasPendingPaymentOrder
-                  ? 'Une commande en attente existe deja. Finalisez d abord ce paiement.'
-                  : 'Stripe Checkout en mode test. Utilisez une carte de test Stripe.'
-                : 'Le paiement est temporairement indisponible: activez Stripe pour lancer la commande.'}
-            </p>
-          </article>
-        </section>
-
-        {latestOrder && (
-          <section className="orders-panel orders-result">
-            <h2>Commande creee</h2>
-            <div className="orders-result-grid">
-              <div>
-                <span>Numero</span>
-                <strong>{latestOrder.order_number}</strong>
-              </div>
-              <div>
-                <span>Statut</span>
-                <strong>{getOrderStatusConfig(latestOrder.status).label}</strong>
-              </div>
-            </div>
-
-            {(latestOrder.status === 'pdf_ready' || latestOrder?.metadata?.pdfReady) && (
-              <div className="orders-download-actions">
+              {currentStepKey !== 'payment' && (
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  onClick={() => downloadPdfFile('final')}
-                  disabled={downloadingKind === 'final'}
+                  className="btn btn-primary"
+                  disabled={currentStepKey === 'address' && !addressComplete}
+                  onClick={() => setManualStep(derivedStep + 1)}
                 >
-                  {downloadingKind === 'final' ? 'Telechargement...' : 'Telecharger PDF final complet'}
+                  Continuer
                 </button>
-              </div>
-            )}
-          </section>
-        )}
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
