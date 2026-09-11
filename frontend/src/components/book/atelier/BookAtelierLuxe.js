@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../../services/supabaseClient';
 import {
@@ -27,6 +27,7 @@ import AtelierConfirmSwitchDialog from './AtelierConfirmSwitchDialog';
 import AtelierOnboarding from './AtelierOnboarding';
 import AtelierFinishModal from './AtelierFinishModal';
 import AtelierPageFilmstrip from './AtelierPageFilmstrip';
+import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
 import { findAtelierLayout } from './atelierLayouts';
 import '../../../styles/luxe-theme.css';
 import './BookAtelierLuxe.css';
@@ -75,13 +76,12 @@ export default function BookAtelierLuxe() {
   const [draftLayoutSlug, setDraftLayoutSlug] = useState(null);
   const [draftSlotItemIds, setDraftSlotItemIds] = useState([]);
   // Ajustement manuel de cadrage (focalX/focalY/zoom) : { [itemId]: {...} },
-  // meme forme que content.photoAdjustments cote backend. L'UI dediee
-  // ("Ajuster") a ete retiree (retour utilisateur 2026-09-10 : "ne sert a
-  // rien") mais ce brouillon reste charge/re-sauvegarde tel quel a chaque
-  // sauvegarde de page — jamais ecrase silencieusement si une page porte
-  // deja un ajustement enregistre avant ce retrait (voir l'effet de
-  // sauvegarde plus bas). Reste toujours {} pour toute nouvelle page.
+  // meme forme que content.photoAdjustments cote backend. L'UI dediee a ete
+  // retiree le 2026-09-10 puis RETABLIE par le cahier des charges v2 (pan &
+  // zoom "toujours disponible", confirme avec l'utilisateur) — elle s'ouvre
+  // desormais au clic sur la photo (voir AtelierPhotoAdjustModal.js).
   const [draftPhotoAdjustments, setDraftPhotoAdjustments] = useState({});
+  const [adjustTargetSlotIndex, setAdjustTargetSlotIndex] = useState(null);
 
   const [coverHtml, setCoverHtml] = useState(null);
   const [backCoverHtml, setBackCoverHtml] = useState(null);
@@ -209,6 +209,21 @@ export default function BookAtelierLuxe() {
   }, [totalPages, pages, layoutsById, photos.length, souvenirs.length]);
   const lastViewIndex = totalViews - 1;
 
+  // Lien profond "?page=N" — utilise par "Revoir ces pages" depuis l'ecran
+  // recapitulatif qualite avant commande (PrintQualityRecapModal). Ne
+  // s'applique qu'UNE fois, au premier chargement des pages : ensuite
+  // l'utilisateur navigue normalement (sinon chaque rendu le ramenerait de
+  // force sur la meme page).
+  const deepLinkAppliedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkAppliedRef.current || !book?.page_count) return;
+    const raw = Number(searchParams.get('page'));
+    if (!Number.isInteger(raw) || raw < 0 || raw >= book.page_count) return;
+    deepLinkAppliedRef.current = true;
+    setViewIndex(Math.floor(raw / 2) + 1);
+    setSelectedSide(raw % 2 === 0 ? 'left' : 'right');
+  }, [book?.page_count, searchParams]);
+
   const viewKind = viewIndex === 0 ? 'cover' : viewIndex === lastViewIndex ? 'back-cover' : 'spread';
   const spreadNumber = viewKind === 'spread' ? viewIndex - 1 : null;
   const leftPageIndex = spreadNumber != null ? spreadNumber * 2 : null;
@@ -275,6 +290,7 @@ export default function BookAtelierLuxe() {
   // a partir de ce qui est deja sauvegarde — jamais a partir du brouillon de
   // la page precedente.
   useEffect(() => {
+    setAdjustTargetSlotIndex(null); // jamais une modale d'ajustement "en cours" en changeant de page
     if (currentPageIndex == null) {
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
@@ -287,7 +303,18 @@ export default function BookAtelierLuxe() {
 
     if (atelierLayout && Array.isArray(pageRow.content?.itemIds) && pageRow.content.itemIds.length === atelierLayout.slots.length) {
       setDraftLayoutSlug(atelierLayout.slug);
-      setDraftSlotItemIds(pageRow.content.itemIds);
+      // Un itemId qui ne correspond plus a AUCUN item reel (photo/souvenir
+      // supprime depuis que cette page a ete enregistree) est traite comme
+      // un emplacement VIDE, jamais comme "rempli" (retour utilisateur,
+      // 2026-09-11) : sans ce nettoyage, un id orphelin restait compte
+      // comme "filled" par l'effet de sauvegarde plus bas
+      // (filledIds.filter(Boolean) le laisse passer, une chaine non vide
+      // reste truthy meme si elle ne pointe plus vers rien) — ce qui
+      // declenchait a tort la sauvegarde VALIDEE (saveManualPage) des que
+      // l'utilisateur touchait a un AUTRE emplacement de cette meme page,
+      // rejetee cote serveur avec un message peu clair.
+      const cleanedItemIds = pageRow.content.itemIds.map((id) => (id && itemsById[id] ? id : null));
+      setDraftSlotItemIds(cleanedItemIds);
       setDraftPhotoAdjustments(pageRow.content?.photoAdjustments || {});
     } else {
       setDraftLayoutSlug(null);
@@ -298,7 +325,7 @@ export default function BookAtelierLuxe() {
     setSelectedSidebarItem(null);
     setSaveStatus('idle');
     setSaveError('');
-  }, [currentPageIndex, pages, layoutsById]);
+  }, [currentPageIndex, pages, layoutsById, itemsById]);
 
   // Sauvegarde automatique — jamais de bouton "Valider" separe, et reflete
   // le brouillon des le PREMIER emplacement rempli (retour utilisateur :
@@ -434,6 +461,45 @@ export default function BookAtelierLuxe() {
         return next;
       });
     }
+  };
+
+  // Ajustement du cadrage (cahier des charges v2) — ouvert au clic sur une
+  // photo deja placee (voir AtelierPageOverlay.js).
+  const handleOpenAdjust = (slotIndex) => {
+    if (!draftSlotItemIds[slotIndex]) return;
+    setAdjustTargetSlotIndex(slotIndex);
+  };
+
+  const handleSavePhotoAdjustment = (itemId, adjustment) => {
+    setDraftPhotoAdjustments((previous) => ({ ...previous, [itemId]: adjustment }));
+    setAdjustTargetSlotIndex(null);
+  };
+
+  const handleResetPhotoAdjustment = (itemId) => {
+    setDraftPhotoAdjustments((previous) => {
+      if (!previous[itemId]) return previous;
+      const next = { ...previous };
+      delete next[itemId];
+      return next;
+    });
+    setAdjustTargetSlotIndex(null);
+  };
+
+  // "Voir d'autres mises en page adaptees" (§2) : bascule la page sur la
+  // mise en page suggeree en gardant la photo concernee a la position ou
+  // elle rentre le mieux, et laisse les autres emplacements vides — la
+  // sauvegarde partielle existante s'occupe du reste.
+  const handleChooseSuggestedLayout = (slug) => {
+    const atelierLayout = findAtelierLayout(slug);
+    const itemId = adjustTargetSlotIndex != null ? draftSlotItemIds[adjustTargetSlotIndex] : null;
+    if (!atelierLayout || !itemId) return;
+    const firstPhotoSlot = atelierLayout.slots.findIndex((type) => type === 'photo');
+    const next = new Array(atelierLayout.slots.length).fill(null);
+    if (firstPhotoSlot >= 0) next[firstPhotoSlot] = itemId;
+    setDraftLayoutSlug(slug);
+    setDraftSlotItemIds(next);
+    setDraftPhotoAdjustments({}); // le cadre change de forme : l'ancien cadrage n'a plus de sens
+    setAdjustTargetSlotIndex(null);
   };
 
   const handleClearPage = async () => {
@@ -676,6 +742,7 @@ export default function BookAtelierLuxe() {
       slotItems={draftSlotItems}
       onAssignSlot={handleAssignSlot}
       onRemoveSlot={handleRemoveSlot}
+      onAdjustSlot={handleOpenAdjust}
       selectedSidebarItem={selectedSidebarItem}
       photoAdjustments={draftPhotoAdjustments}
       printFormat={book?.print_format}
@@ -740,6 +807,23 @@ export default function BookAtelierLuxe() {
         estimatedPages={estimatedPages}
         loadingEstimate={loadingEstimate}
         minPages={MIN_AUTO_PAGES}
+      />
+
+      <AtelierPhotoAdjustModal
+        isOpen={adjustTargetSlotIndex != null}
+        item={adjustTargetSlotIndex != null ? draftSlotItems[adjustTargetSlotIndex] : null}
+        layoutSlug={draftLayoutSlug}
+        slotIndex={adjustTargetSlotIndex}
+        printFormat={book?.print_format}
+        adjustment={
+          adjustTargetSlotIndex != null && draftSlotItems[adjustTargetSlotIndex]
+            ? draftPhotoAdjustments[draftSlotItems[adjustTargetSlotIndex].id]
+            : null
+        }
+        onSave={handleSavePhotoAdjustment}
+        onReset={handleResetPhotoAdjustment}
+        onClose={() => setAdjustTargetSlotIndex(null)}
+        onChooseSuggestedLayout={handleChooseSuggestedLayout}
       />
 
       {error && <div className="wizard-error atelier-error">{error}</div>}

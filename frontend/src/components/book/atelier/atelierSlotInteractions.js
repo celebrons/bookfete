@@ -8,10 +8,12 @@
 // exactement la meme logique — jamais deux implementations qui pourraient
 // diverger silencieusement.
 
-export function parseDroppedItemId(event) {
+import { slotAcceptsItem } from './atelierLayouts';
+
+export function parseDroppedItem(event) {
   try {
     const data = JSON.parse(event.dataTransfer.getData('application/json'));
-    return data?.itemId || null;
+    return data?.itemId ? { itemId: data.itemId, kind: data.kind || null } : null;
   } catch (_error) {
     // Charge utile de drag invalide/etrangere : ignoree, jamais un plantage.
     return null;
@@ -37,18 +39,31 @@ export function makeSlotHandlers({
   onCancelRemove
 }) {
   return {
-    handleDrop(event, slotIndex) {
+    // `slotType` (optionnel, retour utilisateur 2026-09-11) : un depot dont
+    // le kind ne correspond pas a l'emplacement (photo -> texte, ou
+    // l'inverse) est refuse ICI, avant meme d'atteindre onAssignSlot —
+    // jusque-la, seul un indice visuel (.is-rejecting) signalait
+    // l'incompatibilite mais le depot etait quand meme accepte, provoquant
+    // ensuite un rejet cote serveur avec un message brut au moment de la
+    // sauvegarde ("Le contenu choisi ne correspond pas aux emplacements...").
+    // Omis (undefined) -> aucune verification, comportement inchange (ex.
+    // un appelant qui ne connait pas encore le type de l'emplacement).
+    handleDrop(event, slotIndex, slotType) {
       event.preventDefault();
-      const itemId = parseDroppedItemId(event);
-      if (itemId) {
-        onAssignSlot(slotIndex, itemId);
+      const dropped = parseDroppedItem(event);
+      if (dropped && (!slotType || slotAcceptsItem(slotType, { kind: dropped.kind }))) {
+        onAssignSlot(slotIndex, dropped.itemId);
         onCancelRemove?.();
       }
     },
-    handleClick(slotIndex, currentItem) {
+    handleClick(slotIndex, currentItem, slotType) {
       if (selectedSidebarItem) {
-        onAssignSlot(slotIndex, selectedSidebarItem.id);
-        onCancelRemove?.();
+        if (!slotType || slotAcceptsItem(slotType, selectedSidebarItem)) {
+          onAssignSlot(slotIndex, selectedSidebarItem.id);
+          onCancelRemove?.();
+        }
+        // Sinon : rien ne se passe, le hint visuel (.is-rejecting) explique
+        // deja pourquoi avant meme le clic.
       } else if (currentItem) {
         if (pendingRemoveIndex === slotIndex) {
           onRemoveSlot(slotIndex);

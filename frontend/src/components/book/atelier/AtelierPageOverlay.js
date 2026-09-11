@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { getOverlayGeometry, OVERLAY_CONTENT_INSET_PCT } from './atelierLayoutGeometry';
 import { makeSlotHandlers } from './atelierSlotInteractions';
 import { slotAcceptsItem } from './atelierLayouts';
-import { describeSlotPhotoQuality } from './photoQuality';
+import { checkSlotImageFit } from './photoQuality';
 import AtelierPhotoLightbox from './AtelierPhotoLightbox';
+import PhotoFitBadge from '../../common/PhotoFitBadge';
 
 // Incrustation directe sur la page centrale ("tester un truc" — variante
 // demandee en plus du panneau "Mise en page" existant, pas a sa place) :
@@ -37,7 +38,7 @@ function EyeIcon() {
   );
 }
 
-function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemoveSlot, selectedSidebarItem, photoAdjustments, printFormat }) {
+function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemoveSlot, onAdjustSlot, selectedSidebarItem, photoAdjustments, printFormat }) {
   // Retrait a deux temps (retour utilisateur : jamais de retrait direct au
   // clic, il faut une confirmation) — meme mecanisme que le panneau "Mise
   // en page" (AtelierLayoutPanel.js), voir atelierSlotInteractions.js pour
@@ -112,11 +113,13 @@ function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemove
           const item = slotItems[index] || null;
           const rejects = Boolean(selectedSidebarItem && !slotAcceptsItem(slotType, selectedSidebarItem));
           const isPending = pendingRemoveIndex === index;
-          // Badge qualite (§19, cahier des charges "PhotoSlot") : calcule
-          // localement (aucun appel reseau, voir photoQuality.js), jamais le
-          // mot "DPI" affiche — juste l'emoji + un texte au survol (title).
-          const quality = item && slotType === 'photo'
-            ? describeSlotPhotoQuality({ item, layoutSlug: slug, slotIndex: index, printFormat, zoom: photoAdjustments?.[item.id]?.zoom })
+          // Controle qualite EN TEMPS REEL (cahier des charges v2, §1/§4.1) :
+          // calcule localement, aucun appel reseau (voir photoQuality.js).
+          // Le badge n'apparait QUE pour 'limite'/'insuffisant' — une photo
+          // correcte ne declenche aucun avertissement visible (critere
+          // d'acceptation n°1) et le mot "DPI" n'est jamais affiche.
+          const fit = item && slotType === 'photo'
+            ? checkSlotImageFit({ item, layoutSlug: slug, slotIndex: index, printFormat, zoom: photoAdjustments?.[item.id]?.zoom })
             : null;
           return (
             <div
@@ -124,14 +127,30 @@ function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemove
               className={`atelier-overlay-slot ${item ? 'is-filled' : ''} ${rejects ? 'is-rejecting' : ''} ${isPending ? 'is-pending-remove' : ''}`}
               style={{ top: `${rect.top}%`, left: `${rect.left}%`, width: `${rect.width}%`, height: `${rect.height}%` }}
               onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => { event.stopPropagation(); handleDrop(event, index); }}
-              onClick={(event) => { event.stopPropagation(); handleClick(index, item); }}
-              title={item ? (isPending ? 'Cliquer a nouveau pour confirmer le retrait' : undefined) : undefined}
+              onDrop={(event) => { event.stopPropagation(); handleDrop(event, index, slotType); }}
+              onClick={(event) => {
+                event.stopPropagation();
+                // Cahier des charges v2 : le repositionnement s'ouvre AU CLIC
+                // SUR LA PHOTO. Priorite a l'assignation quand un element est
+                // selectionne dans "Mes souvenirs" (comportement historique) ;
+                // sinon, sur une photo deja placee, on ouvre l'ajustement au
+                // lieu d'armer un retrait (le retrait a desormais sa croix).
+                if (!selectedSidebarItem && item && slotType === 'photo' && onAdjustSlot) {
+                  onAdjustSlot(index);
+                  return;
+                }
+                handleClick(index, item, slotType);
+              }}
+              title={item
+                ? (isPending
+                  ? 'Cliquer a nouveau pour confirmer le retrait'
+                  : (slotType === 'photo' && !selectedSidebarItem ? 'Cliquer pour ajuster le cadrage' : undefined))
+                : undefined}
             >
               {!item && <span className="atelier-overlay-slot-label">{SLOT_LABELS[slotType] || 'Emplacement'}</span>}
-              {quality && !isPending && (
-                <span className="atelier-overlay-slot-quality" title={quality.label} aria-label={quality.label}>
-                  {quality.emoji}
+              {!isPending && (
+                <span className="atelier-overlay-slot-quality">
+                  <PhotoFitBadge fit={fit} size="sm" />
                 </span>
               )}
               {item && isPending && <span className="atelier-overlay-slot-confirm">Confirmer le retrait ?</span>}

@@ -58,12 +58,39 @@ const CANDIDATE_BROWSER_PATHS = {
   ]
 };
 
-function resolveBrowserPath() {
+// Chromium embarque par puppeteer (dependance ajoutee le 2026-09-11) :
+// dernier recours, mais SEUL chemin disponible en hebergement type Render,
+// ou aucun navigateur n'est installe sur la machine (pas de Chrome, pas
+// d'apt-get hors Docker) — sans lui, ni le fichier d'impression Gelato ni
+// l'export PDF client ne peuvent etre produits en ligne.
+// Volontairement en DERNIER : une machine qui a deja un vrai Chrome (poste
+// de dev Windows/Mac) continue de l'utiliser, comportement inchange.
+// `executablePath()` renvoie une promesse selon les versions de puppeteer :
+// await gere les deux cas. Jamais bloquant : si puppeteer n'est pas
+// installe ou n'a pas telecharge son binaire, on retombe sur null comme
+// avant (l'appelant affiche deja un message clair).
+async function resolvePuppeteerBrowserPath() {
+  try {
+    // require() paresseux : ce module doit rester chargeable meme sans
+    // puppeteer installe (tests, environnements minimaux).
+    // eslint-disable-next-line global-require
+    const puppeteer = require('puppeteer');
+    const executablePath = await puppeteer.executablePath();
+    return executablePath && fs.existsSync(executablePath) ? executablePath : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function resolveBrowserPath() {
   const explicit = process.env.PDF_BROWSER_PATH || process.env.CHROME_BIN || process.env.GOOGLE_CHROME_BIN;
   if (explicit && fs.existsSync(explicit)) return explicit;
 
   const candidates = CANDIDATE_BROWSER_PATHS[process.platform] || CANDIDATE_BROWSER_PATHS.linux;
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+  const systemBrowser = candidates.find((candidate) => fs.existsSync(candidate));
+  if (systemBrowser) return systemBrowser;
+
+  return resolvePuppeteerBrowserPath();
 }
 
 function cleanText(value = '') {
@@ -87,7 +114,7 @@ function execFilePromise(command, args, options) {
 // en PDF. Renvoie le chemin du fichier PDF genere. Leve une erreur explicite
 // si aucun navigateur headless n'est disponible.
 async function renderPdfFromHtml(html, { fileBaseName = 'preview' } = {}) {
-  const browserPath = resolveBrowserPath();
+  const browserPath = await resolveBrowserPath();
   if (!browserPath) {
     throw new Error(
       "Aucun navigateur headless trouve pour le rendu PDF. Definissez PDF_BROWSER_PATH (Chrome/Edge), ou utilisez l'apercu HTML en attendant."
@@ -261,7 +288,7 @@ async function waitForImages(cdp) {
 // au bord si la coupe n'est pas parfaitement precise — c'est exactement
 // le role du bleed, pas une zone destinee a etre visible.
 async function capturePagesAsImages({ book, pages, items, layouts, format, scale = SCREENSHOT_SCALE, bleedMm = 0 }) {
-  const browserPath = resolveBrowserPath();
+  const browserPath = await resolveBrowserPath();
   if (!browserPath) {
     throw new Error(
       "Aucun navigateur headless trouve pour le rendu PDF. Definissez PDF_BROWSER_PATH (Chrome/Edge), ou utilisez l'apercu HTML en attendant."

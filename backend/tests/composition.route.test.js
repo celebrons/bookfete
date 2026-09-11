@@ -926,12 +926,15 @@ describe('routes/composition', () => {
         .set('Authorization', 'Bearer valid-token');
 
       expect(response.status).toBe(200);
-      const flagged = response.body.lowQualityPhotos.find(
+      const flagged = response.body.warnings.find(
         (entry) => entry.pageIndex === 5 && entry.itemId === 'item-5-photo-lowres'
       );
       expect(flagged).toBeDefined();
-      expect(['attention', 'faible']).toContain(flagged.level);
-      expect(flagged.label.toLowerCase()).not.toContain('dpi'); // jamais le mot DPI affiche (§10)
+      expect(['limite', 'insuffisant']).toContain(flagged.statut);
+      expect(flagged.label.toLowerCase()).not.toContain('dpi'); // jamais le mot DPI affiche (§2)
+      expect(response.body.hasWarnings).toBe(true);
+      // Vignette necessaire a l'ecran recapitulatif (§2) — repli sur l'original.
+      expect(flagged.thumbnailUrl).toBeTruthy();
     });
 
     it('ne signale pas une photo haute resolution dans le meme type de cadre', async () => {
@@ -945,10 +948,34 @@ describe('routes/composition', () => {
         .set('Authorization', 'Bearer valid-token');
 
       expect(response.status).toBe(200);
-      const flagged = response.body.lowQualityPhotos.find(
+      const flagged = response.body.warnings.find(
         (entry) => entry.pageIndex === 6 && entry.itemId === 'item-5-photo-hires'
       );
       expect(flagged).toBeUndefined();
+    });
+
+    // Cahier des charges v2, §4 : le statut est PERSISTE a l'ecriture, pas
+    // seulement calcule a l'affichage.
+    it('persiste content.photoFit a la sauvegarde de la page (statut par photo)', async () => {
+      const saved = await request(app)
+        .put('/api/books/book-test-5/pages/9/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-1', itemIds: ['item-5-photo-lowres'] });
+
+      expect(saved.status).toBe(200);
+      expect(saved.body.content.photoFit).toBeDefined();
+      expect(saved.body.content.photoFit['item-5-photo-lowres'].statut).toBe('insuffisant');
+      expect(typeof saved.body.content.photoFit['item-5-photo-lowres'].dpiEffectif).toBe('number');
+    });
+
+    it("n'ajoute pas de photoFit quand aucune photo n'est evaluable (pas de champ vide en base)", async () => {
+      const saved = await request(app)
+        .put('/api/books/book-test-5/pages/10/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-1', itemIds: ['item-5-photo'] }); // item sans metadata width/height
+
+      expect(saved.status).toBe(200);
+      expect(saved.body.content.photoFit).toBeUndefined();
     });
 
     it('lit le zoom manuel stocke sans planter (formule verifiee separement dans photoQualityEngine.test.js)', async () => {
@@ -966,7 +993,7 @@ describe('routes/composition', () => {
         .set('Authorization', 'Bearer valid-token');
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body.lowQualityPhotos)).toBe(true);
+      expect(Array.isArray(response.body.warnings)).toBe(true);
     });
   });
 });

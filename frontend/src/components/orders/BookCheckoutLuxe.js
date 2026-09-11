@@ -7,7 +7,9 @@ import {
   createStripeCheckoutSession,
   getOrderById,
   getApiBaseUrl,
+  getGelatoStatus,
   listOrdersByBook,
+  sendOrderToGelatoTest,
   updateOrderStatus
 } from '../../services/ordersApi';
 import { estimatePrice } from '../../services/compositionApi';
@@ -109,6 +111,13 @@ const BookCheckoutLuxe = () => {
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState(null);
   const [latestOrder, setLatestOrder] = useState(null);
+  // Envoi de test a l'imprimeur (Gelato), sans paiement — n'apparait que si
+  // le serveur dit que c'est reellement possible (cle API configuree ET
+  // mode production desactive). Voir backend/routes/orders.js.
+  const [gelatoStatus, setGelatoStatus] = useState(null);
+  const [gelatoSending, setGelatoSending] = useState(false);
+  const [gelatoResult, setGelatoResult] = useState(null);
+  const [gelatoError, setGelatoError] = useState('');
   const [pdfJob, setPdfJob] = useState(null);
   const [downloadingKind, setDownloadingKind] = useState('');
 
@@ -480,6 +489,62 @@ const BookCheckoutLuxe = () => {
       setNotice({ type: 'error', message: error.message });
     } finally {
       setDownloadingKind('');
+    }
+  };
+
+  // Statut Gelato (cle API presente ? mode production actif ?) — charge une
+  // fois, jamais bloquant : en cas d'echec, le bloc d'envoi de test reste
+  // simplement masque.
+  useEffect(() => {
+    let cancelled = false;
+    getGelatoStatus()
+      .then((status) => { if (!cancelled) setGelatoStatus(status); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // L'envoi est ASYNCHRONE cote serveur (la generation du fichier prend
+  // plusieurs minutes : ~15 s par page en haute resolution). On relit donc
+  // la commande jusqu'a voir le resultat arriver dans ses metadonnees —
+  // meme principe que le suivi d'export PDF deja en place plus bas.
+  const pollGelatoTestResult = async (orderId) => {
+    const deadline = Date.now() + 15 * 60 * 1000; // large : un livre epais peut etre long
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+      try {
+        const fresh = await getOrderById(orderId);
+        const meta = fresh?.metadata || {};
+        if (meta.gelatoOrderId) {
+          setGelatoResult({ gelatoOrderId: meta.gelatoOrderId, gelatoOrderType: meta.gelatoOrderType || 'draft' });
+          return;
+        }
+        if (meta.gelatoError) {
+          setGelatoError(meta.gelatoError);
+          return;
+        }
+      } catch (_err) {
+        // Lecture ratee (reveil d'instance, reseau) : on retente au tour suivant.
+      }
+    }
+    setGelatoError("L'envoi est toujours en cours apres 15 minutes. Rechargez la page pour voir ou il en est.");
+  };
+
+  const sendToGelatoTest = async () => {
+    if (!latestOrder?.id) return;
+    setGelatoSending(true);
+    setGelatoError('');
+    setGelatoResult(null);
+    try {
+      const started = await sendOrderToGelatoTest(latestOrder.id);
+      if (started?.status === 'done' || started?.gelatoOrderId) {
+        setGelatoResult(started);
+        return;
+      }
+      await pollGelatoTestResult(latestOrder.id);
+    } catch (err) {
+      setGelatoError(err?.message || "L'envoi de test a l'imprimeur a echoue.");
+    } finally {
+      setGelatoSending(false);
     }
   };
 
@@ -955,6 +1020,34 @@ const BookCheckoutLuxe = () => {
                 <input className="input-luxe" name="country" value={address.country} onChange={setAddressField} placeholder="Pays" disabled={checkoutFormLocked} />
                 <input className="input-luxe" name="phone" value={address.phone} onChange={setAddressField} placeholder="Telephone" disabled={checkoutFormLocked} />
               </div>
+            </article>
+          )}
+
+          {gelatoStatus?.testAvailable && latestOrder && includesPrint(String(latestOrder.type || '')) && (
+            <article className="orders-panel">
+              <h2>Envoi de test a l'imprimeur</h2>
+              <p className="orders-disclaimer">
+                Envoie ce livre a Gelato en <strong>brouillon</strong> : le vrai fichier d'impression est genere
+                et depose chez l'imprimeur, mais rien n'est facture ni imprime. Aucun paiement n'est necessaire.
+                La generation prend plusieurs minutes (chaque page est rendue en haute resolution) : laissez
+                cette page ouverte, le resultat s'affiche des qu'il est pret.
+              </p>
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={gelatoSending}
+                onClick={sendToGelatoTest}
+              >
+                {gelatoSending ? 'Envoi en cours (plusieurs minutes)...' : 'Envoyer a Gelato (test)'}
+              </button>
+              {gelatoResult && (
+                <p className="orders-disclaimer">
+                  {gelatoResult.skipped
+                    ? `Deja envoye pour cette commande (${gelatoResult.gelatoOrderId}).`
+                    : `Brouillon cree chez Gelato : ${gelatoResult.gelatoOrderId}. Retrouvez-le dans votre tableau de bord Gelato.`}
+                </p>
+              )}
+              {gelatoError && <p className="orders-error">{gelatoError}</p>}
             </article>
           )}
 

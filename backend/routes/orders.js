@@ -3,7 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
-const { submitPrintOrderToGelato } = require('../services/printing/gelatoOrderService');
+const { submitPrintOrderToGelato, isGelatoLiveOrdersEnabled } = require('../services/printing/gelatoOrderService');
 let Stripe = null;
 
 try {
@@ -470,6 +470,118 @@ const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
     }
   })();
 };
+
+// POST /api/orders/:orderId/gelato-test
+// Envoi MANUEL d'une commande a Gelato en mode test, SANS paiement
+// prealable (2026-09-11, demande utilisateur : pouvoir tester en ligne sur
+// Render avec de vraies photos). Reutilise exactement le meme service que
+// le chemin de production (gelatoOrderService.submitPrintOrderToGelato,
+// donc le meme fichier d'impression valide a 0 erreur par l'outil Gelato)
+// — jamais un second pipeline en parallele.
+//
+// SECURITE : refuse net si GELATO_LIVE_ORDERS === '1'. Dans ce cas, une
+// soumission creerait une VRAIE commande facturee/imprimee : cette route
+// de test ne doit jamais pouvoir declencher ca par inadvertance. Sinon,
+// gelatoOrderService produit un brouillon (orderType:'draft') : visible
+// dans le tableau de bord Gelato, jamais facture ni imprime.
+router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
+  try {
+    if (isGelatoLiveOrdersEnabled()) {
+      return res.status(409).json({
+        error: "GELATO_LIVE_ORDERS=1 : le mode production est actif, l'envoi de test est desactive pour ne pas creer une vraie commande facturee."
+      });
+    }
+
+    const db = createUserScopedClient(req);
+    const { data: order, error: orderError } = await db
+      .from('orders')
+      .select('*')
+      .eq('id', req.params.orderId)
+      .eq('owner_id', req.user.id)
+      .single();
+
+    if (orderError || !order) {
+      return res.status(404).json({ error: 'Commande introuvable' });
+    }
+
+    const type = String(order.type || '').toLowerCase();
+    if (type !== 'print' && type !== 'pack') {
+      return res.status(400).json({ error: "Seules les commandes Impression ou Pack peuvent etre envoyees a l'imprimeur." });
+    }
+    if (!isAddressValid(order.shipping_address)) {
+      return res.status(400).json({ error: 'Adresse de livraison incomplete : Gelato la refuserait.' });
+    }
+
+    const { data: book, error: bookError } = await db
+      .from('books')
+      .select('*')
+      .eq('id', order.book_id)
+      .single();
+    if (bookError || !book) {
+      return res.status(404).json({ error: 'Livre introuvable' });
+    }
+
+    // Deja envoye : reponse immediate, rien a relancer (idempotence deja
+    // assuree par le service, on l'expose juste tout de suite ici).
+    if (order.metadata?.gelatoOrderId) {
+      return res.json({
+        status: 'done',
+        skipped: true,
+        gelatoOrderId: order.metadata.gelatoOrderId,
+        gelatoOrderType: order.metadata.gelatoOrderType || 'draft'
+      });
+    }
+
+    // ASYNCHRONE, volontairement (mesure 2026-09-11 : ~15 s par page pour
+    // la capture haute resolution, soit plusieurs MINUTES pour un livre
+    // complet). Attendre la fin dans la reponse HTTP ferait expirer la
+    // requete cote navigateur et cote proxy Render, alors meme que le
+    // serveur finit correctement son travail. On marque donc le depart,
+    // on repond tout de suite, et le client suit l'avancement en relisant
+    // la commande (meme principe que l'export PDF deja en place).
+    const startedAt = getNowIso();
+    await supabase
+      .from('orders')
+      .update({
+        metadata: { ...(order.metadata || {}), gelatoTestStartedAt: startedAt, gelatoError: null },
+        updated_at: startedAt
+      })
+      .eq('id', order.id);
+
+    (async () => {
+      try {
+        const result = await submitPrintOrderToGelato({ db: supabase, book, order, ownerEmail: req.user.email });
+        if (result.error) {
+          console.error('Envoi de test Gelato echoue pour la commande', order.id, ':', result.error);
+        } else {
+          console.log(`Envoi de test Gelato : brouillon ${result.gelatoOrderId} cree pour la commande ${order.id}`);
+        }
+      } catch (error) {
+        console.error('Erreur inattendue lors de l\'envoi de test Gelato', order.id, ':', error.message);
+        await supabase
+          .from('orders')
+          .update({ metadata: { ...(order.metadata || {}), gelatoError: error.message }, updated_at: getNowIso() })
+          .eq('id', order.id);
+      }
+    })();
+
+    return res.status(202).json({ status: 'started', startedAt });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/orders/gelato/status
+// Le frontend a besoin de savoir si l'envoi de test est possible (cle API
+// configuree, mode production desactive) pour n'afficher le bouton que
+// quand il peut reellement servir — jamais un bouton qui echouera a coup sur.
+router.get('/gelato/status', authenticate, (_req, res) => {
+  res.json({
+    configured: Boolean(process.env.GELATO_API_KEY),
+    liveOrders: isGelatoLiveOrdersEnabled(),
+    testAvailable: Boolean(process.env.GELATO_API_KEY) && !isGelatoLiveOrdersEnabled()
+  });
+});
 
 const isForwardLifecycleTransition = (currentStatus, nextStatus) => (
   getLifecycleRank(nextStatus) >= getLifecycleRank(currentStatus)

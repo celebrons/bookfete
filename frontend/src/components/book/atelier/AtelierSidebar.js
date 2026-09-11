@@ -44,7 +44,13 @@ function AtelierSidebar({
 
   const handleDragStart = (event, item) => {
     event.dataTransfer.effectAllowed = 'copy';
-    event.dataTransfer.setData('application/json', JSON.stringify({ itemId: item.id }));
+    // `kind` inclus (retour utilisateur, 2026-09-11 : une photo deposee sur
+    // un emplacement texte — ou l'inverse — n'etait bloquee nulle part cote
+    // client, seulement signalee visuellement via .is-rejecting ; le
+    // backend rejetait la sauvegarde ensuite avec un message brut) —
+    // permet a atelierSlotInteractions.js de refuser reellement le depot
+    // sans avoir besoin de re-resoudre l'item par son id.
+    event.dataTransfer.setData('application/json', JSON.stringify({ itemId: item.id, kind: item.kind }));
   };
 
   const handlePhotoInputChange = (event) => {

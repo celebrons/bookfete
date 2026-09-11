@@ -325,6 +325,102 @@
 .atelier-confirm-modal { max-width: 440px; }
 .atelier-confirm-modal .atelier-hint { margin: 4px 0 0; }
 
+/* --- Ajustement du cadrage d'une photo (AtelierPhotoAdjustModal) --------
+   Cahier des charges v2 : pan & zoom toujours disponibles. La photo est
+   rendue avec la MEME formule CSS que pageRenderer.js (object-fit:cover +
+   object-position + transform:scale) — apercu = PDF final. */
+.atelier-adjust-modal { max-width: 480px; }
+
+.atelier-adjust-hint {
+  margin: 0 0 var(--space-sm);
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.atelier-adjust-box {
+  position: relative;
+  width: 100%;
+  max-height: 56vh;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #1a1712;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.atelier-adjust-box:active { cursor: grabbing; }
+.atelier-adjust-box img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* le drag se gere sur le conteneur (evite le drag natif du navigateur) */
+}
+
+.atelier-adjust-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: var(--space-md);
+  font-size: 13px;
+  color: var(--text-light);
+}
+.atelier-adjust-zoom-row input[type="range"] { flex: 1; accent-color: var(--gold); }
+
+.atelier-adjust-quality {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+/* Ecart de ratio > 15% : proposition de mises en page mieux adaptees. */
+.atelier-adjust-suggest {
+  margin-top: var(--space-sm);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--silk);
+  border: 1px solid rgba(223, 216, 201, 0.9);
+}
+.atelier-adjust-suggest-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-light);
+}
+.atelier-adjust-suggest-btn {
+  margin-top: 8px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--gold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.atelier-adjust-suggest-btn:hover { color: var(--ink); }
+.atelier-adjust-suggest-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.atelier-adjust-suggest-option {
+  border: 1px solid rgba(184, 146, 74, 0.5);
+  background: var(--white);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-adjust-suggest-option:hover { border-color: var(--gold); background: var(--gold-light); }
+
 .atelier-mood-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -990,17 +1086,14 @@
    il doit se voir d'un coup d'oeil sans avoir a survoler chaque photo. Coin
    superieur-gauche pour ne jamais chevaucher les actions (coin
    inferieur-droit). */
+/* Simple ancrage : l'apparence du badge vit dans PhotoFitBadge.css
+   (composant partage avec l'ecran recapitulatif avant commande), et rien
+   n'est rendu du tout quand la photo est correcte. */
 .atelier-overlay-slot-quality {
   position: absolute;
   top: 4px;
   left: 4px;
-  font-size: 13px;
-  line-height: 1;
-  background: rgba(255, 255, 255, 0.85);
-  border-radius: 999px;
-  padding: 3px 5px;
-  pointer-events: none;
-  box-shadow: 0 1px 4px rgba(36, 31, 24, 0.25);
+  line-height: 0;
 }
 
 .atelier-overlay-slot-confirm {

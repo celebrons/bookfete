@@ -1,0 +1,24 @@
+/* Badge d'avertissement qualite d'impression (voir PhotoFitBadge.js) —
+   discret par construction : c'est un signal, jamais un bouton. Deux
+   severites seulement, l'absence d'avertissement ne rend rien du tout. */
+.photo-fit-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 4px rgba(36, 31, 24, 0.28);
+  pointer-events: auto; /* le survol doit pouvoir afficher l'explication (title) */
+  flex: none;
+}
+
+.photo-fit-badge.is-sm { width: 20px; height: 20px; }
+.photo-fit-badge.is-md { width: 26px; height: 26px; }
+
+.photo-fit-badge.is-sm svg { width: 13px; height: 13px; }
+.photo-fit-badge.is-md svg { width: 17px; height: 17px; }
+
+/* Ambre = "limite" (la photo passe, mais elle peut manquer de nettete). */
+.photo-fit-badge.is-warning { color: #b45f13; }
+/* Corail = "insuffisante" (avertissement fort). */
+.photo-fit-badge.is-danger { color: #c0392b; }

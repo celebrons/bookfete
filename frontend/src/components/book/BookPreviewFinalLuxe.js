@@ -7,10 +7,12 @@ import {
   fetchInteriorPagePreviewHtml,
   estimatePrice,
   getFormatOptions,
-  chooseFormat
+  chooseFormat,
+  getPrintQualityCheck
 } from '../../services/compositionApi';
 import { applyLifecycleStatus } from '../../utils/bookLifecycle';
 import { PageZoomStage, ZoomControls } from '../common/PageZoomStage';
+import PrintQualityRecapModal from '../common/PrintQualityRecapModal';
 import '../../styles/luxe-theme.css';
 import './BookPreviewFinalLuxe.css';
 
@@ -180,6 +182,9 @@ export default function BookPreviewFinalLuxe() {
   const [formatOptions, setFormatOptions] = useState({});
   const [switchingFormat, setSwitchingFormat] = useState(false);
   const [ordering, setOrdering] = useState(false);
+  // Ecran recapitulatif qualite avant commande (cahier des charges v2, §2).
+  const [qualityWarnings, setQualityWarnings] = useState([]);
+  const [isQualityRecapOpen, setIsQualityRecapOpen] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -390,7 +395,10 @@ export default function BookPreviewFinalLuxe() {
     }
   };
 
-  const handleOrder = async () => {
+  // Passage effectif a la commande — extrait pour etre appelable soit
+  // directement (aucun avertissement qualite), soit depuis l'ecran
+  // recapitulatif via "Continuer quand meme".
+  const proceedToCheckout = async () => {
     setOrdering(true);
     try {
       await applyLifecycleStatus('finalized', { book, onUpdateBook: handleUpdateBook });
@@ -399,6 +407,30 @@ export default function BookPreviewFinalLuxe() {
       setError('Impossible de continuer vers la commande.');
       setOrdering(false);
     }
+  };
+
+  // Verrou OBLIGATOIRE avant le paiement (cahier des charges v2, §2) :
+  // "Il est impossible d'arriver a l'etape de paiement sans avoir vu
+  // l'ecran recapitulatif si au moins une photo est sous le seuil de
+  // resolution". C'est ici que le verrou vit (et pas dans l'atelier) parce
+  // que c'est le seul passage oblige vers /checkout — on peut arriver sur
+  // cet ecran sans avoir ouvert "Terminer mon livre".
+  // Jamais bloquant en cas d'echec du controle lui-meme (reseau, etc.) :
+  // on laisse alors passer plutot que d'empecher une commande legitime.
+  const handleOrder = async () => {
+    setOrdering(true);
+    try {
+      const check = await getPrintQualityCheck(bookId);
+      if (check?.hasWarnings) {
+        setQualityWarnings(check.warnings || []);
+        setIsQualityRecapOpen(true);
+        setOrdering(false);
+        return;
+      }
+    } catch (_err) {
+      // Controle indisponible : on continue (voir commentaire ci-dessus).
+    }
+    await proceedToCheckout();
   };
 
   const viewLabel = viewKind === 'cover'
@@ -570,6 +602,18 @@ export default function BookPreviewFinalLuxe() {
           </button>
         </aside>
       </div>
+
+      <PrintQualityRecapModal
+        isOpen={isQualityRecapOpen}
+        warnings={qualityWarnings}
+        loading={ordering}
+        onClose={() => setIsQualityRecapOpen(false)}
+        onContinueAnyway={() => { setIsQualityRecapOpen(false); proceedToCheckout(); }}
+        onReviewPage={(pageIndex) => {
+          setIsQualityRecapOpen(false);
+          navigate(`/book/${bookId}/atelier?page=${pageIndex}`);
+        }}
+      />
 
       {isFullscreen && (
         // Fermeture au clic n'importe ou dans le calque, SAUF sur les

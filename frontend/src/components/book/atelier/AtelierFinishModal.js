@@ -34,8 +34,9 @@ function AtelierFinishModal({ isOpen, onClose, stats, onContinue, bookId, onView
   if (!isOpen || !stats) return null;
 
   const isReady = stats.incompletePages === 0;
-  const lowQualityCount = qualityCheck?.lowQualityPhotos?.length || 0;
-  const firstLowQualityPage = qualityCheck?.lowQualityPhotos?.[0]?.pageIndex;
+  // Contrat v2 : { warnings: [{pageIndex, itemId, statut, label, thumbnailUrl}], hasWarnings }
+  const lowQualityCount = qualityCheck?.warnings?.length || 0;
+  const firstLowQualityPage = qualityCheck?.warnings?.[0]?.pageIndex;
 
   return (
     <div className="atelier-modal-backdrop" onClick={onClose}>

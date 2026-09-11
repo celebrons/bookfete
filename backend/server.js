@@ -66,6 +66,29 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
+// Diagnostic d'impression (2026-09-11) : sert a verifier EN LIGNE, sans
+// lancer une vraie commande, qu'une instance (Render notamment) est
+// reellement capable de produire un fichier d'impression. Les deux causes
+// de panne les plus probables en hebergement sont visibles ici : pas de
+// navigateur headless installe (donc pas de PDF possible) et cle Gelato
+// absente. Aucune donnee sensible n'est exposee : uniquement des booleens
+// et le chemin du binaire navigateur.
+app.get('/api/health/printing', async (_req, res) => {
+  try {
+    const pdfService = require('./services/composition/pdfService');
+    const browserPath = await pdfService.resolveBrowserPath();
+    res.json({
+      browserAvailable: Boolean(browserPath),
+      browserPath: browserPath || null,
+      gelatoConfigured: Boolean(process.env.GELATO_API_KEY),
+      gelatoLiveOrders: process.env.GELATO_LIVE_ORDERS === '1',
+      ready: Boolean(browserPath) && Boolean(process.env.GELATO_API_KEY)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });

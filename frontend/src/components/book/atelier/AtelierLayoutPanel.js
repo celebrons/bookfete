@@ -138,8 +138,8 @@ function LayoutFormatMiniature({ layout, slotItems, printFormat, selectedSidebar
               className={`atelier-format-slot ${item ? 'is-filled' : ''} ${rejects ? 'is-rejecting' : ''} ${isPending ? 'is-pending-remove' : ''}`}
               style={{ top: `${rect.top}%`, left: `${rect.left}%`, width: `${rect.width}%`, height: `${rect.height}%` }}
               onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => handleDrop(event, index)}
-              onClick={() => handleClick(index, item)}
+              onDrop={(event) => handleDrop(event, index, slotType)}
+              onClick={() => handleClick(index, item, slotType)}
               title={item ? (isPending ? 'Cliquer a nouveau pour confirmer le retrait' : 'Cliquer pour retirer') : undefined}
             >
               {item ? (

@@ -1,11 +1,13 @@
 import { supabase } from './supabaseClient';
+import { fetchWithWakeRetry } from './httpClient';
 
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const trimmed = configured.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };
-const REQUEST_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 15000);
+// Timeouts/retry mutualises (voir services/httpClient.js) — 15s codes en
+// dur ici auparavant, trop court pour le reveil d'une instance Render.
 
 const buildHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -24,32 +26,20 @@ const parseJsonSafe = async (response) => {
   }
 };
 
-// Requete JSON standard (GET/POST/PUT/DELETE avec corps JSON).
+// Requete JSON standard (GET/POST/PUT/DELETE avec corps JSON). Timeout +
+// seconde tentative sur reveil d'instance : voir httpClient.js.
 const request = async (path, options = {}) => {
   const { headers } = await buildHeaders();
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}${path}`, {
+    ...options,
+    headers: { ...headers, ...(options.headers || {}) }
+  });
 
-  try {
-    const response = await fetch(`${buildApiBaseUrl()}${path}`, {
-      ...options,
-      signal: controller.signal,
-      headers: { ...headers, ...(options.headers || {}) }
-    });
-
-    const payload = await parseJsonSafe(response);
-    if (!response.ok) {
-      throw new Error(payload?.error || 'Erreur du moteur de mise en page.');
-    }
-    return payload;
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new Error('Le serveur met trop de temps a repondre. Reessayez dans quelques secondes.');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Erreur du moteur de mise en page.');
   }
+  return payload;
 };
 
 // Requete "brute" (pas de Content-Type: application/json impose) : utilisee
@@ -71,27 +61,15 @@ const rawRequest = async (path, options = {}) => {
 // Requete publique (aucune session requise) : pour les pages accessibles
 // avant connexion, comme l'entree de creation depuis la page d'accueil.
 const publicRequest = async (path, options = {}) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(`${buildApiBaseUrl()}${path}`, {
-      ...options,
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
-    });
-    const payload = await parseJsonSafe(response);
-    if (!response.ok) {
-      throw new Error(payload?.error || 'Erreur.');
-    }
-    return payload;
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new Error('Le serveur met trop de temps a repondre. Reessayez dans quelques secondes.');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
+  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+  });
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Erreur.');
   }
+  return payload;
 };
 
 // Requete publique "brute" (aucune session requise, pas de Content-Type

@@ -122,3 +122,74 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
     expect(doublePrint.body.totalCents).toBe(10020 * 2);
   });
 });
+
+// --- Gelato, mode test (2026-09-11) ----------------------------------------
+// Envoi manuel a l'imprimeur SANS paiement (demande utilisateur : tester en
+// ligne sur Render avec de vraies photos). Ce qui compte ici : le garde-fou
+// production et les refus clairs — la soumission elle-meme est couverte par
+// tests/printing/gelatoOrderService.test.js.
+describe('Gelato — mode test', () => {
+  let app;
+  const OLD_ENV = { ...process.env };
+
+  beforeAll(() => { app = buildApp(); });
+  afterEach(() => { process.env = { ...OLD_ENV }; });
+
+  it('GET /gelato/status dit que le test est indisponible sans cle API', async () => {
+    delete process.env.GELATO_API_KEY;
+    const response = await request(app)
+      .get('/api/orders/gelato/status')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.configured).toBe(false);
+    expect(response.body.testAvailable).toBe(false);
+  });
+
+  it('GET /gelato/status : cle API presente et mode production desactive -> test disponible', async () => {
+    process.env.GELATO_API_KEY = 'cle-de-test';
+    process.env.GELATO_LIVE_ORDERS = '0';
+    const response = await request(app)
+      .get('/api/orders/gelato/status')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.body.configured).toBe(true);
+    expect(response.body.liveOrders).toBe(false);
+    expect(response.body.testAvailable).toBe(true);
+  });
+
+  it('GET /gelato/status : GELATO_LIVE_ORDERS=1 -> test NON disponible (garde-fou production)', async () => {
+    process.env.GELATO_API_KEY = 'cle-de-test';
+    process.env.GELATO_LIVE_ORDERS = '1';
+    const response = await request(app)
+      .get('/api/orders/gelato/status')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.body.liveOrders).toBe(true);
+    expect(response.body.testAvailable).toBe(false);
+  });
+
+  it('POST /:orderId/gelato-test refuse net quand le mode production est actif (jamais de vraie commande facturee)', async () => {
+    process.env.GELATO_LIVE_ORDERS = '1';
+    const response = await request(app)
+      .post('/api/orders/commande-inexistante/gelato-test')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/GELATO_LIVE_ORDERS/);
+  });
+
+  it('POST /:orderId/gelato-test refuse une commande introuvable / d\'un autre proprietaire', async () => {
+    process.env.GELATO_LIVE_ORDERS = '0';
+    const response = await request(app)
+      .post('/api/orders/commande-inexistante/gelato-test')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(404);
+  });
+
+  it('POST /:orderId/gelato-test exige une authentification', async () => {
+    const response = await request(app).post('/api/orders/peu-importe/gelato-test');
+    expect(response.status).toBe(401);
+  });
+});

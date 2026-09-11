@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './services/supabaseClient';
+import { wakeUpBackend } from './services/httpClient';
 
 
 import './styles/luxe-theme.css';
@@ -76,6 +77,16 @@ const ProtectedRoute = ({ children }) => {
 // COMPOSANT PRINCIPAL
 // ============================================
 function App() {
+  // Reveil opportuniste du backend des le chargement de l'application :
+  // sur Render, une instance gratuite s'endort apres quelques minutes et
+  // met 30 a 60s a repartir — sans ce ping, c'est la premiere vraie
+  // requete de l'utilisateur qui paie ce reveil (retour utilisateur :
+  // "Le serveur met trop de temps a repondre"). Non bloquant, erreurs
+  // ignorees (voir services/httpClient.js).
+  React.useEffect(() => {
+    wakeUpBackend();
+  }, []);
+
   return (
     <Router>
       <ScrollToTop />

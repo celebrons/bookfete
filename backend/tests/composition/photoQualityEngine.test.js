@@ -7,9 +7,11 @@ const {
   resolveUsableAreaMm,
   resolveSlotSizeMm,
   computeEffectiveDpi,
-  qualityLevelForDpi,
-  describeQuality,
-  QUALITY_DISPLAY
+  checkImageFit,
+  checkSlotImageFit,
+  statutForDpi,
+  FIT_DISPLAY,
+  RATIO_GAP_THRESHOLD
 } = require('../../services/composition/photoQualityEngine');
 
 describe('resolveUsableAreaMm', () => {
@@ -92,38 +94,129 @@ describe('computeEffectiveDpi', () => {
   });
 });
 
-describe('qualityLevelForDpi / describeQuality — paliers (§10)', () => {
+// Cahier des charges v2 (2026-09-11) : 3 statuts seulement (250/150), qui
+// remplacent les 5 paliers de la v1 — une seule echelle dans toute l'app.
+describe('statutForDpi — seuils v2', () => {
   it.each([
-    [300, 'excellent'],
-    [299, 'tres-bon'],
-    [250, 'tres-bon'],
-    [249, 'bon'],
-    [200, 'bon'],
-    [199, 'attention'],
-    [150, 'attention'],
-    [149, 'faible'],
-    [0, 'faible']
+    [400, 'ok'],
+    [250, 'ok'],
+    [249, 'limite'],
+    [150, 'limite'],
+    [149, 'insuffisant'],
+    [0, 'insuffisant']
   ])('%i DPI -> %s', (dpi, expected) => {
-    expect(qualityLevelForDpi(dpi)).toBe(expected);
+    expect(statutForDpi(dpi)).toBe(expected);
   });
 
-  it('tres-bon et bon partagent le meme message affiche (jamais le mot DPI, §10)', () => {
-    expect(QUALITY_DISPLAY['tres-bon']).toEqual(QUALITY_DISPLAY.bon);
-    Object.values(QUALITY_DISPLAY).forEach((entry) => {
+  it('donnee manquante -> null (aucun avis), jamais un faux avertissement', () => {
+    expect(statutForDpi(null)).toBeNull();
+    expect(statutForDpi(undefined)).toBeNull();
+  });
+
+  it('aucun message affiche ne contient le mot "DPI" (§2) et "ok" n\'a aucun message', () => {
+    expect(FIT_DISPLAY.ok.label).toBe('');
+    expect(FIT_DISPLAY.ok.severity).toBeNull();
+    Object.values(FIT_DISPLAY).forEach((entry) => {
       expect(entry.label.toLowerCase()).not.toContain('dpi');
     });
   });
+});
 
-  it('describeQuality retourne le niveau, le DPI arrondi et le message pret pour l\'UI', () => {
-    expect(describeQuality(260.4)).toEqual({
-      level: 'tres-bon',
-      dpi: 260,
-      emoji: '🟡',
-      label: 'Bonne qualité d\'impression'
-    });
+describe('checkImageFit — ecart de ratio + resolution (§1/§4)', () => {
+  it('photo parfaitement au ratio du cadre -> ecartRatio 0, aucun flag', () => {
+    const fit = checkImageFit({ imageWidthPx: 3000, imageHeightPx: 3000, frameWidthMm: 100, frameHeightMm: 100 });
+    expect(fit.ecartRatio).toBeCloseTo(0, 5);
+    expect(fit.ratioGap).toBe(false);
+    expect(fit.statut).toBe('ok');
   });
 
-  it('describeQuality(null) ne plante jamais, retombe sur "faible"', () => {
-    expect(describeQuality(null).level).toBe('faible');
+  it('ecart de ratio juste sous le seuil de 15% -> pas de flag', () => {
+    // cadre carre, photo 1.14:1 -> ecart 14%
+    const fit = checkImageFit({ imageWidthPx: 1140, imageHeightPx: 1000, frameWidthMm: 100, frameHeightMm: 100 });
+    expect(fit.ecartRatio).toBeCloseTo(0.14, 2);
+    expect(fit.ratioGap).toBe(false);
+  });
+
+  it('ecart de ratio au dela de 15% -> flag leve (recadrage applique quand meme)', () => {
+    // cadre carre, photo panoramique 2:1 -> ecart 100%
+    const fit = checkImageFit({ imageWidthPx: 4000, imageHeightPx: 2000, frameWidthMm: 100, frameHeightMm: 100 });
+    expect(fit.ecartRatio).toBeCloseTo(1, 5);
+    expect(fit.ratioGap).toBe(true);
+    expect(fit.ecartRatio).toBeGreaterThan(RATIO_GAP_THRESHOLD);
+  });
+
+  it('photo basse resolution dans un grand cadre -> insuffisant + message sans "DPI"', () => {
+    const fit = checkImageFit({ imageWidthPx: 1200, imageHeightPx: 900, frameWidthMm: 210, frameHeightMm: 280 });
+    expect(fit.statut).toBe('insuffisant');
+    expect(fit.severity).toBe('danger');
+    expect(fit.label).toMatch(/floue/i);
+  });
+
+  it('un zoom manuel peut faire basculer une photo de "ok" a "limite"', () => {
+    const base = { imageWidthPx: 2000, imageHeightPx: 2000, frameWidthMm: 160, frameHeightMm: 160 };
+    expect(checkImageFit(base).statut).toBe('ok'); // ~318 dpi
+    expect(checkImageFit({ ...base, zoom: 2 }).statut).toBe('limite'); // ~159 dpi
+  });
+
+  it('donnees manquantes -> statut null et ecartRatio null, jamais une exception', () => {
+    const fit = checkImageFit({ imageWidthPx: null, imageHeightPx: 900, frameWidthMm: 100, frameHeightMm: 100 });
+    expect(fit.statut).toBeNull();
+    expect(fit.ecartRatio).toBeNull();
+    expect(fit.ratioGap).toBe(false);
+    expect(() => checkImageFit({})).not.toThrow();
+  });
+});
+
+describe('checkSlotImageFit — depuis un item place dans un emplacement', () => {
+  const photo = (width, height) => ({ kind: 'photo', metadata: { width, height } });
+
+  it('resout le cadre tout seul via le slug/slot et renvoie un statut', () => {
+    const fit = checkSlotImageFit({ item: photo(4000, 6000), layoutSlug: 'FULL_PHOTO', slotIndex: 0, formatId: 'standard' });
+    expect(fit.statut).toBe('ok');
+    expect(fit.dpiEffectif).toBeGreaterThan(250);
+  });
+
+  it('photo sans metadata (jamais sondee) -> null, aucun badge affiche', () => {
+    expect(checkSlotImageFit({ item: { kind: 'photo', metadata: {} }, layoutSlug: 'FULL_PHOTO', slotIndex: 0, formatId: 'standard' })).toBeNull();
+  });
+
+  it('emplacement texte d\'une mise en page mixte -> null (jamais evalue)', () => {
+    expect(checkSlotImageFit({ item: photo(4000, 3000), layoutSlug: 'PHOTO_TEXT', slotIndex: 1, formatId: 'standard' })).toBeNull();
+  });
+});
+
+// Trou comble le 2026-09-11 : ces mises en page n'etaient PAS dans
+// PHOTO_SLOT_RATIOS, donc leurs photos echappaient totalement au controle
+// (verifie en base sur un livre reel : pages 6/9/18/24/28 "PAS EVALUE").
+describe('mises en page mixtes — desormais evaluees', () => {
+  it.each([
+    ['PHOTO_TEXT', 0],
+    ['TEXT_PHOTO', 1],
+    ['TWO_PHOTOS_TEXT', 0],
+    ['TWO_PHOTOS_TEXT', 1]
+  ])('%s slot %i a bien un cadre resolu', (slug, slotIndex) => {
+    const frame = resolveSlotSizeMm(slug, slotIndex, 'standard');
+    expect(frame).not.toBeNull();
+    expect(frame.widthMm).toBeGreaterThan(0);
+    expect(frame.heightMm).toBeGreaterThan(0);
+  });
+
+  it('la photo de PHOTO_TEXT occupe toute la largeur utile, pas une demi-colonne', () => {
+    expect(resolveSlotSizeMm('PHOTO_TEXT', 0, 'standard').widthMm).toBeCloseTo(182, 0);
+  });
+
+  it('les 2 photos de TWO_PHOTOS_TEXT sont cote a cote (demi-largeur)', () => {
+    expect(resolveSlotSizeMm('TWO_PHOTOS_TEXT', 0, 'standard').widthMm).toBeCloseTo(88.5, 0);
+  });
+
+  it('une photo basse resolution en PHOTO_TEXT est desormais signalee (avant : ignoree)', () => {
+    const fit = checkSlotImageFit({
+      item: { kind: 'photo', metadata: { width: 900, height: 600 } },
+      layoutSlug: 'PHOTO_TEXT',
+      slotIndex: 0,
+      formatId: 'standard'
+    });
+    expect(fit).not.toBeNull();
+    expect(fit.statut).toBe('insuffisant');
   });
 });

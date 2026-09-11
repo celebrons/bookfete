@@ -67,6 +67,32 @@ function sanitizePhotoAdjustments(raw, validItemIds) {
   return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
 
+// Annote le `content` d'UNE page (statut qualite par photo, cahier des
+// charges v2 §4) avant sauvegarde. Charge items/layouts a la demande —
+// jamais bloquant : si quoi que ce soit echoue ou n'est pas evaluable, le
+// payload repart tel quel plutot que de faire echouer la sauvegarde d'une
+// page pour une simple annotation informative.
+async function annotateSinglePagePayload(book, payload = {}) {
+  const content = payload?.content;
+  if (!content || !Array.isArray(content.blocks) || content.blocks.length === 0) return payload;
+
+  try {
+    const [items, layouts] = await Promise.all([
+      bookContentService.listContentItems(book.id),
+      templateCatalog.listActiveLayouts()
+    ]);
+    const [annotated] = photoQualityEngine.annotatePagesWithPhotoFit({
+      pages: [{ content }],
+      items,
+      layouts,
+      formatId: book.print_format
+    });
+    return { ...payload, content: annotated.content };
+  } catch (_error) {
+    return payload;
+  }
+}
+
 // Bucket Supabase Storage reutilise (deja utilise par le parcours contributeur
 // cote client). Un bucket dedie pourra etre introduit plus tard sans impact
 // sur le modele de donnees : seul ce nom change.
@@ -457,7 +483,15 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
       });
     }
 
-    const pages = await bookContentService.replaceBookPages(book.id, result.pages);
+    // Statut qualite calcule et persiste A L'ECRITURE (cahier des charges
+    // v2, §4) — le client ne l'envoie jamais, il ne fait que le lire.
+    const annotatedPages = photoQualityEngine.annotatePagesWithPhotoFit({
+      pages: result.pages,
+      items,
+      layouts,
+      formatId: book.print_format
+    });
+    const pages = await bookContentService.replaceBookPages(book.id, annotatedPages);
     res.json({ pages, overflow: result.overflow, underflow: result.underflow, pageBudget: result.pageBudget });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -547,7 +581,17 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, async (
       });
     }
 
-    const pages = await bookContentService.replaceBookPages(book.id, formatPages);
+    // Annotation qualite recalculee avec le NOUVEAU format (les cadres
+    // changent de taille mm, donc les statuts changent) — c'est justement
+    // pour ca que le statut stocke n'est jamais la source de verite du
+    // verrou avant commande, qui recalcule toujours.
+    const annotatedFormatPages = photoQualityEngine.annotatePagesWithPhotoFit({
+      pages: formatPages,
+      items,
+      layouts,
+      formatId
+    });
+    const pages = await bookContentService.replaceBookPages(book.id, annotatedFormatPages);
 
     const { data: updatedBook, error: updateError } = await supabase
       .from('books')
@@ -700,14 +744,20 @@ router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, a
 
 // PUT /api/books/:bookId/pages/:pageIndex
 // Edition manuelle d'une page (ex. verrouillage) sans repasser par le moteur.
+// Utilise aussi par la sauvegarde PARTIELLE de l'atelier (emplacements pas
+// tous remplis, voir BookAtelierLuxe.js) : le statut qualite y est donc
+// annote comme sur tous les autres chemins d'ecriture (cahier des charges
+// v2, §4) — le client n'a jamais a le calculer ni a l'envoyer.
 router.put('/api/books/:bookId/pages/:pageIndex', authenticate, requireOwnedBook, async (req, res) => {
   try {
+    const { book } = req;
     const pageIndex = Number(req.params.pageIndex);
     if (!Number.isInteger(pageIndex) || pageIndex < 0) {
       return res.status(400).json({ error: 'pageIndex invalide.' });
     }
 
-    const data = await bookContentService.upsertPage(req.params.bookId, pageIndex, req.body);
+    const payload = await annotateSinglePagePayload(book, req.body);
+    const data = await bookContentService.upsertPage(req.params.bookId, pageIndex, payload);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -802,9 +852,18 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
     const photoAdjustments = sanitizePhotoAdjustments(req.body?.photoAdjustments, itemIds);
     if (photoAdjustments) content.photoAdjustments = photoAdjustments;
 
+    // Statut qualite persiste (cahier des charges v2, §4) — calcule apres
+    // photoAdjustments, dont le zoom influence le DPI effectif.
+    const [annotated] = photoQualityEngine.annotatePagesWithPhotoFit({
+      pages: [{ content }],
+      items: allItems,
+      layouts,
+      formatId: book.print_format
+    });
+
     const data = await bookContentService.upsertPage(book.id, pageIndex, {
       layout_id: layout.id,
-      content,
+      content: annotated.content,
       locked: true
     });
     res.json(data);
@@ -814,14 +873,17 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
 });
 
 // GET /api/books/:bookId/print-quality-check
-// Controle qualite pre-commande (cahier des charges "PhotoSlot", §20/21) :
-// pour chaque photo reellement placee sur une page, resout la taille
-// physique (mm) de son emplacement (photoQualityEngine.resolveSlotSizeMm,
-// via le slug du layout choisi) puis le DPI effectif compte tenu d'un
-// ajustement manuel eventuel (zoom stocke dans content.photoAdjustments).
-// Jamais bloquant, jamais d'erreur pour une photo/slot non reconnu par la
-// table (silencieusement ignoree — voir photoQualityEngine.resolveSlotSizeMm)
-// : ce controle est une aide, pas une validation stricte.
+// Controle qualite obligatoire avant commande (cahier des charges v2, §2 —
+// "ecran recapitulatif") : parcourt TOUTES les pages et renvoie chaque
+// photo dont le statut n'est pas 'ok', avec sa vignette et son numero de
+// page (necessaires a l'ecran recapitulatif).
+//
+// RECALCULE toujours, jamais lu depuis content.photoFit : le statut stocke
+// depend du format d'impression (les cadres changent de taille en mm), il
+// devient faux apres un changement de format. Le champ stocke sert a
+// l'agregation rapide et au badge, jamais de source de verite pour le
+// verrou final. Jamais bloquant cote serveur : une photo non evaluable
+// (jamais sondee, emplacement inconnu) est simplement ignoree.
 router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedBook, async (req, res) => {
   try {
     const { book } = req;
@@ -835,41 +897,44 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
     const layoutsById = Object.fromEntries(layouts.map((layout) => [layout.id, layout]));
 
     let photosCount = 0;
-    const lowQualityPhotos = [];
+    let evaluatedCount = 0;
+    const warnings = [];
 
     pages.forEach((page) => {
       const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
       const adjustmentsByItemId = page.content?.photoAdjustments || {};
       blocks.forEach((block) => {
-        const layout = layoutsById[block.layoutId];
-        const slug = layout?.slug;
-        const slots = layout?.capacity?.slots;
-        if (!slug || !Array.isArray(slots)) return;
+        const slug = layoutsById[block.layoutId]?.slug;
+        if (!slug) return;
 
         (block.itemIds || []).forEach((itemId, slotIndex) => {
           const item = itemId ? itemsById[itemId] : null;
           if (!item || item.kind !== 'photo') return;
           photosCount += 1;
 
-          const frame = photoQualityEngine.resolveSlotSizeMm(slug, slotIndex, book.print_format);
-          const width = item.metadata?.width;
-          const height = item.metadata?.height;
-          if (!frame || !width || !height) return; // donnee manquante -> pas evalue, jamais bloquant
-
-          const adjustment = adjustmentsByItemId[itemId];
-          const dpi = photoQualityEngine.computeEffectiveDpi({
-            imageWidthPx: width,
-            imageHeightPx: height,
-            frameWidthMm: frame.widthMm,
-            frameHeightMm: frame.heightMm,
-            zoom: adjustment?.zoom
+          const fit = photoQualityEngine.checkSlotImageFit({
+            item,
+            layoutSlug: slug,
+            slotIndex,
+            formatId: book.print_format,
+            zoom: adjustmentsByItemId[itemId]?.zoom
           });
-          if (dpi == null) return;
+          if (!fit || !fit.statut) return; // donnee manquante -> pas evalue, jamais un faux avertissement
+          evaluatedCount += 1;
+          if (fit.statut === 'ok') return;
 
-          const quality = photoQualityEngine.describeQuality(dpi);
-          if (quality.level === 'attention' || quality.level === 'faible') {
-            lowQualityPhotos.push({ pageIndex: page.page_index, itemId, ...quality });
-          }
+          warnings.push({
+            pageIndex: page.page_index,
+            itemId,
+            statut: fit.statut,
+            severity: fit.severity,
+            label: fit.label,
+            dpiEffectif: fit.dpiEffectif,
+            ecartRatio: fit.ecartRatio,
+            // Vignette pour l'ecran recapitulatif (§2) — repli sur
+            // l'original si la miniature n'a pas pu etre generee a l'upload.
+            thumbnailUrl: item.metadata?.thumbnailUrl || item.url || null
+          });
         });
       });
     });
@@ -877,8 +942,9 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
     res.json({
       pagesCount: pages.length,
       photosCount,
-      lowQualityPhotos,
-      allGood: lowQualityPhotos.length === 0
+      evaluatedCount,
+      warnings,
+      hasWarnings: warnings.length > 0
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

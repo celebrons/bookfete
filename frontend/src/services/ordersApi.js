@@ -1,11 +1,11 @@
 import { supabase } from './supabaseClient';
+import { fetchWithWakeRetry } from './httpClient';
 
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const trimmed = configured.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };
-const REQUEST_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 15000);
 
 const buildHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -28,34 +28,22 @@ const parseJsonSafe = async (response) => {
   }
 };
 
+// Timeout + seconde tentative sur reveil d'instance : voir httpClient.js.
 const request = async (path, options = {}) => {
   const headers = await buildHeaders();
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(`${buildApiBaseUrl()}${path}`, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        ...headers,
-        ...(options.headers || {})
-      }
-    });
-
-    const payload = await parseJsonSafe(response);
-    if (!response.ok) {
-      throw new Error(payload?.error || 'Erreur API commandes.');
+  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}${path}`, {
+    ...options,
+    headers: {
+      ...headers,
+      ...(options.headers || {})
     }
-    return payload;
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new Error('Le serveur met trop de temps a repondre. Reessayez dans quelques secondes.');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
+  });
+
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Erreur API commandes.');
   }
+  return payload;
 };
 
 export const listOrders = async () => {
@@ -121,6 +109,19 @@ export const updateOrderStatus = (orderId, status, metadata = null) => request(`
     status,
     metadata
   })
+});
+
+// --- Gelato, mode test (2026-09-11) ---------------------------------------
+// Envoi manuel d'une commande a l'imprimeur SANS paiement, en brouillon
+// (jamais facture ni imprime tant que GELATO_LIVE_ORDERS !== '1' cote
+// serveur — voir backend/routes/orders.js et gelatoOrderService.js).
+
+// Le bouton d'envoi de test ne s'affiche que si cet appel dit que c'est
+// reellement possible (cle API presente, mode production desactive).
+export const getGelatoStatus = () => request('/orders/gelato/status');
+
+export const sendOrderToGelatoTest = (orderId) => request(`/orders/${orderId}/gelato-test`, {
+  method: 'POST'
 });
 
 export const getApiBaseUrl = buildApiBaseUrl;
