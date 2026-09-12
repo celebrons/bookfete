@@ -69,6 +69,48 @@ const CANDIDATE_BROWSER_PATHS = {
 // await gere les deux cas. Jamais bloquant : si puppeteer n'est pas
 // installe ou n'a pas telecharge son binaire, on retombe sur null comme
 // avant (l'appelant affiche deja un message clair).
+// Pourquoi le navigateur est-il introuvable ? Sur une machine distante
+// (Render), `browserAvailable: false` sans autre detail est un cul-de-sac :
+// impossible de savoir si puppeteer manque, si son Chromium n'a pas ete
+// telecharge, ou s'il a ete telecharge ailleurs que la ou on le cherche.
+// Cette fonction repond a ces trois questions — elle ne sert QU'au
+// diagnostic (GET /api/health/printing), jamais au rendu.
+async function describeBrowserResolution() {
+  const explicit = process.env.PDF_BROWSER_PATH || process.env.CHROME_BIN || process.env.GOOGLE_CHROME_BIN || null;
+  const candidates = CANDIDATE_BROWSER_PATHS[process.platform] || CANDIDATE_BROWSER_PATHS.linux;
+
+  const detail = {
+    platform: process.platform,
+    envPath: explicit,
+    envPathExists: explicit ? fs.existsSync(explicit) : null,
+    systemCandidates: candidates.map((candidate) => ({ path: candidate, exists: fs.existsSync(candidate) })),
+    puppeteerInstalled: false,
+    puppeteerCacheDir: null,
+    puppeteerExecutablePath: null,
+    puppeteerExecutableExists: false,
+    puppeteerError: null
+  };
+
+  try {
+    // eslint-disable-next-line global-require
+    const puppeteer = require('puppeteer');
+    detail.puppeteerInstalled = true;
+    try {
+      // eslint-disable-next-line global-require
+      detail.puppeteerCacheDir = require('../../.puppeteerrc.cjs')?.cacheDirectory || null;
+    } catch (_configError) {
+      detail.puppeteerCacheDir = null;
+    }
+    const executablePath = await puppeteer.executablePath();
+    detail.puppeteerExecutablePath = executablePath || null;
+    detail.puppeteerExecutableExists = Boolean(executablePath) && fs.existsSync(executablePath);
+  } catch (error) {
+    detail.puppeteerError = error.message;
+  }
+
+  return detail;
+}
+
 async function resolvePuppeteerBrowserPath() {
   try {
     // require() paresseux : ce module doit rester chargeable meme sans
@@ -478,6 +520,7 @@ async function renderPdfFromPages(input) {
 
 module.exports = {
   resolveBrowserPath,
+  describeBrowserResolution,
   renderPdfFromHtml,
   renderPdfFromPages,
   // capturePagesAsImages/SCREENSHOT_SCALE exportes le 2026-09-09 pour

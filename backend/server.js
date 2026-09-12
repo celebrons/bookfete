@@ -82,7 +82,13 @@ app.get('/api/health/printing', async (_req, res) => {
       browserPath: browserPath || null,
       gelatoConfigured: Boolean(process.env.GELATO_API_KEY),
       gelatoLiveOrders: process.env.GELATO_LIVE_ORDERS === '1',
-      ready: Boolean(browserPath) && Boolean(process.env.GELATO_API_KEY)
+      ready: Boolean(browserPath) && Boolean(process.env.GELATO_API_KEY),
+      // Detail affiche UNIQUEMENT quand le navigateur manque : sur une
+      // machine distante, "browserAvailable: false" tout seul ne dit pas si
+      // puppeteer est absent, si son Chromium n'a pas ete telecharge, ou
+      // s'il se trouve ailleurs que la ou on le cherche. Sans ca, le
+      // diagnostic exige un acces au serveur (vecu le 2026-09-12).
+      ...(browserPath ? {} : { diagnostic: await pdfService.describeBrowserResolution() })
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
