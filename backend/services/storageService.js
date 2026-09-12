@@ -93,6 +93,39 @@ async function uploadResizedVariant(bucket, fileName, originalBuffer, maxPx, qua
   }
 }
 
+// Supprime un fichier a partir de son URL PUBLIQUE, telle que stockee dans
+// book_content_items.url / metadata.thumbnailUrl / metadata.previewUrl.
+// Forme attendue :
+//   https://<projet>.supabase.co/storage/v1/object/public/<bucket>/<chemin>
+//
+// Best effort, JAMAIS bloquant : un fichier qu'on n'arrive pas a supprimer
+// n'est qu'un octet de trop dans le stockage, alors qu'une erreur ici
+// empecherait l'utilisateur de nettoyer ses propres photos. On ne fait donc
+// jamais echouer l'appelant pour ca.
+const deleteByPublicUrl = async (publicUrl) => {
+  try {
+    const marker = '/storage/v1/object/public/';
+    const raw = String(publicUrl || '');
+    const at = raw.indexOf(marker);
+    if (at === -1) return false;
+
+    const rest = raw.slice(at + marker.length);
+    const slash = rest.indexOf('/');
+    if (slash === -1) return false;
+
+    const bucket = rest.slice(0, slash);
+    // Les noms de fichiers sont des uuid, mais le chemin peut contenir des
+    // caracteres encodes : on decode avant de le passer au SDK.
+    const filePath = decodeURIComponent(rest.slice(slash + 1));
+    if (!bucket || !filePath) return false;
+
+    const { error } = await supabase.storage.from(bucket).remove([filePath]);
+    return !error;
+  } catch (_error) {
+    return false;
+  }
+};
+
 const uploadFile = async (bucket, file, folder = '') => {
   try {
     const fileExt = file.originalname.split('.').pop();
@@ -176,4 +209,4 @@ const getSignedUrl = async (bucket, fileName, expiresIn = 3600) => {
   }
 };
 
-module.exports = { uploadFile, deleteFile, getSignedUrl };
+module.exports = { uploadFile, deleteFile, deleteByPublicUrl, getSignedUrl };

@@ -51,6 +51,76 @@ async function deleteContentItem(bookId, itemId) {
   if (error) throw error;
 }
 
+// Supprime TOUS les souvenirs d'un type ('photo' ou 'texte') et, surtout,
+// nettoie les references qu'ils laissaient derriere eux.
+//
+// Une suppression unitaire (deleteContentItem) ne retire que la ligne : les
+// pages gardent l'itemId, qui devient orphelin. C'est supportable pour une
+// photo isolee (le rendu ignore deja les ids inconnus), ca ne l'est plus
+// pour 40 d'un coup — on se retrouverait avec des pages entierement
+// composees de trous, et des reglages (cadrage, role typographique) pointant
+// vers des elements disparus.
+//
+// Les emplacements sont mis a `null`, jamais retires du tableau : c'est la
+// convention de tout ce projet (voir renderPhotoBlock/renderMixteOrderedBlock
+// — "les autres elements restent a leur place"). Compacter reindexerait les
+// emplacements et deplacerait le contenu survivant.
+//
+// Retourne les items supprimes, pour que l'appelant puisse nettoyer le
+// stockage (leurs URLs ne sont plus accessibles autrement).
+async function deleteContentItemsByKind(bookId, kind) {
+  const { data: doomed, error: readError } = await supabase
+    .from('book_content_items')
+    .select('*')
+    .eq('book_id', bookId)
+    .eq('kind', kind);
+  if (readError) throw readError;
+  if (!doomed || doomed.length === 0) return [];
+
+  const doomedIds = new Set(doomed.map((item) => item.id));
+
+  const { error: deleteError } = await supabase
+    .from('book_content_items')
+    .delete()
+    .eq('book_id', bookId)
+    .eq('kind', kind);
+  if (deleteError) throw deleteError;
+
+  // Nettoyage des pages : on ne reecrit QUE celles reellement touchees.
+  const pages = await listPages(bookId);
+  const cleanIds = (ids) => (Array.isArray(ids) ? ids.map((id) => (doomedIds.has(id) ? null : id)) : ids);
+  const cleanKeyed = (record) => {
+    if (!record || typeof record !== 'object') return record;
+    const kept = Object.fromEntries(Object.entries(record).filter(([id]) => !doomedIds.has(id)));
+    return Object.keys(kept).length === Object.keys(record).length ? record : kept;
+  };
+
+  for (const page of pages) {
+    const content = page.content || {};
+    const touched = (Array.isArray(content.itemIds) && content.itemIds.some((id) => doomedIds.has(id)))
+      || (Array.isArray(content.blocks) && content.blocks.some((block) => (block.itemIds || []).some((id) => doomedIds.has(id))));
+    if (!touched) continue;
+
+    const nextContent = {
+      ...content,
+      itemIds: cleanIds(content.itemIds),
+      blocks: Array.isArray(content.blocks)
+        ? content.blocks.map((block) => ({ ...block, itemIds: cleanIds(block.itemIds) }))
+        : content.blocks,
+      photoAdjustments: cleanKeyed(content.photoAdjustments),
+      textRoles: cleanKeyed(content.textRoles),
+      textStyles: cleanKeyed(content.textStyles),
+      photoFit: cleanKeyed(content.photoFit),
+      textFit: cleanKeyed(content.textFit)
+    };
+
+    // eslint-disable-next-line no-await-in-loop
+    await upsertPage(bookId, page.page_index, { content: nextContent });
+  }
+
+  return doomed;
+}
+
 async function listPages(bookId) {
   const { data, error } = await supabase
     .from('book_pages')
@@ -210,6 +280,7 @@ module.exports = {
   createContentItem,
   updateContentItem,
   deleteContentItem,
+  deleteContentItemsByKind,
   listPages,
   replaceBookPages,
   appendEmptyPages,

@@ -26,6 +26,8 @@ function AtelierSidebar({
   onDeleteItem,
   uploadingPhotos,
   uploadProgress,
+  onDeleteAll,
+  deletingAll,
   addError,
   // Pre-selection de l'onglet depuis le dashboard ("Ajouter mes photos"/
   // "Ajouter mes souvenirs" -> /atelier?tab=photos|souvenirs, voir
@@ -147,6 +149,23 @@ function AtelierSidebar({
           </div>
         )}
         {addError && <p className="atelier-sidebar-add-error">{addError}</p>}
+
+        {/* Vider l'onglet courant. Volontairement DISCRET et en retrait (petit
+            lien, pas un bouton), et jamais affiche quand il n'y a rien a
+            supprimer : c'est une sortie de secours, pas une action courante.
+            La confirmation, elle, est explicite (voir handleDeleteAll). */}
+        {onDeleteAll && items.length > 0 && (
+          <button
+            type="button"
+            className="atelier-sidebar-delete-all"
+            onClick={() => onDeleteAll(activeTab === 'photos' ? 'photo' : 'texte')}
+            disabled={deletingAll || uploadingPhotos}
+          >
+            {deletingAll
+              ? 'Suppression...'
+              : `Tout supprimer (${items.length} ${activeTab === 'photos' ? 'photos' : 'souvenirs'})`}
+          </button>
+        )}
       </div>
 
       {items.length === 0 ? (

@@ -320,6 +320,48 @@ router.put('/api/books/:bookId/content-items/:itemId', authenticate, requireOwne
   }
 });
 
+// DELETE /api/books/:bookId/content-items?kind=photo|texte
+// Supprime TOUS les souvenirs d'un type (bouton "Tout supprimer" de
+// l'atelier). Geste destructif et irreversible : exige `confirm: true` dans
+// le corps, pour qu'un appel accidentel — ou une requete mal formee — ne
+// puisse jamais vider un livre.
+//
+// Declaree AVANT la route /:itemId ci-dessous : sinon Express ferait
+// correspondre cette URL a un itemId vide.
+router.delete('/api/books/:bookId/content-items', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const kind = String(req.query.kind || '').trim().toLowerCase();
+    if (kind !== 'photo' && kind !== 'texte') {
+      return res.status(400).json({ error: "Precisez ce qu'il faut supprimer (kind=photo ou kind=texte)." });
+    }
+    if (req.body?.confirm !== true) {
+      return res.status(409).json({
+        error: 'Suppression definitive : confirmez explicitement.',
+        needsConfirmation: true
+      });
+    }
+
+    const deleted = await bookContentService.deleteContentItemsByKind(req.book.id, kind);
+
+    // Menage du stockage : original + miniature + version intermediaire de
+    // chaque photo. Best effort et APRES la suppression en base — un fichier
+    // orphelin ne coute qu'un peu d'espace, alors qu'une erreur ici laisserait
+    // l'utilisateur avec des souvenirs qu'il croit supprimes.
+    let filesRemoved = 0;
+    for (const item of deleted) {
+      const urls = [item.url, item.metadata?.thumbnailUrl, item.metadata?.previewUrl].filter(Boolean);
+      for (const url of urls) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await storageService.deleteByPublicUrl(url)) filesRemoved += 1;
+      }
+    }
+
+    return res.json({ deleted: deleted.length, filesRemoved });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/books/:bookId/content-items/:itemId
 router.delete('/api/books/:bookId/content-items/:itemId', authenticate, requireOwnedBook, async (req, res) => {
   try {

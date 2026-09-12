@@ -128,3 +128,103 @@ describe('bookContentService — retrait de pages par la fin', () => {
     expect(report.nonEmpty).toHaveLength(0);
   });
 });
+
+// Suppression en masse ("Tout supprimer" de l'atelier, 2026-09-12).
+// Le point qui compte n'est pas de retirer les lignes — c'est de ne pas
+// laisser derriere soi des references orphelines. Une suppression unitaire
+// pouvait se le permettre (le rendu ignore un id inconnu) ; sur 40 photos
+// d'un coup, les pages deviendraient un champ de trous et les reglages
+// (cadrage, roles typographiques) pointeraient dans le vide.
+describe('bookContentService.deleteContentItemsByKind', () => {
+  beforeEach(() => { jest.resetModules(); });
+
+  const load = () => {
+    const mock = createSupabaseMock({
+      book_content_items: [
+        { id: 'ph1', book_id: 'book-1', kind: 'photo', url: 'http://x/1.jpg' },
+        { id: 'ph2', book_id: 'book-1', kind: 'photo', url: 'http://x/2.jpg' },
+        { id: 'tx1', book_id: 'book-1', kind: 'texte', text: 'un souvenir' },
+        { id: 'ph-autre', book_id: 'book-2', kind: 'photo', url: 'http://x/3.jpg' }
+      ],
+      book_pages: [
+        {
+          id: 'pg-0',
+          book_id: 'book-1',
+          page_index: 0,
+          content: {
+            itemIds: ['ph1', 'tx1', 'ph2'],
+            blocks: [{ kind: 'mixte', itemIds: ['ph1', 'tx1', 'ph2'] }],
+            photoAdjustments: { ph1: { zoom: 1.4 } },
+            textRoles: { tx1: 'quote' },
+            photoFit: { ph1: { statut: 'ok' }, ph2: { statut: 'ok' } }
+          }
+        },
+        {
+          id: 'pg-1',
+          book_id: 'book-1',
+          page_index: 1,
+          content: { itemIds: ['tx1'], blocks: [{ kind: 'texte', itemIds: ['tx1'] }] }
+        }
+      ]
+    });
+    jest.doMock('../../config/supabase', () => mock);
+    return { mock, service: require('../../services/composition/bookContentService') };
+  };
+
+  it('supprime tous les items du type demande, et eux seuls', async () => {
+    const { mock, service } = load();
+    await service.deleteContentItemsByKind('book-1', 'photo');
+
+    const restants = mock.__table('book_content_items').map((row) => row.id).sort();
+    expect(restants).toEqual(['ph-autre', 'tx1']);
+  });
+
+  it("ne touche jamais aux items d'un AUTRE livre", async () => {
+    const { mock, service } = load();
+    await service.deleteContentItemsByKind('book-1', 'photo');
+    expect(mock.__table('book_content_items').some((row) => row.id === 'ph-autre')).toBe(true);
+  });
+
+  it('renvoie les items supprimes (leurs URLs servent au menage du stockage)', async () => {
+    const { service } = load();
+    const deleted = await service.deleteContentItemsByKind('book-1', 'photo');
+    expect(deleted.map((item) => item.url).sort()).toEqual(['http://x/1.jpg', 'http://x/2.jpg']);
+  });
+
+  it('remplace les references supprimees par null, SANS decaler les survivants', async () => {
+    const { mock, service } = load();
+    await service.deleteContentItemsByKind('book-1', 'photo');
+
+    const page = mock.__table('book_pages').find((row) => row.page_index === 0);
+    // Le texte reste a sa position d'origine (index 1) : compacter le tableau
+    // deplacerait le contenu survivant dans un autre emplacement.
+    expect(page.content.itemIds).toEqual([null, 'tx1', null]);
+    expect(page.content.blocks[0].itemIds).toEqual([null, 'tx1', null]);
+  });
+
+  it('nettoie aussi les reglages indexes par itemId', async () => {
+    const { mock, service } = load();
+    await service.deleteContentItemsByKind('book-1', 'photo');
+
+    const page = mock.__table('book_pages').find((row) => row.page_index === 0);
+    expect(page.content.photoAdjustments).toEqual({});
+    expect(page.content.photoFit).toEqual({});
+    // Les reglages des items CONSERVES ne bougent pas.
+    expect(page.content.textRoles).toEqual({ tx1: 'quote' });
+  });
+
+  it('ne reecrit pas une page qui ne contenait aucun item supprime', async () => {
+    const { mock, service } = load();
+    const avant = JSON.stringify(mock.__table('book_pages').find((row) => row.page_index === 1));
+    await service.deleteContentItemsByKind('book-1', 'photo');
+    const apres = JSON.stringify(mock.__table('book_pages').find((row) => row.page_index === 1));
+    expect(apres).toBe(avant);
+  });
+
+  it('ne fait rien quand il n y a rien a supprimer', async () => {
+    const { service } = load();
+    await service.deleteContentItemsByKind('book-1', 'photo');
+    const deuxieme = await service.deleteContentItemsByKind('book-1', 'photo');
+    expect(deuxieme).toEqual([]);
+  });
+});

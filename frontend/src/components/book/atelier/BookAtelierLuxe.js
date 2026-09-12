@@ -14,6 +14,7 @@ import {
   uploadPhoto,
   addTextItem,
   deleteContentItem,
+  deleteAllContentItems,
   getRecommendedPageCount,
   extendBookPages,
   shrinkBookPages,
@@ -111,6 +112,7 @@ export default function BookAtelierLuxe() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   // { done, total, failed } pendant un envoi de lot, null sinon.
   const [uploadProgress, setUploadProgress] = useState(null);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [sidebarAddError, setSidebarAddError] = useState('');
   const [addingPages, setAddingPages] = useState(false);
   const [removingPages, setRemovingPages] = useState(false);
@@ -723,6 +725,40 @@ export default function BookAtelierLuxe() {
     }
   };
 
+  // "Tout supprimer" (photos ou souvenirs). Irreversible, et ca touche aussi
+  // les pages deja composees : la confirmation nomme donc precisement ce qui
+  // va disparaitre, jamais un "etes-vous sur ?" abstrait.
+  const handleDeleteAll = async (kind) => {
+    if (!book?.id || deletingAll) return;
+    const concernes = kind === 'photo' ? photos : souvenirs;
+    if (concernes.length === 0) return;
+
+    const label = kind === 'photo'
+      ? `${concernes.length} photo${concernes.length > 1 ? 's' : ''}`
+      : `${concernes.length} souvenir${concernes.length > 1 ? 's' : ''}`;
+    // eslint-disable-next-line no-restricted-globals
+    if (!window.confirm(
+      `Supprimer définitivement ${label} ?\n\n`
+      + 'Ils seront aussi retirés des pages où vous les aviez placés. Cette action est irréversible.'
+    )) return;
+
+    setDeletingAll(true);
+    setSidebarAddError('');
+    try {
+      await deleteAllContentItems(book.id, kind);
+      // On relit tout plutot que de retirer les elements a la main : les
+      // PAGES ont change elles aussi (references nettoyees cote serveur), et
+      // les deviner ici dupliquerait cette logique.
+      await loadAll();
+      setSelectedSidebarItem(null);
+      setRefreshToken((previous) => previous + 1);
+    } catch (err) {
+      setSidebarAddError(err.message || 'La suppression a echoue.');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const handleDeleteItem = async (itemId) => {
     if (!book?.id) return;
     setSidebarAddError('');
@@ -1036,6 +1072,8 @@ export default function BookAtelierLuxe() {
             onDeleteItem={handleDeleteItem}
             uploadingPhotos={uploadingPhotos}
             uploadProgress={uploadProgress}
+            onDeleteAll={handleDeleteAll}
+            deletingAll={deletingAll}
             addError={sidebarAddError}
             initialTab={searchParams.get('tab')}
             usedItemIds={usedItemIds}

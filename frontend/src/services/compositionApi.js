@@ -131,6 +131,14 @@ export const addTextItem = (bookId, text, displayOrder = 0) => request(`/books/$
   body: JSON.stringify({ source: 'upload', kind: 'texte', text, display_order: displayOrder })
 });
 
+// Supprime TOUS les souvenirs d'un type ('photo' ou 'texte'). Irreversible :
+// le backend exige `confirm: true` et nettoie aussi les references laissees
+// sur les pages ainsi que les fichiers du stockage.
+export const deleteAllContentItems = (bookId, kind) => request(
+  `/books/${bookId}/content-items?kind=${encodeURIComponent(kind)}`,
+  { method: 'DELETE', body: JSON.stringify({ confirm: true }) }
+);
+
 export const deleteContentItem = (bookId, itemId) => request(`/books/${bookId}/content-items/${itemId}`, {
   method: 'DELETE'
 });
