@@ -123,6 +123,10 @@ export default function BookAtelierLuxe() {
   // de chargement ci-dessous ne se redeclenche que sur un changement de
   // dependance, jamais sur un simple `setCoverHtml(null)` isole.
   const [refreshToken, setRefreshToken] = useState(0);
+  // Incremente UNIQUEMENT par loadAll (rechargement delibere des donnees).
+  // Sert de declencheur a l initialisation du brouillon de page : une
+  // sauvegarde automatique, elle, ne doit jamais la relancer.
+  const [contentVersion, setContentVersion] = useState(0);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -140,6 +144,7 @@ export default function BookAtelierLuxe() {
       setItems(itemList || []);
       setLayouts(layoutList || []);
       setPages(pageList || []);
+      setContentVersion((previous) => previous + 1);
 
       if (!bookRow.page_count) {
         setError("Choisissez le nombre de pages du livre (onglet Configuration) avant d'ouvrir l'atelier.");
@@ -159,6 +164,13 @@ export default function BookAtelierLuxe() {
   const souvenirs = useMemo(() => items.filter((item) => item.kind === 'texte'), [items]);
   const itemsById = useMemo(() => Object.fromEntries(items.map((item) => [item.id, item])), [items]);
   const layoutsById = useMemo(() => Object.fromEntries(layouts.map((layout) => [layout.id, layout])), [layouts]);
+
+  // Valeurs lues par l effet d initialisation du brouillon SANS en etre des
+  // dependances (voir son commentaire) : elles doivent etre fraiches, mais
+  // ne jamais le relancer.
+  const pagesRef = useRef(pages); pagesRef.current = pages;
+  const layoutsByIdRef = useRef(layoutsById); layoutsByIdRef.current = layoutsById;
+  const itemsByIdRef = useRef(itemsById); itemsByIdRef.current = itemsById;
 
   // Elements deja places sur UNE page interieure quelconque du livre (pas
   // seulement la page en cours) — retour utilisateur : eviter les doublons
@@ -313,8 +325,8 @@ export default function BookAtelierLuxe() {
       setDraftTextStyles({});
       return;
     }
-    const pageRow = pages.find((page) => page.page_index === currentPageIndex);
-    const realLayout = pageRow?.layout_id ? layoutsById[pageRow.layout_id] : null;
+    const pageRow = pagesRef.current.find((page) => page.page_index === currentPageIndex);
+    const realLayout = pageRow?.layout_id ? layoutsByIdRef.current[pageRow.layout_id] : null;
     const atelierLayout = realLayout ? findAtelierLayout(realLayout.slug) : null;
 
     if (atelierLayout && Array.isArray(pageRow.content?.itemIds) && pageRow.content.itemIds.length === atelierLayout.slots.length) {
@@ -329,7 +341,7 @@ export default function BookAtelierLuxe() {
       // declenchait a tort la sauvegarde VALIDEE (saveManualPage) des que
       // l'utilisateur touchait a un AUTRE emplacement de cette meme page,
       // rejetee cote serveur avec un message peu clair.
-      const cleanedItemIds = pageRow.content.itemIds.map((id) => (id && itemsById[id] ? id : null));
+      const cleanedItemIds = pageRow.content.itemIds.map((id) => (id && itemsByIdRef.current[id] ? id : null));
       setDraftSlotItemIds(cleanedItemIds);
       setDraftPhotoAdjustments(pageRow.content?.photoAdjustments || {});
       setDraftTextRoles(pageRow.content?.textRoles || {});
@@ -345,7 +357,29 @@ export default function BookAtelierLuxe() {
     setSelectedSidebarItem(null);
     setSaveStatus('idle');
     setSaveError('');
-  }, [currentPageIndex, pages, layoutsById, itemsById]);
+    // BUG CORRIGE 2026-09-12 — "le texte ne s'enregistre pas" sur un
+    // gabarit photo+legende.
+    //
+    // Cet effet dependait de `pages` ET `itemsById`. Or ecrire une legende
+    // CREE un souvenir : `items` change, donc `itemsById` change d'identite,
+    // donc cet effet se relancait AUSSITOT — et reecrivait le brouillon a
+    // partir de la page ENREGISTREE, qui ne contenait pas encore la legende
+    // (la sauvegarde est asynchrone). L'affectation etait donc effacee une
+    // fraction de seconde apres avoir ete faite, l'emplacement redevenait
+    // vide, et le souvenir restait orphelin. A la tentative suivante,
+    // l'emplacement paraissant vide, un NOUVEAU souvenir etait cree — d'ou
+    // les doublons constates en base (3 variantes de la meme legende).
+    //
+    // C'etait une COURSE : quand la sauvegarde arrivait avant le rendu, tout
+    // fonctionnait. D'ou un bug intermittent, difficile a reproduire.
+    //
+    // Cet effet INITIALISE le brouillon, il ne doit donc se declencher que
+    // lorsqu'on change reellement de page, ou apres un rechargement
+    // deliberé des donnees (loadAll -> contentVersion). Les valeurs dont il
+    // a besoin sont lues via des refs : toujours fraiches, sans jamais
+    // provoquer de relance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPageIndex, contentVersion]);
 
   // Sauvegarde automatique — jamais de bouton "Valider" separe, et reflete
   // le brouillon des le PREMIER emplacement rempli (retour utilisateur :
