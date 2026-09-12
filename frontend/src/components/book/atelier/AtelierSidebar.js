@@ -25,6 +25,7 @@ function AtelierSidebar({
   onAddText,
   onDeleteItem,
   uploadingPhotos,
+  uploadProgress,
   addError,
   // Pre-selection de l'onglet depuis le dashboard ("Ajouter mes photos"/
   // "Ajouter mes souvenirs" -> /atelier?tab=photos|souvenirs, voir
@@ -91,17 +92,40 @@ function AtelierSidebar({
 
       <div className="atelier-sidebar-add">
         {activeTab === 'photos' ? (
-          <label className={`atelier-sidebar-add-btn ${uploadingPhotos ? 'is-disabled' : ''}`}>
-            {uploadingPhotos ? 'Ajout en cours...' : '+ Ajouter des photos'}
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoInputChange}
-              disabled={uploadingPhotos}
-              hidden
-            />
-          </label>
+          <>
+            <label className={`atelier-sidebar-add-btn ${uploadingPhotos ? 'is-disabled' : ''}`}>
+              {uploadingPhotos ? 'Ajout en cours...' : '+ Ajouter des photos'}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handlePhotoInputChange}
+                disabled={uploadingPhotos}
+                hidden
+              />
+            </label>
+            {/* Avancement REEL (photos envoyees / total). Un lot de 40 photos
+                prend plusieurs minutes : sans ce retour, rien ne distingue
+                "ca travaille" de "c'est plante" (retour utilisateur
+                2026-09-12). Les echecs eventuels sont comptes a part — le lot
+                continue malgre eux. */}
+            {uploadProgress && (
+              <div className="atelier-upload-progress">
+                <div className="atelier-upload-progress-head">
+                  <span>{uploadProgress.done} / {uploadProgress.total} photos</span>
+                  {uploadProgress.failed > 0 && (
+                    <span className="atelier-upload-progress-failed">{uploadProgress.failed} échec{uploadProgress.failed > 1 ? 's' : ''}</span>
+                  )}
+                </div>
+                <div className="atelier-upload-progress-bar">
+                  <div
+                    className="atelier-upload-progress-fill"
+                    style={{ width: `${Math.round((uploadProgress.done / uploadProgress.total) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="atelier-sidebar-add-text">
             <textarea

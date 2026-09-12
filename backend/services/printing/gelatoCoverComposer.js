@@ -26,7 +26,7 @@
 // TAILLE du panneau de capture differe (celle du vrai panneau imprimeur,
 // pas le format plein-page habituel).
 
-const sharp = require('sharp');
+const sharp = require('../../config/sharp');
 const pageRenderer = require('../composition/pageRenderer');
 const pdfService = require('../composition/pdfService');
 const { composeFrontCover, composeBackCover } = require('../composition/coverComposer');

@@ -1574,3 +1574,34 @@
   line-height: 1.4;
   color: var(--text-light);
 }
+
+/* --- Avancement de l'envoi de photos (2026-09-12) -----------------------
+   Un lot de 40 photos prend plusieurs minutes : sans avancement visible,
+   rien ne distingue un traitement en cours d'un blocage. */
+.atelier-upload-progress { margin-top: 8px; }
+
+.atelier-upload-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-light);
+  margin-bottom: 5px;
+}
+.atelier-upload-progress-failed { color: #8c3225; font-weight: 700; }
+
+.atelier-upload-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(36, 31, 24, 0.1);
+  overflow: hidden;
+}
+
+.atelier-upload-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gold);
+  transition: width 0.25s ease;
+}

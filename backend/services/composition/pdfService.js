@@ -32,7 +32,7 @@ const path = require('path');
 const { execFile, spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 const PDFDocument = require('pdfkit');
-const sharp = require('sharp');
+const sharp = require('../../config/sharp');
 const pageRenderer = require('./pageRenderer');
 
 const PDF_PREVIEW_DIR = path.join(__dirname, '..', '..', 'tmp', 'composition-preview');

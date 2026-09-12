@@ -109,6 +109,8 @@ export default function BookAtelierLuxe() {
   const [isConfirmSwitchOpen, setIsConfirmSwitchOpen] = useState(false);
 
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  // { done, total, failed } pendant un envoi de lot, null sinon.
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [sidebarAddError, setSidebarAddError] = useState('');
   const [addingPages, setAddingPages] = useState(false);
   const [removingPages, setRemovingPages] = useState(false);
@@ -668,21 +670,46 @@ export default function BookAtelierLuxe() {
     }
   };
 
+  // Envoi d'un lot de photos, une par une (jamais en parallele : le serveur
+  // decode chaque image, et une rafale saturerait sa memoire).
+  //
+  // Deux exigences apprises d'un envoi reel de 40 photos (2026-09-12) :
+  //   - AVANCEMENT visible : sans lui, plusieurs minutes sans aucun signe de
+  //     vie, impossible de distinguer "ca travaille" de "c'est plante".
+  //   - RESILIENCE : une photo qui echoue ne doit plus interrompre le lot.
+  //     Avant, la premiere erreur faisait perdre TOUTES les photos suivantes
+  //     — sur 40 photos et une coupure a la 9e, 31 etaient abandonnees sans
+  //     que rien ne le dise.
   const handleUploadPhotos = async (files) => {
-    if (!book?.id || !files || files.length === 0) return;
+    const list = Array.from(files || []);
+    if (!book?.id || list.length === 0) return;
+
     setUploadingPhotos(true);
     setSidebarAddError('');
-    try {
-      for (const file of files) {
+    setUploadProgress({ done: 0, total: list.length, failed: 0 });
+
+    const failures = [];
+    for (let index = 0; index < list.length; index += 1) {
+      try {
         // eslint-disable-next-line no-await-in-loop
-        const created = await uploadPhoto(book.id, file, items.length);
+        const created = await uploadPhoto(book.id, list[index], items.length + index);
         setItems((previous) => [...previous, created]);
+      } catch (err) {
+        failures.push({ name: list[index]?.name || `photo ${index + 1}`, message: err.message });
       }
-    } catch (err) {
-      setSidebarAddError(err.message || "L'ajout de la photo a echoue.");
-    } finally {
-      setUploadingPhotos(false);
+      setUploadProgress({ done: index + 1, total: list.length, failed: failures.length });
     }
+
+    if (failures.length > 0) {
+      const noms = failures.slice(0, 3).map((f) => f.name).join(', ');
+      setSidebarAddError(
+        `${failures.length} photo${failures.length > 1 ? 's' : ''} sur ${list.length} n'${failures.length > 1 ? 'ont' : 'a'} pas pu être ajoutée${failures.length > 1 ? 's' : ''} (${noms}${failures.length > 3 ? '…' : ''}). `
+        + 'Les autres sont bien enregistrées — vous pouvez relancer uniquement celles-ci.'
+      );
+    }
+
+    setUploadingPhotos(false);
+    setUploadProgress(null);
   };
 
   const handleAddText = async (text) => {
@@ -1008,6 +1035,7 @@ export default function BookAtelierLuxe() {
             onAddText={handleAddText}
             onDeleteItem={handleDeleteItem}
             uploadingPhotos={uploadingPhotos}
+            uploadProgress={uploadProgress}
             addError={sidebarAddError}
             initialTab={searchParams.get('tab')}
             usedItemIds={usedItemIds}

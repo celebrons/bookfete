@@ -1,7 +1,7 @@
 const supabase = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
 const sizeOf = require('image-size');
-const sharp = require('sharp');
+const sharp = require('../config/sharp');
 
 // Sonde legere (pure JS, aucun binaire natif) les dimensions/orientation
 // d'une image deja en memoire (multer memoryStorage — pas d'I/O supplementaire).
@@ -126,10 +126,16 @@ const uploadFile = async (bucket, file, folder = '') => {
     // champ correspondant dans metadata, et le frontend se replie
     // silencieusement sur l'URL originale (meme convention que
     // orientation/ratio/width/height, deja optionnels).
-    const [thumbnailUrl, previewUrl] = await Promise.all([
-      uploadResizedVariant(bucket, `${folder}/${baseName}_thumb.jpg`, originalBuffer, THUMBNAIL_MAX_PX, THUMBNAIL_QUALITY),
-      uploadResizedVariant(bucket, `${folder}/${baseName}_preview.jpg`, originalBuffer, PREVIEW_MAX_PX, PREVIEW_QUALITY)
-    ]);
+    // SEQUENTIEL, et non Promise.all : les deux variantes decodent chacune
+    // l'image entiere (~70 Mo en bitmap pour une photo de 24 Mpx). Les lancer
+    // ensemble doublait le pic memoire et faisait TUER le processus sur une
+    // instance de 512 Mo — le navigateur affichait alors "Failed to fetch",
+    // a un rang variable selon le poids des photos (constate le 2026-09-12 :
+    // echec a la 9e photo, puis a la 33e sur un second essai).
+    // Le gain de vitesse du parallelisme etait marginal ici (l'envoi vers le
+    // stockage domine), le cout en memoire ne l'etait pas.
+    const thumbnailUrl = await uploadResizedVariant(bucket, `${folder}/${baseName}_thumb.jpg`, originalBuffer, THUMBNAIL_MAX_PX, THUMBNAIL_QUALITY);
+    const previewUrl = await uploadResizedVariant(bucket, `${folder}/${baseName}_preview.jpg`, originalBuffer, PREVIEW_MAX_PX, PREVIEW_QUALITY);
 
     return {
       success: true,
