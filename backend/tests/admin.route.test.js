@@ -30,7 +30,9 @@ jest.mock('../config/supabase', () => {
     ],
     book_pages: [{ id: 'p1', book_id: 'b1' }],
     orders: [{ id: 'o1', book_id: 'b1', status: 'paid', type: 'print', total_cents: 7450 }],
-    profiles: [{ id: 'user-1', email: 'client@test.local', full_name: 'Marie Test' }]
+    profiles: [{ id: 'user-1', email: 'client@test.local', full_name: 'Marie Test' }],
+    layout_definitions: [],
+    book_templates: []
   });
 
   mock.auth = {
@@ -180,5 +182,56 @@ describe('Espace admin — liste des livres', () => {
     expect((await list('?search=marie')).body.books.map((b) => b.id)).toEqual(['b1']);
     expect((await list('?search=client@test')).body.books.map((b) => b.id)).toEqual(['b1']);
     expect((await list('?search=introuvable')).body.books).toHaveLength(0);
+  });
+});
+
+// Consultation d'un livre. BUG REEL signale le 2026-09-12 (capture a
+// l'appui) : l'apercu ne montrait aucune couverture. Les couvertures ne sont
+// JAMAIS stockees dans `book_pages` — elles sont recalculees a la volee par
+// coverComposer, hors du budget de pages interieures. Rendre uniquement
+// `listPages` donnait donc un livre sans premiere ni quatrieme de
+// couverture... et une page entierement blanche pour un livre encore vide,
+// ce qui etait precisement le cas a l'ecran.
+describe('Espace admin — consultation d\'un livre', () => {
+  let app;
+  const OLD_ENV = { ...process.env };
+
+  beforeAll(() => { app = buildApp(); });
+  beforeEach(() => { process.env.ADMIN_EMAILS = ADMIN_EMAIL; });
+  afterEach(() => { process.env = { ...OLD_ENV }; });
+
+  const preview = (id) => request(app)
+    .get(`/api/admin/books/${id}/preview.html`)
+    .set('Authorization', 'Bearer admin-token');
+
+  it('refuse un non-administrateur', async () => {
+    const response = await request(app)
+      .get('/api/admin/books/b1/preview.html')
+      .set('Authorization', 'Bearer user-token');
+    expect(response.status).toBe(404);
+  });
+
+  it('rend un document HTML complet', async () => {
+    const response = await preview('b1');
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('<!doctype html>');
+  });
+
+  it('inclut la premiere ET la quatrieme de couverture', async () => {
+    const response = await preview('b1');
+    expect(response.text).toContain('front-cover');
+    expect(response.text).toContain('back-cover');
+  });
+
+  it("un livre encore vide affiche quand meme ses couvertures (jamais une page blanche)", async () => {
+    // b2 n'a aucune ligne dans book_pages.
+    const response = await preview('b2');
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('front-cover');
+    expect(response.text).not.toContain("n'a pas encore de pages composées");
+  });
+
+  it('404 sur un livre inexistant', async () => {
+    expect((await preview('nexiste-pas')).status).toBe(404);
   });
 });

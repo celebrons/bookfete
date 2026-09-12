@@ -20,6 +20,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const bookContentService = require('../services/composition/bookContentService');
 const templateCatalog = require('../services/composition/templateCatalog');
 const pageRenderer = require('../services/composition/pageRenderer');
+const coverComposer = require('../services/composition/coverComposer');
 const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../services/composition/coverFormat');
 const { resolveFormatDensity } = require('../services/composition/formatDensity');
 
@@ -175,19 +176,24 @@ router.get('/books/:bookId/preview.html', authenticate, requireAdmin, async (req
       .single();
     if (error || !book) return res.status(404).json({ error: 'Livre introuvable.' });
 
-    const [pages, items, layouts] = await Promise.all([
+    const [interiorPages, items, layouts, template] = await Promise.all([
       bookContentService.listPages(book.id),
       bookContentService.listContentItems(book.id),
-      templateCatalog.listActiveLayouts()
+      templateCatalog.listActiveLayouts(),
+      book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null)
     ]);
 
-    const html = pageRenderer.renderBookHtml({
-      book,
-      pages,
-      items,
-      layouts,
-      format: resolveRenderFormat(book.print_format)
-    });
+    const format = resolveRenderFormat(book.print_format);
+    // Les couvertures ne sont JAMAIS stockees dans book_pages : elles sont
+    // recalculees a la volee par coverComposer (voir son en-tete), hors du
+    // budget de pages interieures. Rendre uniquement `listPages` donnait donc
+    // un livre sans premiere ni quatrieme de couverture (signale le
+    // 2026-09-12). On passe par le meme chemin que l'apercu client
+    // (routes/composition.js GET /preview.html) — jamais une seconde facon
+    // d'assembler un livre, qui finirait par diverger.
+    const pages = coverComposer.composeCoversIntoPages({ book, items, template, interiorPages, format });
+
+    const html = pageRenderer.renderBookHtml({ book, pages, items, layouts, format });
 
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
