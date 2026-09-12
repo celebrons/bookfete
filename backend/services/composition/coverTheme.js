@@ -18,6 +18,11 @@
 //
 // Fonctions pures, aucun acces reseau/disque.
 
+// Rapport de contraste WCAG — importe plutot que reimplemente : c'est la
+// meme mecanique que pour les textes interieurs, et deux copies finiraient
+// par diverger. typographySystem est un module pur, aucun cycle possible.
+const { contrastRatio } = require('./typographySystem');
+
 const COVER_THEMES = {
   elegance: {
     titleFont: "'Cormorant Garamond', Georgia, serif",
@@ -107,9 +112,69 @@ function applyFormatAccent(theme, formatId) {
   return { ...theme, ornament: 'none' };
 }
 
+// --- Couleur de couverture choisie par l'utilisateur (2026-09-12) ---------
+//
+// Palette FERMEE, volontairement : un selecteur de couleur libre produirait
+// des couvertures criardes et c'est le produit qui en souffrirait (meme
+// principe que la palette de texte, voir typographySystem.TEXT_COLORS).
+//
+// Que des MATIERES, aucune couleur vive : c'est ce qui donne un objet
+// premium plutot qu'un cahier d'ecolier. Six tons du plus clair au plus
+// sombre — l'echelle suffit a couvrir tous les gouts sans jamais produire
+// un resultat laid.
+//
+// Cette palette repond aussi au commentaire d'applyFormatAccent ci-dessus,
+// qui notait qu'un seul ton Luxe avait ete retenu "pour rester dans le
+// budget de cette passe ; un selecteur pourra venir plus tard".
+const COVER_COLORS = {
+  ivoire: { label: 'Ivoire', hex: '#fffdf8' },
+  blanc: { label: 'Blanc', hex: '#ffffff' },
+  lin: { label: 'Lin', hex: '#ede6d6' },
+  grege: { label: 'Grege', hex: '#d6cfc2' },
+  encre: { label: 'Encre', hex: '#241f18' },
+  nuit: { label: 'Nuit', hex: '#1f2a33' }
+};
+
+const COVER_INK_LIGHT = '#fffdf8';
+const COVER_INK_DARK = '#241f18';
+// Or plus clair, lisible sur un fond sombre — l'or profond du Luxe
+// (#8a6a1f) y disparaitrait.
+const COVER_ACCENT_ON_DARK = '#c9a35f';
+
+// Applique la couleur choisie PAR-DESSUS le theme et l'habillage de format.
+// Ordre volontaire : un choix explicite de l'utilisateur doit gagner sur la
+// teinte par defaut du format, sinon choisir une couleur sur un livre Luxe
+// ne changerait rien.
+//
+// La couleur du TEXTE n'est pas choisie par l'utilisateur : elle est deduite
+// du contraste reel avec le fond. C'est ce qui rend impossible une
+// couverture au titre illisible — et c'est la meme mecanique que pour les
+// textes interieurs (typographySystem.contrastRatio).
+function applyCoverColor(theme, colorToken) {
+  const color = COVER_COLORS[colorToken];
+  if (!color) return theme;
+
+  const onDark = contrastRatio(COVER_INK_LIGHT, color.hex) > contrastRatio(COVER_INK_DARK, color.hex);
+
+  return {
+    ...theme,
+    paper: color.hex,
+    bg: color.hex,
+    ink: onDark ? COVER_INK_LIGHT : COVER_INK_DARK,
+    accent: onDark ? COVER_ACCENT_ON_DARK : theme.accent,
+    accentDeep: onDark ? COVER_ACCENT_ON_DARK : theme.accentDeep,
+    coverColor: colorToken,
+    // Une texture de lin suggeree en CSS clair ne se lit pas sur un fond
+    // sombre : elle y ferait un voile grisatre, pas une matiere.
+    texture: onDark ? 'none' : theme.texture
+  };
+}
+
 module.exports = {
   COVER_THEMES,
   DEFAULT_THEME_SLUG,
+  COVER_COLORS,
   resolveCoverTheme,
-  applyFormatAccent
+  applyFormatAccent,
+  applyCoverColor
 };

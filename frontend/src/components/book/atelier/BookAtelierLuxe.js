@@ -15,7 +15,9 @@ import {
   addTextItem,
   deleteContentItem,
   getRecommendedPageCount,
-  extendBookPages
+  extendBookPages,
+  shrinkBookPages,
+  updateContentItem
 } from '../../../services/compositionApi';
 import AtelierSidebar from './AtelierSidebar';
 import AtelierBookView from './AtelierBookView';
@@ -29,6 +31,7 @@ import AtelierFinishModal from './AtelierFinishModal';
 import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
 import { findAtelierLayout } from './atelierLayouts';
+import AnonymousBanner from '../../common/AnonymousBanner';
 import '../../../styles/luxe-theme.css';
 import './BookAtelierLuxe.css';
 
@@ -81,6 +84,12 @@ export default function BookAtelierLuxe() {
   // zoom "toujours disponible", confirme avec l'utilisateur) — elle s'ouvre
   // desormais au clic sur la photo (voir AtelierPhotoAdjustModal.js).
   const [draftPhotoAdjustments, setDraftPhotoAdjustments] = useState({});
+  // Roles et reglages typographiques par itemId (cahier des charges
+  // typographique §3/§6) — meme mecanique que draftPhotoAdjustments : etat
+  // local, compare dans l'effet d'autosauvegarde, persiste par
+  // saveManualPage.
+  const [draftTextRoles, setDraftTextRoles] = useState({});
+  const [draftTextStyles, setDraftTextStyles] = useState({});
   const [adjustTargetSlotIndex, setAdjustTargetSlotIndex] = useState(null);
 
   const [coverHtml, setCoverHtml] = useState(null);
@@ -102,6 +111,7 @@ export default function BookAtelierLuxe() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [sidebarAddError, setSidebarAddError] = useState('');
   const [addingPages, setAddingPages] = useState(false);
+  const [removingPages, setRemovingPages] = useState(false);
 
   // Force un rechargement de l'apercu de la vue courante meme quand
   // viewIndex ne change pas (ex. sauvegarde de couverture, generation
@@ -295,6 +305,8 @@ export default function BookAtelierLuxe() {
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
       setDraftPhotoAdjustments({});
+      setDraftTextRoles({});
+      setDraftTextStyles({});
       return;
     }
     const pageRow = pages.find((page) => page.page_index === currentPageIndex);
@@ -316,10 +328,14 @@ export default function BookAtelierLuxe() {
       const cleanedItemIds = pageRow.content.itemIds.map((id) => (id && itemsById[id] ? id : null));
       setDraftSlotItemIds(cleanedItemIds);
       setDraftPhotoAdjustments(pageRow.content?.photoAdjustments || {});
+      setDraftTextRoles(pageRow.content?.textRoles || {});
+      setDraftTextStyles(pageRow.content?.textStyles || {});
     } else {
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
       setDraftPhotoAdjustments({});
+      setDraftTextRoles({});
+      setDraftTextStyles({});
     }
     setActiveCategory(null);
     setSelectedSidebarItem(null);
@@ -384,7 +400,9 @@ export default function BookAtelierLuxe() {
     // serait a tort considere "deja sauvegarde" et jamais persiste.
     const alreadySaved = Array.isArray(pageRow?.content?.itemIds)
       && JSON.stringify(pageRow.content.itemIds) === JSON.stringify(draftSlotItemIds)
-      && JSON.stringify(pageRow.content?.photoAdjustments || {}) === JSON.stringify(draftPhotoAdjustments);
+      && JSON.stringify(pageRow.content?.photoAdjustments || {}) === JSON.stringify(draftPhotoAdjustments)
+      && JSON.stringify(pageRow.content?.textRoles || {}) === JSON.stringify(draftTextRoles)
+      && JSON.stringify(pageRow.content?.textStyles || {}) === JSON.stringify(draftTextStyles);
     if (alreadySaved) return undefined;
 
     const realLayout = layouts.find((entry) => entry.slug === draftLayoutSlug);
@@ -396,14 +414,22 @@ export default function BookAtelierLuxe() {
 
     const kind = realLayout.kind === 'photo' || realLayout.kind === 'texte' ? realLayout.kind : 'mixte';
     const persistPromise = isComplete
-      ? saveManualPage(book.id, currentPageIndex, { layoutId: realLayout.id, itemIds: draftSlotItemIds, photoAdjustments: draftPhotoAdjustments })
+      ? saveManualPage(book.id, currentPageIndex, {
+          layoutId: realLayout.id,
+          itemIds: draftSlotItemIds,
+          photoAdjustments: draftPhotoAdjustments,
+          textRoles: draftTextRoles,
+          textStyles: draftTextStyles
+        })
       : updatePageContent(book.id, currentPageIndex, {
           layoutId: realLayout.id,
           content: {
             kind,
             itemIds: draftSlotItemIds,
             blocks: [{ itemIds: draftSlotItemIds, kind, layoutId: realLayout.id, presentationVariant: 0 }],
-            photoAdjustments: draftPhotoAdjustments
+            photoAdjustments: draftPhotoAdjustments,
+            textRoles: draftTextRoles,
+            textStyles: draftTextStyles
           },
           locked: true
         });
@@ -422,7 +448,7 @@ export default function BookAtelierLuxe() {
       });
 
     return () => { cancelled = true; };
-  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
+  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftTextRoles, draftTextStyles, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
 
   const handleChooseLayout = (slug) => {
     const atelierLayout = findAtelierLayout(slug);
@@ -430,6 +456,8 @@ export default function BookAtelierLuxe() {
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(new Array(atelierLayout.slots.length).fill(null));
     setDraftPhotoAdjustments({});
+    setDraftTextRoles({});
+    setDraftTextStyles({});
   };
 
   const handleAssignSlot = (slotIndex, itemId) => {
@@ -468,6 +496,83 @@ export default function BookAtelierLuxe() {
   const handleOpenAdjust = (slotIndex) => {
     if (!draftSlotItemIds[slotIndex]) return;
     setAdjustTargetSlotIndex(slotIndex);
+  };
+
+  // Sauvegarde d'un texte modifie EN PLACE sur la page (cahier des charges
+  // typographique §1, voir AtelierTextEditor.js).
+  //
+  // Deux choses distinctes a enregistrer, volontairement separees :
+  //   - le TEXTE appartient au souvenir (content_items), il est partage par
+  //     toutes les pages qui l'utilisent -> updateContentItem ;
+  //   - le ROLE et les reglages appartiennent a CETTE page (c'est une
+  //     decision de mise en page, pas une propriete du souvenir) -> etat
+  //     local, persiste par l'autosauvegarde existante.
+  // Les confondre ferait qu'un meme souvenir repris ailleurs imposerait son
+  // role a l'autre page.
+  const handleSaveText = async (itemId, { text, role, styleOverrides }) => {
+    setDraftTextRoles((previous) => ({ ...previous, [itemId]: role }));
+    setDraftTextStyles((previous) => ({ ...previous, [itemId]: styleOverrides || {} }));
+
+    const current = itemsById[itemId];
+    const nextText = String(text ?? '');
+    if (!current || current.text === nextText) return;
+
+    // Mise a jour optimiste : l'apercu doit refleter la frappe immediatement,
+    // pas apres un aller-retour reseau.
+    setItems((previous) => previous.map((item) => (
+      item.id === itemId ? { ...item, text: nextText } : item
+    )));
+    setSaveStatus('saving');
+    setSaveError('');
+    try {
+      await updateContentItem(book.id, itemId, { text: nextText });
+      // RECHARGE l'apercu de la page. `setRefreshToken` ne suffisait PAS :
+      // l'effet de chargement ne va chercher que les pages absentes du cache
+      // (`pagePreviewCache[index] == null`), donc apres une modification il
+      // reaffichait l'ancienne version. Le texte etait bien enregistre en
+      // base, mais l'utilisateur voyait l'ancien — et en concluait, a juste
+      // titre, que rien n'avait ete sauvegarde (retour 2026-09-11 : "j'ai
+      // saisi du texte dans le cadre mais il s'enregistre pas").
+      // refreshPagePreview, lui, ECRASE l'entree du cache.
+      await refreshPagePreview(currentPageIndex);
+      setSaveStatus('saved');
+    } catch (err) {
+      // On remet la valeur d'origine : laisser un texte a l'ecran que le
+      // serveur n'a pas enregistre serait le pire des deux mondes.
+      setItems((previous) => previous.map((item) => (
+        item.id === itemId ? { ...item, text: current.text } : item
+      )));
+      setSaveError(err.message || "La modification du texte n'a pas pu etre enregistree.");
+      setSaveStatus('error');
+    }
+  };
+
+  // Ecriture DIRECTE dans un emplacement vide (retour utilisateur
+  // 2026-09-11 : "il faut pouvoir ecrire directement dans les cases vierges
+  // ou bien glisser un souvenir"). Le souvenir est cree a la volee puis pose
+  // dans l'emplacement — il rejoint donc "Mes souvenirs" comme n'importe
+  // quel autre, plutot que de vivre uniquement dans cette page.
+  //
+  // Rien n'est cree si le champ est laisse vide : ouvrir un emplacement puis
+  // se raviser ne doit pas polluer la liste des souvenirs.
+  const handleCreateText = async (slotIndex, { text, role, styleOverrides }) => {
+    const value = String(text || '').trim();
+    if (!book?.id || !value) return;
+
+    setSaveStatus('saving');
+    setSaveError('');
+    try {
+      const created = await addTextItem(book.id, value, items.length);
+      setItems((previous) => [...previous, created]);
+      setDraftTextRoles((previous) => ({ ...previous, [created.id]: role }));
+      setDraftTextStyles((previous) => ({ ...previous, [created.id]: styleOverrides || {} }));
+      // Poser l'item declenche l'effet d'autosauvegarde, qui persiste la page
+      // ET rafraichit son apercu : pas de second chemin d'enregistrement.
+      handleAssignSlot(slotIndex, created.id);
+    } catch (err) {
+      setSaveStatus('error');
+      setSaveError(err.message || "Le texte n'a pas pu etre cree.");
+    }
   };
 
   const handleSavePhotoAdjustment = (itemId, adjustment) => {
@@ -512,6 +617,8 @@ export default function BookAtelierLuxe() {
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
       setDraftPhotoAdjustments({});
+      setDraftTextRoles({});
+      setDraftTextStyles({});
       setSaveStatus('idle');
       await refreshPagePreview(currentPageIndex);
     } catch (err) {
@@ -602,14 +709,14 @@ export default function BookAtelierLuxe() {
   };
 
   // Ouvre la modale de generation en verifiant d'abord si le contenu reel
-  // suffit a atteindre le palier minimum (28 pages, PAGE_COUNT_TIERS[0] cote
-  // backend voir layoutEngine.js — 2026-09-09 : minimum imprimable Gelato,
-  // etait 16 avant integration imprimeur) SANS duplication — le moteur ne
-  // repete jamais une photo/un texte pour "boucher les trous" (voir
+  // suffit a atteindre le palier minimum (30 pages, PAGE_COUNT_TIERS[0] cote
+  // backend voir layoutEngine.js — 2026-09-11 : porte de 28 a 30, etait 16
+  // avant integration imprimeur) SANS duplication — le moteur ne repete
+  // jamais une photo/un texte pour "boucher les trous" (voir
   // layoutEngine.compose, garanti par des tests dedies), donc un contenu
-  // trop maigre pour 28 pages doit etre signale plutot que de generer un
+  // trop maigre pour 30 pages doit etre signale plutot que de generer un
   // livre presente comme fini alors qu'il ne l'est pas.
-  const MIN_AUTO_PAGES = 28;
+  const MIN_AUTO_PAGES = 30;
   const openGenerateModal = async () => {
     if (!book?.id) return;
     setGenerateError('');
@@ -697,6 +804,52 @@ export default function BookAtelierLuxe() {
     }
   };
 
+  // Reduire volontairement le livre (bouton "-2" du filmstrip) — contrepartie
+  // exacte de handleAddPages, meme mecanique de rafraichissement.
+  //
+  // Le serveur retire par la FIN et refuse net de descendre sous le minimum
+  // imprimable. Si les dernieres pages ne sont PAS vides, il repond 409
+  // needsConfirmation avec les numeros concernes plutot que de supprimer :
+  // on pose alors la question, en nommant les pages. Ne jamais transformer ce
+  // 409 en simple message d'erreur — l'utilisateur croirait l'action
+  // impossible alors qu'elle attend juste son accord.
+  const handleRemovePages = async () => {
+    if (!book?.id || removingPages) return;
+
+    const applyResult = ({ book: updatedBook, pages: freshPages }) => {
+      setBook((previous) => ({ ...previous, ...updatedBook }));
+      setPages(freshPages || []);
+      setRefreshToken((previous) => previous + 1);
+    };
+
+    setRemovingPages(true);
+    try {
+      applyResult(await shrinkBookPages(book.id, 2));
+    } catch (err) {
+      const details = err?.payload;
+      if (details?.needsConfirmation) {
+        const numbers = (details.pageNumbers || []).join(' et ');
+        const message = details.lockedCount > 0
+          ? `Les pages ${numbers} contiennent du contenu ou sont verrouillees. Les supprimer definitivement ?`
+          : `Les pages ${numbers} contiennent du contenu. Les supprimer definitivement ?`;
+        // eslint-disable-next-line no-restricted-globals
+        if (!window.confirm(message)) {
+          setRemovingPages(false);
+          return;
+        }
+        try {
+          applyResult(await shrinkBookPages(book.id, 2, true));
+        } catch (confirmErr) {
+          setError(confirmErr.message || 'Impossible de retirer des pages.');
+        }
+      } else {
+        setError(err.message || 'Impossible de retirer des pages.');
+      }
+    } finally {
+      setRemovingPages(false);
+    }
+  };
+
   const canGoPrevious = viewIndex > 0;
   const canGoNext = viewIndex < lastViewIndex;
 
@@ -746,6 +899,10 @@ export default function BookAtelierLuxe() {
       selectedSidebarItem={selectedSidebarItem}
       photoAdjustments={draftPhotoAdjustments}
       printFormat={book?.print_format}
+      onSaveText={handleSaveText}
+      onCreateText={handleCreateText}
+      textRoles={draftTextRoles}
+      textStyles={draftTextStyles}
     />
   ) : null;
 
@@ -765,6 +922,9 @@ export default function BookAtelierLuxe() {
 
   return (
     <div className="atelier-container">
+      {/* Rappel discret quand on travaille sans compte : c'est l'ecran ou
+          l'on passe le plus de temps, donc celui ou il faut le dire. */}
+      <AnonymousBanner compact />
       <header className="atelier-header">
         {/* Plus de lien vers /book/:bookId (l'onglet "Edition" n'existe
             plus, remplace par l'atelier lui-meme — voir BookPageLuxe.js qui
@@ -912,6 +1072,12 @@ export default function BookAtelierLuxe() {
           onSelect={goToFilmstripTarget}
           onAddPages={handleAddPages}
           addingPages={addingPages}
+          onRemovePages={handleRemovePages}
+          removingPages={removingPages}
+          // Le serveur reste l'autorite (il refuse en 422), mais griser le
+          // bouton evite de proposer une action qu'on sait deja impossible.
+          canRemovePages={(pages.length || 0) - 2 >= MIN_AUTO_PAGES}
+          minPages={MIN_AUTO_PAGES}
         />
       ) : null}
 

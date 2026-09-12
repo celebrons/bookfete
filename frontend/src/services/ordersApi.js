@@ -89,6 +89,15 @@ export const createOrder = (payload) => request('/orders', {
   body: JSON.stringify(payload)
 });
 
+// Supprime une commande pour repartir de zero (essais de formats, de types
+// de commande, de paiement) — voir backend DELETE /api/orders/:orderId, qui
+// supprime aussi les brouillons Gelato associes et refuse les seuls cas
+// vraiment irreversibles (commande partie en production, ou payee avec
+// Stripe en mode live).
+export const deleteOrder = (orderId) => request(`/orders/${orderId}`, {
+  method: 'DELETE'
+});
+
 export const createStripeCheckoutSession = (orderId) => request(`/orders/${orderId}/checkout-session`, {
   method: 'POST'
 });

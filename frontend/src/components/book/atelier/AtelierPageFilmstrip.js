@@ -54,7 +54,18 @@ function FilmstripCell({ target, label, status, isActive, aspectRatio, onSelect 
   );
 }
 
-function AtelierPageFilmstrip({ pageStatuses, activeTarget, printFormat, onSelect, onAddPages, addingPages }) {
+function AtelierPageFilmstrip({
+  pageStatuses,
+  activeTarget,
+  printFormat,
+  onSelect,
+  onAddPages,
+  addingPages,
+  onRemovePages,
+  removingPages,
+  canRemovePages,
+  minPages
+}) {
   const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
   const aspectRatio = `${dims.widthMm} / ${dims.heightMm}`;
 
@@ -83,10 +94,27 @@ function AtelierPageFilmstrip({ pageStatuses, activeTarget, printFormat, onSelec
           onSelect={onSelect}
         />
       ))}
-      {/* Agrandir volontairement le livre (jamais automatique — voir
-          routes/composition.js: POST /pages/extend) : 2 pages a la fois,
-          meme palier que le catalogue imprimeur (Gelato n'accepte que des
-          nombres pairs de pages). */}
+      {/* Agrandir ou reduire volontairement le livre (jamais automatique —
+          voir routes/composition.js: POST /pages/extend et /pages/shrink) :
+          2 pages a la fois, meme palier que le catalogue imprimeur (Gelato
+          n'accepte que des nombres pairs de pages). Le retrait se fait par la
+          FIN et se desactive des qu'on atteint le minimum imprimable — le
+          bouton reste visible (grise, avec l'explication en infobulle)
+          plutot que de disparaitre sans dire pourquoi. */}
+      {onRemovePages && (
+        <button
+          type="button"
+          className="atelier-filmstrip-add is-remove"
+          style={{ aspectRatio }}
+          onClick={onRemovePages}
+          disabled={removingPages || !canRemovePages}
+          title={canRemovePages
+            ? 'Retirer les 2 dernieres pages du livre'
+            : `Minimum ${minPages} pages : impossible d'en retirer davantage`}
+        >
+          {removingPages ? '…' : '−2'}
+        </button>
+      )}
       {onAddPages && (
         <button
           type="button"

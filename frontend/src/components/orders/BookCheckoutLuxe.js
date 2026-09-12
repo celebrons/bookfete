@@ -5,6 +5,7 @@ import {
   confirmStripePayment,
   createOrder,
   createStripeCheckoutSession,
+  deleteOrder,
   getOrderById,
   getApiBaseUrl,
   getGelatoStatus,
@@ -123,6 +124,8 @@ const BookCheckoutLuxe = () => {
   const [gelatoProgress, setGelatoProgress] = useState(null);
   const [gelatoResult, setGelatoResult] = useState(null);
   const [gelatoError, setGelatoError] = useState('');
+  const [deletingOrder, setDeletingOrder] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [pdfJob, setPdfJob] = useState(null);
   const [downloadingKind, setDownloadingKind] = useState('');
 
@@ -630,6 +633,40 @@ const BookCheckoutLuxe = () => {
     }
   };
 
+  // Supprimer la commande pour RECOMMENCER le parcours (2026-09-11, demande
+  // utilisateur : pouvoir reessayer un autre type, un autre format, un autre
+  // paiement sans rester bloque). C'est la seule facon de revenir a l'ecran 1 :
+  // des qu'une commande existe, l'etape est imposee par son etat reel
+  // (derivedStep) et la creation d'une nouvelle est verrouillee.
+  //
+  // Le serveur refuse les cas vraiment irreversibles (commande partie en
+  // production, ou payee avec Stripe en mode live) : inutile de dupliquer ce
+  // jugement ici, on affiche son message.
+  const deleteCurrentOrder = async () => {
+    if (!latestOrder?.id || deletingOrder) return;
+    const label = latestOrder.order_number ? ` ${latestOrder.order_number}` : '';
+    // eslint-disable-next-line no-restricted-globals
+    if (!window.confirm(`Supprimer definitivement la commande${label} et repartir de zero ?`)) return;
+
+    setDeletingOrder(true);
+    setDeleteError('');
+    try {
+      await deleteOrder(latestOrder.id);
+      // Remise a zero complete : sans effacer aussi le suivi et les traces de
+      // l'envoi Gelato, l'ecran garderait l'etat de la commande supprimee.
+      setLatestOrder(null);
+      setTracking(null);
+      setGelatoResult(null);
+      setGelatoError('');
+      setGelatoProgress(null);
+      setManualStep(0);
+    } catch (err) {
+      setDeleteError(err?.message || 'Impossible de supprimer cette commande.');
+    } finally {
+      setDeletingOrder(false);
+    }
+  };
+
   const submitOrder = async () => {
     try {
       setSubmitting(true);
@@ -1134,6 +1171,27 @@ const BookCheckoutLuxe = () => {
                   Continuer
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Recommencer : sans ca, une commande existante fige le parcours
+              (etape imposee + creation verrouillee) et on ne peut plus
+              essayer un autre type, un autre format ni un autre paiement. */}
+          {latestOrder && (
+            <div className="orders-reset-block">
+              <button
+                type="button"
+                className="btn btn-outline is-danger"
+                onClick={deleteCurrentOrder}
+                disabled={deletingOrder}
+              >
+                {deletingOrder ? 'Suppression...' : 'Supprimer cette commande et recommencer'}
+              </button>
+              <p className="orders-disclaimer">
+                Supprime aussi les brouillons deposes chez l'imprimeur. Une commande reellement
+                payee ou deja partie en production ne peut pas etre supprimee.
+              </p>
+              {deleteError && <p className="orders-error">{deleteError}</p>}
             </div>
           )}
         </section>

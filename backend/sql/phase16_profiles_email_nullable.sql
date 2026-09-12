@@ -1,0 +1,36 @@
+-- phase16_profiles_email_nullable.sql (2026-09-12)
+--
+-- DEBLOQUE LE DEMARRAGE SANS COMPTE.
+--
+-- Symptome : `supabase.auth.signInAnonymously()` echoue avec
+--   500 unexpected_failure — "Database error creating anonymous user"
+-- alors que l'option "Allow anonymous sign-ins" est pourtant bien activee
+-- dans le tableau de bord Supabase.
+--
+-- Cause, etablie par sondes successives (2026-09-12) :
+--   1. `public.profiles.email` est NOT NULL — verifie : une insertion avec
+--      email NULL renvoie 23502 "null value in column email of relation
+--      profiles violates not-null constraint".
+--   2. Un DECLENCHEUR sur `auth.users` cree automatiquement la ligne
+--      `profiles` — verifie : un utilisateur cree via l'API admin, sans que
+--      l'application n'insere quoi que ce soit, obtient quand meme sa ligne.
+--   3. Un compte ANONYME n'a, par definition, pas d'email. Le declencheur
+--      tente donc d'inserer NULL, viole la contrainte, et Supabase remonte
+--      l'echec sous la forme generique "Database error creating anonymous
+--      user".
+--
+-- Ni la table `profiles` ni ce declencheur ne sont definis dans ce depot :
+-- ils ont ete crees hors code (tableau de bord / installation initiale).
+-- C'est pourquoi rien ici ne le laissait deviner.
+--
+-- Correction : rendre l'email facultatif. C'est semantiquement juste — un
+-- visiteur anonyme n'a reellement pas d'email — et non destructif : aucune
+-- ligne existante n'est modifiee, on retire seulement une contrainte.
+-- L'email est renseigne des la conversion en compte reel, par
+-- POST /api/auth/anonymous/complete (voir controllers/anonymousController.js).
+--
+-- A executer dans l'editeur SQL Supabase. Idempotent : relancable sans
+-- risque.
+
+alter table public.profiles
+  alter column email drop not null;

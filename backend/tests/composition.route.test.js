@@ -604,13 +604,26 @@ describe('routes/composition', () => {
       expect(response.text).not.toContain('data-cvr-role="front-cover"');
     });
 
-    it('cover-preview.html rend une page dimensionnee 100vw/100vh (jamais de defilement dans la iframe)', async () => {
+    // 2026-09-11 : l'apercu ne dimensionne plus la page en 100vw/100vh. Les
+    // unites CSS pt et mm etant ABSOLUES, elles ne suivaient pas ce
+    // redimensionnement : la typographie et les marges restaient a leur
+    // taille absolue et paraissaient donc disproportionnees des que l'apercu
+    // etait affiche plus petit que la taille physique de la page — l'apercu
+    // n'etait pas fidele au PDF. La page garde desormais sa taille reelle et
+    // est mise a l'echelle par une transformation, qui entraine TOUT avec
+    // elle. La garantie testee ici reste la meme : aucun defilement dans
+    // l'iframe.
+    it('cover-preview.html tient dans son conteneur sans defilement, a l\'echelle de la page reelle', async () => {
       const response = await request(app)
         .get(`/api/books/${BOOK_ID}/cover-preview.html`)
         .set('Authorization', 'Bearer valid-token');
 
-      expect(response.text).toContain('width: 100vw');
-      expect(response.text).toContain('height: 100vh');
+      expect(response.text).toContain('overflow: hidden');
+      expect(response.text).toContain('width: var(--page-width-mm)');
+      expect(response.text).toContain('height: var(--page-height-mm)');
+      // Mise a l'echelle proportionnelle (un seul facteur pour les deux axes,
+      // donc jamais de deformation).
+      expect(response.text).toContain('Math.min(window.innerWidth / w, window.innerHeight / h)');
     });
 
     it('cover-preview.html applique reellement book.print_format aux dimensions de la couverture (marge de securite livret = 8mm, standard = 15mm)', async () => {

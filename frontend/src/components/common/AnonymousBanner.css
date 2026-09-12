@@ -1,0 +1,37 @@
+/* Bandeau "vous travaillez sans compte" (voir AnonymousBanner.js).
+   Informatif, jamais alarmant : on ne reproche pas a quelqu'un de ne pas
+   s'etre inscrit, c'est nous qui le lui avons propose. */
+.anon-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 10px 18px;
+  background: rgba(184, 146, 74, 0.12);
+  border-bottom: 1px solid rgba(184, 146, 74, 0.3);
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.anon-banner.is-compact {
+  border-radius: 10px;
+  border: 1px solid rgba(184, 146, 74, 0.3);
+  margin-bottom: var(--space-md);
+}
+
+.anon-banner-text { line-height: 1.4; }
+
+.anon-banner-action {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--white, #fff);
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+.anon-banner-action:hover { filter: brightness(1.08); }

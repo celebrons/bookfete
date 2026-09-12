@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './services/supabaseClient';
 import { wakeUpBackend } from './services/httpClient';
+import { linkAnonymousBooksAfterLogin } from './services/anonymousSession';
 
 
 import './styles/luxe-theme.css';
@@ -85,6 +86,11 @@ function App() {
   // ignorees (voir services/httpClient.js).
   React.useEffect(() => {
     wakeUpBackend();
+    // Retour d'une connexion OAuth : le composant de connexion n'est plus
+    // monte, c'est donc ici qu'on rattache les livres commences en session
+    // anonyme au compte qui vient de se connecter. Sans jeton anonyme en
+    // attente, l'appel ne fait rien (voir services/anonymousSession.js).
+    linkAnonymousBooksAfterLogin();
   }, []);
 
   return (

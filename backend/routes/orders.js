@@ -96,6 +96,19 @@ const stripeClient = (STRIPE_ENABLED && Stripe && STRIPE_SECRET_KEY)
   ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
   : null;
 
+// Stripe indique lui-meme son mode dans le prefixe de la cle secrete
+// (`sk_test_...` bac a sable, `sk_live_...` vrais paiements) — c'est la
+// source la plus fiable disponible ici, et elle ne demande aucune variable
+// d'environnement supplementaire a tenir a jour. Utilise par DELETE
+// /:orderId pour laisser effacer librement une commande de test tout en
+// protegeant une commande reellement payee.
+//
+// Par prudence, une cle absente ou de forme inconnue est traitee comme du
+// LIVE : en cas de doute, on protege la commande plutot que de la laisser
+// supprimer. Relu a CHAQUE appel (et non fige au chargement du module) pour
+// que basculer la cle prenne effet sans redemarrage, et pour rester testable.
+const isStripeLiveMode = () => !/^sk_test_/.test(process.env.STRIPE_SECRET_KEY || '');
+
 const extractBearerToken = (req) => {
   const authHeader = req.headers?.authorization || '';
   const [scheme, token] = authHeader.split(' ');
@@ -1045,8 +1058,109 @@ router.get('/:orderId', authenticate, async (req, res) => {
   }
 });
 
+// DELETE /api/orders/:orderId
+// Supprime une commande pour pouvoir RECOMMENCER un test (demande
+// utilisateur 2026-09-11 : "je dois pouvoir supprimer les commandes pour les
+// besoins des tests... sans blocage"). Sans ca, une commande en attente
+// bloque la creation d'une nouvelle (voir BookCheckoutLuxe) et le parcours
+// saute directement a l'ecran de suivi : impossible de reessayer un autre
+// type, un autre format ou un autre paiement.
+//
+// Deux refus, volontairement etroits pour ne genrer aucun scenario de test :
+//   - une commande reellement partie en PRODUCTION chez l'imprimeur
+//     (metadata.gelatoOrderType === 'order') : elle sera imprimee et
+//     facturee, effacer la ligne locale ferait perdre la trace d'un
+//     engagement bien reel. Ne peut pas arriver tant que GELATO_LIVE_ORDERS
+//     n'est pas a '1'.
+//   - une commande payee alors que Stripe tourne en mode LIVE : de l'argent
+//     a vraiment change de main. En mode test (`sk_test_`), aucun blocage.
+// Tout le reste (brouillon, en attente de paiement, payee en mode test,
+// echouee, annulee) est librement supprimable.
+router.delete('/:orderId', authenticate, async (req, res) => {
+  try {
+    const db = createUserScopedClient(req);
+    const { data: order, error: orderError } = await db
+      .from('orders')
+      .select('*')
+      .eq('id', req.params.orderId)
+      .eq('owner_id', req.user.id)
+      .single();
+
+    if (orderError || !order) {
+      return res.status(404).json({ error: 'Commande introuvable' });
+    }
+
+    const gelatoOrderType = order.metadata?.gelatoOrderType || null;
+    if (gelatoOrderType === 'order') {
+      return res.status(409).json({
+        error: "Cette commande est partie en production chez l'imprimeur : elle ne peut pas etre supprimee."
+      });
+    }
+
+    const status = String(order.status || '').toLowerCase();
+    if (ORDER_STATUS_PAID_OR_AFTER.has(status) && isStripeLiveMode()) {
+      return res.status(409).json({
+        error: 'Cette commande a ete reellement payee (Stripe en mode live) : elle ne peut pas etre supprimee.'
+      });
+    }
+
+    // Menage chez Gelato : le brouillon courant ET ceux archives par les
+    // renvois precedents (voir /gelato-test) encombreraient le tableau de
+    // bord alors que plus rien ne les reference. Best effort, comme partout
+    // ailleurs pour cette suppression : un echec cote Gelato ne doit pas
+    // empecher l'utilisateur de nettoyer sa propre commande (pire cas, un
+    // brouillon orphelin, sans consequence ni cout).
+    const draftIds = [
+      ...(gelatoOrderType === 'draft' && order.metadata?.gelatoOrderId ? [order.metadata.gelatoOrderId] : []),
+      ...(Array.isArray(order.metadata?.gelatoPreviousDrafts)
+        ? order.metadata.gelatoPreviousDrafts.map((entry) => entry?.gelatoOrderId).filter(Boolean)
+        : [])
+    ];
+    const deletedDrafts = [];
+    for (const draftId of draftIds) {
+      try {
+        await gelatoClient.deleteOrder(draftId);
+        deletedDrafts.push(draftId);
+      } catch (error) {
+        console.warn('Suppression du brouillon Gelato impossible', draftId, ':', error.message);
+      }
+    }
+
+    const { error: deleteError } = await db
+      .from('orders')
+      .delete()
+      .eq('id', order.id)
+      .eq('owner_id', req.user.id);
+
+    if (deleteError) throw deleteError;
+
+    return res.json({
+      deleted: true,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      deletedGelatoDrafts: deletedDrafts
+    });
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message });
+  }
+});
+
 router.post('/', authenticate, async (req, res) => {
   try {
+    // Demarrage sans compte (2026-09-12) : tout se fait librement en session
+    // anonyme — creer le livre, deposer les photos, composer, voir l'apercu.
+    // La commande est le SEUL point de passage qui exige un vrai compte, et
+    // c'est ici qu'il faut le tenir : sans email ni mot de passe, l'acheteur
+    // ne pourrait ni retrouver sa commande, ni recevoir son suivi, ni
+    // reclamer quoi que ce soit. C'est aussi le moment naturel pour le
+    // demander — la valeur a deja ete vue.
+    if (req.user?.is_anonymous === true) {
+      return res.status(403).json({
+        error: 'Creez votre compte pour commander : il vous permettra de retrouver votre livre et de suivre sa fabrication.',
+        requiresAccount: true
+      });
+    }
+
     const db = createUserScopedClient(req);
     const type = String(req.body?.type || '').trim().toLowerCase();
     const quantity = Number(req.body?.quantity || 1);

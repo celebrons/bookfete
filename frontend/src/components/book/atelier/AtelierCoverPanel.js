@@ -29,6 +29,23 @@ const KICKER_MODES = PHRASE_MODES;
 // Doivent rester coherents avec FRONT_COVER_VARIANTS/BACK_COVER_VARIANTS
 // (backend/services/composition/{front,back}CoverRenderer.js) — meme
 // convention/meme avertissement que l'ancien BookCoverDesignerLuxe.js.
+// MIROIR de backend/services/composition/coverTheme.js COVER_COLORS — meme
+// convention de duplication assumee que les autres petites tables partagees
+// de ce projet (dimensions de format, palette de texte). Les jetons doivent
+// rester identiques des deux cotes : c'est le backend qui decide du rendu
+// reel, ceci ne sert qu'a afficher les pastilles.
+//
+// Que des matieres, aucune couleur vive : un selecteur libre produirait des
+// couvertures criardes, et c'est le produit qui en souffrirait.
+const COVER_COLORS = [
+  { token: 'ivoire', label: 'Ivoire', hex: '#fffdf8' },
+  { token: 'blanc', label: 'Blanc', hex: '#ffffff' },
+  { token: 'lin', label: 'Lin', hex: '#ede6d6' },
+  { token: 'grege', label: 'Grege', hex: '#d6cfc2' },
+  { token: 'encre', label: 'Encre', hex: '#241f18' },
+  { token: 'nuit', label: 'Nuit', hex: '#1f2a33' }
+];
+
 const FRONT_FORMATS = [
   { id: 'AUTO', label: 'Automatique' },
   { id: 'COVER_PHOTO', label: 'Photo et bandeau', shape: 'photo-band' },
@@ -205,6 +222,10 @@ const buildInitialState = (book) => {
     title: normalizeText(book?.title),
     frontVariant,
     backVariant,
+    // Couleur de tout l habillage de couverture (recto, dos et 4e) — voir
+    // backend coverTheme.applyCoverColor. Une valeur inconnue retombe sur
+    // le defaut du theme plutot que d etre appliquee telle quelle.
+    coverColor: COVER_COLORS.some((c) => c.token === overrides.coverColor) ? overrides.coverColor : '',
     frontPhotoId: overrides.frontPhotoId || null,
     // Photo de 4e de couverture (retour utilisateur, 2026-09-10 : "permettre
     // de modifier la photo de la 4e de couverture") — meme principe que
@@ -280,6 +301,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved }) {
           cover_overrides: {
             frontVariant: formState.frontVariant,
             backVariant: formState.backVariant,
+            coverColor: formState.coverColor || null,
             frontPhotoId: formState.frontPhotoId || null,
             backPhotoId: formState.backPhotoId || null,
             subtitle: formState.subtitle,
@@ -348,6 +370,41 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved }) {
               placeholder="Ex : Notre ete 2019"
               maxLength={180}
             />
+          </div>
+
+          {/* Couleur de l'habillage — UN seul reglage pour le recto, le dos
+              et la 4e : sur un Luxe, les trois ne forment qu'une seule
+              feuille qui enveloppe le livre, deux teintes differentes
+              ressembleraient a une erreur d'impression. La couleur du texte
+              n'est pas proposee : elle est deduite du contraste avec le fond
+              (voir backend coverTheme.applyCoverColor), donc un titre
+              illisible est impossible. */}
+          <div className="coverlite-group">
+            <span className="coverlite-group-label">Couleur de la couverture</span>
+            <div className="coverlite-colors" role="group" aria-label="Couleur de la couverture">
+              <button
+                type="button"
+                className={`coverlite-color is-auto ${!formState.coverColor ? 'is-active' : ''}`}
+                onClick={() => updateField('coverColor', '')}
+                title="Laisser Celebrons choisir selon le style et le format"
+              >
+                Auto
+              </button>
+              {COVER_COLORS.map((color) => (
+                <button
+                  key={color.token}
+                  type="button"
+                  className={`coverlite-color ${formState.coverColor === color.token ? 'is-active' : ''}`}
+                  style={{ background: color.hex }}
+                  onClick={() => updateField('coverColor', color.token)}
+                  title={color.label}
+                  aria-label={color.label}
+                />
+              ))}
+            </div>
+            <p className="coverlite-hint">
+              S'applique a la couverture, au dos et a la 4e — un livre n'a qu'une seule matiere.
+            </p>
           </div>
 
           <div className="coverlite-group">

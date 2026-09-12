@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { getOverlayGeometry, OVERLAY_CONTENT_INSET_PCT } from './atelierLayoutGeometry';
+import React, { useEffect, useRef, useState } from 'react';
+import { getOverlayGeometry, getOverlayInsetPct, getPageMetrics } from './atelierLayoutGeometry';
 import { makeSlotHandlers } from './atelierSlotInteractions';
 import { slotAcceptsItem } from './atelierLayouts';
 import { checkSlotImageFit } from './photoQuality';
 import AtelierPhotoLightbox from './AtelierPhotoLightbox';
+import AtelierTextEditor from './AtelierTextEditor';
+import { defaultRoleForSlot, slotBoxMm } from './textQuality';
 import PhotoFitBadge from '../../common/PhotoFitBadge';
 
 // Incrustation directe sur la page centrale ("tester un truc" — variante
@@ -19,7 +21,14 @@ import PhotoFitBadge from '../../common/PhotoFitBadge';
 // L'iframe en dessous a pointer-events:none (voir BookAtelierLuxe.css) : les
 // clics/drops passent donc naturellement a travers jusqu'a ces emplacements,
 // sans qu'il soit necessaire de communiquer avec le contenu de l'iframe.
-const SLOT_LABELS = { photo: 'Photo', text: 'Texte', title: 'Titre' };
+// Libelles d'un emplacement VIDE. Ils doivent dire quoi FAIRE, pas nommer un
+// type : "Texte" n'indiquait ni qu'on peut y glisser un souvenir, ni qu'on
+// peut ecrire directement dedans (retour utilisateur 2026-09-11).
+const SLOT_LABELS = {
+  photo: 'Glisser une photo',
+  text: 'Glisser un souvenir ou écrire',
+  title: 'Glisser un titre ou écrire'
+};
 
 function XIcon() {
   return (
@@ -38,7 +47,39 @@ function EyeIcon() {
   );
 }
 
-function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemoveSlot, onAdjustSlot, selectedSidebarItem, photoAdjustments, printFormat }) {
+function AtelierPageOverlay({
+  slug, slotTypes, slotItems, onAssignSlot, onRemoveSlot, onAdjustSlot,
+  selectedSidebarItem, photoAdjustments, printFormat,
+  // Edition du texte directement sur la page (§1). Absent = comportement
+  // d'avant (clic sur un texte = retrait a deux temps), donc aucun appelant
+  // existant n'est casse s'il ne fournit pas ces props.
+  onSaveText, onCreateText, textRoles, textStyles
+}) {
+  // Index de l'emplacement en cours d'edition, et largeur REELLE de
+  // l'incrustation en pixels : celle-ci sert a convertir les points
+  // typographiques en pixels ecran a la bonne echelle (WYSIWYG, §1).
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [overlayWidthPx, setOverlayWidthPx] = useState(0);
+  const overlayRef = useRef(null);
+  // Marges reelles de CE format (et non des valeurs A4 figees) : elles
+  // positionnent l'incrustation ET servent de reference d'echelle a
+  // l'edition en ligne.
+  const overlayInset = getOverlayInsetPct(printFormat);
+  const pageMetrics = getPageMetrics(printFormat);
+
+  useEffect(() => {
+    const node = overlayRef.current;
+    if (!node) return undefined;
+    const measure = () => setOverlayWidthPx(node.getBoundingClientRect().width);
+    measure();
+    // La page se redimensionne avec la fenetre : sans cet observateur, la
+    // typographie de l'editeur resterait a l'echelle du premier rendu et ne
+    // correspondrait plus a ce qui est affiche dessous.
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   // Retrait a deux temps (retour utilisateur : jamais de retrait direct au
   // clic, il faut une confirmation) — meme mecanisme que le panneau "Mise
   // en page" (AtelierLayoutPanel.js), voir atelierSlotInteractions.js pour
@@ -100,12 +141,13 @@ function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemove
   return (
     <>
       <div
+        ref={overlayRef}
         className="atelier-page-overlay"
         style={{
-          top: `${OVERLAY_CONTENT_INSET_PCT.top}%`,
-          left: `${OVERLAY_CONTENT_INSET_PCT.left}%`,
-          right: `${OVERLAY_CONTENT_INSET_PCT.right}%`,
-          bottom: `${OVERLAY_CONTENT_INSET_PCT.bottom}%`
+          top: `${overlayInset.top}%`,
+          left: `${overlayInset.left}%`,
+          right: `${overlayInset.right}%`,
+          bottom: `${overlayInset.bottom}%`
         }}
       >
         {geometry.map((rect, index) => {
@@ -130,6 +172,15 @@ function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemove
               onDrop={(event) => { event.stopPropagation(); handleDrop(event, index, slotType); }}
               onClick={(event) => {
                 event.stopPropagation();
+                // Un retrait ARME passe avant tout : c'est le second clic qui
+                // le confirme. Sans cette priorite, le clic de confirmation
+                // rouvrait l'editeur de texte et "Confirmer le retrait ?"
+                // restait affiche sans jamais pouvoir aboutir (bug signale
+                // 2026-09-11).
+                if (isPending) {
+                  handleClick(index, item, slotType);
+                  return;
+                }
                 // Cahier des charges v2 : le repositionnement s'ouvre AU CLIC
                 // SUR LA PHOTO. Priorite a l'assignation quand un element est
                 // selectionne dans "Mes souvenirs" (comportement historique) ;
@@ -139,12 +190,31 @@ function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemove
                   onAdjustSlot(index);
                   return;
                 }
+                // Meme principe pour le TEXTE (cahier des charges
+                // typographique §1) : un clic sur un texte deja place ouvre
+                // l'edition EN PLACE, il n'arme pas un retrait — le retrait a
+                // sa croix, comme pour les photos.
+                if (!selectedSidebarItem && slotType !== 'photo' && (item ? onSaveText : onCreateText)) {
+                  // Emplacement VIDE : on ouvre l'editeur pour ecrire
+                  // directement, sans passer par "Mes souvenirs" (retour
+                  // utilisateur : "il faut pouvoir ecrire directement dans
+                  // les cases vierges ou bien glisser un souvenir").
+                  // Un retrait arme sur un AUTRE emplacement n'a plus lieu
+                  // d'etre si l'utilisateur part editer un texte.
+                  setPendingRemoveIndex(null);
+                  setEditingIndex(index);
+                  return;
+                }
                 handleClick(index, item, slotType);
               }}
               title={item
                 ? (isPending
                   ? 'Cliquer a nouveau pour confirmer le retrait'
-                  : (slotType === 'photo' && !selectedSidebarItem ? 'Cliquer pour ajuster le cadrage' : undefined))
+                  : (selectedSidebarItem
+                    ? undefined
+                    : (slotType === 'photo'
+                      ? 'Cliquer pour ajuster le cadrage'
+                      : (onSaveText ? 'Cliquer pour modifier le texte' : undefined))))
                 : undefined}
             >
               {!item && <span className="atelier-overlay-slot-label">{SLOT_LABELS[slotType] || 'Emplacement'}</span>}
@@ -181,6 +251,31 @@ function AtelierPageOverlay({ slug, slotTypes, slotItems, onAssignSlot, onRemove
             </div>
           );
         })}
+
+        {/* Editeur en ligne : monte DANS l'incrustation, donc positionne
+            dans le meme repere en % que les emplacements — il se superpose
+            exactement au texte qu'il remplace. */}
+        {editingIndex != null && geometry[editingIndex] && (
+          <AtelierTextEditor
+            // Emplacement vide : un item "neuf" sans id — c'est onCreateText
+            // qui le fera exister, et seulement si l'utilisateur ecrit
+            // quelque chose.
+            item={slotItems[editingIndex] || { id: null, text: '' }}
+            rect={geometry[editingIndex]}
+            role={textRoles?.[slotItems[editingIndex]?.id] || defaultRoleForSlot(slug, editingIndex)}
+            styleOverrides={textStyles?.[slotItems[editingIndex]?.id] || {}}
+            printFormat={printFormat}
+            reference={{ referenceWidthPx: overlayWidthPx, referenceWidthMm: pageMetrics.contentWidthMm }}
+            {...slotBoxMm(geometry[editingIndex], printFormat)}
+            onSave={(payload) => {
+              const existing = slotItems[editingIndex];
+              if (existing) onSaveText(existing.id, payload);
+              else onCreateText(editingIndex, payload);
+              setEditingIndex(null);
+            }}
+            onCancel={() => setEditingIndex(null)}
+          />
+        )}
       </div>
       <AtelierPhotoLightbox url={viewingUrl} onClose={() => setViewingUrl(null)} />
     </>

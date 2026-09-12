@@ -425,3 +425,173 @@ describe('POST /:orderId/gelato-test — renvoi apres changement de format', () 
     expect(gelatoClient.deleteOrder).not.toHaveBeenCalled();
   });
 });
+
+// --- DELETE /api/orders/:orderId (2026-09-11) -----------------------------
+// Suppression d'une commande pour recommencer un test. Les cas interessants
+// ne sont pas les suppressions qui marchent, mais les DEUX refus : une
+// commande partie en production chez l'imprimeur, et une commande payee avec
+// Stripe en mode live. Ces deux-la representent un engagement reel.
+describe('DELETE /api/orders/:orderId', () => {
+  let app;
+  const OLD_ENV = { ...process.env };
+
+  // Ces tests suppriment VRAIMENT des lignes du magasin mock partage par tout
+  // le fichier : sans remise en etat, le deuxieme test ne trouverait plus
+  // rien. On reconstruit donc les lignes utilisees ici avant chaque test.
+  const FIXTURES = () => ([
+    {
+      id: 'order-a-supprimer',
+      owner_id: 'owner-test-1',
+      book_id: 'order-book-1',
+      order_number: 'CMD-DEL-1',
+      type: 'print',
+      status: 'awaiting_payment',
+      metadata: { gelatoOrderId: 'gelato-draft-del', gelatoOrderType: 'draft' }
+    },
+    {
+      id: 'order-payee-test',
+      owner_id: 'owner-test-1',
+      book_id: 'order-book-1',
+      order_number: 'CMD-DEL-2',
+      type: 'print',
+      status: 'paid',
+      metadata: {}
+    },
+    {
+      id: 'order-en-production',
+      owner_id: 'owner-test-1',
+      book_id: 'order-book-1',
+      order_number: 'CMD-DEL-3',
+      type: 'print',
+      status: 'paid',
+      metadata: { gelatoOrderId: 'gelato-prod-1', gelatoOrderType: 'order' }
+    },
+    {
+      id: 'order-avec-anciens-brouillons',
+      owner_id: 'owner-test-1',
+      book_id: 'order-book-1',
+      order_number: 'CMD-DEL-4',
+      type: 'print',
+      status: 'awaiting_payment',
+      metadata: {
+        gelatoOrderId: 'gelato-draft-courant',
+        gelatoOrderType: 'draft',
+        gelatoPreviousDrafts: [{ gelatoOrderId: 'gelato-draft-ancien' }]
+      }
+    }
+  ]);
+
+  beforeAll(() => { app = buildApp(); });
+
+  beforeEach(() => {
+    gelatoClient.deleteOrder.mockReset();
+    gelatoClient.deleteOrder.mockResolvedValue({});
+    process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+
+    const rows = global.__ordersSupabaseMock.__table('orders');
+    const fixtures = FIXTURES();
+    const ids = new Set(fixtures.map((row) => row.id));
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      if (ids.has(rows[index].id)) rows.splice(index, 1);
+    }
+    fixtures.forEach((row) => rows.push(row));
+  });
+
+  afterEach(() => { process.env = { ...OLD_ENV }; });
+
+  const idsInStore = () => global.__ordersSupabaseMock.__table('orders').map((row) => row.id);
+
+  it('exige une authentification', async () => {
+    const response = await request(app).delete('/api/orders/order-a-supprimer');
+    expect(response.status).toBe(401);
+  });
+
+  it("refuse la commande d'un autre proprietaire, sans la supprimer", async () => {
+    const response = await request(app)
+      .delete('/api/orders/order-autre')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(404);
+    expect(idsInStore()).toContain('order-autre');
+  });
+
+  it('supprime une commande en attente de paiement', async () => {
+    const response = await request(app)
+      .delete('/api/orders/order-a-supprimer')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.deleted).toBe(true);
+    expect(idsInStore()).not.toContain('order-a-supprimer');
+  });
+
+  it('supprime aussi le brouillon Gelato associe (tableau de bord propre)', async () => {
+    await request(app)
+      .delete('/api/orders/order-a-supprimer')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(gelatoClient.deleteOrder).toHaveBeenCalledWith('gelato-draft-del');
+  });
+
+  it('supprime egalement les brouillons archives des essais precedents', async () => {
+    await request(app)
+      .delete('/api/orders/order-avec-anciens-brouillons')
+      .set('Authorization', 'Bearer valid-token');
+
+    const sent = gelatoClient.deleteOrder.mock.calls.map(([id]) => id);
+    expect(sent).toEqual(expect.arrayContaining(['gelato-draft-courant', 'gelato-draft-ancien']));
+  });
+
+  it("un echec cote Gelato n'empeche pas l'utilisateur de nettoyer sa commande", async () => {
+    gelatoClient.deleteOrder.mockRejectedValue(new Error('Gelato indisponible'));
+
+    const response = await request(app)
+      .delete('/api/orders/order-a-supprimer')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(200);
+    expect(idsInStore()).not.toContain('order-a-supprimer');
+  });
+
+  it('REFUSE une commande partie en production chez l\'imprimeur', async () => {
+    const response = await request(app)
+      .delete('/api/orders/order-en-production')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(409);
+    expect(idsInStore()).toContain('order-en-production');
+    // Et surtout : on ne touche pas a la commande reelle chez Gelato.
+    expect(gelatoClient.deleteOrder).not.toHaveBeenCalled();
+  });
+
+  it('supprime une commande payee quand Stripe est en mode TEST', async () => {
+    const response = await request(app)
+      .delete('/api/orders/order-payee-test')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(200);
+    expect(idsInStore()).not.toContain('order-payee-test');
+  });
+
+  it('REFUSE une commande payee quand Stripe est en mode LIVE (vrai argent)', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_live_reelle';
+
+    const response = await request(app)
+      .delete('/api/orders/order-payee-test')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(409);
+    expect(idsInStore()).toContain('order-payee-test');
+  });
+
+  it('sans cle Stripe configuree, une commande payee est protegee (en cas de doute, on protege)', async () => {
+    delete process.env.STRIPE_SECRET_KEY;
+
+    const response = await request(app)
+      .delete('/api/orders/order-payee-test')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(409);
+    expect(idsInStore()).toContain('order-payee-test');
+  });
+});

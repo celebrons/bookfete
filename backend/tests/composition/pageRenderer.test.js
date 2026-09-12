@@ -215,6 +215,43 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     expect(html).toContain('data-layout="FOUR_PHOTOS"');
   });
 
+  // BUG REEL signale le 2026-09-11 sur capture d'ecran ("le texte que j'ai
+  // glisse dans l'emplacement du texte apparait dans l'emplacement de la
+  // photo"). Les mises en page MIXTES recevaient la liste COMPACTEE : un
+  // emplacement vide disparaissait purement et simplement du rendu, le bloc
+  // restant devenait seul enfant flex et s'etalait sur toute la page, centre
+  // verticalement (.mixte-texte { align-items:center }) — le texte
+  // s'affichait donc au milieu, visuellement dans la zone photo, alors que
+  // l'incrustation d'edition le montrait en haut.
+  //
+  // Meme garantie que pour les grilles de photos : un emplacement vide GARDE
+  // sa bande, pour que les autres ne bougent pas.
+  it('TEXT_PHOTO sans photo : le texte reste dans SA bande, la bande photo est conservee vide', () => {
+    const html = bodyOf(pageFor('TEXT_PHOTO', ['t1', null], 'mixte'));
+    expect(html).toContain('mixte-texte');
+    expect(html).toContain('mixte-photo');
+    expect((html.match(/<img /g) || []).length).toBe(0);
+    // L'ordre du document porte la position : texte AVANT photo.
+    expect(html.indexOf('mixte-texte')).toBeLessThan(html.indexOf('mixte-photo'));
+  });
+
+  it("PHOTO_TEXT sans texte : la bande texte est conservee vide, la photo ne s'etale pas sur la page", () => {
+    const html = bodyOf(pageFor('PHOTO_TEXT', ['p1', null], 'mixte'));
+    expect(html).toContain('mixte-photo');
+    expect(html).toContain('mixte-texte');
+    expect(html.indexOf('mixte-photo')).toBeLessThan(html.indexOf('mixte-texte'));
+  });
+
+  it('TWO_PHOTOS_TEXT avec une seule photo : les 3 bandes restent, les elements gardent leur place', () => {
+    const html = bodyOf(pageFor('TWO_PHOTOS_TEXT', ['p1', null, 't1'], 'mixte'));
+    expect((html.match(/class="mixte-photo"/g) || []).length).toBe(2);
+    expect((html.match(/class="mixte-texte"/g) || []).length).toBe(1);
+    expect((html.match(/<img /g) || []).length).toBe(1);
+    // 2 emplacements photo => classe multi-photo conservee, meme si une
+    // seule photo est reellement posee.
+    expect(html).toContain('mixte-multi-photo');
+  });
+
   it('PHOTO_WITH_CAPTION rend une figure avec figcaption, distincte de PHOTO_TEXT', () => {
     const withCaption = bodyOf(pageFor('PHOTO_WITH_CAPTION', ['p1', 't1'], 'mixte'));
     expect(withCaption).toContain('class="block-photo photo-with-caption"');
@@ -331,13 +368,18 @@ describe('renderBookHtml — nouveaux layouts atelier manuel (v3)', () => {
   // silencieusement le vrai contenu restant du rendu.
   it('TITLE_TWO_PHOTOS avec le TITRE retire (photos seules restantes) : les deux photos restent visibles, aucune traitee comme titre', () => {
     const html = bodyOf(pageFor('TITLE_TWO_PHOTOS', [null, 'p1', 'p2'], 'mixte'));
-    expect(html).not.toContain('class="page-title"');
+    // 2026-09-11 : la bande du titre RESTE meme vide (sinon la grille de
+    // photos remonte et ne correspond plus a ce que montre l'incrustation
+    // d'edition). La garantie testee ici — aucun autre element promu a tort
+    // en titre — tient toujours : le h2 est vide.
+    expect(html).toContain('class="page-title" aria-hidden="true"></h2>');
     expect((html.match(/<img /g) || []).length).toBe(2); // les 2 photos, aucune perdue
   });
 
   it('TITLE_TEXT avec le TITRE retire (corps de texte seul restant) : le corps reste visible, jamais rendu comme titre', () => {
     const html = bodyOf(pageFor('TITLE_TEXT', [null, 'body1'], 'mixte'));
-    expect(html).not.toContain('class="page-title"');
+    // Meme raison que ci-dessus : bande conservee, mais vide.
+    expect(html).toContain('class="page-title" aria-hidden="true"></h2>');
     expect(html).toContain('Un souvenir plus long, raconte ici.');
   });
 
@@ -398,6 +440,7 @@ describe('renderBookHtml — nouveaux layouts atelier manuel (v3)', () => {
     expect((html.match(/<img /g) || []).length).toBe(1);
   });
 
+
   it('TWO_TESTIMONIES avec un temoignage retire : la grille reste testimony-stack-2, la carte restante garde sa colonne (pas de recomposition en texte plein)', () => {
     const html = bodyOf(pageFor('TWO_TESTIMONIES', [null, 't2'], 'texte'));
     expect(html).toContain('testimony-stack-2');
@@ -440,10 +483,46 @@ describe('renderBookHtml — densite par format (--fmt-space-scale/--fmt-type-sc
     expect(html).toContain('--fmt-type-scale: 0.88;');
   });
 
-  it('les marges/gaps et tailles de police significatives dependent des variables (jamais une valeur figee)', () => {
+  it('les marges/gaps dependent des variables (jamais une valeur figee)', () => {
     const html = renderBookHtml({ book: {}, pages: [], items: [] });
     expect(html).toContain('padding: calc(14mm * var(--fmt-space-scale, 1));');
-    expect(html).toContain('font-size: calc(13pt * var(--fmt-type-scale, 1));');
+  });
+
+  // 2026-09-11 — cahier des charges typographique. Ce bloc remplace une
+  // assertion devenue FAUSSE par construction : elle verifiait que le corps
+  // de texte valait `calc(13pt * var(--fmt-type-scale))`, c'est-a-dire
+  // exactement la mise a l'echelle globale que le §15 refuse ("Le changement
+  // de format doit provoquer une vraie recomposition du texte, pas seulement
+  // un scaling"). La garantie utile n'est plus "la taille est multipliee",
+  // c'est "aucune taille de texte n'est ecrite en dur dans le renderer".
+  it('le texte de CONTENU ne porte plus aucune taille en dur : tout vient des variables de role', () => {
+    const html = renderBookHtml({ book: {}, pages: [], items: [] });
+
+    expect(html).toContain('--type-body-size: 11pt;');
+    expect(html).toContain('font-size: var(--type-body-size);');
+
+    // Il reste exactement 3 tailles en dur, et ce sont des choix ASSUMES :
+    // les "details editoriaux discrets" du §17 (numero de page dore,
+    // numero et titre de separation de chapitre). Ce ne sont aucun des 5
+    // roles de contenu — ils ont une taille deliberement hors echelle
+    // (7.5pt pour un numero de page, la ou la plus petite legende fait 8pt)
+    // et les forcer dans un role les grossirait sans rien y gagner.
+    //
+    // Ce test les COMPTE plutot que de les interdire : si ce nombre augmente,
+    // c'est qu'une taille de contenu est repartie en dur quelque part.
+    const enDur = html.match(/font-size: calc\(\d+(\.\d+)?pt \* var\(--fmt-type-scale/g) || [];
+    expect(enDur).toHaveLength(3);
+  });
+
+  it('chaque format produit ses PROPRES valeurs typographiques, pas un multiple des memes', () => {
+    const sizes = ['livret', 'standard', 'luxe'].map((formatId) => {
+      const html = renderBookHtml({
+        book: {}, pages: [], items: [],
+        format: { trimWidthMm: 210, trimHeightMm: 280, formatId }
+      });
+      return html.match(/--type-title-size: ([\d.]+)pt;/)[1];
+    });
+    expect(sizes).toEqual(['28', '32', '36']);
   });
 });
 
@@ -535,5 +614,116 @@ describe('renderBookHtml — texte decoupe (textOverrides)', () => {
     expect(html).toContain('Alice');
     expect(html).toContain('(suite)');
     expect(html).not.toContain('<img'); // pas de photo re-rendue
+  });
+});
+
+// Role et reglages typographiques choisis dans l'atelier
+// (content.textRoles / content.textStyles). BUG REEL 2026-09-11 : ces champs
+// etaient persistes et lus par le controle qualite, mais le RENDU les
+// ignorait — "le texte s'enregistre mais la mise en forme ne change pas".
+// Aucun test ne couvrait le chemin persistance -> rendu : c'est exactement
+// ce trou qui a laisse passer le defaut.
+describe('renderBookHtml — role et reglages typographiques de l\'utilisateur', () => {
+  const layouts = [{ id: 'l-text-photo', slug: 'TEXT_PHOTO', kind: 'mixte' }];
+  const items = [{ id: 't1', kind: 'texte', text: 'Notre histoire' }];
+
+  function pageWith(content, formatId = 'standard') {
+    return bodyOf(renderBookHtml({
+      book: {},
+      items,
+      layouts,
+      format: { trimWidthMm: 210, trimHeightMm: 280, formatId },
+      pages: [{
+        page_index: 0,
+        content: {
+          kind: 'mixte',
+          blocks: [{ kind: 'mixte', itemIds: ['t1', null], layoutId: 'l-text-photo' }],
+          ...content
+        }
+      }]
+    }));
+  }
+
+  it("sans reglage, le rendu reste STRICTEMENT inchange (aucune page deja composee ne bouge)", () => {
+    const html = pageWith({});
+    expect(html).toContain('<p>Notre histoire</p>');
+    expect(html).not.toContain('font-family:');
+  });
+
+  it('le role choisi change reellement la police et la taille rendues', () => {
+    const titre = pageWith({ textRoles: { t1: 'title' } });
+    const legende = pageWith({ textRoles: { t1: 'caption' } });
+
+    expect(titre).toContain('font-size:32pt');
+    expect(titre).toContain('Cormorant Garamond'); // serif editoriale
+    expect(legende).toContain('font-size:9pt');
+    expect(legende).toContain('Inter'); // sans-serif
+  });
+
+  it('alignement et couleur choisis sont appliques', () => {
+    const html = pageWith({ textRoles: { t1: 'body' }, textStyles: { t1: { align: 'center', color: 'taupe' } } });
+    expect(html).toContain('text-align:center');
+    expect(html).toContain('color:#8f8a7c');
+  });
+
+  it('le meme role donne des tailles differentes selon le format (§15)', () => {
+    const tailles = ['livret', 'standard', 'luxe'].map((formatId) => (
+      pageWith({ textRoles: { t1: 'title' } }, formatId).match(/font-size:([\d.]+)pt/)[1]
+    ));
+    expect(tailles).toEqual(['28', '32', '36']);
+  });
+
+  it('une taille hors plage du role est ramenee dans les bornes, jamais appliquee telle quelle', () => {
+    const html = pageWith({ textRoles: { t1: 'body' }, textStyles: { t1: { sizePt: 99 } } });
+    expect(html).toContain('font-size:12pt'); // borne haute du role body
+  });
+
+  it('un reglage pose sur un AUTRE item ne touche pas ce texte', () => {
+    const html = pageWith({ textRoles: { 'autre-item': 'title' } });
+    expect(html).toContain('<p>Notre histoire</p>');
+    expect(html).not.toContain('font-size:32pt');
+  });
+});
+
+// BUG REEL 2026-09-11 : "j'ai pris un template titre+texte, en glissant un
+// souvenir dans le titre, celui-ci est apparu dans le texte en bas". Sans le
+// corps de texte, le titre devenait seul enfant d'un bloc centre
+// verticalement et flottait au milieu de la page, alors que l'incrustation
+// d'edition le place en haut. Meme famille que le bug des mises en page
+// mixtes corrige le meme jour : un emplacement vide doit GARDER sa bande.
+describe('renderBookHtml — TITLE_TEXT : chaque emplacement garde sa bande', () => {
+  const layouts = [
+    { id: 'l-title-text', slug: 'TITLE_TEXT', kind: 'mixte' },
+    { id: 'l-title-two-photos', slug: 'TITLE_TWO_PHOTOS', kind: 'mixte' }
+  ];
+  const items = [
+    { id: 'ti', kind: 'texte', text: 'MON TITRE' },
+    { id: 'bo', kind: 'texte', text: 'le corps' },
+    { id: 'ph', kind: 'photo', url: 'https://cdn.test/1.jpg' }
+  ];
+
+  const pageFor = (layoutId, itemIds) => bodyOf(renderBookHtml({
+    book: {}, items, layouts,
+    format: { trimWidthMm: 210, trimHeightMm: 280, formatId: 'standard' },
+    pages: [{ page_index: 0, content: { kind: 'mixte', blocks: [{ kind: 'mixte', itemIds, layoutId }] } }]
+  }));
+
+  it('titre seul : la bande du corps est conservee, le titre reste EN HAUT', () => {
+    const html = pageFor('l-title-text', ['ti', null]);
+    expect(html).toContain('MON TITRE');
+    expect(html).toContain('class="title-text-body"');
+    // L'ordre du document porte la position : titre AVANT le corps.
+    expect(html.indexOf('page-title')).toBeLessThan(html.indexOf('title-text-body'));
+  });
+
+  it('titre + corps : meme structure, les deux bandes presentes et dans l\'ordre', () => {
+    const html = pageFor('l-title-text', ['ti', 'bo']);
+    expect(html.indexOf('MON TITRE')).toBeLessThan(html.indexOf('le corps'));
+  });
+
+  it('TITLE_TWO_PHOTOS sans titre : la grille de photos ne remonte pas dans la bande du titre', () => {
+    const html = pageFor('l-title-two-photos', [null, 'ph', null]);
+    expect(html).toContain('class="page-title" aria-hidden="true"></h2>');
+    expect(html.indexOf('page-title')).toBeLessThan(html.indexOf('title-photos-grid'));
   });
 });

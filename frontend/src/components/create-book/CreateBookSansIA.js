@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { createBook, listTemplates } from '../../services/compositionApi';
+import { ensureSession } from '../../services/anonymousSession';
 import './CreateBookSansIA.css';
 
 const RETURN_TO_KEY = 'returnTo';
@@ -55,9 +56,9 @@ export default function CreateBookSansIA() {
     // jamais impose au client : page_count_mode absent = 'auto' par defaut
     // (BookConfigLuxe.js), qui recalculera ce nombre depuis le contenu reel
     // des que l'utilisateur passe par Configuration. 2026-09-09 : 28 (pas
-    // 16) — minimum reellement imprimable chez Gelato, voir
-    // backend/services/composition/layoutEngine.js PAGE_COUNT_TIERS.
-    page_count: 28,
+    // 16) — minimum reellement imprimable chez Gelato ; 2026-09-11 : porte a
+    // 30, voir backend/services/composition/layoutEngine.js PAGE_COUNT_TIERS.
+    page_count: 30,
     ...(values.mode === 'solo' && values.subtitle.trim()
       ? { cover_overrides: { subtitle: values.subtitle.trim() } }
       : {}),
@@ -127,8 +128,16 @@ export default function CreateBookSansIA() {
 
     const values = { title, mode, subtitle, recipientName, eventDate };
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    // Demarrage SANS COMPTE (2026-09-12) : plus aucun mur d'inscription ici.
+    // Sans session, on en ouvre une anonyme et on cree le livre tout de
+    // suite — le compte sera demande au moment de commander, quand la valeur
+    // a deja ete vue. C'est ce qui permet de deposer ses photos et de
+    // composer avant de s'engager.
+    const { unavailable } = await ensureSession();
+    if (unavailable) {
+      // Repli sur l'ancien parcours : si la connexion anonyme est
+      // indisponible (option desactivee cote Supabase, reseau), on ne bloque
+      // pas la creation — on repasse par l'inscription, rien n'est perdu.
       localStorage.setItem(DRAFT_KEY, JSON.stringify(values));
       localStorage.setItem(RETURN_TO_KEY, '/create-book');
       navigate('/register');

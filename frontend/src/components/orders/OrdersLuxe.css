@@ -370,6 +370,25 @@
   margin-top: var(--space-md);
 }
 
+/* Suppression d'une commande pour recommencer le parcours (essais de
+   formats/types/paiement). Volontairement discret et en bas de l'ecran :
+   c'est une action destructrice, pas le chemin normal. */
+.orders-reset-block {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid rgba(223, 216, 201, 0.9);
+}
+.orders-reset-block .orders-disclaimer { margin-top: 8px; }
+
+.btn.btn-outline.is-danger {
+  border-color: rgba(160, 58, 45, 0.45);
+  color: #a03a2d;
+}
+.btn.btn-outline.is-danger:hover:not(:disabled) {
+  background: rgba(160, 58, 45, 0.08);
+  border-color: #a03a2d;
+}
+
 /* Rappel de l'adresse de livraison dans le recapitulatif avant paiement. */
 .orders-recap-address {
   margin: var(--space-md) 0;

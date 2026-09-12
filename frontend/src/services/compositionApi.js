@@ -37,7 +37,16 @@ const request = async (path, options = {}) => {
 
   const payload = await parseJsonSafe(response);
   if (!response.ok) {
-    throw new Error(payload?.error || 'Erreur du moteur de mise en page.');
+    const error = new Error(payload?.error || 'Erreur du moteur de mise en page.');
+    // Details structures conserves, pas seulement le message : certaines
+    // routes repondent autre chose qu'un simple echec (ex. POST /pages/shrink
+    // renvoie 409 + needsConfirmation + les numeros des pages concernees,
+    // pour que l'appelant puisse POSER la question plutot que d'afficher un
+    // refus sec). Purement additif : les appelants existants continuent de
+    // lire err.message comme avant.
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
   }
   return payload;
 };
@@ -109,6 +118,13 @@ export const listContentItems = (bookId) => request(`/books/${bookId}/content-it
 
 // Mode Automatique (§06) : palier de pages recommande a partir du contenu reel.
 export const getRecommendedPageCount = (bookId) => request(`/books/${bookId}/recommended-page-count`);
+
+// Modifie un souvenir existant (edition du texte directement sur la page,
+// voir AtelierTextEditor.js) — backend PUT /content-items/:itemId.
+export const updateContentItem = (bookId, itemId, patch) => request(`/books/${bookId}/content-items/${itemId}`, {
+  method: 'PUT',
+  body: JSON.stringify(patch)
+});
 
 export const addTextItem = (bookId, text, displayOrder = 0) => request(`/books/${bookId}/content-items`, {
   method: 'POST',
@@ -215,6 +231,15 @@ export const extendBookPages = (bookId, count = 2) => request(`/books/${bookId}/
   body: JSON.stringify({ count })
 });
 
+// Retire des pages a la fin du livre (bouton "-2" du filmstrip atelier) —
+// voir routes/composition.js: POST /pages/shrink. `confirm` n'est a passer
+// que si le serveur a repondu 409 needsConfirmation (les pages retirees ne
+// sont pas vides) ET que l'utilisateur a explicitement accepte la perte.
+export const shrinkBookPages = (bookId, count = 2, confirm = false) => request(`/books/${bookId}/pages/shrink`, {
+  method: 'POST',
+  body: JSON.stringify({ count, confirm })
+});
+
 // --- Atelier de creation personnalisee (edition manuelle page par page) -----
 
 export const listPages = (bookId) => request(`/books/${bookId}/pages`);
@@ -239,9 +264,14 @@ export const fetchInteriorPagePreviewHtml = async (bookId, pageIndex) => {
 // desormais) pour ne jamais ecraser silencieusement un ajustement deja
 // enregistre. Nettoye/borne cote backend (routes/composition.js:
 // sanitizePhotoAdjustments), jamais besoin de validation ici.
-export const saveManualPage = (bookId, pageIndex, { layoutId, itemIds, photoAdjustments }) => request(
+// textRoles/textStyles (optionnels, cahier des charges typographique
+// 2026-09-11) : { [itemId]: 'title'|'subtitle'|'body'|'caption'|'quote' } et
+// { [itemId]: {align, color, sizePt} }. Egalement nettoyes/bornes cote
+// backend (sanitizeTextRoles/sanitizeTextStyles) : une valeur hors du cadre
+// est ecartee au profit de celle du role, jamais appliquee telle quelle.
+export const saveManualPage = (bookId, pageIndex, { layoutId, itemIds, photoAdjustments, textRoles, textStyles }) => request(
   `/books/${bookId}/pages/${pageIndex}/manual`,
-  { method: 'PUT', body: JSON.stringify({ layoutId, itemIds, photoAdjustments }) }
+  { method: 'PUT', body: JSON.stringify({ layoutId, itemIds, photoAdjustments, textRoles, textStyles }) }
 );
 
 // Vide une page (retour a l'etat vierge, deverrouillee) : reutilise la route

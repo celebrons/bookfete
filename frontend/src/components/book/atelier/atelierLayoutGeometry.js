@@ -15,15 +15,47 @@
 // reproduction exacte — a re-verifier a l'oeil si l'agencement CSS de
 // pageRenderer.js change significativement.
 //
-// OVERLAY_CONTENT_INSET_PCT reprend le padding reel de .page dans
-// pageRenderer.js (14mm sur une page 210x297mm) converti en % de chaque axe.
-
-export const OVERLAY_CONTENT_INSET_PCT = {
-  top: (14 / 297) * 100,
-  bottom: (14 / 297) * 100,
-  left: (14 / 210) * 100,
-  right: (14 / 210) * 100
+// Marge interieure reelle de .page dans pageRenderer.js :
+// `padding: calc(14mm * var(--fmt-space-scale))`. Elle depend donc du FORMAT,
+// via spaceScale (formatDensity.js) ET des dimensions reelles de la page.
+//
+// CORRIGE 2026-09-11 : ces valeurs etaient figees sur 14mm / 210 x 297mm —
+// un heritage A4 qui ne correspond a AUCUN des trois formats reels. Sur un
+// livret (200x200mm, spaceScale 0.62, donc 8.68mm de marge), l'incrustation
+// etait retreciee de 6.67% par cote au lieu de 4.34% : les zones de depot
+// tombaient a cote, et l'echelle typographique de l'edition en ligne, qui se
+// deduit de la largeur de l'incrustation, etait sous-evaluee d'environ 13%
+// (texte affiche plus petit qu'a l'impression — probleme signale).
+const PAGE_PADDING_MM = 14;
+const SPACE_SCALE = { livret: 0.62, standard: 1, luxe: 1.55 };
+export const FORMAT_DIMENSIONS_MM = {
+  livret: { widthMm: 200, heightMm: 200 },
+  standard: { widthMm: 210, heightMm: 280 },
+  luxe: { widthMm: 210, heightMm: 280 }
 };
+
+export function getPageMetrics(printFormat) {
+  const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
+  const paddingMm = PAGE_PADDING_MM * (SPACE_SCALE[printFormat] ?? 1);
+  return {
+    ...dims,
+    paddingMm,
+    contentWidthMm: Math.max(1, dims.widthMm - 2 * paddingMm),
+    contentHeightMm: Math.max(1, dims.heightMm - 2 * paddingMm)
+  };
+}
+
+export function getOverlayInsetPct(printFormat) {
+  const { widthMm, heightMm, paddingMm } = getPageMetrics(printFormat);
+  const vertical = (paddingMm / heightMm) * 100;
+  const horizontal = (paddingMm / widthMm) * 100;
+  return { top: vertical, bottom: vertical, left: horizontal, right: horizontal };
+}
+
+// Conserve pour les appelants qui n'ont pas de format sous la main : valeurs
+// du format de reference (standard). Ne plus l'utiliser pour un rendu a
+// l'echelle — passer par getOverlayInsetPct(printFormat).
+export const OVERLAY_CONTENT_INSET_PCT = getOverlayInsetPct('standard');
 
 export const LAYOUT_GEOMETRY = {
   FULL_PHOTO: [

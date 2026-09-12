@@ -1,0 +1,266 @@
+/* Edition du texte directement sur la page (voir AtelierTextEditor.js).
+   Le champ se superpose EXACTEMENT a l'emplacement et n'a volontairement
+   aucun style propre (ni cadre, ni fond opaque, ni police imposee) : tout
+   vient du role typographique, pour que taper revienne a voir la page finale
+   (cahier des charges §1 WYSIWYG). */
+
+.atelier-text-editor {
+  position: absolute;
+  z-index: 30;
+  /* INDISPENSABLE : le conteneur .atelier-page-overlay porte
+     `pointer-events: none` (il laisse passer les clics entre les
+     emplacements, seuls ceux-ci les captent — voir BookAtelierLuxe.css).
+     L'editeur vit dans ce conteneur : sans ce retablissement, il etait
+     visible mais totalement INERTE — impossible de cliquer dans le champ ni
+     sur la barre, et chaque clic traversait jusqu'a l'emplacement en dessous,
+     ou il armait le retrait. C'est exactement le symptome signale le
+     2026-09-11 ("la planche de travail on dirait qu'elle est cachee
+     derriere", "confirmer le retrait ne marche pas"). */
+  pointer-events: auto;
+}
+
+.atelier-text-editor-field {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 2%;
+  border: 1px solid var(--gold);
+  border-radius: 2px;
+  /* Legerement translucide plutot qu'opaque : on continue de percevoir la
+     page dessous, ce qui aide a juger la composition pendant la frappe. */
+  background: rgba(255, 253, 248, 0.94);
+  box-shadow: 0 2px 14px rgba(36, 31, 24, 0.14);
+  resize: none;
+  overflow: hidden;
+  /* font-family/size/weight/align/color : poses en inline par le composant,
+     depuis typography.js. Ne RIEN declarer ici, sinon l'apercu mentirait. */
+}
+
+.atelier-text-editor-field:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(184, 146, 74, 0.2);
+}
+
+/* Approche de la limite, puis limite atteinte : le cadre lui-meme change de
+   couleur, pour que le signal soit visible sans quitter le texte des yeux. */
+.atelier-text-editor-field.is-near-limit,
+.atelier-text-editor-field.is-near-limit:focus {
+  border-color: #b8873a;
+  box-shadow: 0 0 0 3px rgba(184, 135, 58, 0.18);
+}
+.atelier-text-editor-field.is-at-limit,
+.atelier-text-editor-field.is-at-limit:focus {
+  border-color: #a03a2d;
+  box-shadow: 0 0 0 3px rgba(160, 58, 45, 0.2);
+}
+
+/* --- Jauge de remplissage de l'emplacement ------------------------------ */
+.atelier-text-fill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.atelier-text-fill-bar {
+  display: block;
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(36, 31, 24, 0.12);
+  overflow: hidden;
+}
+
+.atelier-text-fill-level {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #1f7a3d;
+  transition: width 0.15s ease;
+}
+.atelier-text-fill.is-near-limit .atelier-text-fill-level { background: #b8873a; }
+.atelier-text-fill.is-at-limit .atelier-text-fill-level { background: #a03a2d; }
+
+.atelier-text-fill-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-light);
+  min-width: 34px;
+}
+.atelier-text-fill.is-near-limit .atelier-text-fill-value { color: #8a6329; font-weight: 700; }
+.atelier-text-fill.is-at-limit .atelier-text-fill-value { color: #8c3225; font-weight: 700; }
+
+/* --- Bloc de controles (barre + alertes) -------------------------------- */
+/* Place SOUS le champ quand celui-ci est en haut de page, AU-DESSUS sinon :
+   fixe en haut, la barre sortait de la page et disparaissait derriere le
+   cadre du livre. Barre et alertes restent toujours du meme cote pour ne
+   jamais se chevaucher. */
+.atelier-text-controls {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 460px;
+  z-index: 2;
+}
+.atelier-text-controls.is-below { top: calc(100% + 8px); }
+.atelier-text-controls.is-above { bottom: calc(100% + 8px); flex-direction: column-reverse; }
+/* Emplacement occupant toute la hauteur : aucune place autour, la barre se
+   pose a l'interieur, ancree en bas. Elle masque un peu de texte — c'est
+   assume, une barre invisible serait pire. */
+.atelier-text-controls.is-inside {
+  bottom: 8px;
+  flex-direction: column-reverse;
+}
+
+/* --- Barre d'edition minimale (§6) -------------------------------------- */
+/* Volontairement petite et sobre : elle ne doit pas ressembler a un logiciel
+   de PAO. Trois reglages seulement (role, alignement, couleur). */
+.atelier-text-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: var(--white, #fff);
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  box-shadow: 0 6px 20px rgba(36, 31, 24, 0.16);
+  white-space: nowrap;
+}
+
+/* Libelle du reglage de style : sans lui, la liste deroulante n'etait pas
+   comprise. Discret mais present. */
+.atelier-text-toolbar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.atelier-text-toolbar-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.atelier-text-toolbar-role {
+  font-size: 12px;
+  font-family: inherit;
+  padding: 3px 6px;
+  border: 1px solid rgba(36, 31, 24, 0.18);
+  border-radius: 5px;
+  background: var(--white, #fff);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.atelier-text-toolbar-size {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+.atelier-text-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(36, 31, 24, 0.14);
+  flex: none;
+}
+
+.atelier-text-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.atelier-text-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-text-toolbar-btn:hover { background: rgba(36, 31, 24, 0.07); color: var(--ink); }
+.atelier-text-toolbar-btn.is-active { background: rgba(184, 146, 74, 0.18); color: var(--ink); }
+
+/* Contour franc : les teintes claires etaient invisibles sur le fond blanc
+   de la barre. La palette ne propose plus de couleur illisible sur le papier
+   (voir selectableColorsForRole), mais le contour reste necessaire des que le
+   texte est pose sur une photo, ou blanc/ivoire redeviennent proposables. */
+.atelier-text-swatch {
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(36, 31, 24, 0.45);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+/* Enregistrement explicite : discret mais nomme, parce qu'une sauvegarde
+   qu'il faut deviner n'en est pas une. */
+.atelier-text-save-btn {
+  padding: 4px 11px;
+  border: none;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--white, #fff);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+.atelier-text-save-btn:hover { filter: brightness(1.08); }
+
+.atelier-text-swatch:hover { transform: scale(1.15); }
+.atelier-text-swatch.is-active {
+  box-shadow: 0 0 0 2px var(--white, #fff), 0 0 0 3.5px var(--gold);
+}
+
+/* --- Alerte d'adaptation (§9) ------------------------------------------- */
+/* "Alerte legere" : elle informe, elle ne bloque jamais la saisie. */
+.atelier-text-alert {
+  margin: 0;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  background: rgba(184, 146, 74, 0.16);
+  color: #6b5320;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(36, 31, 24, 0.1);
+}
+
+.atelier-text-alert.is-error {
+  background: rgba(160, 58, 45, 0.14);
+  color: #8c3225;
+}
+
+/* Approche de la limite : on previent, sans dramatiser — ce n'est pas encore
+   un probleme, c'est une marge qui se reduit. */
+.atelier-text-alert.is-warning {
+  background: rgba(184, 135, 58, 0.16);
+  color: #8a6329;
+}
+
+/* Information neutre (affichage agrandi) : ce n'est pas un probleme, elle ne
+   doit donc pas porter la couleur d'alerte. */
+.atelier-text-alert.is-info {
+  background: rgba(36, 31, 24, 0.07);
+  color: var(--text-light);
+}

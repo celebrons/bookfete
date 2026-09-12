@@ -86,3 +86,59 @@ describe('coverTheme.applyFormatAccent', () => {
     expect(base).toEqual(snapshot);
   });
 });
+
+// Couleur de couverture choisie par l'utilisateur (2026-09-12).
+// Palette FERMEE : la garantie qui compte n'est pas "on peut changer la
+// couleur", c'est "on ne peut pas produire une couverture illisible".
+describe('coverTheme.applyCoverColor', () => {
+  const { COVER_COLORS, applyCoverColor, applyFormatAccent, COVER_THEMES } = require('../../services/composition/coverTheme');
+  const { contrastRatio } = require('../../services/composition/typographySystem');
+
+  const base = applyFormatAccent(COVER_THEMES.elegance, 'standard');
+
+  it('propose une palette de matieres, sans couleur vive', () => {
+    expect(Object.keys(COVER_COLORS)).toEqual(['ivoire', 'blanc', 'lin', 'grege', 'encre', 'nuit']);
+  });
+
+  it('applique la couleur choisie au fond ET au papier', () => {
+    const theme = applyCoverColor(base, 'nuit');
+    expect(theme.paper).toBe(COVER_COLORS.nuit.hex);
+    expect(theme.bg).toBe(COVER_COLORS.nuit.hex);
+  });
+
+  it('AUCUNE couleur de la palette ne produit un titre illisible', () => {
+    Object.keys(COVER_COLORS).forEach((token) => {
+      const theme = applyCoverColor(base, token);
+      // Seuil WCAG du grand texte, largement depasse en pratique — un titre
+      // de couverture est enorme, mais on ne veut aucune marge d'erreur.
+      expect(contrastRatio(theme.ink, theme.paper)).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  it('bascule le texte en clair sur un fond sombre, et inversement', () => {
+    expect(applyCoverColor(base, 'encre').ink).toBe('#fffdf8');
+    expect(applyCoverColor(base, 'blanc').ink).toBe('#241f18');
+  });
+
+  it('sans choix, le theme reste exactement celui du format (aucune regression)', () => {
+    expect(applyCoverColor(base, undefined)).toEqual(base);
+    expect(applyCoverColor(base, '')).toEqual(base);
+  });
+
+  it('un jeton inconnu est ignore plutot qu applique (jamais de couleur inventee)', () => {
+    expect(applyCoverColor(base, 'rose-fluo')).toEqual(base);
+  });
+
+  it("gagne sur la teinte imposee par le format Luxe (un choix explicite doit primer)", () => {
+    const luxe = applyFormatAccent(COVER_THEMES.elegance, 'luxe');
+    expect(luxe.paper).toBe('#ede6d6');
+    expect(applyCoverColor(luxe, 'encre').paper).toBe(COVER_COLORS.encre.hex);
+  });
+
+  it('retire la texture de lin sur un fond sombre (elle y ferait un voile grisatre)', () => {
+    const luxe = applyFormatAccent(COVER_THEMES.elegance, 'luxe');
+    expect(luxe.texture).toBe('linen');
+    expect(applyCoverColor(luxe, 'encre').texture).toBe('none');
+    expect(applyCoverColor(luxe, 'lin').texture).toBe('linen');
+  });
+});

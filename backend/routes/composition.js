@@ -23,6 +23,8 @@ const { composeBookForFormat } = require('../services/composition/formatComposer
 const { buildManualPageContent } = require('../services/composition/manualPageBuilder');
 const { MOOD_LAYOUT_WEIGHTS } = require('../services/composition/layoutScoring');
 const photoQualityEngine = require('../services/composition/photoQualityEngine');
+const textQualityEngine = require('../services/composition/textQualityEngine');
+const typographySystem = require('../services/composition/typographySystem');
 const { PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX } = pageRenderer;
 
 // Fusionne dimensions (coverFormat.js) + densite (formatDensity.js) en UN
@@ -67,6 +69,45 @@ function sanitizePhotoAdjustments(raw, validItemIds) {
   return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
 
+// Nettoie { [itemId]: role } venu du client. Meme principe que
+// sanitizePhotoAdjustments : jamais bloquant, jamais d'itemId etranger a la
+// page, et surtout jamais un role invente — normalizeRole ramene toute
+// valeur inconnue sur 'body' plutot que de laisser passer une chaine libre
+// qui n'aurait aucune traduction typographique.
+function sanitizeTextRoles(raw, validItemIds) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const validSet = new Set(validItemIds);
+  const cleaned = {};
+  Object.entries(raw).forEach(([itemId, role]) => {
+    if (!validSet.has(itemId)) return;
+    cleaned[itemId] = typographySystem.normalizeRole(role);
+  });
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
+// Nettoie { [itemId]: {align, color, sizePt} }. C'est ici que se joue
+// concretement le "Celebrons reste responsable du design" du cahier des
+// charges : une couleur hors palette, un alignement fantaisiste ou une
+// taille hors de la plage du role sont ECARTES — pas rejetes avec une
+// erreur (l'utilisateur n'y peut rien), simplement ignores au profit de la
+// valeur du role. Il est donc impossible, meme en appelant l'API
+// directement, de casser la coherence typographique du livre.
+function sanitizeTextStyles(raw, validItemIds) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const validSet = new Set(validItemIds);
+  const cleaned = {};
+  Object.entries(raw).forEach(([itemId, style]) => {
+    if (!validSet.has(itemId) || !style || typeof style !== 'object') return;
+    const entry = {};
+    if (['left', 'center', 'right', 'justify'].includes(style.align)) entry.align = style.align;
+    if (typographySystem.TEXT_COLORS[style.color]) entry.color = style.color;
+    const sizePt = Number(style.sizePt);
+    if (Number.isFinite(sizePt)) entry.sizePt = sizePt; // borne par resolveRoleStyle a l'usage
+    if (Object.keys(entry).length > 0) cleaned[itemId] = entry;
+  });
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
 // Annote le `content` d'UNE page (statut qualite par photo, cahier des
 // charges v2 §4) avant sauvegarde. Charge items/layouts a la demande —
 // jamais bloquant : si quoi que ce soit echoue ou n'est pas evaluable, le
@@ -81,8 +122,17 @@ async function annotateSinglePagePayload(book, payload = {}) {
       bookContentService.listContentItems(book.id),
       templateCatalog.listActiveLayouts()
     ]);
-    const [annotated] = photoQualityEngine.annotatePagesWithPhotoFit({
+    const [withPhotoFit] = photoQualityEngine.annotatePagesWithPhotoFit({
       pages: [{ content }],
+      items,
+      layouts,
+      formatId: book.print_format
+    });
+    // Qualite TEXTE annotee dans la meme passe (cahier des charges
+    // typographique §19) : un seul objet content porte les deux verdicts,
+    // donc un seul ecran recapitulatif a lire avant commande.
+    const [annotated] = textQualityEngine.annotatePagesWithTextFit({
+      pages: [withPhotoFit],
       items,
       layouts,
       formatId: book.print_format
@@ -491,7 +541,13 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
       layouts,
       formatId: book.print_format
     });
-    const pages = await bookContentService.replaceBookPages(book.id, annotatedPages);
+    const annotatedPagesWithText = textQualityEngine.annotatePagesWithTextFit({
+      pages: annotatedPages,
+      items,
+      layouts,
+      formatId: book.print_format
+    });
+    const pages = await bookContentService.replaceBookPages(book.id, annotatedPagesWithText);
     res.json({ pages, overflow: result.overflow, underflow: result.underflow, pageBudget: result.pageBudget });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -591,7 +647,19 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, async (
       layouts,
       formatId
     });
-    const pages = await bookContentService.replaceBookPages(book.id, annotatedFormatPages);
+    // Le changement de format est precisement le moment ou la qualite TEXTE
+    // bouge le plus : les tailles, l'interligne ET la largeur de colonne
+    // different reellement d'un format a l'autre (voir typographySystem
+    // FORMAT_TYPOGRAPHY), donc un texte qui tenait en Livret peut deborder
+    // en Luxe. Reannoter ici, et pas seulement a la composition, est ce qui
+    // rend l'avertissement juste apres une bascule de format.
+    const annotatedFormatPagesWithText = textQualityEngine.annotatePagesWithTextFit({
+      pages: annotatedFormatPages,
+      items,
+      layouts,
+      formatId
+    });
+    const pages = await bookContentService.replaceBookPages(book.id, annotatedFormatPagesWithText);
 
     const { data: updatedBook, error: updateError } = await supabase
       .from('books')
@@ -742,6 +810,74 @@ router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, a
   }
 });
 
+// POST /api/books/:bookId/pages/shrink
+// Retire des pages a la FIN du livre (bouton "-2" du filmstrip atelier) —
+// contrepartie exacte de /pages/extend ci-dessus. Body optionnel
+// { count, confirm }.
+//
+// Trois garde-fous, dans cet ordre :
+//   1. count pair (meme palier imprimeur que l'ajout) ;
+//   2. on ne descend JAMAIS sous le plancher imprimable — sinon le livre
+//      deviendrait silencieusement non commandable, et l'utilisateur ne
+//      l'apprendrait qu'au moment de commander ;
+//   3. une page non vide ou verrouillee ne part pas sans un `confirm: true`
+//      explicite : la reponse 409 dit precisement ce qui serait perdu, pour
+//      que le client puisse poser la question au lieu de deviner.
+router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const { book } = req;
+    const requestedCount = Number(req.body?.count);
+    const count = Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : 2;
+    if (count % 2 !== 0) {
+      return res.status(400).json({ error: 'Le nombre de pages retirees doit etre pair.' });
+    }
+
+    const { totalPages, doomed, nonEmpty, locked } = await bookContentService.inspectTrailingPages(book.id, count);
+
+    if (doomed.length < count) {
+      return res.status(400).json({ error: 'Ce livre ne contient pas assez de pages pour en retirer autant.' });
+    }
+
+    const remaining = totalPages - count;
+    if (remaining < layoutEngine.MIN_PRINTABLE_PAGES) {
+      return res.status(422).json({
+        error: `Impossible de descendre sous ${layoutEngine.MIN_PRINTABLE_PAGES} pages : c'est le minimum imprimable (votre livre en compte ${totalPages}).`
+      });
+    }
+
+    if ((nonEmpty.length > 0 || locked.length > 0) && req.body?.confirm !== true) {
+      return res.status(409).json({
+        error: locked.length > 0
+          ? 'Les dernieres pages contiennent du contenu ou sont verrouillees.'
+          : 'Les dernieres pages contiennent du contenu.',
+        needsConfirmation: true,
+        nonEmptyCount: nonEmpty.length,
+        lockedCount: locked.length,
+        // Numeros affiches a l'utilisateur (1-based, comme dans l'atelier),
+        // pas des page_index bruts : le message doit pouvoir etre repris tel
+        // quel a l'ecran.
+        pageNumbers: doomed
+          .filter((page) => !bookContentService.isPageEmpty(page) || page?.locked === true)
+          .map((page) => page.page_index + 1)
+      });
+    }
+
+    const pages = await bookContentService.removeTrailingPages(book.id, count);
+
+    const { data: updatedBook, error: updateError } = await supabase
+      .from('books')
+      .update({ page_count: pages.length, updated_at: new Date().toISOString() })
+      .eq('id', book.id)
+      .select()
+      .single();
+    if (updateError) throw updateError;
+
+    res.json({ book: updatedBook, pages, removed: count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // PUT /api/books/:bookId/pages/:pageIndex
 // Edition manuelle d'une page (ex. verrouillage) sans repasser par le moteur.
 // Utilise aussi par la sauvegarde PARTIELLE de l'atelier (emplacements pas
@@ -852,10 +988,26 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
     const photoAdjustments = sanitizePhotoAdjustments(req.body?.photoAdjustments, itemIds);
     if (photoAdjustments) content.photoAdjustments = photoAdjustments;
 
+    // Roles et reglages typographiques (cahier des charges typographique
+    // §3/§6), memes garanties que photoAdjustments : jamais d'itemId etranger
+    // a cette page, jamais une valeur hors du cadre autorise.
+    const textRoles = sanitizeTextRoles(req.body?.textRoles, itemIds);
+    if (textRoles) content.textRoles = textRoles;
+    const textStyles = sanitizeTextStyles(req.body?.textStyles, itemIds);
+    if (textStyles) content.textStyles = textStyles;
+
     // Statut qualite persiste (cahier des charges v2, §4) — calcule apres
     // photoAdjustments, dont le zoom influence le DPI effectif.
-    const [annotated] = photoQualityEngine.annotatePagesWithPhotoFit({
+    const [withPhotoFit] = photoQualityEngine.annotatePagesWithPhotoFit({
       pages: [{ content }],
+      items: allItems,
+      layouts,
+      formatId: book.print_format
+    });
+    // ... et apres textRoles/textStyles, qui changent la taille appliquee
+    // donc le verdict de debordement (§19).
+    const [annotated] = textQualityEngine.annotatePagesWithTextFit({
+      pages: [withPhotoFit],
       items: allItems,
       layouts,
       formatId: book.print_format
@@ -898,6 +1050,8 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
 
     let photosCount = 0;
     let evaluatedCount = 0;
+    let textsCount = 0;
+    let textsEvaluatedCount = 0;
     const warnings = [];
 
     pages.forEach((page) => {
@@ -909,7 +1063,46 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
 
         (block.itemIds || []).forEach((itemId, slotIndex) => {
           const item = itemId ? itemsById[itemId] : null;
-          if (!item || item.kind !== 'photo') return;
+          if (!item) return;
+
+          // --- Textes (cahier des charges typographique §19) ---------------
+          // Memes regles que le rendu (typographySystem), donc un texte
+          // signale ici est reellement un texte qui pose probleme a
+          // l'impression : debordement, taille sous le minimum imprimable,
+          // ou contraste insuffisant sur une photo.
+          if (item.kind === 'texte') {
+            textsCount += 1;
+            const textFit = textQualityEngine.checkTextFit({
+              text: item.text,
+              role: page.content?.textRoles?.[itemId],
+              layoutSlug: slug,
+              slotIndex,
+              formatId: book.print_format,
+              overrides: page.content?.textStyles?.[itemId] || {}
+            });
+            if (!textFit) return; // layout inconnu -> pas evalue, jamais un faux avertissement
+            textsEvaluatedCount += 1;
+            if (textFit.statut === 'ok') return;
+
+            warnings.push({
+              kind: 'texte',
+              pageIndex: page.page_index,
+              itemId,
+              statut: textFit.statut,
+              severity: textFit.severity,
+              label: textFit.label,
+              role: textFit.role,
+              sizePt: textFit.sizePt,
+              overflowMm: textFit.overflowMm,
+              reasons: textFit.reasons,
+              // Extrait court : l'ecran recapitulatif doit permettre de
+              // reconnaitre DE QUEL texte on parle sans ouvrir la page.
+              excerpt: String(item.text || '').trim().slice(0, 90)
+            });
+            return;
+          }
+
+          if (item.kind !== 'photo') return;
           photosCount += 1;
 
           const fit = photoQualityEngine.checkSlotImageFit({
@@ -929,6 +1122,7 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
             statut: fit.statut,
             severity: fit.severity,
             label: fit.label,
+            kind: 'photo',
             dpiEffectif: fit.dpiEffectif,
             ecartRatio: fit.ecartRatio,
             // Vignette pour l'ecran recapitulatif (§2) — repli sur
@@ -943,6 +1137,8 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
       pagesCount: pages.length,
       photosCount,
       evaluatedCount,
+      textsCount,
+      textsEvaluatedCount,
       warnings,
       hasWarnings: warnings.length > 0
     });

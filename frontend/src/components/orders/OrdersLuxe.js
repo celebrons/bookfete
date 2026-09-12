@@ -6,7 +6,7 @@ import {
   includesPdf,
   formatPriceCents
 } from '../../utils/orderWorkflow';
-import { createStripeCheckoutSession, listOrders, updateOrderStatus } from '../../services/ordersApi';
+import { createStripeCheckoutSession, deleteOrder, listOrders, updateOrderStatus } from '../../services/ordersApi';
 import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
 
@@ -33,6 +33,7 @@ const OrdersLuxe = () => {
   const [notice, setNotice] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState('');
   const [startingPaymentOrderId, setStartingPaymentOrderId] = useState('');
+  const [deletingOrderId, setDeletingOrderId] = useState('');
 
   const loadOrders = async () => {
     try {
@@ -62,6 +63,27 @@ const OrdersLuxe = () => {
       setNotice({ type: 'error', message: error.message });
     } finally {
       setUpdatingOrderId('');
+    }
+  };
+
+  // Suppression d'une commande (essais de formats/types/paiement). Le serveur
+  // est seul juge de ce qui est supprimable : on se contente de confirmer
+  // l'intention et de relayer son refus le cas echeant.
+  const removeOrder = async (order) => {
+    if (!order?.id || deletingOrderId) return;
+    // eslint-disable-next-line no-restricted-globals
+    if (!window.confirm(`Supprimer definitivement la commande ${order.order_number || ''} ?`)) return;
+
+    try {
+      setDeletingOrderId(order.id);
+      setNotice(null);
+      await deleteOrder(order.id);
+      setOrders((prev) => prev.filter((item) => item.id !== order.id));
+      setNotice({ type: 'success', message: 'Commande supprimee.' });
+    } catch (error) {
+      setNotice({ type: 'error', message: error.message });
+    } finally {
+      setDeletingOrderId('');
     }
   };
 
@@ -204,6 +226,18 @@ const OrdersLuxe = () => {
                         {updatingOrderId === order.id ? 'Mise a jour...' : nextPrintLabel(order.status)}
                       </button>
                     )}
+
+                    {/* Nettoyage des essais : le serveur refuse de lui-meme
+                        une commande partie en production ou reellement
+                        payee, on affiche alors son message. */}
+                    <button
+                      type="button"
+                      className="btn btn-outline is-danger"
+                      disabled={deletingOrderId === order.id}
+                      onClick={() => removeOrder(order)}
+                    >
+                      {deletingOrderId === order.id ? 'Suppression...' : 'Supprimer'}
+                    </button>
                   </div>
                 </article>
               );

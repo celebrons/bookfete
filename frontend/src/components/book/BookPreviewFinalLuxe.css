@@ -186,6 +186,20 @@
   display: block;
   border: none;
   background: var(--white);
+  /* INDISPENSABLE : .scaled-page-frame-clip est un conteneur flex (il centre
+     cette iframe), donc l'iframe en est un ELEMENT FLEX — et un element flex
+     se retracte par defaut. Sa largeur naturelle (756px pour un livret)
+     etait ramenee a la largeur du cadre (~348px) tandis que sa HAUTEUR
+     restait a 756px : l'iframe devenait portrait alors que la page est
+     carree.
+     Invisible jusqu'au 2026-09-11, parce que le rendu s'etirait alors en
+     100vw/100vh et remplissait ce cadre deforme. Depuis que la page garde
+     ses vraies proportions, la deformation se voit : la page occupait le
+     haut du cadre, le reste montrant le fond du document (probleme signale
+     avec capture a l'appui).
+     flex:none retablit ce que tout ce composant suppose : l'iframe garde sa
+     taille naturelle, SEUL le transform:scale la redimensionne. */
+  flex: none;
   /* transform-origin par defaut (center) : .scaled-page-frame-clip centre
      cette iframe via flex, la mise a l'echelle doit se faire depuis son
      propre centre pour rester alignee avec ce centrage. */

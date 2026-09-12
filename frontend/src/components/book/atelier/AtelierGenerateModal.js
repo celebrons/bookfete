@@ -13,7 +13,9 @@ function AtelierGenerateModal({
   error,
   estimatedPages,
   loadingEstimate,
-  minPages = 16
+  // Repli seulement : l'appelant passe toujours MIN_AUTO_PAGES
+  // (BookAtelierLuxe.js), aligne sur layoutEngine.PAGE_COUNT_TIERS[0].
+  minPages = 30
 }) {
   const [selectedMood, setSelectedMood] = useState('classique');
   // Le moteur automatique ne repete jamais une photo/un texte pour "boucher

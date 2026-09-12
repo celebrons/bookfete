@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
+import {
+  convertAnonymousToAccount,
+  isCurrentlyAnonymous,
+  rememberAnonymousTokenBeforeLogin
+} from '../../services/anonymousSession';
 import '../../styles/luxe-theme.css';
 import './AuthLuxe.css';
 
@@ -37,6 +42,9 @@ const RegisterLuxe = () => {
 
   const handleOAuth = async (provider) => {
     setError(null);
+    // L'aller-retour OAuth remplace la session anonyme : on met son jeton de
+    // cote pour pouvoir rattacher les livres commences au retour (App.js).
+    await rememberAnonymousTokenBeforeLogin();
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${window.location.origin}${returnTarget()}` }
@@ -62,6 +70,18 @@ const RegisterLuxe = () => {
     }
 
     try {
+      // Demarrage sans compte (2026-09-12) : si le visiteur a deja commence
+      // son livre en session ANONYME, on ne cree pas un second compte — on
+      // CONVERTIT celui-ci. L'identifiant reste le meme, donc le livre, les
+      // photos et les pages deja composees restent rattaches sans aucun
+      // transfert. Creer un nouveau compte ici les abandonnerait.
+      if (await isCurrentlyAnonymous()) {
+        await convertAnonymousToAccount({ email, password, fullName });
+        localStorage.removeItem(DRAFT_KEY);
+        navigate(returnTarget(), { replace: true });
+        return;
+      }
+
       const response = await fetch(`${buildApiBaseUrl()}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

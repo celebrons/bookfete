@@ -162,6 +162,18 @@
 .atelier-filmstrip-add:hover { background: rgba(184, 146, 74, 0.16); }
 .atelier-filmstrip-add:disabled { opacity: 0.6; cursor: progress; }
 
+/* Retrait de pages ("-2") : meme gabarit que l'ajout, teinte neutre plutot
+   que doree — ce n'est pas l'action que l'on encourage. Desactive au
+   plancher imprimable, avec un curseur "interdit" (et non "progress",
+   herite ci-dessus, qui suggererait a tort un traitement en cours). */
+.atelier-filmstrip-add.is-remove {
+  border-color: rgba(36, 31, 24, 0.28);
+  background: rgba(36, 31, 24, 0.04);
+  color: var(--text-light);
+}
+.atelier-filmstrip-add.is-remove:hover:not(:disabled) { background: rgba(36, 31, 24, 0.09); }
+.atelier-filmstrip-add.is-remove:disabled { cursor: not-allowed; }
+
 /* --- "Terminer mon livre" (bas de page) + verification --------------- */
 
 .atelier-finish-bar {
@@ -672,7 +684,14 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  z-index: 5;
+  /* Au-dessus de l'editeur de texte en ligne (.atelier-text-editor, z-index
+     30) : .atelier-page-pane ne cree AUCUN contexte d'empilement (position
+     relative sans z-index), donc l'editeur rivalisait directement avec ce
+     bouton et le recouvrait des que l'emplacement texte occupait le haut de
+     la page — cas le plus courant, un titre. L'oeil disparaissait alors
+     precisement sur les pages a texte (probleme signale 2026-09-11).
+     Reste sous le calque plein ecran (70/75), qu'il ne doit pas percer. */
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1507,4 +1526,51 @@
   .atelier-sidebar {
     max-height: none;
   }
+}
+
+/* --- Couleur de couverture (2026-09-12) ---------------------------------
+   Palette fermee de matieres (voir COVER_COLORS dans AtelierCoverPanel.js et
+   son miroir backend coverTheme.js). Contour franc sur chaque pastille :
+   sans lui, l'ivoire et le blanc seraient invisibles sur un panneau clair. */
+.coverlite-colors {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.coverlite-color {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(36, 31, 24, 0.45);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.coverlite-color:hover { transform: scale(1.12); }
+.coverlite-color.is-active {
+  box-shadow: 0 0 0 2px var(--white, #fff), 0 0 0 4px var(--gold);
+}
+
+/* "Auto" : laisser Celebrons choisir selon le style et le format. */
+.coverlite-color.is-auto {
+  width: auto;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text-light);
+}
+.coverlite-color.is-auto:hover { transform: none; background: rgba(36, 31, 24, 0.06); }
+.coverlite-color.is-auto.is-active { color: var(--ink); }
+
+.coverlite-hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-light);
 }

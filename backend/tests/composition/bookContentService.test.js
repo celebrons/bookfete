@@ -60,3 +60,71 @@ describe('bookContentService.replaceBookPages', () => {
     expect(mock.__table('book_pages')).toHaveLength(0);
   });
 });
+
+// Retrait de pages par la fin (bouton "-2" de l'atelier, voir
+// routes/composition.js: POST /pages/shrink). Le service EXECUTE : c'est la
+// route qui juge de la perte de contenu, d'ou des tests separes sur ce que
+// l'inspection rapporte et sur ce que la suppression touche reellement.
+describe('bookContentService — retrait de pages par la fin', () => {
+  beforeEach(() => {
+    jest.resetModules();
+  });
+
+  const buildPages = () => ([
+    { id: 'pg-0', book_id: 'book-1', page_index: 0, layout_id: 'l1', content: { itemIds: ['a'] }, locked: false },
+    { id: 'pg-1', book_id: 'book-1', page_index: 1, layout_id: 'l1', content: { itemIds: ['b'] }, locked: false },
+    { id: 'pg-2', book_id: 'book-1', page_index: 2, layout_id: 'l1', content: {}, locked: false },
+    { id: 'pg-3', book_id: 'book-1', page_index: 3, layout_id: null, content: { itemIds: [] }, locked: false }
+  ]);
+
+  const load = (pages) => {
+    const mock = createSupabaseMock({ book_pages: pages });
+    jest.doMock('../../config/supabase', () => mock);
+    return { mock, service: require('../../services/composition/bookContentService') };
+  };
+
+  it('retire les dernieres pages et laisse intactes celles du debut', async () => {
+    const { mock, service } = load(buildPages());
+
+    await service.removeTrailingPages('book-1', 2);
+
+    expect(mock.__table('book_pages').map((p) => p.page_index).sort()).toEqual([0, 1]);
+  });
+
+  it('signale les pages non vides sans rien supprimer', async () => {
+    const { mock, service } = load(buildPages());
+
+    // Les 3 dernieres pages incluent pg-1, qui porte du contenu.
+    const report = await service.inspectTrailingPages('book-1', 3);
+
+    expect(report.totalPages).toBe(4);
+    expect(report.doomed).toHaveLength(3);
+    expect(report.nonEmpty.map((p) => p.page_index)).toEqual([1]);
+    // Inspecter ne doit JAMAIS ecrire : c'est tout l'interet d'avoir separe
+    // cette etape de la suppression.
+    expect(mock.__table('book_pages')).toHaveLength(4);
+  });
+
+  it('signale les pages verrouillees', async () => {
+    const pages = buildPages();
+    pages[3].locked = true;
+    const { service } = load(pages);
+
+    const report = await service.inspectTrailingPages('book-1', 2);
+
+    expect(report.locked.map((p) => p.page_index)).toEqual([3]);
+  });
+
+  it('traite un itemId orphelin comme une page vide', async () => {
+    // Une photo supprimee laisse un trou (null) dans itemIds : compter la
+    // longueur brute ferait passer cette page pour remplie et bloquerait
+    // inutilement le retrait.
+    const { service } = load([
+      { id: 'pg-0', book_id: 'book-1', page_index: 0, layout_id: 'l1', content: { itemIds: [null, null] }, locked: false }
+    ]);
+
+    expect(service.isPageEmpty({ content: { itemIds: [null, null] } })).toBe(true);
+    const report = await service.inspectTrailingPages('book-1', 1);
+    expect(report.nonEmpty).toHaveLength(0);
+  });
+});

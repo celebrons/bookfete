@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
+import {
+  linkAnonymousBooksAfterLogin,
+  rememberAnonymousTokenBeforeLogin
+} from '../../services/anonymousSession';
 import '../../styles/luxe-theme.css';
 import './AuthLuxe.css';
 
@@ -21,12 +25,24 @@ const LoginLuxe = () => {
     setError(null);
 
     try {
+      // Demarrage sans compte (2026-09-12) : le visiteur a peut-etre commence
+      // un livre en session anonyme avant de se connecter a un compte qui
+      // existait deja. Se connecter REMPLACE la session, donc l'identifiant
+      // change et les livres commences deviendraient orphelins. On met le
+      // jeton anonyme de cote AVANT (il disparaitrait apres), puis on
+      // demande au serveur de transferer les livres APRES.
+      await rememberAnonymousTokenBeforeLogin();
+
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: String(emailValue || '').trim().toLowerCase(),
         password: String(passwordValue || '')
       });
 
       if (loginError) throw loginError;
+
+      // Jamais bloquant : ne pas retrouver un livre commence ne doit pas
+      // empecher de se connecter.
+      await linkAnonymousBooksAfterLogin();
 
       const returnTo = localStorage.getItem('returnTo');
       localStorage.removeItem('returnTo');
@@ -66,6 +82,11 @@ const LoginLuxe = () => {
   // simplement au tableau de bord, jamais vers un ecran de creation non lie.
   const handleOAuth = async (provider) => {
     setError(null);
+    // Meme raison que dans runLogin : l'aller-retour OAuth remplacera la
+    // session anonyme, son jeton doit donc etre mis de cote maintenant. Le
+    // rattachement des livres se fera au retour, au chargement de l'app
+    // (voir App.js) — ce composant ne sera plus monte.
+    await rememberAnonymousTokenBeforeLogin();
     const returnTo = localStorage.getItem('returnTo') || '/dashboard';
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,

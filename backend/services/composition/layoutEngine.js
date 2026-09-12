@@ -43,9 +43,18 @@ const DEFAULT_FIXED_PAGES = 2; // garde + page de titre (la couverture est un do
 // Gelato (integration imprimeur en cours de test, voir
 // backend/services/printing/gelatoCatalog.js) : tous les produits
 // photobooks du catalogue reel n'acceptent qu'entre 28 et 200 pages, par pas
-// de 2, verifie via l'API (voir memoire "gelato-integration-status"). 28
-// devient donc le nouveau plancher.
-const PAGE_COUNT_TIERS = [28, 32, 48, 64];
+// de 2, verifie via l'API (voir memoire "gelato-integration-status").
+//
+// 2026-09-11 : plancher porte a 30 (demande utilisateur). A NOTER, verifie a
+// nouveau sur l'API reelle le meme jour : Gelato accepte toujours 28 (la
+// liste renvoyee par /prices?pageCount=<invalide> commence bien par
+// [28,30,32,...] sur les 3 produits) — 30 est donc un choix PRODUIT, plus
+// strict que la contrainte imprimeur, pas une obligation Gelato. C'est sans
+// risque (un cran au-dessus du minimum reel), mais si quelqu'un cherche un
+// jour a redescendre a 28, rien cote imprimeur ne s'y oppose. La valeur
+// reelle du catalogue reste 28 dans gelatoCatalog.js, qui decrit l'imprimeur
+// et non notre politique editoriale.
+const PAGE_COUNT_TIERS = [30, 32, 48, 64];
 // Alias semantique de PAGE_COUNT_TIERS[0] : plancher DUR applique partout ou
 // un nombre de pages est sur le point d'etre PERSISTE (POST /compose, POST
 // /format — voir routes/composition.js), pas seulement suggere. Choix

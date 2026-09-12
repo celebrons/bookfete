@@ -72,7 +72,7 @@ function EyeIcon() {
 // draftLayoutSlug/draftSlotItemIds decrivent). Differenciation forte
 // deliberee (badge + assombrissement de l'autre page) pour qu'il soit
 // impossible de deposer par erreur sur la mauvaise page d'un double-page.
-function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, aspectRatio }) {
+function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, aspectRatio, onExpand }) {
   const isInactive = selectable && !isSelected;
   return (
     <div
@@ -85,6 +85,24 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
         <iframe title={pageLabel} srcDoc={html} className="atelier-page-frame" />
       ) : (
         <div className="atelier-page-placeholder" />
+      )}
+      {/* "Voir a l'echelle", pose sur LA PAGE et non sur le plateau.
+          Auparavant il vivait au coin haut droit de .atelier-book-stage :
+          en double-page, ce coin est celui de la page de DROITE, donc loin
+          de la page qu'on est en train de modifier — et hors champ des que
+          la colonne centrale rogne le plateau. L'utilisateur ne le trouvait
+          plus ("l'oeil de l'apercu en haut de page n'apparait tjrs pas").
+          Ici il est toujours sur la page regardee. */}
+      {onExpand && html && (
+        <button
+          type="button"
+          className="atelier-book-stage-eye"
+          onClick={(event) => { event.stopPropagation(); onExpand(); }}
+          title="Voir à l'échelle — proportions et dimensions d'impression respectées"
+          aria-label="Voir à l'échelle"
+        >
+          <EyeIcon />
+        </button>
       )}
       {overlay}
       {selectable && isSelected && (
@@ -214,22 +232,13 @@ function AtelierBookView({
   return (
     <div className="atelier-book-view">
       <div className="atelier-book-stage">
-        {/* Raccourci "Voir à l'échelle" (retour utilisateur : "un petit oeil
-            sur le coin haut droit du livre") — en plus du bouton de la barre
-            de navigation ci-dessous (deja deplace la depuis un coin de page
-            lors d'une passe precedente, garde tel quel), pas a sa place :
-            deux acces au meme calque, l'un permanent/explicite en bas, l'un
-            rapide/discret directement sur la page. */}
-        <button
-          type="button"
-          className="atelier-book-stage-eye"
-          onClick={() => setIsFullscreenOpen(true)}
-          disabled={!hasContentToExpand}
-          title="Voir à l'échelle"
-          aria-label="Voir à l'échelle"
-        >
-          <EyeIcon />
-        </button>
+        {/* Le raccourci "Voir à l'échelle" (retour utilisateur : "un petit
+            oeil sur le coin haut droit du livre") est desormais rendu DANS
+            chaque page (voir PagePane) plutot qu'ici, au coin du plateau —
+            voir le commentaire de PagePane pour la raison. Le bouton
+            permanent de la barre de navigation ci-dessous reste inchange :
+            deux acces au meme calque, l'un explicite en bas, l'un rapide et
+            discret sur la page elle-meme. */}
 
         {loading && <p className="atelier-hint atelier-book-loading">Chargement de la page...</p>}
 
@@ -239,6 +248,7 @@ function AtelierBookView({
             pageLabel="Couverture"
             selectable={false}
             aspectRatio={pageAspectRatio}
+            onExpand={() => setIsFullscreenOpen(true)}
             overlay={(
               <CoverPhotoOverlay
                 onAssign={onAssignCoverPhoto ? (itemId) => onAssignCoverPhoto('front', itemId) : null}
@@ -254,6 +264,7 @@ function AtelierBookView({
             pageLabel="4e de couverture"
             selectable={false}
             aspectRatio={pageAspectRatio}
+            onExpand={() => setIsFullscreenOpen(true)}
             overlay={(
               <CoverPhotoOverlay
                 onAssign={onAssignCoverPhoto ? (itemId) => onAssignCoverPhoto('back', itemId) : null}
@@ -273,6 +284,7 @@ function AtelierBookView({
               onSelect={() => onSelectSide('left')}
               overlay={selectedSide === 'left' ? overlay : null}
               aspectRatio={pageAspectRatio}
+            onExpand={() => setIsFullscreenOpen(true)}
             />
             {rightPageNumber != null && (
               <PagePane
@@ -283,6 +295,7 @@ function AtelierBookView({
                 onSelect={() => onSelectSide('right')}
                 overlay={selectedSide === 'right' ? overlay : null}
                 aspectRatio={pageAspectRatio}
+            onExpand={() => setIsFullscreenOpen(true)}
               />
             )}
           </div>

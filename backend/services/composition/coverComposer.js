@@ -16,7 +16,7 @@
 // Fonctions pures, aucun acces reseau/disque.
 
 const { rankPhotos } = require('./coverPhotoSelector');
-const { resolveCoverTheme, applyFormatAccent } = require('./coverTheme');
+const { resolveCoverTheme, applyFormatAccent, applyCoverColor } = require('./coverTheme');
 const { pickClosingPhrase, formatStatsLine } = require('./coverCopy');
 const { detectContentProfile } = require('./contentProfile');
 const { resolveCoverFormat, DEFAULT_COVER_FORMAT_ID } = require('./coverFormat');
@@ -162,8 +162,14 @@ function resolveForcedFrontComposition(forcedVariant, { ranked, overridden }) {
  * @returns {object} page-entry { page_index, layout_id, content }
  */
 function composeFrontCover({ book, items, template, format }) {
-  const theme = applyFormatAccent(resolveCoverTheme(template), format?.formatId);
   const overrides = resolveCoverOverrides(book);
+  // Couleur choisie par l'utilisateur (cover_overrides.coverColor), appliquee
+  // PAR-DESSUS le theme et l'habillage de format — voir coverTheme.js.
+  // Absente : rien ne change, le rendu reste exactement celui d'avant.
+  const theme = applyCoverColor(
+    applyFormatAccent(resolveCoverTheme(template), format?.formatId),
+    overrides.coverColor
+  );
   const titleInfo = buildFrontTitleInfo(book, overrides);
   const ranked = rankPhotos(items, format);
   const best = ranked[0];
@@ -265,8 +271,16 @@ function resolveForcedBackComposition(forcedVariant, { statsLine, ranked, overri
  * @returns {object} page-entry { page_index, layout_id, content }
  */
 function composeBackCover({ book, items, template, format, frontCoverItemIds = [] }) {
-  const theme = applyFormatAccent(resolveCoverTheme(template), format?.formatId);
   const overrides = resolveCoverOverrides(book);
+  // Meme couleur que le recto, toujours : sur un Luxe, couverture, dos et 4e
+  // ne forment qu'UNE seule feuille qui enveloppe le livre (voir
+  // gelatoCoverComposer.js). Deux teintes differentes obligeraient le dos a
+  // trancher et ressembleraient a une erreur d'impression — d'ou un seul
+  // reglage pour tout l'habillage, jamais un par face.
+  const theme = applyCoverColor(
+    applyFormatAccent(resolveCoverTheme(template), format?.formatId),
+    overrides.coverColor
+  );
 
   const photos = (items || []).filter((item) => item.kind === 'photo').length;
   const souvenirs = (items || []).filter((item) => item.kind === 'texte').length;

@@ -135,6 +135,62 @@ async function appendEmptyPages(bookId, count) {
   return listPages(bookId);
 }
 
+// Une page est consideree VIDE si aucun emplacement n'est rempli — meme
+// critere exact que le filmstrip de l'atelier (BookAtelierLuxe.js
+// finishStats : `content.itemIds.filter(Boolean)`), volontairement, pour que
+// la vignette grise que l'utilisateur voit et la page que le serveur accepte
+// de supprimer soient toujours la meme chose. Le `filter(Boolean)` n'est pas
+// cosmetique : un itemId orphelin (photo supprimee depuis) laisse un trou
+// dans le tableau, et compter la longueur brute ferait passer une page
+// reellement vide pour remplie.
+function isPageEmpty(page) {
+  const itemIds = page?.content?.itemIds;
+  if (!Array.isArray(itemIds)) return true;
+  return itemIds.filter(Boolean).length === 0;
+}
+
+// Inspecte les `count` dernieres pages sans rien supprimer : dit a l'appelant
+// ce qui serait perdu. Separe de la suppression elle-meme pour que la route
+// puisse refuser AVANT d'ecrire quoi que ce soit.
+async function inspectTrailingPages(bookId, count) {
+  const existing = await listPages(bookId);
+  const doomed = count > 0 ? existing.slice(-count) : [];
+  return {
+    totalPages: existing.length,
+    doomed,
+    nonEmpty: doomed.filter((page) => !isPageEmpty(page)),
+    locked: doomed.filter((page) => page?.locked === true)
+  };
+}
+
+// Retire les `count` DERNIERES pages du livre. Contrepartie exacte de
+// appendEmptyPages ci-dessus (bouton "-2" du filmstrip atelier, voir
+// routes/composition.js: POST /pages/shrink).
+//
+// Toujours par la FIN, jamais au milieu : supprimer une page intermediaire
+// obligerait a reindexer tout ce qui suit, ce qui deplacerait silencieusement
+// des pages verrouillees et decalerait les numeros de page deja composes dans
+// le contenu. La contrainte de parite (pages retirees 2 par 2) vient du
+// catalogue imprimeur, comme pour l'ajout.
+//
+// Ne decide RIEN sur la perte de contenu : c'est la route qui verifie que les
+// pages visees sont vides et non verrouillees, ou que l'utilisateur a
+// explicitement confirme. Ici, on execute.
+async function removeTrailingPages(bookId, count) {
+  const { doomed } = await inspectTrailingPages(bookId, count);
+  if (doomed.length === 0) return listPages(bookId);
+
+  const { error } = await supabase
+    .from('book_pages')
+    .delete()
+    .eq('book_id', bookId)
+    .in('page_index', doomed.map((page) => page.page_index));
+
+  if (error) throw error;
+
+  return listPages(bookId);
+}
+
 async function upsertPage(bookId, pageIndex, payload = {}) {
   const { data, error } = await supabase
     .from('book_pages')
@@ -157,5 +213,8 @@ module.exports = {
   listPages,
   replaceBookPages,
   appendEmptyPages,
+  inspectTrailingPages,
+  removeTrailingPages,
+  isPageEmpty,
   upsertPage
 };
