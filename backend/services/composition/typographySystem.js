@@ -266,19 +266,71 @@ function estimateHeightMm(lineCount, sizePt, lineHeight) {
   return (lineCount * sizePt * lineHeight) / PT_PER_MM;
 }
 
-// Cherche la plus grande taille du role qui fait tenir `text` dans
-// `slotWidthMm` x `slotHeightMm`, par pas de 0.5pt, de la taille naturelle du
-// format jusqu'a la borne basse du role.
+// En dessous de ce nombre de lignes, justifier n'a aucun sens : la
+// justification n'agit pas sur la derniere ligne d'un paragraphe, donc un
+// texte de une ou deux lignes "justifie" est en realite ferre a gauche, et il
+// pend dans le vide des qu'il est seul dans un grand emplacement. Un texte
+// aussi court se compose centre — c'est la regle typographique habituelle
+// pour une legende ou un chapeau, et c'est ce que demandait l'utilisateur le
+// 2026-09-12 ("que le texte s'adapte au mieux... alignement").
+const JUSTIFY_MIN_LINES = 3;
+
+// En dessous de ce taux de remplissage, on considere que l'emplacement est
+// nettement sous-occupe et qu'agrandir le texte sert la page. Au-dessus, on
+// laisse la taille naturelle du format : grossir un texte qui remplit deja
+// son emplacement ne ferait que le pousser au debordement.
+const GROW_BELOW_FILL = 0.85;
+
+// Part de la marge restante (entre la taille naturelle du format et la borne
+// haute du role) que l'agrandissement s'autorise a consommer.
+//
+// Pourquoi ne pas monter jusqu'a maxPt : la position du format dans la plage
+// (rangePosition, §15) est ce qui distingue reellement un livret d'un luxe.
+// En laissant tout texte court atteindre la borne haute, les trois formats
+// rendaient exactement la meme page des que le texte etait bref — le contraire
+// de ce que le cahier des charges demande. Avec cette borne, l'ordre des
+// formats est toujours respecte : un titre court fait 32pt en livret, 34 en
+// standard, 36 en luxe.
+const GROW_MAX_SHARE = 0.5;
+
+// Cherche la taille du role la plus juste pour `text` dans
+// `slotWidthMm` x `slotHeightMm`, par pas de 0.5pt, DANS LES DEUX SENS :
+//   - le texte ne tient pas a la taille naturelle du format -> on REDUIT
+//     jusqu'a la borne basse du role ;
+//   - le texte laisse une grande part de l'emplacement inoccupee -> on
+//     AGRANDIT jusqu'a la borne haute du role.
+//
+// L'agrandissement a ete ajoute le 2026-09-12 : jusque-la l'ajustement ne
+// savait que retrecir, si bien qu'un texte court restait a sa taille naturelle
+// en flottant dans un grand vide (retour utilisateur, capture a l'appui). Il
+// reste borne par la PLAGE DU ROLE (§10) : la coherence du livre passe avant
+// le remplissage, et c'est pourquoi un corps de texte ne gagne que 1 a 2 pt la
+// ou un titre ou une citation, dont la plage est large, gagnent beaucoup plus.
 //
 // Retourne toujours un resultat AFFICHABLE (jamais de troncature, §9) :
 //   status 'ok'      -> tient a la taille naturelle du format
+//   status 'grown'   -> tient, agrandi dans la plage pour occuper la place
 //   status 'reduced' -> tient, mais a une taille reduite dans la plage
 //   status 'overflow'-> ne tient meme pas a la taille minimale du role :
 //                       l'appelant doit alerter l'utilisateur (§9 "afficher
 //                       une alerte legere"), surtout pas couper en silence.
-function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm }) {
+//
+// `overrides` : reglages explicites de l'utilisateur. Un alignement choisi a
+// la main n'est JAMAIS remplace par la regle des textes courts — l'automatisme
+// comble une absence de choix, il ne contredit pas un choix.
+function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm, overrides = {} }) {
   const style = resolveRoleStyle(role, formatId);
   const safeText = String(text || '');
+  const alignChosen = ['left', 'center', 'right', 'justify'].includes(overrides.align);
+
+  // Alignement retenu une fois le nombre de lignes connu (voir
+  // JUSTIFY_MIN_LINES). Ne s'applique qu'aux roles reellement justifies :
+  // un titre ou une legende sont deja centres par leur role.
+  const alignFor = (lines) => {
+    if (alignChosen) return overrides.align;
+    if (style.align === 'justify' && lines > 0 && lines < JUSTIFY_MIN_LINES) return 'center';
+    return style.align;
+  };
 
   // Marge interieure du format retiree des deux cotes : un texte qui touche
   // le bord de son emplacement n'est jamais elegant, et se rapproche
@@ -295,7 +347,7 @@ function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm }) {
 
   if (!safeText.trim()) {
     return {
-      ...style, status: 'ok', lines: 0, estimatedHeightMm: 0,
+      ...style, status: 'ok', lines: 0, estimatedHeightMm: 0, fillRatio: 0,
       usableWidthMm: round2(usableWidthMm), usableHeightMm: round2(usableHeightMm)
     };
   }
@@ -310,6 +362,22 @@ function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm }) {
     }
   }
 
+  // Le texte tient a sa taille naturelle et laisse beaucoup de place : on
+  // monte dans la plage du role tant que ca tient encore. On s'arrete au
+  // dernier pas VALIDE, jamais au premier qui deborde — l'agrandissement ne
+  // doit pas pouvoir creer le probleme qu'il est cense eviter.
+  if (chosen && Math.abs(chosen.sizePt - naturalPt) < 0.001) {
+    const fill = usableHeightMm > 0 ? chosen.heightMm / usableHeightMm : 1;
+    const growCeiling = naturalPt + (style.maxPt - naturalPt) * GROW_MAX_SHARE;
+    if (fill < GROW_BELOW_FILL) {
+      for (let sizePt = naturalPt + 0.5; sizePt <= growCeiling + 0.001; sizePt += 0.5) {
+        const attempt = fits(round2(sizePt));
+        if (!attempt.ok) break;
+        chosen = { sizePt: round2(sizePt), ...attempt };
+      }
+    }
+  }
+
   if (!chosen) {
     // Ne tient pas, meme au minimum du role. On rend quand meme, a la taille
     // minimale : le texte reste LISIBLE et ENTIER, et c'est l'alerte (et le
@@ -318,21 +386,29 @@ function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm }) {
     return {
       ...style,
       fontSizePt: style.minPt,
+      align: alignFor(atMin.lines),
       status: 'overflow',
       lines: atMin.lines,
       estimatedHeightMm: round2(atMin.heightMm),
+      fillRatio: usableHeightMm > 0 ? round2(atMin.heightMm / usableHeightMm) : 1,
       overflowMm: round2(atMin.heightMm - usableHeightMm),
       usableWidthMm: round2(usableWidthMm),
       usableHeightMm: round2(usableHeightMm)
     };
   }
 
+  let status = 'ok';
+  if (chosen.sizePt < naturalPt - 0.001) status = 'reduced';
+  else if (chosen.sizePt > naturalPt + 0.001) status = 'grown';
+
   return {
     ...style,
     fontSizePt: chosen.sizePt,
-    status: chosen.sizePt < naturalPt - 0.001 ? 'reduced' : 'ok',
+    align: alignFor(chosen.lines),
+    status,
     lines: chosen.lines,
     estimatedHeightMm: round2(chosen.heightMm),
+    fillRatio: usableHeightMm > 0 ? round2(chosen.heightMm / usableHeightMm) : 1,
     usableWidthMm: round2(usableWidthMm),
     usableHeightMm: round2(usableHeightMm)
   };
@@ -467,6 +543,9 @@ module.exports = {
   PALETTE_MIN_CONTRAST,
   CONTRAST_LARGE_PT,
   AVG_GLYPH_WIDTH_EM,
+  JUSTIFY_MIN_LINES,
+  GROW_BELOW_FILL,
+  GROW_MAX_SHARE,
   normalizeRole,
   resolveFormatTypography,
   selectableColorsForRole,

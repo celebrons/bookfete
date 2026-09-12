@@ -255,10 +255,12 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
   it('PHOTO_WITH_CAPTION rend une figure avec figcaption, distincte de PHOTO_TEXT', () => {
     const withCaption = bodyOf(pageFor('PHOTO_WITH_CAPTION', ['p1', 't1'], 'mixte'));
     expect(withCaption).toContain('class="block-photo photo-with-caption"');
-    expect(withCaption).toContain('<figcaption>');
+    // `<figcaption` sans `>` : la balise porte desormais l'ajustement
+    // automatique en inline (voir buildTextFits).
+    expect(withCaption).toContain('<figcaption');
 
     const photoText = bodyOf(pageFor('PHOTO_TEXT', ['p1', 't1'], 'mixte'));
-    expect(photoText).not.toContain('<figcaption>');
+    expect(photoText).not.toContain('<figcaption');
   });
 
   it('PHOTO_TEXT et TEXT_PHOTO respectent l\'ordre reel des items (photo puis texte, ou l\'inverse)', () => {
@@ -644,19 +646,36 @@ describe('renderBookHtml — role et reglages typographiques de l\'utilisateur',
     }));
   }
 
-  it("sans reglage, le rendu reste STRICTEMENT inchange (aucune page deja composee ne bouge)", () => {
+  // Sans reglage de l'utilisateur, le rendu n'applique QUE l'ajustement
+  // automatique (taille agrandie / centrage d'un texte court, voir
+  // buildTextFits). Il ne doit surtout pas poser la fiche de style complete
+  // d'un role par defaut : les selecteurs historiques (.page-title,
+  // .contribution-message...) portent deja leur propre role, et un inline les
+  // ecraserait tous avec 'body'.
+  it("sans reglage, le rendu n'applique que l'ajustement automatique — jamais une fiche de style complete", () => {
     const html = pageWith({});
-    expect(html).toContain('<p>Notre histoire</p>');
+    expect(html).toContain('Notre histoire');
     expect(html).not.toContain('font-family:');
+    expect(html).not.toContain('font-weight:');
+    expect(html).not.toContain('color:#');
+  });
+
+  it("sans reglage, un texte court est agrandi et centre (il ne flotte plus dans le vide)", () => {
+    const html = pageWith({});
+    expect(html).toMatch(/font-size:1[12](\.5)?pt/); // au-dessus des 11pt naturels du format standard
+    expect(html).toContain('text-align:center');
   });
 
   it('le role choisi change reellement la police et la taille rendues', () => {
     const titre = pageWith({ textRoles: { t1: 'title' } });
     const legende = pageWith({ textRoles: { t1: 'caption' } });
 
-    expect(titre).toContain('font-size:32pt');
+    // Taille agrandie dans la plage du role (32pt naturels -> 34pt au plus,
+    // voir GROW_MAX_SHARE) : c'est la police et la famille qui sont testees
+    // ici, la taille exacte l'est dans typographySystem.test.js.
+    expect(titre).toMatch(/font-size:3[2-4]pt/);
     expect(titre).toContain('Cormorant Garamond'); // serif editoriale
-    expect(legende).toContain('font-size:9pt');
+    expect(legende).toMatch(/font-size:(9|9\.5|10)pt/);
     expect(legende).toContain('Inter'); // sans-serif
   });
 
@@ -667,10 +686,14 @@ describe('renderBookHtml — role et reglages typographiques de l\'utilisateur',
   });
 
   it('le meme role donne des tailles differentes selon le format (§15)', () => {
+    // L'ajustement automatique agrandit un titre court, mais jamais au point
+    // d'aligner les trois formats sur la meme valeur (GROW_MAX_SHARE).
     const tailles = ['livret', 'standard', 'luxe'].map((formatId) => (
-      pageWith({ textRoles: { t1: 'title' } }, formatId).match(/font-size:([\d.]+)pt/)[1]
+      Number(pageWith({ textRoles: { t1: 'title' } }, formatId).match(/font-size:([\d.]+)pt/)[1])
     ));
-    expect(tailles).toEqual(['28', '32', '36']);
+    expect(tailles[0]).toBeLessThan(tailles[1]);
+    expect(tailles[1]).toBeLessThan(tailles[2]);
+    expect(tailles[2]).toBeLessThanOrEqual(36);
   });
 
   it('une taille hors plage du role est ramenee dans les bornes, jamais appliquee telle quelle', () => {
@@ -680,8 +703,10 @@ describe('renderBookHtml — role et reglages typographiques de l\'utilisateur',
 
   it('un reglage pose sur un AUTRE item ne touche pas ce texte', () => {
     const html = pageWith({ textRoles: { 'autre-item': 'title' } });
-    expect(html).toContain('<p>Notre histoire</p>');
-    expect(html).not.toContain('font-size:32pt');
+    expect(html).toContain('Notre histoire');
+    // Aucune trace du role 'title' : ni sa police, ni sa plage de taille.
+    expect(html).not.toContain('Cormorant Garamond');
+    expect(html).not.toMatch(/font-size:3\dpt/);
   });
 });
 

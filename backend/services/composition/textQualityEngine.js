@@ -134,13 +134,17 @@ function checkTextFit({
   const slotHeightMm = usable.heightMm * heightShare;
 
   const fit = typography.fitTextToSlot({
-    text, role: safeRole, formatId, slotWidthMm, slotHeightMm
+    text, role: safeRole, formatId, slotWidthMm, slotHeightMm, overrides
   });
 
   // La taille appliquee tient compte d'un eventuel reglage utilisateur, mais
   // reste bornee par le role (resolveRoleStyle clampe deja).
   const style = typography.resolveRoleStyle(safeRole, formatId, overrides);
-  const sizePt = Math.min(fit.fontSizePt, style.fontSizePt);
+  // Une taille CHOISIE a la main fait foi ; sinon c'est l'ajustement
+  // automatique qui decide, dans les deux sens (il sait desormais agrandir un
+  // texte court, pas seulement reduire un texte long — voir fitTextToSlot).
+  // L'ancien Math.min() annulait silencieusement tout agrandissement.
+  const sizePt = Number.isFinite(Number(overrides.sizePt)) ? style.fontSizePt : fit.fontSizePt;
 
   const reasons = [];
   if (fit.status === 'overflow') {

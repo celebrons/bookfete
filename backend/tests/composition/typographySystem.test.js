@@ -97,23 +97,62 @@ describe('typographySystem — le format recompose, il ne met pas a l\'echelle (
 describe('typographySystem — adaptation automatique du texte (§9)', () => {
   const SLOT = { slotWidthMm: 180, slotHeightMm: 60 };
 
-  it('un titre court tient a la taille naturelle du format', () => {
+  it('un titre court est AGRANDI pour occuper son emplacement, jamais laisse a flotter', () => {
+    // Depuis le 2026-09-12 l'ajustement fonctionne dans les deux sens (retour
+    // utilisateur : un texte court flottait au milieu d'un grand vide).
     FORMATS.forEach((formatId) => {
       const fit = typography.fitTextToSlot({ text: 'Notre mariage', role: 'title', formatId, ...SLOT });
-      expect(fit.status).toBe('ok');
-      expect(fit.fontSizePt).toBe(typography.baseSizePt('title', formatId));
+      expect(['ok', 'grown']).toContain(fit.status);
+      expect(fit.fontSizePt).toBeGreaterThanOrEqual(typography.baseSizePt('title', formatId));
+      expect(fit.fontSizePt).toBeLessThanOrEqual(36); // borne haute du role
     });
+  });
+
+  it("l'agrandissement ne gomme PAS le caractere du format (§15) : l'ordre livret < standard < luxe tient", () => {
+    // Garde-fou explicite : laisser tout texte court monter jusqu'a la borne
+    // haute du role rendrait les trois formats identiques des que le texte est
+    // bref — exactement l'inverse de ce que demande le §15.
+    const tailles = FORMATS.map((formatId) => (
+      typography.fitTextToSlot({ text: 'Notre mariage', role: 'title', formatId, ...SLOT }).fontSizePt
+    ));
+    expect(tailles[0]).toBeLessThan(tailles[1]);
+    expect(tailles[1]).toBeLessThan(tailles[2]);
   });
 
   it("le titre tres long de l'exemple du cahier des charges tient encore, quitte a etre reduit", () => {
     const long = 'Le jour ou nous avons celebre notre amour avec toutes les personnes qui comptent pour nous';
     FORMATS.forEach((formatId) => {
       const fit = typography.fitTextToSlot({ text: long, role: 'title', formatId, ...SLOT });
-      expect(['ok', 'reduced']).toContain(fit.status);
+      expect(['ok', 'grown', 'reduced']).toContain(fit.status);
       // Jamais en dessous de la borne du role : reduire a l'infini
       // produirait un titre illisible plutot qu'une alerte.
       expect(fit.fontSizePt).toBeGreaterThanOrEqual(28);
     });
+  });
+
+  it('un texte trop court pour etre justifie est centre, jamais ferre a gauche', () => {
+    // La justification n'agit pas sur la derniere ligne : sur une ou deux
+    // lignes elle equivaut a un alignement a gauche, et le texte pend dans le
+    // vide (page signalee le 2026-09-12).
+    const court = typography.fitTextToSlot({
+      text: 'Rencontre avec Papy, Mamie', role: 'body', formatId: 'standard', ...SLOT
+    });
+    expect(court.lines).toBeLessThan(typography.JUSTIFY_MIN_LINES);
+    expect(court.align).toBe('center');
+
+    const longText = typography.fitTextToSlot({
+      text: 'phrase assez longue pour tenir sur plusieurs lignes. '.repeat(12),
+      role: 'body', formatId: 'standard', ...SLOT
+    });
+    expect(longText.lines).toBeGreaterThanOrEqual(typography.JUSTIFY_MIN_LINES);
+    expect(longText.align).toBe('justify');
+  });
+
+  it("un alignement CHOISI par l'utilisateur n'est jamais remplace par l'automatisme", () => {
+    const fit = typography.fitTextToSlot({
+      text: 'Deux mots', role: 'body', formatId: 'standard', ...SLOT, overrides: { align: 'left' }
+    });
+    expect(fit.align).toBe('left');
   });
 
   it('la reduction se fait DANS la plage du role, jamais en dessous', () => {

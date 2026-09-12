@@ -104,9 +104,23 @@
   align-items: center;
   gap: 6px;
   width: max-content;
-  max-width: 460px;
+  /* Ne JAMAIS depasser la zone de contenu de la page : .atelier-page-pane est
+     en overflow:hidden, donc tout debordement est purement et simplement
+     rogne — c'est ce qui coupait la liste "Style" en deux (signale le
+     2026-09-12). La barre s'enroule plutot que de deborder.
+     Repli seulement : `left`/`width`/`transform` sont recalcules en inline par
+     le composant pour couvrir la largeur de la PAGE et non celle de
+     l'emplacement (voir controlsSpanStyle dans AtelierTextEditor.js). */
+  max-width: 100%;
+  /* Le bloc est plus large que la barre qu'il contient : sans ca, ses zones
+     vides (a gauche et a droite de la barre) avaleraient les clics destines a
+     la photo ou a l'emplacement voisin. Seuls la barre et les alertes captent
+     reellement le pointeur. */
+  pointer-events: none;
   z-index: 2;
 }
+.atelier-text-toolbar,
+.atelier-text-alert { pointer-events: auto; }
 .atelier-text-controls.is-below { top: calc(100% + 8px); }
 .atelier-text-controls.is-above { bottom: calc(100% + 8px); flex-direction: column-reverse; }
 /* Emplacement occupant toute la hauteur : aucune place autour, la barre se
@@ -123,13 +137,20 @@
 .atelier-text-toolbar {
   display: flex;
   align-items: center;
+  justify-content: center;
+  /* S'enroule au lieu de deborder (voir .atelier-text-controls) : sur un
+     emplacement etroit — une legende sous une grande photo — la barre ne
+     tient pas sur une ligne. */
+  flex-wrap: wrap;
   gap: 6px;
+  max-width: 100%;
   padding: 5px 8px;
   border-radius: 8px;
-  background: var(--white, #fff);
+  /* Fond OPAQUE, jamais translucide : cette barre se pose par-dessus une
+     photo pleine page. Un fond transparent la rendait illisible. */
+  background: #ffffff;
   border: 1px solid rgba(223, 216, 201, 0.9);
-  box-shadow: 0 6px 20px rgba(36, 31, 24, 0.16);
-  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(36, 31, 24, 0.28);
 }
 
 /* Libelle du reglage de style : sans lui, la liste deroulante n'etait pas
@@ -234,33 +255,56 @@
 
 /* --- Alerte d'adaptation (§9) ------------------------------------------- */
 /* "Alerte legere" : elle informe, elle ne bloque jamais la saisie. */
+/* Fonds OPAQUES, jamais translucides : ces messages se posent par-dessus une
+   photo pleine page. En rgba(), le texte devenait illisible sur une image
+   contrastee (signale le 2026-09-12, capture a l'appui). L'ombre portee les
+   detache de la photo, la bordure les tient meme sur un fond tres clair. */
 .atelier-text-alert {
   margin: 0;
-  padding: 5px 9px;
+  /* Le bloc parent couvre desormais toute la largeur de la page : sans borne,
+     ces messages s'etireraient sur une seule ligne interminable. */
+  max-width: min(100%, 360px);
+  padding: 6px 10px;
   border-radius: 6px;
   font-size: 11.5px;
   line-height: 1.35;
-  background: rgba(184, 146, 74, 0.16);
+  background: #fdf6e6;
+  border: 1px solid rgba(184, 146, 74, 0.45);
   color: #6b5320;
   text-align: center;
-  box-shadow: 0 2px 10px rgba(36, 31, 24, 0.1);
+  box-shadow: 0 3px 14px rgba(36, 31, 24, 0.3);
 }
 
 .atelier-text-alert.is-error {
-  background: rgba(160, 58, 45, 0.14);
+  background: #fbeae7;
+  border-color: rgba(160, 58, 45, 0.45);
   color: #8c3225;
 }
 
 /* Approche de la limite : on previent, sans dramatiser — ce n'est pas encore
    un probleme, c'est une marge qui se reduit. */
 .atelier-text-alert.is-warning {
-  background: rgba(184, 135, 58, 0.16);
+  background: #fdf1de;
+  border-color: rgba(184, 135, 58, 0.5);
   color: #8a6329;
 }
 
 /* Information neutre (affichage agrandi) : ce n'est pas un probleme, elle ne
    doit donc pas porter la couleur d'alerte. */
 .atelier-text-alert.is-info {
-  background: rgba(36, 31, 24, 0.07);
-  color: var(--text-light);
+  background: #f4f2ee;
+  border-color: rgba(36, 31, 24, 0.2);
+  color: #4a4335;
 }
+
+/* Les groupes gardent leur taille et passent a la ligne plutot que de se
+   comprimer : comprimee, la liste "Style" n'affichait plus que quelques
+   lettres (signale le 2026-09-12). */
+.atelier-text-toolbar-field,
+.atelier-text-toolbar-group,
+.atelier-text-toolbar-size,
+.atelier-text-fill,
+.atelier-text-save-btn { flex: none; }
+
+/* Largeur plancher de la liste : elle doit rester lisible meme enroulee. */
+.atelier-text-toolbar-role { min-width: 104px; }

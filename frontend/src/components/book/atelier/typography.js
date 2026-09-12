@@ -194,11 +194,22 @@ export function estimateHeightMm(lineCount, sizePt, lineHeight) {
 }
 
 // Voir typographySystem.fitTextToSlot cote backend : meme algorithme, mots
-// pour mots. Retourne toujours un resultat affichable — 'overflow' est une
-// ALERTE, jamais une troncature (§9).
-export function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm }) {
+// pour mots (y compris l'agrandissement et la regle des textes courts ajoutes
+// le 2026-09-12). Retourne toujours un resultat affichable — 'overflow' est
+// une ALERTE, jamais une troncature (§9).
+export const JUSTIFY_MIN_LINES = 3;
+export const GROW_BELOW_FILL = 0.85;
+export const GROW_MAX_SHARE = 0.5;
+
+export function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm, overrides = {} }) {
   const style = resolveRoleStyle(role, formatId);
   const safeText = String(text || '');
+  const alignChosen = ['left', 'center', 'right', 'justify'].includes(overrides.align);
+  const alignFor = (lines) => {
+    if (alignChosen) return overrides.align;
+    if (style.align === 'justify' && lines > 0 && lines < JUSTIFY_MIN_LINES) return 'center';
+    return style.align;
+  };
 
   const usableWidthMm = Math.max(1, (Number(slotWidthMm) || 0) * style.measureRatio - style.slotPaddingMm * 2);
   const usableHeightMm = Math.max(1, (Number(slotHeightMm) || 0) - style.slotPaddingMm * 2);
@@ -212,7 +223,7 @@ export function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm 
 
   if (!safeText.trim()) {
     return {
-      ...style, status: 'ok', lines: 0, estimatedHeightMm: 0,
+      ...style, status: 'ok', lines: 0, estimatedHeightMm: 0, fillRatio: 0,
       usableWidthMm: round2(usableWidthMm), usableHeightMm: round2(usableHeightMm)
     };
   }
@@ -227,26 +238,48 @@ export function fitTextToSlot({ text, role, formatId, slotWidthMm, slotHeightMm 
     }
   }
 
+  // Agrandissement : voir le backend pour le raisonnement (occuper la place
+  // sans effacer le caractere du format).
+  if (chosen && Math.abs(chosen.sizePt - naturalPt) < 0.001) {
+    const fill = usableHeightMm > 0 ? chosen.heightMm / usableHeightMm : 1;
+    const growCeiling = naturalPt + (style.maxPt - naturalPt) * GROW_MAX_SHARE;
+    if (fill < GROW_BELOW_FILL) {
+      for (let sizePt = naturalPt + 0.5; sizePt <= growCeiling + 0.001; sizePt += 0.5) {
+        const attempt = fits(round2(sizePt));
+        if (!attempt.ok) break;
+        chosen = { sizePt: round2(sizePt), ...attempt };
+      }
+    }
+  }
+
   if (!chosen) {
     const atMin = fits(style.minPt);
     return {
       ...style,
       fontSizePt: style.minPt,
+      align: alignFor(atMin.lines),
       status: 'overflow',
       lines: atMin.lines,
       estimatedHeightMm: round2(atMin.heightMm),
+      fillRatio: usableHeightMm > 0 ? round2(atMin.heightMm / usableHeightMm) : 1,
       overflowMm: round2(atMin.heightMm - usableHeightMm),
       usableWidthMm: round2(usableWidthMm),
       usableHeightMm: round2(usableHeightMm)
     };
   }
 
+  let status = 'ok';
+  if (chosen.sizePt < naturalPt - 0.001) status = 'reduced';
+  else if (chosen.sizePt > naturalPt + 0.001) status = 'grown';
+
   return {
     ...style,
     fontSizePt: chosen.sizePt,
-    status: chosen.sizePt < naturalPt - 0.001 ? 'reduced' : 'ok',
+    align: alignFor(chosen.lines),
+    status,
     lines: chosen.lines,
     estimatedHeightMm: round2(chosen.heightMm),
+    fillRatio: usableHeightMm > 0 ? round2(chosen.heightMm / usableHeightMm) : 1,
     usableWidthMm: round2(usableWidthMm),
     usableHeightMm: round2(usableHeightMm)
   };

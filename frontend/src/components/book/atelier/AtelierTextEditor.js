@@ -107,15 +107,21 @@ function AtelierTextEditor({
   // Adaptation automatique en temps reel (§9) : calculee avec EXACTEMENT la
   // meme fonction que le serveur, donc l'alerte affichee ici correspond a ce
   // que le controle avant commande dira.
+  // `overrides` transmis : l'ajustement doit connaitre les choix explicites
+  // de l'utilisateur pour ne jamais les contredire (un alignement choisi a la
+  // main n'est pas remplace par le centrage automatique des textes courts).
   const fit = fitTextToSlot({
-    text: draft, role: currentRole, formatId: printFormat, slotWidthMm, slotHeightMm
+    text: draft, role: currentRole, formatId: printFormat, slotWidthMm, slotHeightMm, overrides
   });
 
   const trueStyle = screenStyleForRole(currentRole, printFormat, reference, {
     ...overrides,
-    // La taille affichee suit l'ajustement automatique : si le texte a du
-    // etre reduit pour tenir, l'utilisateur le voit reduit, pas apres coup.
-    sizePt: fit.fontSizePt
+    // La taille affichee suit l'ajustement automatique, DANS LES DEUX SENS :
+    // reduite si le texte a du retrecir pour tenir, agrandie s'il laissait son
+    // emplacement a moitie vide. Ce que l'on voit en tapant est ce qui sera
+    // imprime.
+    sizePt: fit.fontSizePt,
+    align: fit.align
   });
 
   // A l'echelle reelle, un corps de texte de 10pt sur une page entiere
@@ -186,6 +192,30 @@ function AtelierTextEditor({
   // preferable a une barre invisible.
   else placement = 'inside';
 
+  // Largeur disponible pour la barre. Elle etait bornee a la largeur de
+  // l'EMPLACEMENT, ce qui est trop peu : sur une legende ou une colonne de
+  // temoignage, la barre s'enroulait sur cinq ou six lignes, et avant cela
+  // elle debordait et se faisait rogner par .atelier-page-pane
+  // (overflow:hidden) — la liste "Style" apparaissait coupee (signale le
+  // 2026-09-12, capture a l'appui).
+  //
+  // La barre flotte AU-DESSUS de la page : rien ne l'oblige a rester dans les
+  // bornes de l'emplacement, seulement dans celles de la page. On etire donc
+  // le bloc de controles sur toute la largeur de la zone de contenu — exprimee
+  // en % de l'emplacement, puisque c'est lui le conteneur de reference — et la
+  // barre s'y centre. Le rattachement visuel a l'emplacement reste assure par
+  // l'adjacence verticale et par le cadre dore du champ.
+  const slotLeft = Number(rect?.left) || 0;
+  const slotWidth = Number(rect?.width) || 0;
+  const controlsSpanStyle = slotWidth > 0
+    ? {
+      left: `${(-slotLeft / slotWidth) * 100}%`,
+      width: `${(100 / slotWidth) * 100}%`,
+      maxWidth: 'none',
+      transform: 'none'
+    }
+    : undefined;
+
   return (
     <div
       ref={rootRef}
@@ -205,7 +235,7 @@ function AtelierTextEditor({
       {/* Barre + alertes regroupees : elles doivent rester du MEME cote du
           champ, sinon elles se chevauchent selon la position de
           l'emplacement dans la page. */}
-      <div className={`atelier-text-controls is-${placement}`}>
+      <div className={`atelier-text-controls is-${placement}`} style={controlsSpanStyle}>
       {/* Barre minimale (§6). Trois reglages, pas un de plus. */}
       {/* Le preventDefault (qui empeche le champ de perdre le focus quand on
           clique un reglage) est pose sur CHAQUE BOUTON, jamais sur la barre

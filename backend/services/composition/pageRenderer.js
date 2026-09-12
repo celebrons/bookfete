@@ -97,17 +97,101 @@ function textFor(item, overridesByItemId) {
 //
 // Toutes les valeurs injectees viennent de tables fermees (roles, palette,
 // alignements) et sont bornees par resolveRoleStyle — jamais du texte libre.
+// `presentation.fits` (voir buildTextFits) : ajustement automatique calcule
+// une fois par page. Il apporte deux choses que le CSS seul ne peut pas
+// deduire, parce qu'elles dependent de la LONGUEUR du texte :
+//   - une taille agrandie quand le texte n'occupe qu'une petite part de son
+//     emplacement (borne par la plage du role) ;
+//   - un centrage quand le texte est trop court pour etre justifie.
+//
+// Prudence deliberee : on n'applique JAMAIS une reduction issue de cet
+// ajustement. La hauteur d'emplacement dont il part est une estimation
+// (TEXT_SLOT_HEIGHT_SHARE, lue sur le CSS et non mesuree) ; s'en servir pour
+// agrandir ne risque au pire que de moins bien remplir, alors que s'en servir
+// pour reduire pourrait rapetisser un texte qui tenait tres bien. Un texte
+// trop long reste donc signale par le controle qualite, jamais rabote en
+// silence (§9).
 function textPresentationStyle(itemId, presentation = {}) {
   if (!itemId) return '';
   const role = presentation.roles?.[itemId];
   const overrides = presentation.styles?.[itemId];
-  if (!role && !overrides) return '';
+  const fit = presentation.fits?.[itemId];
+  if (!role && !overrides && !fit) return '';
+
+  // Aucun choix de l'utilisateur : on n'ecrit QUE les deux proprietes issues
+  // de l'ajustement. Poser ici toute la fiche de style du role ecraserait les
+  // selecteurs historiques (.page-title, .contribution-message...) avec un
+  // role par defaut qui n'est pas forcement le leur — c'est precisement ce que
+  // le garde-fou d'origine evitait.
+  if (!role && !overrides) {
+    const parts = [];
+    if (fit.sizePt) parts.push(`font-size:${fit.sizePt}pt`);
+    if (fit.align) parts.push(`text-align:${fit.align}`);
+    return parts.length ? ` style="${parts.join(';')}"` : '';
+  }
 
   const style = typography.resolveRoleStyle(role, presentation.formatId, overrides || {});
-  return ` style="font-family:${style.fontFamily};font-size:${style.fontSizePt}pt;`
+  // La taille CHOISIE par l'utilisateur fait foi ; sinon l'agrandissement
+  // automatique s'applique. Idem pour l'alignement.
+  const explicitSize = Number.isFinite(Number(overrides?.sizePt));
+  const sizePt = !explicitSize && fit?.sizePt ? fit.sizePt : style.fontSizePt;
+  const explicitAlign = ['left', 'center', 'right', 'justify'].includes(overrides?.align);
+  const align = !explicitAlign && fit?.align ? fit.align : style.align;
+
+  return ` style="font-family:${style.fontFamily};font-size:${sizePt}pt;`
     + `line-height:${style.lineHeight};letter-spacing:${style.letterSpacingEm}em;`
     + `font-weight:${style.fontWeight};font-style:${style.fontStyle};`
-    + `text-align:${style.align};color:${style.color}"`;
+    + `text-align:${align};color:${style.color}"`;
+}
+
+// Ajustement automatique de CHAQUE texte de la page, calcule une seule fois
+// puis simplement transporte dans `textPresentation` — les 24 points d'appel
+// de textPresentationStyle n'ont ainsi rien a savoir de la geometrie.
+//
+// La nature de l'emplacement (role par defaut, part de hauteur disponible)
+// vient de textQualityEngine : c'est deja lui qui decrit cette geometrie pour
+// le controle avant commande, et en faire une deuxieme description ici
+// donnerait deux verites sur une meme page.
+function buildTextFits({ blocks, itemsById, layoutsById, formatId, roles = {}, styles = {} }) {
+  const textQuality = require('./textQualityEngine');
+  const usable = textQuality.resolveUsableAreaMm(formatId);
+  const fits = {};
+
+  (Array.isArray(blocks) ? blocks : []).forEach((block) => {
+    const slug = layoutsById[block.layoutId]?.slug;
+    const heightShare = textQuality.TEXT_SLOT_HEIGHT_SHARE[slug];
+    // Layout inconnu de la table : on ne devine pas de geometrie, donc pas
+    // d'ajustement — la page reste rendue exactement comme avant.
+    if (heightShare == null) return;
+
+    (block.itemIds || []).forEach((itemId, slotIndex) => {
+      const item = itemId ? itemsById[itemId] : null;
+      if (!item || item.kind !== 'texte') return;
+
+      const role = roles[itemId] || textQuality.defaultRoleForSlot(slug, slotIndex);
+      const overrides = styles[itemId] || {};
+      const natural = typography.resolveRoleStyle(role, formatId, {});
+      const fit = typography.fitTextToSlot({
+        text: item.text,
+        role,
+        formatId,
+        slotWidthMm: usable.widthMm,
+        slotHeightMm: usable.heightMm * heightShare,
+        overrides
+      });
+
+      fits[itemId] = {
+        role,
+        // Jamais de reduction issue d'une estimation : voir textPresentationStyle.
+        sizePt: fit.fontSizePt > natural.fontSizePt ? fit.fontSizePt : null,
+        align: fit.align !== natural.align ? fit.align : null,
+        lines: fit.lines,
+        fillRatio: fit.fillRatio
+      };
+    });
+  });
+
+  return fits;
 }
 
 // Marqueur "(n/total)" affiche des qu'un texte a ete decoupe (y compris sur
@@ -472,6 +556,14 @@ function renderPage(page, itemsById, layoutsById, isLast, context = {}) {
     styles: page.content?.textStyles || {},
     formatId: context?.format?.formatId
   };
+  textPresentation.fits = buildTextFits({
+    blocks,
+    itemsById,
+    layoutsById,
+    formatId: textPresentation.formatId,
+    roles: textPresentation.roles,
+    styles: textPresentation.styles
+  });
   const blocksHtml = blocks
     .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation))
     .join('');
@@ -587,12 +679,39 @@ const BASE_CSS = `
   /* taille/police portees par le role 'body' (typographySystem.js) */
   /* PHOTO_TEXT / TEXT_PHOTO / TWO_PHOTOS_TEXT (v2) : ordre visuel = ordre reel des items. */
   .mixte-ordered { display: flex; flex-direction: column; gap: calc(5mm * var(--fmt-space-scale, 1)); height: 100%; }
-  .mixte-ordered .mixte-photo { flex: 1.4; min-height: 0; }
+  /* La bande TEXTE prend la hauteur de son texte, pas une part fixe de la
+     page ; la photo prend tout le reste.
+
+     CORRIGE 2026-09-12 (signale sur capture : "c'est pas top"). Avant, les
+     deux bandes se partageaient la page dans un rapport fige (1.4 / 1). Un
+     texte de deux lignes recevait donc ~40% de la page et s'y retrouvait
+     centre, ce qui creusait DEUX vides : un entre la photo et le texte, un
+     sous le texte. Mesure sur la page signalee : bande texte 47.8% de la
+     page, occupee a 9%. Desormais le blanc n'est plus pris au milieu de la
+     composition, il revient a la photo.
+
+     La photo garde une hauteur minimale : un texte tres long la reduit, il ne
+     l'efface pas. */
+  .mixte-ordered .mixte-photo { flex: 1 1 auto; min-height: 30%; }
   .mixte-ordered .mixte-photo .photo-frame { height: 100%; }
-  .mixte-ordered .mixte-texte { flex: 1; display: flex; align-items: center; }
-  .mixte-ordered .mixte-texte p { max-width: calc(100% * var(--type-measure, 1)); }
-  .mixte-multi-photo { flex-direction: row; flex-wrap: wrap; }
-  .mixte-multi-photo .mixte-photo { flex: 1 1 45%; }
+  .mixte-ordered .mixte-texte { flex: 0 1 auto; display: flex; align-items: center; justify-content: center; }
+  /* Le paragraphe doit occuper la LARGEUR de sa colonne, pas celle de son
+     contenu. Sans largeur explicite, c'est un element flex : il se retrecit a
+     son texte, et alors ni text-align ni la justification n'ont le moindre effet
+     visible — un texte "justifie" restait colle a gauche, un texte "centre"
+     n'etait centre que dans sa propre boite. C'est ce qui donnait, sur la page
+     signalee le 2026-09-12, deux lignes ferrees a gauche sous deux photos
+     centrees. */
+  .mixte-ordered .mixte-texte p { width: calc(100% * var(--type-measure, 1)); max-width: 100%; }
+  /* Deux photos cote a cote + un texte dessous. Ici la photo ne PEUT pas
+     absorber tout le blanc : a 45% de largeur, lui donner toute la hauteur
+     restante en ferait un bandeau de 1 pour 2.7, donc un recadrage brutal
+     (object-fit: cover). On lui fixe donc un cadre 3/4, stable quelle que
+     soit la longueur du texte — c'est ce qui rend la page previsible — et le
+     blanc qui reste se repartit en haut et en bas (align-content: center)
+     plutot que de s'accumuler sous le texte. */
+  .mixte-multi-photo { flex-direction: row; flex-wrap: wrap; align-content: center; }
+  .mixte-multi-photo .mixte-photo { flex: 0 1 48%; aspect-ratio: 3 / 4; min-height: 0; max-height: 62%; }
   .mixte-multi-photo .mixte-texte { flex-basis: 100%; }
   /* TITLE_TEXT / TITLE_TWO_PHOTOS / TITLE_FOUR_PHOTOS (atelier manuel) : le
      titre est toujours le premier item du bloc (voir renderTitleTextBlock/
@@ -763,6 +882,14 @@ function renderSinglePageHtml(input) {
       styles: page.content?.textStyles || {},
       formatId: format?.formatId
     };
+    textPresentation.fits = buildTextFits({
+      blocks,
+      itemsById,
+      layoutsById,
+      formatId: format?.formatId,
+      roles: textPresentation.roles,
+      styles: textPresentation.styles
+    });
     const blocksHtml = blocks
       .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation))
       .join('');
