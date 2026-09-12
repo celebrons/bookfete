@@ -53,6 +53,8 @@ if (typeof orderRoutes.handleStripeWebhook === 'function') {
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
+// Espace d administration (lecture seule) — voir middleware/requireAdmin.js
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api/books/create', bookCreationRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/chapters', chapterRoutes);

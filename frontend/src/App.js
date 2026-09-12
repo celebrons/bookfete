@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { supabase } from './services/supabaseClient';
 import { wakeUpBackend } from './services/httpClient';
 import { linkAnonymousBooksAfterLogin } from './services/anonymousSession';
+import AdminBooksLuxe from './components/admin/AdminBooksLuxe';
 
 
 import './styles/luxe-theme.css';
@@ -107,6 +108,10 @@ function App() {
           <Route path="/login" element={<LoginLuxe />} />
           <Route path="/register" element={<RegisterLuxe />} />
           <Route path="/create-book" element={<CreateBookSansIA />} />
+          {/* Espace d administration : la page se protege elle-meme (elle
+              demande au serveur si l utilisateur y a droit) et le backend
+              garde chaque route independamment. */}
+          <Route path="/admin" element={<AdminBooksLuxe />} />
 		  <Route path="/invite/:token" element={<InvitationPageLuxe />} />
 		  <Route path="/contribute/:token" element={<TokenContributePageLuxe />} />
 		  <Route path="/participer/:token" element={<BookShareJoinLuxe />} />

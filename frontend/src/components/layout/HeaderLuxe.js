@@ -2,6 +2,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
+import { checkIsAdmin } from '../../services/adminApi';
 import '../../styles/luxe-theme.css';
 
 const IconGear = () => (
@@ -22,6 +23,7 @@ const IconGear = () => (
 const HeaderLuxe = () => {
   const navigate = useNavigate();
   const [user, setUser] = React.useState(null);
+  const [isAdmin, setIsAdmin] = React.useState(false);
 
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -34,6 +36,16 @@ const HeaderLuxe = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Le serveur seul sait qui est administrateur (ADMIN_EMAILS n'existe pas
+  // cote client, et c'est voulu). Recalcule a chaque changement de session :
+  // se deconnecter doit faire disparaitre le lien immediatement.
+  React.useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    let cancelled = false;
+    checkIsAdmin().then((value) => { if (!cancelled) setIsAdmin(value); });
+    return () => { cancelled = true; };
+  }, [user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -107,6 +119,25 @@ const HeaderLuxe = () => {
               >
                 Tableau de bord
               </Link>
+              {/* Lien vers l'espace d'administration, affiche UNIQUEMENT aux
+                  administrateurs (le serveur repond oui/non, voir
+                  adminApi.checkIsAdmin). Ce n'est pas une protection — chaque
+                  route admin est gardee independamment cote serveur — juste
+                  de quoi ne pas avoir a retenir l'URL. */}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  title="Espace d'administration"
+                  style={{
+                    textDecoration: 'none',
+                    color: 'var(--gold)',
+                    fontSize: '14px',
+                    fontWeight: '700'
+                  }}
+                >
+                  Administration
+                </Link>
+              )}
               <Link
                 to="/account"
                 title="Espace client"
