@@ -161,7 +161,17 @@ function AtelierPageOverlay({
           // correcte ne declenche aucun avertissement visible (critere
           // d'acceptation n°1) et le mot "DPI" n'est jamais affiche.
           const fit = item && slotType === 'photo'
-            ? checkSlotImageFit({ item, layoutSlug: slug, slotIndex: index, printFormat, zoom: photoAdjustments?.[item.id]?.zoom })
+            ? checkSlotImageFit({
+              item,
+              layoutSlug: slug,
+              slotIndex: index,
+              printFormat,
+              zoom: photoAdjustments?.[item.id]?.zoom,
+              // Sans le mode, une photo affichee ENTIERE etait jugee comme si
+              // elle etait rognee : badge de flou injustifie sur un reglage
+              // que l'utilisateur venait de choisir.
+              fitMode: photoAdjustments?.[item.id]?.fitMode
+            })
             : null;
           return (
             <div

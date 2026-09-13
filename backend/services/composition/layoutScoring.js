@@ -206,6 +206,10 @@ const PHOTO_SLOT_RATIOS = {
   FULL_PHOTO: ['page'],
   PHOTO_WITH_CAPTION: ['page'],
   TWO_PHOTOS: [0.38, 0.38], // moitie largeur, pleine hauteur -> tres vertical
+  // Symetrique du precedent (ajoute le 2026-09-13) : deux photos EMPILEES,
+  // donc pleine largeur et demi-hauteur -> tres horizontal. C'est la mise en
+  // page qui accueille une photo paysage sans la mutiler.
+  TWO_PHOTOS_STACKED: [1.46, 1.46],
   THREE_PHOTOS: [0.95, 0.95, 1.9], // 2 cases quasi carrees + 1 case large en bas (grid-column:1/-1)
   FOUR_PHOTOS: [0.95, 0.95, 0.95, 0.95], // grille 2x2, cases quasi carrees
   TITLE_TWO_PHOTOS: [1.3, 1.3], // meme grille que TWO_PHOTOS mais hauteur reduite par le titre au dessus -> plus large que haut
@@ -216,15 +220,18 @@ const PHOTO_SLOT_RATIOS = {
   // manquaient a cette table, donc TOUTE photo placee dans une de ces mises
   // en page echappait au controle de resolution avant commande (verifie en
   // base sur un livre reel : pages 6/9/18/24/28 "PAS EVALUE").
-  // Derive du CSS reel (pageRenderer.js) : .mixte-ordered est une colonne
-  // flex (gap 5mm) ou .mixte-photo{flex:1.4} et .mixte-texte{flex:1} ->
-  // la photo prend 1.4/2.4 ~ 58% de la hauteur utile, sur toute la largeur.
-  PHOTO_TEXT: [1.26, null],
-  TEXT_PHOTO: [null, 1.26],
-  // .mixte-multi-photo passe la meme colonne en ligne avec retour
-  // (.mixte-photo{flex:1 1 45%}) : 2 photos cote a cote (demi-largeur) au
-  // dessus d'un texte pleine largeur -> nettement plus haut que large.
-  TWO_PHOTOS_TEXT: [0.62, 0.62, null]
+  // Derive du CSS reel (pageRenderer.js). REVU le 2026-09-12 : la bande texte
+  // epouse desormais son contenu et la photo prend tout le reste, donc sa part
+  // de hauteur n'est plus figee a 1.4/2.4 (~58%) — elle va d'environ 53% (texte
+  // long) a 80% (legende de deux lignes). On retient le milieu de cette plage :
+  // cette table est un nudge de scoring, pas une mesure.
+  PHOTO_TEXT: [1.0, null],
+  TEXT_PHOTO: [null, 1.0],
+  // .mixte-multi-photo : 2 photos cote a cote au dessus d'un texte pleine
+  // largeur. Depuis le 2026-09-12 leur cadre porte `aspect-ratio: 3/4`, donc
+  // le ratio n'est plus a estimer — il vaut exactement 0.75, quelle que soit
+  // la longueur du texte.
+  TWO_PHOTOS_TEXT: [0.75, 0.75, null]
 };
 
 // Ratio de la page elle-meme par format (voir coverFormat.js — dupliquee

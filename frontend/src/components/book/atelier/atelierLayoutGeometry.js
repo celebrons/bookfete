@@ -65,6 +65,11 @@ export const LAYOUT_GEOMETRY = {
     { top: 0, left: 0, width: 48, height: 100 },
     { top: 0, left: 52, width: 48, height: 100 }
   ],
+  // Meme paire, empilee (.photo-grid-duo-v : une colonne, deux rangees).
+  TWO_PHOTOS_STACKED: [
+    { top: 0, left: 0, width: 100, height: 48 },
+    { top: 52, left: 0, width: 100, height: 48 }
+  ],
   // 2 photos en haut, 1 pleine largeur en bas (voir pageRenderer.js —
   // .photo-grid-3, corrige pour ne plus etre 3 colonnes egales).
   THREE_PHOTOS: [

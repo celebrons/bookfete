@@ -27,7 +27,14 @@ export const ATELIER_CATEGORIES = [
 
 export const ATELIER_LAYOUTS = [
   { slug: 'FULL_PHOTO', label: '1 grande photo', category: 'photo-single', slots: ['photo'] },
-  { slug: 'TWO_PHOTOS', label: '2 photos', category: 'photo-multi', slots: ['photo', 'photo'] },
+  // Les deux arrangements d'une paire de photos. Les libelles decrivent la
+  // forme des CADRES (ce que l'utilisateur voit et choisit), pas le sens de
+  // l'empilement : "2 photos verticales" = cote a cote, cadres etroits et
+  // hauts ; "2 photos horizontales" = l'une sous l'autre, cadres larges et
+  // bas. C'est le vocabulaire employe par l'utilisateur (2026-09-13), et
+  // c'est le seul qui soit sans ambiguite au moment de choisir.
+  { slug: 'TWO_PHOTOS', label: '2 photos verticales', category: 'photo-multi', slots: ['photo', 'photo'] },
+  { slug: 'TWO_PHOTOS_STACKED', label: '2 photos horizontales', category: 'photo-multi', slots: ['photo', 'photo'] },
   { slug: 'THREE_PHOTOS', label: '3 photos', category: 'photo-multi', slots: ['photo', 'photo', 'photo'] },
   { slug: 'FOUR_PHOTOS', label: '4 photos', category: 'photo-multi', slots: ['photo', 'photo', 'photo', 'photo'] },
   { slug: 'PHOTO_TEXT', label: 'Photo puis texte', category: 'photo-text', slots: ['photo', 'text'] },

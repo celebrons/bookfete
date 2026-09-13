@@ -50,6 +50,8 @@ function resolveUsableAreaMm(formatId) {
 function resolveSlotColumns(slug, slotIndex) {
   if (slug === 'TWO_PHOTOS' || slug === 'TITLE_TWO_PHOTOS' || slug === 'FOUR_PHOTOS' || slug === 'TITLE_FOUR_PHOTOS') return 2;
   if (slug === 'THREE_PHOTOS') return slotIndex === 2 ? 1 : 2;
+  // TWO_PHOTOS_STACKED : une seule colonne, deux rangees (.photo-grid-duo-v).
+  if (slug === 'TWO_PHOTOS_STACKED') return 1;
   // Mises en page mixtes (2026-09-11) : la photo de PHOTO_TEXT/TEXT_PHOTO
   // occupe toute la largeur (colonne flex), celles de TWO_PHOTOS_TEXT sont
   // cote a cote (.mixte-multi-photo{flex:1 1 45%}) — voir PHOTO_SLOT_RATIOS.
@@ -105,11 +107,21 @@ function resolveSlotSizeMm(layoutSlug, slotIndex, formatId) {
  * @returns {number|null} null si des donnees essentielles manquent
  *   (jamais bloquant pour l'appelant — voir checkImageFit/statutForDpi).
  */
-function computeEffectiveDpi({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom }) {
+function computeEffectiveDpi({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom, fitMode }) {
   if (!imageWidthPx || !imageHeightPx || !frameWidthMm || !frameHeightMm) return null;
   const frameWidthIn = frameWidthMm / MM_PER_INCH;
   const frameHeightIn = frameHeightMm / MM_PER_INCH;
-  const baseDpi = Math.min(imageWidthPx / frameWidthIn, imageHeightPx / frameHeightIn);
+  // L'axe contraignant s'inverse selon le mode d'ajustement (2026-09-13) :
+  //   - `cover` agrandit l'image jusqu'a couvrir le cadre, donc c'est l'axe
+  //     le PLUS etire qui fixe la resolution -> min() ;
+  //   - `contain` la reduit jusqu'a tenir entierement, donc c'est l'autre ->
+  //     max(), et la resolution est mecaniquement MEILLEURE (l'image occupe
+  //     moins de surface imprimee).
+  // Garder min() en mode contain produisait un avertissement de flou sur une
+  // photo qui n'en souffre pas — une fausse alerte sur un mode que
+  // l'utilisateur vient de choisir deliberement.
+  const perAxis = [imageWidthPx / frameWidthIn, imageHeightPx / frameHeightIn];
+  const baseDpi = fitMode === 'contain' ? Math.max(...perAxis) : Math.min(...perAxis);
   const effectiveZoom = zoom && zoom > 0 ? zoom : 1;
   return baseDpi / effectiveZoom;
 }
@@ -154,9 +166,12 @@ function statutForDpi(dpi) {
  *   jamais sondee, cadre inconnu) : l'appelant n'affiche alors rien plutot
  *   que d'inventer un avertissement.
  */
-function checkImageFit({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom }) {
-  const dpiEffectif = computeEffectiveDpi({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom });
+function checkImageFit({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom, fitMode }) {
+  const dpiEffectif = computeEffectiveDpi({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom, fitMode });
   const statut = statutForDpi(dpiEffectif);
+  // En mode "photo entiere", un zoom superieur a 1 recommence a rogner : au
+  // dela, l'ecart de forme redevient une coupe, comme en mode `cover`.
+  const showsWholePhoto = fitMode === 'contain' && !(zoom > 1);
 
   let ecartRatio = null;
   if (imageWidthPx && imageHeightPx && frameWidthMm && frameHeightMm) {
@@ -169,7 +184,12 @@ function checkImageFit({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightM
     ecartRatio,
     dpiEffectif: Number.isFinite(dpiEffectif) ? Math.round(dpiEffectif) : null,
     statut,
-    ratioGap: ecartRatio != null && ecartRatio > RATIO_GAP_THRESHOLD,
+    // `ratioGap` veut dire "une partie de la photo est coupee" — c'est ce que
+    // les ecrans en font (message de recadrage, proposition d'autres mises en
+    // page). En mode "photo entiere", RIEN n'est coupe : l'ecart de forme
+    // devient de la marge, choisie deliberement. Le signaler comme une coupe
+    // serait simplement faux.
+    ratioGap: !showsWholePhoto && ecartRatio != null && ecartRatio > RATIO_GAP_THRESHOLD,
     ...(statut ? FIT_DISPLAY[statut] : { severity: null, label: '' })
   };
 }
@@ -179,7 +199,7 @@ function checkImageFit({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightM
  * (resout le cadre via resolveSlotSizeMm). Retourne null si le slug/slot
  * n'est pas evaluable ou si la photo n'a pas ete sondee a l'upload.
  */
-function checkSlotImageFit({ item, layoutSlug, slotIndex, formatId, zoom }) {
+function checkSlotImageFit({ item, layoutSlug, slotIndex, formatId, zoom, fitMode }) {
   const imageWidthPx = item?.metadata?.width;
   const imageHeightPx = item?.metadata?.height;
   if (!imageWidthPx || !imageHeightPx) return null;
@@ -190,7 +210,8 @@ function checkSlotImageFit({ item, layoutSlug, slotIndex, formatId, zoom }) {
     imageHeightPx,
     frameWidthMm: frame.widthMm,
     frameHeightMm: frame.heightMm,
-    zoom
+    zoom,
+    fitMode
   });
 }
 
@@ -218,13 +239,17 @@ function computePagePhotoFit({ content, itemsById, layoutsById, formatId }) {
         layoutSlug: slug,
         slotIndex,
         formatId,
-        zoom: adjustments[itemId]?.zoom
+        zoom: adjustments[itemId]?.zoom,
+        fitMode: adjustments[itemId]?.fitMode
       });
       if (!result || !result.statut) return;
       fit[itemId] = {
         statut: result.statut,
         dpiEffectif: result.dpiEffectif,
-        ecartRatio: result.ecartRatio == null ? null : Math.round(result.ecartRatio * 1000) / 1000
+        ecartRatio: result.ecartRatio == null ? null : Math.round(result.ecartRatio * 1000) / 1000,
+        // Persiste pour que l'ecran recapitulatif avant commande n'annonce pas
+        // une coupe sur une photo affichee entiere.
+        ratioGap: result.ratioGap
       };
     });
   });

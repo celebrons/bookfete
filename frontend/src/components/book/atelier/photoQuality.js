@@ -38,13 +38,14 @@ const PHOTO_SLOT_RATIOS = {
   FULL_PHOTO: ['page'],
   PHOTO_WITH_CAPTION: ['page'],
   TWO_PHOTOS: [0.38, 0.38],
+  TWO_PHOTOS_STACKED: [1.46, 1.46],
   THREE_PHOTOS: [0.95, 0.95, 1.9],
   FOUR_PHOTOS: [0.95, 0.95, 0.95, 0.95],
   TITLE_TWO_PHOTOS: [1.3, 1.3],
   TITLE_FOUR_PHOTOS: [1.1, 1.1, 1.1, 1.1],
-  PHOTO_TEXT: [1.26, null],
-  TEXT_PHOTO: [null, 1.26],
-  TWO_PHOTOS_TEXT: [0.62, 0.62, null]
+  PHOTO_TEXT: [1.0, null],
+  TEXT_PHOTO: [null, 1.0],
+  TWO_PHOTOS_TEXT: [0.75, 0.75, null]
 };
 
 // Seuils du cahier des charges v2 : 3 statuts, pas plus.
@@ -74,6 +75,8 @@ function resolveUsableAreaMm(printFormat) {
 function resolveSlotColumns(slug, slotIndex) {
   if (slug === 'TWO_PHOTOS' || slug === 'TITLE_TWO_PHOTOS' || slug === 'FOUR_PHOTOS' || slug === 'TITLE_FOUR_PHOTOS') return 2;
   if (slug === 'THREE_PHOTOS') return slotIndex === 2 ? 1 : 2;
+  // TWO_PHOTOS_STACKED : une seule colonne, deux rangees.
+  if (slug === 'TWO_PHOTOS_STACKED') return 1;
   if (slug === 'PHOTO_TEXT' || slug === 'TEXT_PHOTO') return 1;
   if (slug === 'TWO_PHOTOS_TEXT') return 2;
   return null;
@@ -95,9 +98,12 @@ export function resolveSlotSizeMm(layoutSlug, slotIndex, printFormat) {
   return { widthMm, heightMm: widthMm / rawRatio };
 }
 
-export function computeEffectiveDpi({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom }) {
+// `fitMode` : voir photoQualityEngine.computeEffectiveDpi cote backend —
+// l'axe contraignant s'inverse entre `cover` (min) et `contain` (max).
+export function computeEffectiveDpi({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom, fitMode }) {
   if (!imageWidthPx || !imageHeightPx || !frameWidthMm || !frameHeightMm) return null;
-  const baseDpi = Math.min(imageWidthPx / (frameWidthMm / MM_PER_INCH), imageHeightPx / (frameHeightMm / MM_PER_INCH));
+  const perAxis = [imageWidthPx / (frameWidthMm / MM_PER_INCH), imageHeightPx / (frameHeightMm / MM_PER_INCH)];
+  const baseDpi = fitMode === 'contain' ? Math.max(...perAxis) : Math.min(...perAxis);
   return baseDpi / (zoom && zoom > 0 ? zoom : 1);
 }
 
@@ -110,9 +116,12 @@ export function statutForDpi(dpi) {
 
 // Fonction canonique du cahier des charges v2 (§4) — meme signature et
 // memes retours que le backend.
-export function checkImageFit({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom }) {
-  const dpiEffectif = computeEffectiveDpi({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom });
+export function checkImageFit({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom, fitMode }) {
+  const dpiEffectif = computeEffectiveDpi({ imageWidthPx, imageHeightPx, frameWidthMm, frameHeightMm, zoom, fitMode });
   const statut = statutForDpi(dpiEffectif);
+  // Voir le backend : en mode "photo entiere" (sans re-zoom), rien n'est
+  // coupe, donc `ratioGap` — qui signifie "une partie est coupee" — est faux.
+  const showsWholePhoto = fitMode === 'contain' && !(zoom > 1);
 
   let ecartRatio = null;
   if (imageWidthPx && imageHeightPx && frameWidthMm && frameHeightMm) {
@@ -125,7 +134,8 @@ export function checkImageFit({ imageWidthPx, imageHeightPx, frameWidthMm, frame
     ecartRatio,
     dpiEffectif: Number.isFinite(dpiEffectif) ? Math.round(dpiEffectif) : null,
     statut,
-    ratioGap: ecartRatio != null && ecartRatio > RATIO_GAP_THRESHOLD,
+    showsWholePhoto,
+    ratioGap: !showsWholePhoto && ecartRatio != null && ecartRatio > RATIO_GAP_THRESHOLD,
     ...(statut ? FIT_DISPLAY[statut] : { severity: null, label: '' })
   };
 }
@@ -133,7 +143,7 @@ export function checkImageFit({ imageWidthPx, imageHeightPx, frameWidthMm, frame
 // Raccourci pour un item deja place dans un emplacement connu. Retourne
 // null si la photo n'a pas ete sondee a l'upload ou si l'emplacement n'est
 // pas evaluable : les appelants n'affichent alors aucun badge.
-export function checkSlotImageFit({ item, layoutSlug, slotIndex, printFormat, zoom }) {
+export function checkSlotImageFit({ item, layoutSlug, slotIndex, printFormat, zoom, fitMode }) {
   const imageWidthPx = item?.metadata?.width;
   const imageHeightPx = item?.metadata?.height;
   if (!imageWidthPx || !imageHeightPx) return null;
@@ -144,7 +154,8 @@ export function checkSlotImageFit({ item, layoutSlug, slotIndex, printFormat, zo
     imageHeightPx,
     frameWidthMm: frame.widthMm,
     frameHeightMm: frame.heightMm,
-    zoom
+    zoom,
+    fitMode
   });
 }
 

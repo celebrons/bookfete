@@ -246,7 +246,14 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsBy
     return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url, adjustmentsByItemId[item.id])}</figure>`;
   }
   const cells = orderedItems.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>'));
+  // "duo-v" = les deux photos EMPILEES (une colonne, deux rangees), donc deux
+  // cadres larges et bas. Piege de vocabulaire a garder en tete : l'empilement
+  // est vertical, les cadres sont horizontaux — c'est ce que l'utilisateur
+  // appelle "2 photos horizontales" (TWO_PHOTOS_STACKED, ajoute le
+  // 2026-09-13). `photo-duo-vertical` est l'ancien slug inactif equivalent,
+  // conserve pour les livres composes avant le catalogue v2.
   const vertical = slug === 'photo-duo-vertical'
+    || slug === 'TWO_PHOTOS_STACKED'
     || (slug === 'TWO_PHOTOS' && slotCount === 2 && presentationVariant === 1);
   if (slotCount === 2 && vertical) {
     return `<div class="block-photo photo-grid photo-grid-duo-v" data-layout="${escapeHtml(slug)}">${cells.join('')}</div>`;
@@ -444,7 +451,7 @@ function renderTitlePhotosBlock(rawItems, slug, adjustmentsByItemId = {}, textPr
   return `<div class="block-title-photos" data-layout="${escapeHtml(slug)}">${titleHtml}${photosHtml}</div>`;
 }
 
-const PHOTO_SLUGS = new Set(['FULL_PHOTO', 'TWO_PHOTOS', 'THREE_PHOTOS', 'FOUR_PHOTOS']);
+const PHOTO_SLUGS = new Set(['FULL_PHOTO', 'TWO_PHOTOS', 'TWO_PHOTOS_STACKED', 'THREE_PHOTOS', 'FOUR_PHOTOS']);
 const TEXTE_SLUGS = new Set(['ONE_TESTIMONY', 'TWO_TESTIMONIES', 'THREE_TESTIMONIES']);
 const MIXTE_ORDERED_SLUGS = new Set(['PHOTO_TEXT', 'TEXT_PHOTO', 'TWO_PHOTOS_TEXT']);
 const TITLE_PHOTO_SLUGS = new Set(['TITLE_TWO_PHOTOS', 'TITLE_FOUR_PHOTOS']);
@@ -606,10 +613,10 @@ const BASE_CSS = `
      imgFrame() ci-dessus, a partir de content.photoAdjustments — absents
      (photo jamais ajustee a la main), ils valent 50%/50%/1 : cover centre,
      identique visuellement a une photo qui n'a jamais ete touchee.
-     .is-contain (classe posee par imgFrame quand fitMode==='contain') est
-     l'echappatoire reservee a un futur layout EXPLICITEMENT artistique
-     (cadre blanc/Polaroid volontaire) — aucun layout ne l'utilise
-     aujourd'hui, le hook existe pret a l'emploi. Meme non-perte de qualite
+     .is-contain (classe posee par imgFrame quand fitMode==='contain') n'est
+     plus un crochet inutilise depuis le 2026-09-13 : c'est le mode "photo
+     entiere", choisi photo par photo dans AtelierPhotoAdjustModal quand le
+     recadrage automatique coupe trop (voir plus bas). Meme non-perte de qualite
      qu'avant : ni recompression ni redimensionnement de l'original (voir
      storageService.js), seule la mise a l'echelle/le point d'ancrage
      d'affichage changent — et c'est le MEME rendu, ici, dans l'apercu
@@ -623,7 +630,22 @@ const BASE_CSS = `
     transform: scale(var(--zoom, 1));
     transform-origin: var(--fx, 50%) var(--fy, 50%);
   }
-  .photo-frame.is-contain img { object-fit: contain; transform: none; }
+  /* "Photo entiere" (fitMode:'contain', choisi photo par photo dans
+     AtelierPhotoAdjustModal) : l'image tient TOUT ENTIERE dans le cadre, au
+     prix de marges. C'est la reponse au besoin "pouvoir dezoomer un peu pour
+     que la photo rentre dans le cadre" (2026-09-13) — avec object-fit:cover,
+     un zoom inferieur a 1 ne revelerait rien de plus : il retrecirait l'image
+     DEJA recadree, en laissant du blanc sur les bords. Seul le mode "photo
+     entiere" change reellement ce qui est visible.
+     Le zoom reste actif ici (il ne l'etait pas avant) : a partir de la photo
+     entiere, l'utilisateur peut re-remplir progressivement jusqu'au recadrage
+     — le reglage est donc continu d'un bout a l'autre, et non deux modes
+     etanches. */
+  .photo-frame.is-contain img {
+    object-fit: contain;
+    transform: scale(var(--zoom, 1));
+    transform-origin: var(--fx, 50%) var(--fy, 50%);
+  }
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .photo-solo { margin: 0; height: 100%; }
   .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }

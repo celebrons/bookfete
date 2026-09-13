@@ -109,6 +109,27 @@ export default function BookAtelierLuxe() {
   const [loadingEstimate, setLoadingEstimate] = useState(false);
   const [isConfirmSwitchOpen, setIsConfirmSwitchOpen] = useState(false);
 
+  // Retour en arriere APRES coup, sur la derniere action qui a vide la page
+  // (choisir une autre mise en page, "Changer de mise en page", "Vider cette
+  // page"). Retour utilisateur 2026-09-13 : "je me trompe a chaque fois en
+  // testant, je supprime le contenu et pas de possibilite de revenir sur ce
+  // qu'il y'avait avant".
+  //
+  // Choisir une autre mise en page remet tous les emplacements a null, et la
+  // sauvegarde automatique traduit ca par un clearPage : la page enregistree
+  // disparait pour de bon. Les souvenirs, eux, ne sont jamais touches (ils
+  // vivent dans content_items, clearPage ne remet a null que la page) — un
+  // simple instantane de l'etat local suffit donc a tout retablir.
+  //
+  // `pageIndex` fait partie de l'instantane : sans lui, revenir en arriere
+  // apres avoir change de page aurait recopie le contenu d'une page sur une
+  // autre.
+  const [undoSnapshot, setUndoSnapshot] = useState(null);
+  // clearPage en cours : le retour en arriere doit l'ATTENDRE avant de
+  // reecrire, sinon l'effacement peut arriver au serveur apres la
+  // restauration et re-vider la page.
+  const clearInFlightRef = useRef(null);
+
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   // { done, total, failed } pendant un envoi de lot, null sinon.
   const [uploadProgress, setUploadProgress] = useState(null);
@@ -164,6 +185,13 @@ export default function BookAtelierLuxe() {
   const souvenirs = useMemo(() => items.filter((item) => item.kind === 'texte'), [items]);
   const itemsById = useMemo(() => Object.fromEntries(items.map((item) => [item.id, item])), [items]);
   const layoutsById = useMemo(() => Object.fromEntries(layouts.map((layout) => [layout.id, layout])), [layouts]);
+  // Mises en page reellement disponibles en base. Tant que la liste n'est pas
+  // chargee, on ne filtre rien (undefined) : mieux vaut tout proposer une
+  // fraction de seconde que faire clignoter le panneau.
+  const availableLayoutSlugs = useMemo(
+    () => (layouts.length > 0 ? new Set(layouts.map((layout) => layout.slug)) : undefined),
+    [layouts]
+  );
 
   // Valeurs lues par l effet d initialisation du brouillon SANS en etre des
   // dependances (voir son commentaire) : elles doivent etre fraiches, mais
@@ -258,6 +286,15 @@ export default function BookAtelierLuxe() {
   const currentPageIndex = viewKind === 'spread'
     ? (selectedSide === 'right' && rightPageIndex != null ? rightPageIndex : leftPageIndex)
     : null;
+
+  // Un retour en arriere ne vaut que pour la page ou l'erreur a ete faite :
+  // des qu'on change de page, il est perime. (L'affichage verifie AUSSI le
+  // pageIndex de l'instantane — rien ne doit pouvoir recopier le contenu
+  // d'une page sur une autre.) Declare ICI et pas plus haut avec l'etat :
+  // `currentPageIndex` est calcule a cet endroit, et un tableau de
+  // dependances est evalue immediatement — le referencer avant sa definition
+  // aurait leve une ReferenceError au premier rendu.
+  useEffect(() => { setUndoSnapshot(null); }, [currentPageIndex]);
 
   const refreshPagePreview = useCallback(async (pageIndex) => {
     if (!book?.id || pageIndex == null) return;
@@ -408,7 +445,13 @@ export default function BookAtelierLuxe() {
       let cancelledEmpty = false;
       setSaveStatus('saving');
       setSaveError('');
-      clearPage(book.id, currentPageIndex)
+      const clearPromise = clearPage(book.id, currentPageIndex);
+      // Publie pour handleUndo (voir clearInFlightRef) ; retire des qu'elle
+      // est terminee, quelle qu'en soit l'issue.
+      clearInFlightRef.current = clearPromise;
+      const forget = () => { if (clearInFlightRef.current === clearPromise) clearInFlightRef.current = null; };
+      clearPromise.then(forget, forget);
+      clearPromise
         .then(() => {
           if (cancelledEmpty) return undefined;
           setPages((previous) => previous.filter((page) => page.page_index !== currentPageIndex));
@@ -488,9 +531,46 @@ export default function BookAtelierLuxe() {
     return () => { cancelled = true; };
   }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftTextRoles, draftTextStyles, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
 
+  // Instantane de ce qui est actuellement sur la page, AVANT de le remplacer.
+  // Ne fait rien si la page est deja vide : il n'y aurait rien a retablir, et
+  // proposer "Annuler" sans objet brouillerait le signal.
+  const captureUndo = () => {
+    if (!draftLayoutSlug || draftSlotItemIds.filter(Boolean).length === 0) return;
+    setUndoSnapshot({
+      pageIndex: currentPageIndex,
+      layoutSlug: draftLayoutSlug,
+      slotItemIds: [...draftSlotItemIds],
+      photoAdjustments: { ...draftPhotoAdjustments },
+      textRoles: { ...draftTextRoles },
+      textStyles: { ...draftTextStyles },
+      label: findAtelierLayout(draftLayoutSlug)?.label || 'la mise en page precedente'
+    });
+  };
+
+  // Retablit l'instantane. Attend d'abord un eventuel clearPage en vol :
+  // sans ca, l'effacement pouvait arriver au serveur APRES la restauration
+  // et re-vider la page — exactement le defaut que ce bouton repare.
+  const handleUndo = async () => {
+    const snapshot = undoSnapshot;
+    if (!snapshot || snapshot.pageIndex !== currentPageIndex) return;
+    if (clearInFlightRef.current) {
+      try { await clearInFlightRef.current; } catch { /* l'echec de l'effacement ne doit pas empecher de retablir */ }
+    }
+    setUndoSnapshot(null);
+    setDraftLayoutSlug(snapshot.layoutSlug);
+    setDraftSlotItemIds(snapshot.slotItemIds);
+    setDraftPhotoAdjustments(snapshot.photoAdjustments);
+    setDraftTextRoles(snapshot.textRoles);
+    setDraftTextStyles(snapshot.textStyles);
+    // La sauvegarde automatique reecrit la page toute seule : le brouillon ne
+    // correspond plus a ce qui est enregistre (la page a ete effacee), donc
+    // son garde-fou `alreadySaved` ne s'applique pas.
+  };
+
   const handleChooseLayout = (slug) => {
     const atelierLayout = findAtelierLayout(slug);
     if (!atelierLayout) return;
+    captureUndo();
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(new Array(atelierLayout.slots.length).fill(null));
     setDraftPhotoAdjustments({});
@@ -639,6 +719,7 @@ export default function BookAtelierLuxe() {
     const firstPhotoSlot = atelierLayout.slots.findIndex((type) => type === 'photo');
     const next = new Array(atelierLayout.slots.length).fill(null);
     if (firstPhotoSlot >= 0) next[firstPhotoSlot] = itemId;
+    captureUndo();
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(next);
     setDraftPhotoAdjustments({}); // le cadre change de forme : l'ancien cadrage n'a plus de sens
@@ -647,6 +728,7 @@ export default function BookAtelierLuxe() {
 
   const handleClearPage = async () => {
     if (currentPageIndex == null || !book?.id) return;
+    captureUndo();
     setSaveStatus('saving');
     setSaveError('');
     try {
@@ -1144,7 +1226,14 @@ export default function BookAtelierLuxe() {
               slotItems={draftSlotItems}
               onAssignSlot={handleAssignSlot}
               onRemoveSlot={handleRemoveSlot}
-              onChangeFormat={() => { setDraftLayoutSlug(null); setDraftSlotItemIds([]); setDraftPhotoAdjustments({}); }}
+              onChangeFormat={() => {
+                captureUndo();
+                setDraftLayoutSlug(null);
+                setDraftSlotItemIds([]);
+                setDraftPhotoAdjustments({});
+                setDraftTextRoles({});
+                setDraftTextStyles({});
+              }}
               selectedSidebarItem={selectedSidebarItem}
               onClearPage={handleClearPage}
               hasContent={hasContent}
@@ -1152,6 +1241,20 @@ export default function BookAtelierLuxe() {
               saveError={saveError}
               printFormat={book.print_format}
               currentPageIndex={currentPageIndex}
+              availableSlugs={availableLayoutSlugs}
+              // Propose le retour en arriere UNIQUEMENT tant que la nouvelle
+              // mise en page est encore vide : des que l'utilisateur y a place
+              // quelque chose, "Annuler" detruirait ce travail neuf au lieu de
+              // reparer une erreur. La fenetre offerte est exactement celle ou
+              // l'on se rend compte de sa meprise.
+              onUndo={
+                undoSnapshot
+                  && undoSnapshot.pageIndex === currentPageIndex
+                  && draftSlotItemIds.filter(Boolean).length === 0
+                  ? handleUndo
+                  : null
+              }
+              undoLabel={undoSnapshot?.label}
             />
           ) : (
             <AtelierCoverPanel

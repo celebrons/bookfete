@@ -42,6 +42,14 @@ function AtelierPhotoAdjustModal({
   const [focalX, setFocalX] = useState(0.5);
   const [focalY, setFocalY] = useState(0.5);
   const [zoom, setZoom] = useState(1);
+  // 'cover' (defaut historique) : la photo remplit le cadre, quitte a etre
+  // rognee. 'contain' : elle y tient ENTIEREMENT, avec des marges.
+  //
+  // C'est la reponse au besoin "pouvoir dezoomer un peu pour que la photo
+  // rentre dans le cadre" (2026-09-13). Un zoom inferieur a 1 en mode `cover`
+  // n'aurait rien donne : il retrecit l'image DEJA rognee, sans jamais
+  // reveler ce qui a ete coupe. Seul `contain` change ce qui est visible.
+  const [fitMode, setFitMode] = useState('cover');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const dragRef = useRef(null);
   const boxRef = useRef(null);
@@ -54,6 +62,7 @@ function AtelierPhotoAdjustModal({
     setFocalX(adjustment?.focalX ?? 0.5);
     setFocalY(adjustment?.focalY ?? 0.5);
     setZoom(adjustment?.zoom ?? 1);
+    setFitMode(adjustment?.fitMode === 'contain' ? 'contain' : 'cover');
     setShowSuggestions(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, item?.id]);
@@ -83,7 +92,8 @@ function AtelierPhotoAdjustModal({
       imageHeightPx: item.metadata.height,
       frameWidthMm: frame.widthMm,
       frameHeightMm: frame.heightMm,
-      zoom
+      zoom,
+      fitMode
     })
     : null;
 
@@ -136,12 +146,44 @@ function AtelierPhotoAdjustModal({
           <button type="button" className="atelier-modal-close" onClick={onClose} aria-label="Fermer">×</button>
         </div>
 
-        <p className="atelier-adjust-hint">Faites glisser la photo pour la repositionner, zoomez si besoin.</p>
+        <p className="atelier-adjust-hint">
+          {fitMode === 'contain'
+            ? 'La photo entiere tient dans le cadre. Zoomez pour la faire remplir davantage.'
+            : 'Faites glisser la photo pour la repositionner, zoomez si besoin.'}
+        </p>
+
+        {/* Choix du mode. Deux options nommees par ce qu'elles FONT, jamais
+            par le terme technique (cover/contain). */}
+        <div className="atelier-adjust-mode" role="group" aria-label="Cadrage dans l'emplacement">
+          {[
+            { value: 'cover', label: 'Remplir le cadre' },
+            { value: 'contain', label: 'Photo entiere' }
+          ].map((mode) => (
+            <button
+              key={mode.value}
+              type="button"
+              className={`atelier-adjust-mode-btn ${fitMode === mode.value ? 'is-active' : ''}`}
+              // Repartir de 1 en changeant de mode : le zoom n'a pas la meme
+              // signification de part et d'autre (a partir du cadre rempli
+              // d'un cote, de la photo entiere de l'autre). Conserver la
+              // valeur donnerait un saut incomprehensible.
+              onClick={() => { setFitMode(mode.value); setZoom(1); }}
+              aria-pressed={fitMode === mode.value}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
 
         <div
           ref={boxRef}
           className="atelier-adjust-box"
-          style={{ aspectRatio: ratio }}
+          // En mode "photo entiere", les marges sont VISIBLES : le fond de
+          // l'apercu doit donc etre celui du papier (#fffdf8, voir
+          // typographySystem.PAGE_PAPER_HEX), sinon la modale montrerait des
+          // bandes noires la ou le livre imprimera de l'ivoire — et cette
+          // modale promet "ce que vous voyez est ce que vous aurez".
+          style={{ aspectRatio: ratio, ...(fitMode === 'contain' ? { background: '#fffdf8' } : null) }}
           onPointerDown={handlePointerDown}
         >
           <img
@@ -149,7 +191,7 @@ function AtelierPhotoAdjustModal({
             alt=""
             draggable={false}
             style={{
-              objectFit: 'cover',
+              objectFit: fitMode,
               objectPosition: `${focalX * 100}% ${focalY * 100}%`,
               transform: `scale(${zoom})`,
               transformOrigin: `${focalX * 100}% ${focalY * 100}%`
@@ -182,6 +224,7 @@ function AtelierPhotoAdjustModal({
           <div className="atelier-adjust-suggest">
             <p className="atelier-adjust-suggest-text">
               Cette photo a une forme très différente de son cadre : une partie est coupée.
+              Vous pouvez aussi choisir « Photo entière » ci-dessus pour ne rien couper.
             </p>
             {!showSuggestions ? (
               <button type="button" className="atelier-adjust-suggest-btn" onClick={() => setShowSuggestions(true)}>
@@ -215,7 +258,7 @@ function AtelierPhotoAdjustModal({
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => onSave(item.id, { focalX, focalY, zoom, fitMode: 'cover' })}
+            onClick={() => onSave(item.id, { focalX, focalY, zoom, fitMode })}
           >
             Enregistrer
           </button>

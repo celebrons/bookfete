@@ -71,14 +71,27 @@ describe('renderBookHtml — remplissage du cadre (cover par defaut)', () => {
     expect(bodyOf(html)).toContain(`--zoom:${PHOTO_ZOOM_MAX};`);
   });
 
-  it('fitMode:"contain" (echappatoire template artistique explicite, §18) pose la classe is-contain', () => {
+  it('fitMode:"contain" ("photo entiere", choisi dans l\'atelier) pose la classe is-contain', () => {
     const html = renderBookHtml({
       book: {},
       items: [{ id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
       pages: [pageWithPhoto({ fitMode: 'contain' })]
     });
     expect(bodyOf(html)).toContain('class="photo-frame is-contain"');
-    expect(html).toContain('.photo-frame.is-contain img { object-fit: contain; transform: none; }');
+    expect(html).toContain('object-fit: contain;');
+  });
+
+  it('le zoom reste actif en mode "photo entiere" (le reglage est continu, pas deux modes etanches)', () => {
+    // Avant le 2026-09-13 ce mode posait `transform: none` : partir de la
+    // photo entiere et re-remplir un peu le cadre etait impossible.
+    const html = renderBookHtml({
+      book: {},
+      items: [{ id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
+      pages: [pageWithPhoto({ fitMode: 'contain', zoom: 1.4 })]
+    });
+    expect(bodyOf(html)).toContain('--zoom:1.4;');
+    expect(html).not.toContain('is-contain img { object-fit: contain; transform: none;');
+    expect(html).toMatch(/\.photo-frame\.is-contain img \{[^}]*transform: scale\(var\(--zoom, 1\)\)/);
   });
 
   it("n'introduit aucune regression sur les couvertures (frontCoverRenderer.js appelle imgFrame sans ajustement)", () => {

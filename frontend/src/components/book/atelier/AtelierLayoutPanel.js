@@ -12,32 +12,87 @@ import { getOverlayGeometry, OVERLAY_CONTENT_INSET_PCT } from './atelierLayoutGe
 
 const SLOT_LABELS = { photo: 'Photo', text: 'Texte', title: 'Titre' };
 
-// TWO_TESTIMONIES/THREE_TESTIMONIES sont les seules mises en page ou
-// plusieurs emplacements 'text' sont reellement cote a cote dans le rendu
-// final (cartes de temoignages, voir pageRenderer.js: .testimony-stack) —
-// partout ailleurs (TITLE_TEXT notamment), un emplacement 'text' est un
-// paragraphe pleine largeur. Sans cette distinction, la mini-vignette
-// affichait TOUJOURS les emplacements texte empiles verticalement (largeur
-// 100% par defaut), y compris pour ces deux mises en page ou le vrai rendu
-// les place cote a cote — laissant croire a tort que le format est
-// "vertical" alors que la page reelle est bien horizontale.
-const INLINE_TEXT_LAYOUTS = new Set(['TWO_TESTIMONIES', 'THREE_TESTIMONIES']);
-
-function LayoutMiniPreview({ slug, slots }) {
-  const inlineText = INLINE_TEXT_LAYOUTS.has(slug);
+// Repere "photo" dessine dans les emplacements image de la vignette. A cette
+// taille (une case fait parfois 12 px de haut) un pictogramme detaille
+// deviendrait une tache : deux formes pleines seulement, une colline et un
+// soleil, qui restent lisibles tres petit.
+function MiniPhotoGlyph() {
   return (
-    <div className="atelier-layout-mini">
-      {slots.map((type, index) => {
-        const className = type === 'text' && inlineText
-          ? 'atelier-layout-mini-text atelier-layout-mini-text-inline'
-          : `atelier-layout-mini-${type}`;
-        return <span key={index} className={className} />;
-      })}
+    <svg className="atelier-layout-mini-glyph" viewBox="0 0 16 12" aria-hidden="true" focusable="false">
+      <circle cx="11.6" cy="3.4" r="1.7" />
+      <path d="M0 12 L5 4.6 L8.7 9.4 L11.2 6.6 L16 12 Z" />
+    </svg>
+  );
+}
+
+// Vignette d'une mise en page dans la galerie de choix.
+//
+// REECRITE le 2026-09-13 (retour utilisateur, capture a l'appui : "on dirait
+// deux emplacements photos identiques"). Elle avait deux defauts, et le
+// second etait le plus trompeur :
+//
+//  1. photo et texte ne differaient que par une nuance de beige (#d3c6a6 vs
+//     #cbbfa5) — indiscernable. Ils se distinguent maintenant par la FORME :
+//     un aplat avec un repere photo, contre un bloc clair raye de lignes de
+//     texte. C'est le contraste qui porte l'information, pas la teinte.
+//  2. surtout, elle n'utilisait PAS la geometrie reelle : les emplacements
+//     etaient empiles en flex a des tailles a peu pres egales. "Grande photo,
+//     petite legende" (82% / 14% dans le rendu reel) s'affichait donc en deux
+//     blocs de meme taille, ce qui decrivait une autre mise en page que celle
+//     qu'on allait obtenir. Elle lit desormais LAYOUT_GEOMETRY, exactement
+//     comme l'incrustation posee sur la page et comme LayoutFormatMiniature
+//     plus bas — une seule source de verite sur la disposition.
+//
+// Effet de bord : la table INLINE_TEXT_LAYOUTS a disparu. Elle corrigeait a la
+// main le cas des temoignages cote a cote ; la geometrie reelle le decrit
+// deja (TWO_TESTIMONIES/THREE_TESTIMONIES sont en colonnes), donc la
+// rustine n'a plus lieu d'etre.
+function LayoutMiniPreview({ slug, slots, printFormat }) {
+  const geometry = getOverlayGeometry(slug);
+  const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
+
+  // Repli pour un slug sans geometrie : un empilement regulier. Aucun cas
+  // aujourd'hui, mais une vignette vide serait pire qu'une vignette
+  // approximative.
+  const fallbackRect = (index) => {
+    const h = 100 / slots.length;
+    return { top: index * h, left: 0, width: 100, height: h - 2 };
+  };
+
+  return (
+    <div className="atelier-layout-mini" style={{ aspectRatio: `${dims.widthMm} / ${dims.heightMm}` }}>
+      <div
+        className="atelier-layout-mini-inset"
+        style={{
+          top: `${OVERLAY_CONTENT_INSET_PCT.top}%`,
+          left: `${OVERLAY_CONTENT_INSET_PCT.left}%`,
+          right: `${OVERLAY_CONTENT_INSET_PCT.right}%`,
+          bottom: `${OVERLAY_CONTENT_INSET_PCT.bottom}%`
+        }}
+      >
+        {slots.map((type, index) => {
+          const rect = (geometry && geometry[index]) || fallbackRect(index);
+          return (
+            <span
+              key={index}
+              className={`atelier-layout-mini-slot is-${type}`}
+              style={{
+                top: `${rect.top}%`,
+                left: `${rect.left}%`,
+                width: `${rect.width}%`,
+                height: `${rect.height}%`
+              }}
+            >
+              {type === 'photo' ? <MiniPhotoGlyph /> : null}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function FormatGallery({ layouts, selectedSlug, onChoose }) {
+function FormatGallery({ layouts, selectedSlug, onChoose, printFormat }) {
   return (
     <div className="atelier-format-grid">
       {layouts.map((layout) => (
@@ -47,7 +102,7 @@ function FormatGallery({ layouts, selectedSlug, onChoose }) {
           className={`atelier-format-option ${selectedSlug === layout.slug ? 'is-selected' : ''}`}
           onClick={() => onChoose(layout.slug)}
         >
-          <LayoutMiniPreview slug={layout.slug} slots={layout.slots} />
+          <LayoutMiniPreview slug={layout.slug} slots={layout.slots} printFormat={printFormat} />
           <span className="atelier-format-label">{layout.label}</span>
         </button>
       ))}
@@ -177,10 +232,26 @@ function AtelierLayoutPanel({
   saveStatus,
   saveError,
   printFormat,
-  currentPageIndex
+  currentPageIndex,
+  // Slugs REELLEMENT presents dans layout_definitions (charges par
+  // BookAtelierLuxe depuis /api/catalog/layouts). ATELIER_LAYOUTS est un
+  // catalogue statique : proposer une mise en page que la base ne connait pas
+  // affiche un bouton qui echoue a l'enregistrement ("mise en page
+  // introuvable"), sans que rien n'explique pourquoi. C'est exactement ce qui
+  // arrive entre l'ajout d'un layout et l'execution de sa migration SQL
+  // (2026-09-13, TWO_PHOTOS_STACKED). Non fourni -> aucun filtre, comportement
+  // d'avant.
+  availableSlugs,
+  // Retour en arriere sur la derniere action qui a vide la page (voir
+  // BookAtelierLuxe : captureUndo/handleUndo). `null` quand il n'y a rien a
+  // retablir — le lien n'apparait alors pas du tout.
+  onUndo,
+  undoLabel
 }) {
+  const isAvailable = (slug) => !availableSlugs || availableSlugs.has(slug);
   const draftLayout = ATELIER_LAYOUTS.find((layout) => layout.slug === draftLayoutSlug) || null;
-  const galleryLayouts = activeCategory ? layoutsByCategory(activeCategory) : ATELIER_LAYOUTS;
+  const galleryLayouts = (activeCategory ? layoutsByCategory(activeCategory) : ATELIER_LAYOUTS)
+    .filter((layout) => isAvailable(layout.slug));
 
   // Retrait a deux temps pour "Vider cette page" (retour utilisateur :
   // "ajouter une confirmation ou un undo visible" — meme principe deja
@@ -202,6 +273,17 @@ function AtelierLayoutPanel({
         )}
       </div>
 
+      {/* Filet de securite apres coup. Il vaut mieux qu'une confirmation
+          AVANT : on ne sait qu'on s'est trompe qu'une fois le contenu parti,
+          et une confirmation de plus a chaque changement de mise en page
+          alourdirait le geste courant pour tout le monde. */}
+      {onUndo && (
+        <button type="button" className="atelier-layout-undo" onClick={onUndo}>
+          <span aria-hidden="true">↩</span>{' '}
+          Annuler — revenir à {undoLabel ? `« ${undoLabel} »` : 'la mise en page précédente'} avec son contenu
+        </button>
+      )}
+
       {!draftLayout ? (
         <>
           <p className="atelier-layout-question">Que souhaitez-vous mettre sur cette page ?</p>
@@ -218,7 +300,12 @@ function AtelierLayoutPanel({
               </button>
             ))}
           </div>
-          <FormatGallery layouts={galleryLayouts} selectedSlug={draftLayoutSlug} onChoose={onChooseLayout} />
+          <FormatGallery
+            layouts={galleryLayouts}
+            selectedSlug={draftLayoutSlug}
+            onChoose={onChooseLayout}
+            printFormat={printFormat}
+          />
         </>
       ) : (
         <>
