@@ -265,6 +265,16 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     expect(html).toContain('mixte-multi-photo');
   });
 
+  // Garde-fou pose le 2026-09-13 : des cadres plus hauts remplissaient mieux
+  // la page mais rognaient les photos, ce que l'utilisateur a refuse
+  // explicitement ("je veux pas de photo tronquee"). Un cadre 3/4 montre une
+  // photo portrait ENTIERE — c'est ca qu'il faut preserver.
+  it('TWO_PHOTOS_TEXT garde des cadres 3/4 : une photo portrait n\'y est pas rognee', () => {
+    const { PHOTO_SLOT_RATIOS } = require('../../services/composition/layoutScoring');
+    expect(PHOTO_SLOT_RATIOS.TWO_PHOTOS_TEXT[0]).toBe(0.75);
+    expect(PHOTO_SLOT_RATIOS.TWO_PHOTOS_TEXT[1]).toBe(0.75);
+  });
+
   it('PHOTO_WITH_CAPTION rend une figure avec figcaption, distincte de PHOTO_TEXT', () => {
     const withCaption = bodyOf(pageFor('PHOTO_WITH_CAPTION', ['p1', 't1'], 'mixte'));
     expect(withCaption).toContain('class="block-photo photo-with-caption"');

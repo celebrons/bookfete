@@ -248,6 +248,15 @@ export const shrinkBookPages = (bookId, count = 2, confirm = false) => request(`
   body: JSON.stringify({ count, confirm })
 });
 
+// Deplace une page a une autre position (glisser-deposer dans le filmstrip) —
+// voir routes/composition.js: POST /pages/move. Ce n'est pas une permutation :
+// les pages situees entre les deux positions se decalent, l'ordre de lecture
+// du reste du livre est donc preserve.
+export const movePage = (bookId, fromIndex, toIndex) => request(`/books/${bookId}/pages/move`, {
+  method: 'POST',
+  body: JSON.stringify({ fromIndex, toIndex })
+});
+
 // --- Atelier de creation personnalisee (edition manuelle page par page) -----
 
 export const listPages = (bookId) => request(`/books/${bookId}/pages`);

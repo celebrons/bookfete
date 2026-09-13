@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // Bande de vignettes en bas de l'atelier — navigation directe vers
 // n'importe quelle page sans repasser par precedente/suivante (retour
@@ -28,25 +28,92 @@ const FORMAT_DIMENSIONS_MM = {
 
 const STATUS_LABEL = { complete: 'Page complete', partial: 'Page en cours', empty: 'Page vide', cover: '' };
 
-function FilmstripCell({ target, label, status, isActive, aspectRatio, onSelect }) {
+// Type de donnee PROPRE au deplacement de page. Volontairement distinct de
+// l'`application/json` utilise par la barre laterale pour glisser un souvenir
+// (AtelierSidebar) : sans ca, lacher une photo sur le filmstrip aurait ete
+// interprete comme un deplacement de page.
+const PAGE_DRAG_TYPE = 'application/x-celebrons-page';
+
+function FilmstripCell({
+  target, label, status, isActive, aspectRatio, onSelect,
+  // Deplacement : seules les pages interieures sont concernees (une
+  // couverture ne se deplace pas), d'ou `onMove` absent sur les autres.
+  onMove, dropSide, onDragOverCell, onDragLeaveCell, isDragging
+}) {
   const ref = useRef(null);
 
   // Fait defiler la bande pour garder la vignette active visible, y compris
   // quand la navigation se fait via precedente/suivante (pas seulement un
   // clic direct dans le filmstrip) — sinon la selection "invisible" hors
   // champ romprait la coherence entre le filmstrip et la vue centrale.
+  //
+  // On deplace NOUS-MEMES le defilement horizontal de la bande, au lieu
+  // d'appeler scrollIntoView. Celui-ci fait defiler TOUS les ancetres
+  // scrollables, document compris : des que la bande n'etait pas entierement
+  // visible, chaque "page suivante" faisait descendre la fenetre jusqu'a
+  // elle, et le livre sortait du champ (signale le 2026-09-13 : "on est
+  // renvoyes vers les pages timeline"). `block: 'nearest'` ne protege pas de
+  // ca — il evite le defilement vertical seulement quand l'element est DEJA
+  // entierement visible.
   useEffect(() => {
-    if (isActive) ref.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    if (!isActive) return;
+    const cell = ref.current;
+    const strip = cell?.parentElement;
+    if (!cell || !strip) return;
+    // Calcul par rectangles plutot que par offsetLeft : la bande n'est pas
+    // positionnee (pas de position:relative), offsetLeft se rapporterait donc
+    // a un ancetre quelconque et le centrage serait faux.
+    const cellRect = cell.getBoundingClientRect();
+    const stripRect = strip.getBoundingClientRect();
+    const delta = (cellRect.left - stripRect.left) - (strip.clientWidth - cellRect.width) / 2;
+    const maxLeft = strip.scrollWidth - strip.clientWidth;
+    strip.scrollTo({ left: Math.max(0, Math.min(strip.scrollLeft + delta, maxLeft)), behavior: 'smooth' });
   }, [isActive]);
+
+  const movable = Boolean(onMove);
+  const title = movable
+    ? `Page ${label}${STATUS_LABEL[status] ? ` — ${STATUS_LABEL[status]}` : ''} — glisser pour la déplacer`
+    : (STATUS_LABEL[status] ? `${label} — ${STATUS_LABEL[status]}` : `${label}`);
 
   return (
     <button
       ref={ref}
       type="button"
-      className={`atelier-filmstrip-cell is-${status} ${isActive ? 'is-active' : ''}`}
+      className={[
+        'atelier-filmstrip-cell',
+        `is-${status}`,
+        isActive ? 'is-active' : '',
+        movable ? 'is-movable' : '',
+        isDragging ? 'is-dragging' : '',
+        dropSide ? `is-drop-${dropSide}` : ''
+      ].filter(Boolean).join(' ')}
       style={{ aspectRatio }}
+      draggable={movable}
+      onDragStart={movable ? (event) => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData(PAGE_DRAG_TYPE, String(target));
+        onMove.start(target);
+      } : undefined}
+      onDragEnd={movable ? () => onMove.end() : undefined}
+      onDragOver={movable ? (event) => {
+        if (!event.dataTransfer.types.includes(PAGE_DRAG_TYPE)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        // Cote survole : on depose AVANT ou APRES cette page selon que le
+        // pointeur est dans sa moitie gauche ou droite. Sans ca, deposer sur
+        // la derniere page ne permettrait jamais de placer quelque chose
+        // apres elle.
+        const rect = event.currentTarget.getBoundingClientRect();
+        onDragOverCell(target, event.clientX < rect.left + rect.width / 2 ? 'before' : 'after');
+      } : undefined}
+      onDragLeave={movable ? () => onDragLeaveCell(target) : undefined}
+      onDrop={movable ? (event) => {
+        if (!event.dataTransfer.types.includes(PAGE_DRAG_TYPE)) return;
+        event.preventDefault();
+        onMove.drop(Number(event.dataTransfer.getData(PAGE_DRAG_TYPE)), target);
+      } : undefined}
       onClick={() => onSelect(target)}
-      title={STATUS_LABEL[status] ? `${label} — ${STATUS_LABEL[status]}` : `${label}`}
+      title={title}
     >
       <span className="atelier-filmstrip-cell-label">{label}</span>
       {status === 'complete' && <span className="atelier-filmstrip-cell-check" aria-hidden="true">✓</span>}
@@ -64,13 +131,48 @@ function AtelierPageFilmstrip({
   onRemovePages,
   removingPages,
   canRemovePages,
-  minPages
+  minPages,
+  // Deplacement de page (facultatif : sans lui, le filmstrip se comporte
+  // exactement comme avant).
+  onMovePage,
+  movingPage
 }) {
   const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
   const aspectRatio = `${dims.widthMm} / ${dims.heightMm}`;
 
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null); // { index, side }
+
+  const move = onMovePage ? {
+    start: (index) => { setDraggedIndex(index); setDropTarget(null); },
+    end: () => { setDraggedIndex(null); setDropTarget(null); },
+    drop: (from, over) => {
+      setDraggedIndex(null);
+      const side = dropTarget?.index === over ? dropTarget.side : 'before';
+      // Position d'insertion vue comme un "entre-deux", puis ramenee a un
+      // index de destination. Retirer d'abord la page decale d'un cran tout
+      // ce qui la suit : sans cette correction, deplacer une page vers la
+      // droite la posait systematiquement une position trop loin.
+      const insertAt = side === 'after' ? over + 1 : over;
+      const to = insertAt > from ? insertAt - 1 : insertAt;
+      setDropTarget(null);
+      if (to !== from) onMovePage(from, to);
+    }
+  } : null;
+
+  const cellMoveProps = (pageIndex) => (move ? {
+    onMove: move,
+    isDragging: draggedIndex === pageIndex,
+    dropSide: draggedIndex != null && dropTarget?.index === pageIndex ? dropTarget.side : null,
+    onDragOverCell: (index, side) => setDropTarget((previous) => (
+      previous?.index === index && previous?.side === side ? previous : { index, side }
+    )),
+    onDragLeaveCell: (index) => setDropTarget((previous) => (previous?.index === index ? null : previous))
+  } : {});
+
   return (
-    <div className="atelier-filmstrip">
+    <>
+    <div className={`atelier-filmstrip ${movingPage ? 'is-moving' : ''}`}>
       {/* Couvertures : ni "complete" ni "vide" au meme sens qu'une page
           interieure (toujours un contenu par defaut) — classe neutre
           dediee plutot qu'un statut trompeur. */}
@@ -92,6 +194,7 @@ function AtelierPageFilmstrip({
           isActive={activeTarget === pageIndex}
           aspectRatio={aspectRatio}
           onSelect={onSelect}
+          {...cellMoveProps(pageIndex)}
         />
       ))}
       {/* Agrandir ou reduire volontairement le livre (jamais automatique —
@@ -137,6 +240,12 @@ function AtelierPageFilmstrip({
         onSelect={onSelect}
       />
     </div>
+    {onMovePage && (
+      <p className="atelier-filmstrip-hint">
+        Glissez une vignette pour déplacer la page — ou réglez sa position par le picto au coin de la page.
+      </p>
+    )}
+    </>
   );
 }
 

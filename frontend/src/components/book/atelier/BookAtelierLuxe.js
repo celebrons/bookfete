@@ -18,6 +18,7 @@ import {
   getRecommendedPageCount,
   extendBookPages,
   shrinkBookPages,
+  movePage,
   updateContentItem
 } from '../../../services/compositionApi';
 import AtelierSidebar from './AtelierSidebar';
@@ -31,6 +32,7 @@ import AtelierOnboarding from './AtelierOnboarding';
 import AtelierFinishModal from './AtelierFinishModal';
 import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
+import AtelierPageActions from './AtelierPageActions';
 import { findAtelierLayout } from './atelierLayouts';
 import AnonymousBanner from '../../common/AnonymousBanner';
 import '../../../styles/luxe-theme.css';
@@ -91,6 +93,9 @@ export default function BookAtelierLuxe() {
   // saveManualPage.
   const [draftTextRoles, setDraftTextRoles] = useState({});
   const [draftTextStyles, setDraftTextStyles] = useState({});
+  // Page a laquelle le brouillon ci-dessus appartient — voir le garde-fou de
+  // la sauvegarde automatique.
+  const [draftPageIndex, setDraftPageIndex] = useState(null);
   const [adjustTargetSlotIndex, setAdjustTargetSlotIndex] = useState(null);
 
   const [coverHtml, setCoverHtml] = useState(null);
@@ -137,6 +142,7 @@ export default function BookAtelierLuxe() {
   const [sidebarAddError, setSidebarAddError] = useState('');
   const [addingPages, setAddingPages] = useState(false);
   const [removingPages, setRemovingPages] = useState(false);
+  const [movingPage, setMovingPage] = useState(false);
 
   // Force un rechargement de l'apercu de la vue courante meme quand
   // viewIndex ne change pas (ex. sauvegarde de couverture, generation
@@ -354,6 +360,11 @@ export default function BookAtelierLuxe() {
   // la page precedente.
   useEffect(() => {
     setAdjustTargetSlotIndex(null); // jamais une modale d'ajustement "en cours" en changeant de page
+    // Page a laquelle appartient le brouillon. Sans ce marqueur, la
+    // sauvegarde automatique plus bas pouvait ecrire le brouillon de la page
+    // PRECEDENTE sur la NOUVELLE — voir son garde-fou et le commentaire qui
+    // l'accompagne.
+    setDraftPageIndex(currentPageIndex);
     if (currentPageIndex == null) {
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
@@ -434,6 +445,26 @@ export default function BookAtelierLuxe() {
   //    (clearPage) plutot que de laisser un ancien contenu perime affiche.
   useEffect(() => {
     if (!draftLayoutSlug || currentPageIndex == null || !book?.id) return undefined;
+
+    // GARDE-FOU ESSENTIEL : n'ecrire que si le brouillon appartient bien a la
+    // page courante.
+    //
+    // Quand on change de page, DEUX effets se declenchent dans le meme rendu :
+    // celui qui reinitialise le brouillon (declare plus haut) et celui-ci.
+    // React execute les effets dans l'ordre de declaration, mais les
+    // setState du premier ne prennent effet qu'au rendu SUIVANT : cet
+    // effet-ci voyait donc le brouillon de la page PRECEDENTE avec l'index de
+    // la NOUVELLE, et l'y enregistrait. Consequence mesuree en pilotant
+    // l'application apres un deplacement de page (2026-09-13) : le meme
+    // souvenir se retrouvait sur DEUX pages en base
+    // (`0:MARQUEUR PAGE 1 | 1:MARQUEUR PAGE 1`).
+    //
+    // `draftPageIndex` est pose par l'effet d'initialisation : tant qu'il ne
+    // correspond pas, le brouillon n'est pas encore celui de cette page et on
+    // ne touche a rien. Au rendu suivant, les deux concordent et la
+    // sauvegarde reprend normalement.
+    if (draftPageIndex !== currentPageIndex) return undefined;
+
     const atelierLayout = findAtelierLayout(draftLayoutSlug);
     if (!atelierLayout) return undefined;
 
@@ -529,7 +560,7 @@ export default function BookAtelierLuxe() {
       });
 
     return () => { cancelled = true; };
-  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftTextRoles, draftTextStyles, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
+  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftTextRoles, draftTextStyles, draftPageIndex, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
 
   // Instantane de ce qui est actuellement sur la page, AVANT de le remplacer.
   // Ne fait rien si la page est deja vide : il n'y aurait rien a retablir, et
@@ -937,6 +968,69 @@ export default function BookAtelierLuxe() {
   // declenchee depuis l'atelier avec une ambiance choisie. Apres succes,
   // l'utilisateur feuillette directement le resultat dans l'atelier — pas de
   // second ecran de "preview avant de garder".
+  // Deplacement d'une page (glisser-deposer dans le filmstrip). Aucun contenu
+  // n'est reecrit : seuls les numeros de page changent cote serveur.
+  //
+  // Apres coup, TOUT le cache d'apercus est jete : entre la page de depart et
+  // la page d'arrivee, chaque numero designe desormais une autre page, et une
+  // vignette conservee afficherait le contenu du voisin. `contentVersion`
+  // reinitialise le brouillon de la page selectionnee pour la meme raison.
+  //
+  // On SUIT la page deplacee (setViewIndex/selectedSide sur sa nouvelle
+  // position) : la relacher et ne plus savoir ou elle est atterri serait la
+  // pire facon de finir le geste.
+  const handleMovePage = async (fromIndex, toIndex) => {
+    if (!book?.id || fromIndex === toIndex) return;
+    setMovingPage(true);
+    setSaveError('');
+    try {
+      const result = await movePage(book.id, fromIndex, toIndex);
+      setPages(result?.pages || []);
+
+      // L'apercu d'une page deplacee n'a pas change : c'est la MEME page, a
+      // une autre place. On permute donc les entrees deja en memoire, avec
+      // exactement la meme correspondance que le serveur applique aux pages
+      // (bookContentService.movePage) — miroir assume, comme ailleurs dans ce
+      // projet.
+      //
+      // Pourquoi pas un rechargement : essaye d'abord, il donnait un resultat
+      // INTERMITTENT puis systematiquement faux (mesure en pilotant
+      // l'application : 2 essais sur 3, puis 4 sur 4). Plusieurs
+      // rechargements se croisaient et l'ancien apercu restait affiche —
+      // "la 2 va bien vers le 1 mais elle reste affichee dans le 2"
+      // (2026-09-13). Permuter est instantane et ne peut pas se tromper :
+      // aucune requete a arbitrer.
+      //
+      // SEULE reserve : en format Luxe, la page porte un petit numero en
+      // coin, qui restera l'ancien jusqu'au prochain chargement naturel de
+      // cette page. Un detail de quelques millimetres, contre une regression
+      // d'affichage certaine — l'arbitrage est vite fait.
+      setPagePreviewCache((previous) => {
+        const nextIndexFor = (index) => {
+          if (index === fromIndex) return toIndex;
+          if (fromIndex < toIndex) return index > fromIndex && index <= toIndex ? index - 1 : index;
+          return index >= toIndex && index < fromIndex ? index + 1 : index;
+        };
+        const next = {};
+        Object.entries(previous).forEach(([key, html]) => {
+          next[nextIndexFor(Number(key))] = html;
+        });
+        return next;
+      });
+
+      setContentVersion((previous) => previous + 1);
+      setViewIndex(Math.floor(toIndex / 2) + 1);
+      setSelectedSide(toIndex % 2 === 0 ? 'left' : 'right');
+      // Volontairement AUCUN rechargement d'apercu ici (ni setRefreshToken,
+      // ni refreshPagePreview) : la permutation ci-dessus suffit, et toute
+      // requete supplementaire ne ferait que reintroduire la course.
+    } catch (err) {
+      setSaveError(err.message || "La page n'a pas pu etre deplacee.");
+    } finally {
+      setMovingPage(false);
+    }
+  };
+
   const handleGenerate = async (mood) => {
     if (!book?.id) return;
     setIsGenerating(true);
@@ -1065,6 +1159,24 @@ export default function BookAtelierLuxe() {
   // "Mise en page", pas a sa place) : memes emplacements/etat, voir
   // AtelierPageOverlay. Rien a afficher tant qu'aucun format n'est choisi
   // pour la page courante (repli sur le panneau de droite, comme avant).
+  // Actions posees sur la page en cours de modification (coin bas droit) —
+  // deplacer la page dans le livre, la vider. Elles etaient dans le panneau de
+  // droite, qui melangeait ainsi le travail de mise en page et les actions sur
+  // la page ; elles vivent desormais sur la page, comme l'oeil "voir a
+  // l'echelle" a son coin haut droit (2026-09-13).
+  const pageActions = viewKind === 'spread' && currentPageIndex != null ? (
+    <AtelierPageActions
+      pageNumber={currentPageIndex + 1}
+      totalPages={totalPages}
+      // Le composant raisonne en numeros AFFICHES (1-based), le moteur en
+      // index : la conversion se fait ici, une seule fois.
+      onMoveToPosition={(oneBased) => handleMovePage(currentPageIndex, oneBased - 1)}
+      movingPage={movingPage}
+      onClearPage={handleClearPage}
+      hasContent={hasContent}
+    />
+  ) : null;
+
   const draftLayoutForOverlay = draftLayoutSlug ? findAtelierLayout(draftLayoutSlug) : null;
   const pageOverlay = viewKind === 'spread' && draftLayoutForOverlay ? (
     <AtelierPageOverlay
@@ -1212,6 +1324,7 @@ export default function BookAtelierLuxe() {
             canGoNext={canGoNext}
             navLabel={navLabel}
             overlay={pageOverlay}
+            pageActions={pageActions}
             printFormat={book.print_format}
             onAssignCoverPhoto={handleAssignCoverPhoto}
             selectedSidebarItem={selectedSidebarItem}
@@ -1235,13 +1348,13 @@ export default function BookAtelierLuxe() {
                 setDraftTextStyles({});
               }}
               selectedSidebarItem={selectedSidebarItem}
-              onClearPage={handleClearPage}
-              hasContent={hasContent}
               saveStatus={saveStatus}
               saveError={saveError}
               printFormat={book.print_format}
               currentPageIndex={currentPageIndex}
               availableSlugs={availableLayoutSlugs}
+              // "Vider cette page" et "Position dans le livre" sont passes sur
+              // la page elle-meme (voir pageActions plus bas).
               // Propose le retour en arriere UNIQUEMENT tant que la nouvelle
               // mise en page est encore vide : des que l'utilisateur y a place
               // quelque chose, "Annuler" detruirait ce travail neuf au lieu de
@@ -1281,6 +1394,8 @@ export default function BookAtelierLuxe() {
           // bouton evite de proposer une action qu'on sait deja impossible.
           canRemovePages={(pages.length || 0) - 2 >= MIN_AUTO_PAGES}
           minPages={MIN_AUTO_PAGES}
+          onMovePage={handleMovePage}
+          movingPage={movingPage}
         />
       ) : null}
 

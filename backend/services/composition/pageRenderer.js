@@ -726,12 +726,23 @@ const BASE_CSS = `
      centrees. */
   .mixte-ordered .mixte-texte p { width: calc(100% * var(--type-measure, 1)); max-width: 100%; }
   /* Deux photos cote a cote + un texte dessous. Ici la photo ne PEUT pas
-     absorber tout le blanc : a 45% de largeur, lui donner toute la hauteur
-     restante en ferait un bandeau de 1 pour 2.7, donc un recadrage brutal
+     absorber tout le blanc : a 48% de largeur, lui donner toute la hauteur
+     restante en ferait un bandeau de 1 pour 2.5, donc un recadrage brutal
      (object-fit: cover). On lui fixe donc un cadre 3/4, stable quelle que
      soit la longueur du texte — c'est ce qui rend la page previsible — et le
      blanc qui reste se repartit en haut et en bas (align-content: center)
-     plutot que de s'accumuler sous le texte. */
+     plutot que de s'accumuler sous le texte.
+
+     ESSAYE PUIS RETIRE le 2026-09-13 : des cadres nettement plus hauts (une
+     rangee en aspect-ratio 9/8) remplissaient bien mieux la page — 57.8% de
+     photo au lieu de 41.6% — mais au prix d'un recadrage que l'utilisateur a
+     refuse net ("je veux pas de photo tronquee"). Mesure qui a tranche : sur
+     sa page, la photo portrait passait de 100% a 73% visible et la paysage de
+     56% a 41%. REMPLIR LA PAGE NE JUSTIFIE PAS DE COUPER DANS LES PHOTOS —
+     ne pas retenter sans une demande explicite. Le blanc est le prix assume
+     de deux photos cote a cote sur une page portrait ; les mises en page
+     "2 photos horizontales" et le mode "photo entiere" sont les vraies
+     reponses quand la forme de la photo ne convient pas au cadre. */
   .mixte-multi-photo { flex-direction: row; flex-wrap: wrap; align-content: center; }
   .mixte-multi-photo .mixte-photo { flex: 0 1 48%; aspect-ratio: 3 / 4; min-height: 0; max-height: 62%; }
   .mixte-multi-photo .mixte-texte { flex-basis: 100%; }

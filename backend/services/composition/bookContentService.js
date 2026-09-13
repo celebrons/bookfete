@@ -261,6 +261,59 @@ async function removeTrailingPages(bookId, count) {
   return listPages(bookId);
 }
 
+// Deplace la page `fromIndex` a la position `toIndex`, en decalant celles qui
+// se trouvent entre les deux. Ce n'est PAS une permutation : echanger deux
+// pages distantes melangerait l'ordre de lecture du livre, alors qu'on veut
+// "prendre cette page et la poser la" (retour utilisateur 2026-09-13).
+//
+// Les pages sans ligne en base (jamais remplies) n'ont rien a deplacer : leur
+// absence se comporte exactement comme une page vide qui se decale, le calcul
+// reste donc juste sans avoir a les materialiser.
+//
+// DEUX PASSES, indispensables : `book_pages` porte un index UNIQUE sur
+// (book_id, page_index), verifie ligne par ligne et non en fin d'instruction.
+// Ecrire directement les index finaux ferait donc collision avec une page pas
+// encore deplacee. On gare d'abord les lignes concernees tres au-dela du livre
+// (PARK_OFFSET), puis on pose les index definitifs — les emplacements vises
+// sont alors tous libres.
+const PARK_OFFSET = 100000;
+
+async function movePage(bookId, fromIndex, toIndex) {
+  if (fromIndex === toIndex) return listPages(bookId);
+
+  const existing = await listPages(bookId);
+
+  // Application bijective de l'ancien index vers le nouveau : c'est cette
+  // propriete qui garantit qu'aucune page non deplacee n'occupe une place
+  // visee par une page deplacee (voir la 2e passe).
+  const nextIndexFor = (index) => {
+    if (index === fromIndex) return toIndex;
+    if (fromIndex < toIndex) return index > fromIndex && index <= toIndex ? index - 1 : index;
+    return index >= toIndex && index < fromIndex ? index + 1 : index;
+  };
+
+  const moved = existing
+    .map((page) => ({ id: page.id, to: nextIndexFor(page.page_index), from: page.page_index }))
+    .filter((row) => row.from !== row.to);
+
+  if (moved.length === 0) return listPages(bookId);
+
+  // `book_id` est repasse a chaque ligne : supabase envoie un INSERT ... ON
+  // CONFLICT, et la ligne candidate doit satisfaire les colonnes NOT NULL
+  // meme quand le conflit garantit qu'on fera un UPDATE.
+  const write = async (rows) => {
+    const { error } = await supabase
+      .from('book_pages')
+      .upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
+  };
+
+  await write(moved.map((row) => ({ id: row.id, book_id: bookId, page_index: PARK_OFFSET + row.to })));
+  await write(moved.map((row) => ({ id: row.id, book_id: bookId, page_index: row.to })));
+
+  return listPages(bookId);
+}
+
 async function upsertPage(bookId, pageIndex, payload = {}) {
   const { data, error } = await supabase
     .from('book_pages')
@@ -287,5 +340,6 @@ module.exports = {
   inspectTrailingPages,
   removeTrailingPages,
   isPageEmpty,
+  movePage,
   upsertPage
 };

@@ -920,6 +920,41 @@ router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, a
   }
 });
 
+// POST /api/books/:bookId/pages/move
+// Deplace une page a une autre position (glisser-deposer dans le filmstrip de
+// l'atelier). Body { fromIndex, toIndex }.
+//
+// Ne touche AUCUN contenu : seuls les numeros de page changent. Les
+// annotations qualite (photoFit/textFit) ne dependent pas de la position de la
+// page dans le livre, il n'y a donc rien a recalculer ici — et surtout rien a
+// reecrire dans `content`, ce qui pourrait perdre un ajustement.
+//
+// Les pages VERROUILLEES se deplacent comme les autres : le verrou protege
+// d'une recomposition automatique, pas d'un geste deliberé de l'utilisateur.
+router.post('/api/books/:bookId/pages/move', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const { book } = req;
+    const fromIndex = Number(req.body?.fromIndex);
+    const toIndex = Number(req.body?.toIndex);
+
+    // Le nombre de pages fait foi depuis le LIVRE, pas depuis le nombre de
+    // lignes en base : une page jamais remplie n'a pas de ligne, et refuser
+    // de deplacer vers elle serait incomprehensible.
+    const totalPages = Number(book.page_count) || 0;
+    const isValid = (value) => Number.isInteger(value) && value >= 0 && value < totalPages;
+    if (!isValid(fromIndex) || !isValid(toIndex)) {
+      return res.status(400).json({
+        error: `Position invalide : ce livre compte ${totalPages} pages.`
+      });
+    }
+
+    const pages = await bookContentService.movePage(book.id, fromIndex, toIndex);
+    res.json({ pages, fromIndex, toIndex });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // PUT /api/books/:bookId/pages/:pageIndex
 // Edition manuelle d'une page (ex. verrouillage) sans repasser par le moteur.
 // Utilise aussi par la sauvegarde PARTIELLE de l'atelier (emplacements pas
@@ -971,6 +1006,15 @@ router.get('/api/books/:bookId/pages/:pageIndex/preview.html', authenticate, req
     const format = resolveRenderFormat(book.print_format);
     const html = pageRenderer.renderSinglePageHtml({ book, page, items, layouts, format });
     res.set('Content-Type', 'text/html; charset=utf-8');
+    // JAMAIS de cache HTTP sur un apercu : son contenu depend de l'etat du
+    // livre a l'instant de la demande. express pose un ETag par defaut, donc
+    // le navigateur revalidait et pouvait recevoir un 304 — c'est-a-dire
+    // RESERVIR l'ancien HTML — quand deux rechargements se croisaient.
+    // Observe en pilotant l'application apres un deplacement de page
+    // (2026-09-13) : "apercu page 1 -> 304" puis "-> 200", et selon celle qui
+    // arrivait en dernier, l'ancienne page restait affichee. Un apercu est
+    // par nature volatil : il ne doit jamais etre servi depuis un cache.
+    res.set('Cache-Control', 'no-store');
     res.send(html);
   } catch (error) {
     res.status(500).json({ error: error.message });

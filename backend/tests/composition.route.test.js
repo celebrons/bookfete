@@ -773,6 +773,45 @@ describe('routes/composition', () => {
     });
   });
 
+  // Deplacement d'une page (glisser-deposer dans le filmstrip, 2026-09-13).
+  // La mecanique de reindexage elle-meme est verifiee contre une vraie base
+  // (bookContentService.movePage) ; ici on verrouille les GARDE-FOUS de la
+  // route, seuls remparts contre un index invente par un appelant.
+  describe('POST /api/books/:bookId/pages/move — atelier', () => {
+    it('refuse une requete sans header Authorization', async () => {
+      const response = await request(app)
+        .post('/api/books/book-test-5/pages/move')
+        .send({ fromIndex: 0, toIndex: 1 });
+      expect(response.status).toBe(401);
+    });
+
+    it("refuse le livre d'un autre proprietaire", async () => {
+      const response = await request(app)
+        .post(`/api/books/${OTHER_BOOK_ID}/pages/move`)
+        .set('Authorization', 'Bearer valid-token')
+        .send({ fromIndex: 0, toIndex: 1 });
+      expect(response.status).toBe(403);
+    });
+
+    it('refuse une position hors des pages du livre (book.page_count)', async () => {
+      const response = await request(app)
+        .post('/api/books/book-test-5/pages/move')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ fromIndex: 0, toIndex: 99 });
+      expect(response.status).toBe(400);
+    });
+
+    it('refuse une position non entiere ou negative', async () => {
+      for (const body of [{ fromIndex: -1, toIndex: 0 }, { fromIndex: 0, toIndex: 1.5 }, { fromIndex: 'a', toIndex: 0 }, {}]) {
+        const response = await request(app)
+          .post('/api/books/book-test-5/pages/move')
+          .set('Authorization', 'Bearer valid-token')
+          .send(body);
+        expect(response.status).toBe(400);
+      }
+    });
+  });
+
   describe('PUT /api/books/:bookId/pages/:pageIndex/manual — atelier', () => {
     it('refuse une requete sans header Authorization', async () => {
       const response = await request(app)

@@ -72,7 +72,7 @@ function EyeIcon() {
 // draftLayoutSlug/draftSlotItemIds decrivent). Differenciation forte
 // deliberee (badge + assombrissement de l'autre page) pour qu'il soit
 // impossible de deposer par erreur sur la mauvaise page d'un double-page.
-function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, aspectRatio, onExpand }) {
+function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, aspectRatio, onExpand, actions }) {
   const isInactive = selectable && !isSelected;
   return (
     <div
@@ -105,6 +105,12 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
         </button>
       )}
       {overlay}
+      {/* Actions sur la page (deplacer / vider) — coin bas droit, en
+          vis-a-vis de l'oeil. Uniquement sur la page en cours de
+          modification : les poser sur les deux pages d'un double-page
+          encombrerait pour rien et rendrait ambigu ce sur quoi elles
+          agissent. */}
+      {selectable && isSelected && actions}
       {selectable && isSelected && (
         <span className="atelier-page-pane-editing-badge">✎ Page en cours de modification</span>
       )}
@@ -163,6 +169,11 @@ function AtelierBookView({
   // seul que draftLayoutSlug/draftSlotItemIds (BookAtelierLuxe.js)
   // decrivent, deposer sur l'autre cote modifierait la mauvaise page.
   overlay,
+  // Actions posees sur la page en cours de modification (deplacer / vider) —
+  // voir AtelierPageActions. Un noeud deja construit par l'appelant, comme
+  // `overlay` : cette vue ne connait pas ces mecaniques, elle leur donne
+  // seulement une place.
+  pageActions,
   // Format d'impression choisi (book.print_format) : determine les vraies
   // proportions affichees par "Voir a l'echelle" — absent ou inconnu replie
   // sur "standard", jamais une erreur.
@@ -283,8 +294,9 @@ function AtelierBookView({
               isSelected={selectedSide === 'left'}
               onSelect={() => onSelectSide('left')}
               overlay={selectedSide === 'left' ? overlay : null}
+              actions={pageActions}
               aspectRatio={pageAspectRatio}
-            onExpand={() => setIsFullscreenOpen(true)}
+              onExpand={() => setIsFullscreenOpen(true)}
             />
             {rightPageNumber != null && (
               <PagePane
@@ -294,8 +306,9 @@ function AtelierBookView({
                 isSelected={selectedSide === 'right'}
                 onSelect={() => onSelectSide('right')}
                 overlay={selectedSide === 'right' ? overlay : null}
+                actions={pageActions}
                 aspectRatio={pageAspectRatio}
-            onExpand={() => setIsFullscreenOpen(true)}
+                onExpand={() => setIsFullscreenOpen(true)}
               />
             )}
           </div>

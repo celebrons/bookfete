@@ -227,8 +227,6 @@ function AtelierLayoutPanel({
   onRemoveSlot,
   onChangeFormat,
   selectedSidebarItem,
-  onClearPage,
-  hasContent,
   saveStatus,
   saveError,
   printFormat,
@@ -252,15 +250,6 @@ function AtelierLayoutPanel({
   const draftLayout = ATELIER_LAYOUTS.find((layout) => layout.slug === draftLayoutSlug) || null;
   const galleryLayouts = (activeCategory ? layoutsByCategory(activeCategory) : ATELIER_LAYOUTS)
     .filter((layout) => isAvailable(layout.slug));
-
-  // Retrait a deux temps pour "Vider cette page" (retour utilisateur :
-  // "ajouter une confirmation ou un undo visible" — meme principe deja
-  // etabli pour le retrait d'un seul emplacement, voir LayoutFormatMiniature/
-  // atelierSlotInteractions.js, applique ici a l'action globale de la page).
-  // Reinitialise en changeant de page (currentPageIndex) pour ne jamais
-  // laisser une confirmation armee "suivre" sur une autre page.
-  const [pendingClear, setPendingClear] = useState(false);
-  useEffect(() => { setPendingClear(false); }, [currentPageIndex]);
 
   return (
     <aside className="atelier-layout-panel">
@@ -328,26 +317,11 @@ function AtelierLayoutPanel({
 
           {saveError && <div className="wizard-error">{saveError}</div>}
 
-          {hasContent && (
-            pendingClear ? (
-              <div className="atelier-clear-confirm">
-                <button
-                  type="button"
-                  className="btn btn-outline atelier-clear-btn is-pending"
-                  onClick={() => { setPendingClear(false); onClearPage(); }}
-                >
-                  Confirmer : vider la page ?
-                </button>
-                <button type="button" className="atelier-clear-cancel" onClick={() => setPendingClear(false)}>
-                  Annuler
-                </button>
-              </div>
-            ) : (
-              <button type="button" className="btn btn-outline atelier-clear-btn" onClick={() => setPendingClear(true)}>
-                Vider cette page
-              </button>
-            )
-          )}
+          {/* "Vider cette page" et "Position dans le livre" ne sont plus ici :
+              ils sont passes en pictogrammes au coin bas droit de la page
+              elle-meme (AtelierPageActions, 2026-09-13). Ce panneau sert a
+              COMPOSER ; ce qui AGIT SUR la page vit sur la page, comme l'oeil
+              "voir a l'echelle" deja pose a son coin haut droit. */}
         </>
       )}
     </aside>

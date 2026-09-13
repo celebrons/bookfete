@@ -228,9 +228,11 @@ const PHOTO_SLOT_RATIOS = {
   PHOTO_TEXT: [1.0, null],
   TEXT_PHOTO: [null, 1.0],
   // .mixte-multi-photo : 2 photos cote a cote au dessus d'un texte pleine
-  // largeur. Depuis le 2026-09-12 leur cadre porte `aspect-ratio: 3/4`, donc
-  // le ratio n'est plus a estimer — il vaut exactement 0.75, quelle que soit
-  // la longueur du texte.
+  // largeur. Leur cadre est impose par le CSS (`aspect-ratio: 3/4`), il n'est
+  // donc pas a estimer — il vaut exactement 0.75, quelle que soit la longueur
+  // du texte. (Passe a 0.547 le 2026-09-13 puis remis a 0.75 le meme jour :
+  // des cadres plus hauts remplissaient mieux la page mais rognaient les
+  // photos, ce que l'utilisateur a refuse.)
   TWO_PHOTOS_TEXT: [0.75, 0.75, null]
 };
 

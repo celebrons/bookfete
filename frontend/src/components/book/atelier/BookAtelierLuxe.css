@@ -141,6 +141,43 @@
   color: var(--gold);
 }
 
+/* --- Deplacement d'une page (glisser-deposer dans la bande) -------------
+   Volontairement DISCRET, comme demande : aucun bouton ni poignee visible au
+   repos. Le curseur de deplacement au survol est le seul indice permanent,
+   l'infobulle de chaque vignette le dit en toutes lettres, et tout le reste
+   n'apparait que pendant le glissement. */
+.atelier-filmstrip-cell.is-movable { cursor: grab; }
+.atelier-filmstrip-cell.is-movable:active { cursor: grabbing; }
+
+/* Les enfants de la vignette n'interceptent aucun evenement : sinon passer le
+   pointeur du bouton a son numero declenche un dragleave sur le bouton, et le
+   trait d'insertion clignote pendant tout le glissement. */
+.atelier-filmstrip-cell-label,
+.atelier-filmstrip-cell-check { pointer-events: none; }
+
+/* La vignette prise en main s'efface : on suit le TRAIT d'insertion, pas
+   elle. */
+.atelier-filmstrip-cell.is-dragging { opacity: 0.35; }
+
+/* Trait d'insertion : montre ou la page atterrira, avant ou apres la vignette
+   survolee. Indispensable pour pouvoir poser une page APRES la derniere. */
+.atelier-filmstrip-cell.is-drop-before::before,
+.atelier-filmstrip-cell.is-drop-after::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--gold);
+}
+.atelier-filmstrip-cell.is-drop-before::before { left: -5px; }
+.atelier-filmstrip-cell.is-drop-after::after { right: -5px; }
+
+/* Pendant l'enregistrement du deplacement : la bande ne repond plus, pour
+   qu'un second glissement ne parte pas d'un ordre deja perime. */
+.atelier-filmstrip.is-moving { pointer-events: none; opacity: 0.7; }
+
 /* Ajouter des pages (voir AtelierPageFilmstrip.js) — meme gabarit que les
    vignettes de page, style dedie (icone + fond doux) pour bien se distinguer
    d'une page reelle. */
@@ -1368,6 +1405,166 @@
   color: var(--text-light);
 }
 
+/* --- Actions posees sur la page (coin bas droit) ------------------------
+   Deplacer la page / la vider. En vis-a-vis de l'oeil "voir a l'echelle" du
+   coin haut droit : tout ce qui AGIT SUR la page vit sur la page, le panneau
+   de droite ne garde que la composition. Deux pictogrammes discrets, qui
+   OUVRENT le reglage complet plutot que de le remplacer. */
+.atelier-page-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 41; /* au-dessus de l'editeur de texte en ligne (30), comme l'oeil (40) */
+  display: flex;
+  gap: 6px;
+}
+
+.atelier-page-action { position: relative; }
+
+.atelier-page-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text-light);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(36, 31, 24, 0.18);
+  transition: var(--transition-fast);
+}
+.atelier-page-action-btn:hover { color: var(--ink); border-color: var(--gold); background: #fff; }
+.atelier-page-action-btn.is-open { color: var(--ink); border-color: var(--gold); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.25); }
+.atelier-page-action-btn.is-danger:hover { color: #8c3225; border-color: rgba(160, 58, 45, 0.6); }
+.atelier-page-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Volet ouvert par un pictogramme. Ancre au-dessus du bouton et cale a
+   DROITE : il ne doit jamais sortir de la page (.atelier-page-pane est en
+   overflow:hidden, tout debordement serait purement rogne — piege deja
+   rencontre avec la barre de mise en forme du texte). */
+.atelier-page-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: 232px;
+  max-width: 80vw;
+  padding: 10px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 9px;
+  background: #ffffff; /* opaque : il se pose souvent sur une photo */
+  box-shadow: 0 6px 22px rgba(36, 31, 24, 0.3);
+  text-align: left;
+  cursor: default;
+}
+
+.atelier-page-popover-title {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.atelier-page-popover-hint {
+  margin: 8px 0 0;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--text-light);
+}
+.atelier-page-popover-hint.is-error { color: #8c3225; font-weight: 700; }
+
+.atelier-page-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.atelier-page-popover-cancel,
+.atelier-page-popover-confirm {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-page-popover-cancel {
+  border: 1px solid rgba(36, 31, 24, 0.2);
+  background: transparent;
+  color: var(--text-light);
+}
+.atelier-page-popover-cancel:hover { color: var(--ink); }
+.atelier-page-popover-confirm {
+  border: none;
+  background: #a03a2d;
+  color: #fff;
+  font-weight: 700;
+}
+.atelier-page-popover-confirm:hover { filter: brightness(1.08); }
+
+.atelier-page-position-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atelier-page-position-step {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(36, 31, 24, 0.18);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-page-position-step:hover:not(:disabled) { border-color: var(--gold); background: rgba(184, 146, 74, 0.12); }
+.atelier-page-position-step:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.atelier-page-position-field {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+.atelier-page-position-field input {
+  width: 48px;
+  padding: 3px 4px;
+  border: 1px solid rgba(36, 31, 24, 0.22);
+  border-radius: 5px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.atelier-page-position-field input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+
+
+/* Rappel sous la pellicule : le glisser-deposer y est un raccourci, il ne
+   doit plus etre le seul moyen de deplacer une page (voir
+   .atelier-page-position). */
+.atelier-filmstrip-hint {
+  margin: 4px 0 0;
+  font-size: 10.5px;
+  color: var(--text-light);
+  text-align: center;
+}
+
 /* "Annuler" : retablit la mise en page precedente AVEC son contenu. Assez
    visible pour etre trouve dans la seconde qui suit l'erreur (fond ambre,
    pleine largeur du panneau), assez sobre pour ne pas rivaliser avec le choix
@@ -1584,40 +1781,9 @@
 .atelier-format-slot.is-filled:hover .atelier-format-slot-check { opacity: 0; }
 .atelier-format-slot.is-filled:hover .atelier-format-slot-remove { opacity: 1; }
 
-.atelier-clear-btn {
-  align-self: flex-start;
-}
-
-/* Confirmation a deux temps (retour utilisateur : "ajouter une confirmation
-   ou un undo visible sur Vider cette page") — meme esprit que le retrait
-   d'un seul emplacement (couleur d'alerte + libelle explicite au 2e temps),
-   avec un "Annuler" toujours visible a cote plutot qu'un simple second clic
-   au meme endroit (l'action ici efface TOUTE la page, pas un seul
-   emplacement — une sortie explicite parait plus sure). */
-.atelier-clear-confirm {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-}
-.atelier-clear-btn.is-pending {
-  border-color: #b42318;
-  color: #b42318;
-}
-.atelier-clear-btn.is-pending:hover {
-  background: rgba(180, 35, 24, 0.08);
-}
-.atelier-clear-cancel {
-  border: none;
-  background: none;
-  padding: 4px 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(60, 52, 40, 0.6);
-  cursor: pointer;
-  text-decoration: underline;
-}
-.atelier-clear-cancel:hover { color: var(--ink); }
+/* Les styles de l ancien bouton "Vider cette page" du panneau ont ete
+   retires le 2026-09-13 : l action est passee en pictogramme sur la page
+   (.atelier-page-action-btn.is-danger). */
 
 @media (max-width: 1080px) {
   .atelier-workspace {
