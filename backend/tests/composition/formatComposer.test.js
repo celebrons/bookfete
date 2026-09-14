@@ -49,10 +49,29 @@ describe('composeBookForFormat — pages verrouillees', () => {
     expect(allItemIds.filter((id) => id === 'p3').length).toBe(1);
   });
 
-  it("conserve 100% du contenu (aucune perte), verrouille ou non", () => {
-    const { pages } = composeBookForFormat({ items, existingPages, template: TEMPLATE, layouts: LAYOUTS, formatId: 'standard' });
-    const allItemIds = new Set(pages.flatMap((page) => page.content?.itemIds || []));
-    expect(allItemIds).toEqual(new Set(['p1', 'p2', 'p3', 'p4']));
+  // CONTRAT MODIFIE LE 2026-09-14, deliberement.
+  //
+  // Ce test exigeait auparavant que TOUT le contenu du livre soit replace,
+  // y compris les souvenirs jamais poses sur une page. C'etait un defaut, pas
+  // une garantie : sur un livre compose a la main, changer de format ajoutait
+  // silencieusement des pages remplies de contenu que l'utilisateur n'avait
+  // pas mis dans son livre (constate sur « Voyage a Montreal » : 30 pages
+  // faites a la main, +4 pages en Livret/Standard et +6 en Luxe).
+  //
+  // Nouveau contrat : sur un livre qui contient des pages faites a la main,
+  // seul le contenu DEJA POSE circule. La garantie « aucune perte » reste
+  // entiere pour un livre 100% automatique (test dedie plus bas).
+  it('ne perd aucun contenu DEJA POSE sur une page, verrouillee ou non', () => {
+    const avecPageAuto = [
+      ...existingPages,
+      { page_index: 2, locked: false, layout_id: 'l-full-photo', content: { kind: 'photo', itemIds: ['p1'], blocks: [{ itemIds: ['p1'] }] } }
+    ];
+    const { pages } = composeBookForFormat({ items, existingPages: avecPageAuto, template: TEMPLATE, layouts: LAYOUTS, formatId: 'standard' });
+    const allItemIds = new Set(pages.flatMap((page) => page.content?.itemIds || []).filter(Boolean));
+    expect(allItemIds).toEqual(new Set(['p1', 'p2', 'p3']));
+    // p4 n'a jamais ete pose : il reste dans la bibliotheque, le livre ne
+    // grossit pas tout seul pour l'accueillir.
+    expect(allItemIds.has('p4')).toBe(false);
   });
 
   it("etend le total de pages plutot que de tronquer une page verrouillee tres en avance", () => {
@@ -179,5 +198,86 @@ describe('composeBookForFormat — livre sans contenu restant', () => {
     const { pages, pageCount } = composeBookForFormat({ items: [], existingPages: [], template: TEMPLATE, layouts: LAYOUTS, formatId: 'standard' });
     expect(pages).toEqual([]);
     expect(pageCount).toBe(0);
+  });
+});
+
+// Changer de FORMAT ne doit jamais ajouter au livre du contenu que
+// l'utilisateur n'y a pas mis.
+//
+// Defaut reel constate le 2026-09-14 sur « Voyage a Montreal » : 30 pages
+// composees a la main, 10 souvenirs jamais places restes dans la
+// bibliotheque. Le simple choix d'un format ajoutait 4 pages en
+// Livret/Standard et 6 en Luxe, remplies de ces souvenirs-la. « Des pages
+// supplementaires apparaissent dans l'apercu final, mon livre ne contient
+// que 30 pages. »
+describe('composeBookForFormat — un livre fait a la main ne grossit pas tout seul', () => {
+  // 4 photos posees a la main sur 2 pages, 6 photos JAMAIS placees.
+  const posees = [photoItem('p1', 0), photoItem('p2', 1), photoItem('p3', 2), photoItem('p4', 3)];
+  const jamaisPlacees = [5, 6, 7, 8, 9, 10].map((n) => photoItem(`libre-${n}`, n));
+  const items = [...posees, ...jamaisPlacees];
+
+  const pagesManuelles = [
+    { page_index: 0, layout_id: 'l-two-photos', locked: true, content: { kind: 'photo', itemIds: ['p1', 'p2'], blocks: [{ kind: 'photo', layoutId: 'l-two-photos', itemIds: ['p1', 'p2'] }] } },
+    { page_index: 1, layout_id: 'l-two-photos', locked: true, content: { kind: 'photo', itemIds: ['p3', 'p4'], blocks: [{ kind: 'photo', layoutId: 'l-two-photos', itemIds: ['p3', 'p4'] }] } }
+  ];
+
+  const composer = (formatId, existingPages) => composeBookForFormat({
+    items, existingPages, template: TEMPLATE, layouts: LAYOUTS, formatId
+  });
+
+  it('garde EXACTEMENT le meme nombre de pages dans les trois formats', () => {
+    const comptes = ['livret', 'standard', 'luxe'].map((f) => composer(f, pagesManuelles).pageCount);
+    expect(comptes).toEqual([2, 2, 2]);
+  });
+
+  it('ne place aucun souvenir laisse dans la bibliotheque', () => {
+    const { pages } = composer('luxe', pagesManuelles);
+    const posesEnPage = pages.flatMap((page) => page.content?.itemIds || []).filter(Boolean);
+    jamaisPlacees.forEach((item) => {
+      expect(posesEnPage).not.toContain(item.id);
+    });
+  });
+
+  // NON DESTRUCTIF : les pages automatiques deja presentes ne sont pas
+  // supprimees non plus. Un livre genere automatiquement puis retouche a la
+  // main ne doit pas perdre ses pages generees en changeant de format —
+  // ce serait le defaut symetrique, et bien pire que d'en ajouter.
+  it('ne supprime pas non plus les pages automatiques deja presentes', () => {
+    const avecPageAuto = [
+      ...pagesManuelles,
+      { page_index: 2, layout_id: 'l-two-photos', locked: false, content: { kind: 'photo', itemIds: ['libre-5', 'libre-6'], blocks: [{ kind: 'photo', layoutId: 'l-two-photos', itemIds: ['libre-5', 'libre-6'] }] } }
+    ];
+    ['livret', 'standard', 'luxe'].forEach((formatId) => {
+      const { pages, pageCount } = composer(formatId, avecPageAuto);
+      expect(pageCount).toBe(3);
+      const posesEnPage = pages.flatMap((page) => page.content?.itemIds || []).filter(Boolean);
+      expect(posesEnPage).toContain('libre-5');
+      expect(posesEnPage).toContain('libre-6');
+      // ... et toujours aucun souvenir jamais pose.
+      expect(posesEnPage).not.toContain('libre-9');
+    });
+  });
+
+  // Le coeur de la regle : en mode manuel, changer de format change le
+  // PAPIER, jamais le livre.
+  it('rend le livre STRICTEMENT identique dans les trois formats', () => {
+    const avecPageAuto = [
+      ...pagesManuelles,
+      { page_index: 2, layout_id: 'l-full-photo', locked: false, content: { kind: 'photo', itemIds: ['libre-5'], blocks: [{ kind: 'photo', layoutId: 'l-full-photo', itemIds: ['libre-5'] }] } }
+    ];
+    const rendus = ['livret', 'standard', 'luxe'].map((formatId) => JSON.stringify(composer(formatId, avecPageAuto).pages));
+    expect(rendus[1]).toBe(rendus[0]);
+    expect(rendus[2]).toBe(rendus[0]);
+  });
+
+  it('un livre 100% automatique garde sa pagination propre a chaque format', () => {
+    // Aucune page verrouillee : le moteur reprend TOUT le contenu, comme
+    // avant — c'est la fonctionnalite « chaque format a sa propre
+    // pagination », elle ne doit pas etre touchee par le correctif.
+    const { pages } = composeBookForFormat({
+      items, existingPages: [], template: TEMPLATE, layouts: LAYOUTS, formatId: 'standard'
+    });
+    const posesEnPage = pages.flatMap((page) => page.content?.itemIds || []).filter(Boolean);
+    expect(posesEnPage.length).toBe(items.length);
   });
 });

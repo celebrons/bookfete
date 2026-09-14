@@ -28,6 +28,13 @@ const CHAPTER_SEPARATOR_MAX_COUNT = 4; // jamais plus de 4, meme sur un tres lon
 // Insere des pages de separation dans le contenu FRAICHEMENT COMPOSE (jamais
 // dans les pages verrouillees, qui ne passent pas par ici) — jamais avant la
 // toute premiere page (un livre commence par du contenu, pas un separateur).
+// Etendue reelle d'une liste de pages : le plus grand index + 1. Duplique
+// volontairement plutot qu'importe de bookContentService (qui, lui, parle a
+// la base) : ce module doit rester une fonction pure.
+function pageExtent(pages = []) {
+  return pages.reduce((max, page) => Math.max(max, (Number(page.page_index) || 0) + 1), 0);
+}
+
 function withChapterSeparators(composedPages, formatId) {
   if (formatId !== 'luxe' || composedPages.length < CHAPTER_SEPARATOR_MIN_PAGES) return composedPages;
 
@@ -72,6 +79,49 @@ function composeBookForFormat(input = {}) {
   // nouveau chemin, plus exigeant puisqu'il tourne a chaque changement de
   // format plutot qu'a la demande.
   const lockedItemIds = new Set(lockedPages.flatMap((page) => page.content?.itemIds || []));
+
+  // MODE MANUEL : CHANGER DE FORMAT NE TOUCHE PAS AU LIVRE.
+  //
+  // Des qu'un livre contient une seule page composee a la main, c'est
+  // l'utilisateur qui decide de ce qu'il contient — pas le moteur. Choisir un
+  // format change alors le PAPIER, jamais le contenu : aucune page ajoutee,
+  // aucune page retiree, aucun contenu deplace.
+  //
+  // Histoire de ce garde-fou, en deux temps (2026-09-14) :
+  //
+  //   1. A l'origine, cette fonction reprenait TOUT ce qui n'etait pas sur une
+  //      page verrouillee — y compris les souvenirs jamais places, restes dans
+  //      la bibliotheque. Sur « Voyage a Montreal » (30 pages faites a la
+  //      main, 10 souvenirs jamais utilises), choisir un format ajoutait 4
+  //      pages en Livret/Standard et 6 en Luxe.
+  //   2. Premiere correction, trop timide : ne rejouer que le contenu deja
+  //      pose sur les pages automatiques existantes. Mais les pages fautives
+  //      etaient DEJA la, et leur contenu comptait donc comme "deja pose" :
+  //      elles se regeneraient indefiniment. Retour utilisateur : « elles
+  //      reapparaissent malgre la suppression ».
+  //
+  // D'ou la regle actuelle, sans exception : « en mode manuel, il ne faut
+  // JAMAIS ajouter du contenu non voulu ».
+  //
+  // NON DESTRUCTIF, deliberement : les pages automatiques deja presentes sont
+  // rendues telles quelles, jamais supprimees. Un livre genere
+  // automatiquement puis retouche a la main (donc porteur de pages
+  // verrouillees) ne perd pas ses pages generees en changeant de format —
+  // ce serait le defaut symetrique, et bien pire. Pour retirer des pages, il
+  // y a l'atelier ("-2") et scripts/pages-ajoutees-par-le-format.js.
+  const hasManualPages = lockedPages.length > 0;
+  if (hasManualPages) {
+    const pagesInchangees = [...existingPages]
+      .sort((a, b) => a.page_index - b.page_index)
+      .map((page) => ({
+        page_index: page.page_index,
+        layout_id: page.layout_id,
+        content: page.content || {},
+        locked: page.locked === true
+      }));
+    return { pages: pagesInchangees, pageCount: pageExtent(pagesInchangees) };
+  }
+
   const remainingItems = items.filter((item) => !lockedItemIds.has(item.id));
 
   const units = buildUnitsFromItems(remainingItems);

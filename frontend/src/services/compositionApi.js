@@ -126,9 +126,21 @@ export const updateContentItem = (bookId, itemId, patch) => request(`/books/${bo
   body: JSON.stringify(patch)
 });
 
-export const addTextItem = (bookId, text, displayOrder = 0) => request(`/books/${bookId}/content-items`, {
+// `origin` dit d'ou vient le souvenir, et decide de sa duree de vie (voir
+// backend routes/composition.js sanitizeItemOrigin) :
+//   'library' — ajoute deliberement via le bouton "Ajouter" : il reste, qu'il
+//               soit utilise ou non. C'est le defaut.
+//   'page'    — ecrit directement dans un emplacement de page : il n'existe
+//               que pour cet emplacement, et disparait s'il en sort.
+export const addTextItem = (bookId, text, displayOrder = 0, origin = 'library') => request(`/books/${bookId}/content-items`, {
   method: 'POST',
-  body: JSON.stringify({ source: 'upload', kind: 'texte', text, display_order: displayOrder })
+  body: JSON.stringify({
+    source: 'upload',
+    kind: 'texte',
+    text,
+    display_order: displayOrder,
+    metadata: { origin: origin === 'page' ? 'page' : 'library' }
+  })
 });
 
 // Supprime TOUS les souvenirs d'un type ('photo' ou 'texte'). Irreversible :

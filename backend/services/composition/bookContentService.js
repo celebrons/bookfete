@@ -121,6 +121,67 @@ async function deleteContentItemsByKind(bookId, kind) {
   return doomed;
 }
 
+// Supprime les souvenirs ECRITS DANS UNE PAGE puis abandonnes.
+//
+// Regle produit (2026-09-14) : « il ne faut jamais garder des souvenirs
+// ecrits dans une page puis abandonnes ; l'onglet Souvenirs sert surtout a
+// recuperer les souvenirs des contributeurs ». Un texte tape directement dans
+// un emplacement n'existe que pour cet emplacement : s'il en sort — retire,
+// changement de mise en page, page videe — il disparait avec lui.
+//
+// QUATRE conditions cumulees, volontairement etroites. Chacune protege une
+// categorie de contenu qu'il serait grave de perdre :
+//   1. kind 'texte'          — une PHOTO n'est jamais supprimee : c'est un
+//                              fichier que l'utilisateur a choisi et envoye.
+//   2. source 'upload'       — jamais une contribution : la bibliotheque
+//                              existe d'abord pour les recueillir.
+//   3. metadata.origin 'page' — jamais un souvenir ajoute a la main via le
+//                              bouton "Ajouter" (origin 'library'), ni un
+//                              souvenir anterieur a cette regle (champ
+//                              absent = 'library' par defaut, voir
+//                              routes/composition.js sanitizeItemOrigin).
+//   4. reference par AUCUNE page — tant qu'il est pose quelque part, il fait
+//                              partie du livre et ne bouge pas.
+//
+// Appelee APRES chaque ecriture de page, jamais avant : c'est l'etat final
+// des pages qui decide. Jamais bloquante — un echec de nettoyage ne doit pas
+// faire echouer la sauvegarde d'une page.
+async function purgeAbandonedPageTexts(bookId) {
+  try {
+    const [pages, items] = await Promise.all([listPages(bookId), listContentItems(bookId)]);
+
+    // Tout ce qui est reference par une page, quelle qu'elle soit : itemIds
+    // de la page ET itemIds de chaque bloc (les deux existent selon le chemin
+    // d'ecriture, et l'un peut etre a jour sans l'autre).
+    const utilises = new Set();
+    pages.forEach((page) => {
+      (page.content?.itemIds || []).filter(Boolean).forEach((id) => utilises.add(id));
+      (page.content?.blocks || []).forEach((block) => {
+        (block?.itemIds || []).filter(Boolean).forEach((id) => utilises.add(id));
+      });
+    });
+
+    const abandonnes = items.filter((item) => (
+      item.kind === 'texte'
+      && item.source === 'upload'
+      && item.metadata?.origin === 'page'
+      && !utilises.has(item.id)
+    ));
+    if (abandonnes.length === 0) return [];
+
+    const { error } = await supabase
+      .from('book_content_items')
+      .delete()
+      .eq('book_id', bookId)
+      .in('id', abandonnes.map((item) => item.id));
+    if (error) throw error;
+
+    return abandonnes;
+  } catch (_error) {
+    return [];
+  }
+}
+
 async function listPages(bookId) {
   const { data, error } = await supabase
     .from('book_pages')
@@ -453,6 +514,7 @@ module.exports = {
   removeTrailingPages,
   isPageEmpty,
   listPagesForRender,
+  purgeAbandonedPageTexts,
   movePage,
   upsertPage,
   MIN_BOOK_PAGES,

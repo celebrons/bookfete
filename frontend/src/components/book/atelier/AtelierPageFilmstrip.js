@@ -36,6 +36,8 @@ const PAGE_DRAG_TYPE = 'application/x-celebrons-page';
 
 function FilmstripCell({
   target, label, status, isActive, aspectRatio, onSelect,
+  // Nombre de photos signalees sur CETTE page (0 = rien a signaler).
+  qualityWarnings = 0,
   // Deplacement : seules les pages interieures sont concernees (une
   // couverture ne se deplace pas), d'ou `onMove` absent sur les autres.
   onMove, dropSide, onDragOverCell, onDragLeaveCell, isDragging
@@ -71,9 +73,14 @@ function FilmstripCell({
   }, [isActive]);
 
   const movable = Boolean(onMove);
+  // L'avertissement passe AVANT le reste dans l'infobulle : c'est la seule
+  // information qui demande une action.
+  const alerte = qualityWarnings > 0
+    ? ` — ⚠️ ${qualityWarnings} photo${qualityWarnings > 1 ? 's' : ''} peu nette${qualityWarnings > 1 ? 's' : ''}`
+    : '';
   const title = movable
-    ? `Page ${label}${STATUS_LABEL[status] ? ` — ${STATUS_LABEL[status]}` : ''} — glisser pour la déplacer`
-    : (STATUS_LABEL[status] ? `${label} — ${STATUS_LABEL[status]}` : `${label}`);
+    ? `Page ${label}${STATUS_LABEL[status] ? ` — ${STATUS_LABEL[status]}` : ''}${alerte} — glisser pour la déplacer`
+    : (STATUS_LABEL[status] ? `${label} — ${STATUS_LABEL[status]}${alerte}` : `${label}${alerte}`);
 
   return (
     <button
@@ -84,6 +91,7 @@ function FilmstripCell({
         `is-${status}`,
         isActive ? 'is-active' : '',
         movable ? 'is-movable' : '',
+        qualityWarnings > 0 ? 'has-quality-warning' : '',
         isDragging ? 'is-dragging' : '',
         dropSide ? `is-drop-${dropSide}` : ''
       ].filter(Boolean).join(' ')}
@@ -116,13 +124,24 @@ function FilmstripCell({
       title={title}
     >
       <span className="atelier-filmstrip-cell-label">{label}</span>
-      {status === 'complete' && <span className="atelier-filmstrip-cell-check" aria-hidden="true">✓</span>}
+      {/* Le ⚠️ REMPLACE le ✓ : une page peut etre complete ET porter une photo
+          trop peu definie — afficher les deux cote a cote donnerait un signal
+          contradictoire sur une vignette de 40 px. L'alerte prime. */}
+      {qualityWarnings > 0 ? (
+        <span className="atelier-filmstrip-cell-warning" aria-hidden="true">⚠️</span>
+      ) : (
+        status === 'complete' && <span className="atelier-filmstrip-cell-check" aria-hidden="true">✓</span>
+      )}
     </button>
   );
 }
 
 function AtelierPageFilmstrip({
   pageStatuses,
+  // { [pageIndex]: nombre } — photos signalees par page (voir
+  // GET /print-quality-check). Absent = aucune pastille, comportement
+  // d'avant inchange.
+  qualityWarningsByPage = {},
   activeTarget,
   printFormat,
   onSelect,
@@ -194,6 +213,7 @@ function AtelierPageFilmstrip({
           isActive={activeTarget === pageIndex}
           aspectRatio={aspectRatio}
           onSelect={onSelect}
+          qualityWarnings={qualityWarningsByPage[pageIndex] || 0}
           {...cellMoveProps(pageIndex)}
         />
       ))}

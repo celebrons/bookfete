@@ -16,27 +16,64 @@ import { getPrintQualityCheck } from '../../../services/compositionApi';
 // bloquant non plus : n'affecte jamais `isReady`/le bouton "Voir mon
 // livre" — juste une ligne d'information en plus, avec un lien pour aller
 // directement corriger si souhaite.
-function AtelierFinishModal({ isOpen, onClose, stats, onContinue, bookId, onViewPage }) {
+function AtelierFinishModal({
+  isOpen, onClose, stats, onContinue, bookId, onViewPage,
+  // Avertissements deja charges par l'atelier (il en a besoin pour les
+  // pastilles du filmstrip) : evite un second appel identique. Absent = on
+  // retombe sur le chargement local ci-dessous.
+  warnings: warningsFromParent,
+  onRefreshQuality
+}) {
   const [qualityCheck, setQualityCheck] = useState(null);
+  // La liste des pages concernees est REPLIEE par defaut : sur un livre a 37
+  // avertissements, la derouler d'office noierait le bouton "Voir mon livre".
+  const [listeDepliee, setListeDepliee] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !bookId) {
       setQualityCheck(null);
-      return;
+      setListeDepliee(false);
+      return undefined;
+    }
+    // Le parent tient deja la liste a jour : on la reprend telle quelle, et on
+    // lui demande simplement de la rafraichir — c'est le moment ou le chiffre
+    // doit etre exact.
+    if (Array.isArray(warningsFromParent)) {
+      setQualityCheck({ warnings: warningsFromParent });
+      if (onRefreshQuality) onRefreshQuality();
+      return undefined;
     }
     let cancelled = false;
     getPrintQualityCheck(bookId)
       .then((result) => { if (!cancelled) setQualityCheck(result); })
       .catch(() => {}); // silencieux : jamais bloquant, juste pas de ligne qualite affichee
     return () => { cancelled = true; };
-  }, [isOpen, bookId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, bookId, warningsFromParent]);
 
   if (!isOpen || !stats) return null;
 
   const isReady = stats.incompletePages === 0;
   // Contrat v2 : { warnings: [{pageIndex, itemId, statut, label, thumbnailUrl}], hasWarnings }
-  const lowQualityCount = qualityCheck?.warnings?.length || 0;
-  const firstLowQualityPage = qualityCheck?.warnings?.[0]?.pageIndex;
+  // On ne garde que les PHOTOS : le controle renvoie aussi des avertissements
+  // de texte, qui ne parlent pas de nettete et ont leur propre signalement.
+  const photoWarnings = (qualityCheck?.warnings || []).filter((entry) => entry.kind !== 'texte');
+  const lowQualityCount = photoWarnings.length;
+
+  // Regroupees PAR PAGE : c'est la page qu'on va rouvrir, pas la photo. Une
+  // page portant 3 photos trop justes ne doit apparaitre qu'une fois.
+  const pagesConcernees = [];
+  photoWarnings.forEach((entry) => {
+    if (entry.pageIndex == null) return;
+    const existante = pagesConcernees.find((p2) => p2.pageIndex === entry.pageIndex);
+    if (existante) {
+      existante.count += 1;
+      if (entry.statut === 'insuffisant') existante.pire = 'insuffisant';
+      return;
+    }
+    pagesConcernees.push({ pageIndex: entry.pageIndex, count: 1, pire: entry.statut });
+  });
+  pagesConcernees.sort((x, y) => x.pageIndex - y.pageIndex);
 
   return (
     <div className="atelier-modal-backdrop" onClick={onClose}>
@@ -63,17 +100,50 @@ function AtelierFinishModal({ isOpen, onClose, stats, onContinue, bookId, onView
             ) : (
               <li className="is-warning">
                 ⚠️ {lowQualityCount} photo{lowQualityCount > 1 ? 's' : ''} pourraient être moins nette{lowQualityCount > 1 ? 's' : ''}
-                {onViewPage && firstLowQualityPage != null && (
+                {pagesConcernees.length > 0 && (
                   <>
                     {' — '}
                     <button
                       type="button"
                       className="atelier-finish-quality-link"
-                      onClick={() => { onClose(); onViewPage(firstLowQualityPage); }}
+                      onClick={() => setListeDepliee((v) => !v)}
+                      aria-expanded={listeDepliee}
                     >
-                      Voir les photos concernées
+                      {listeDepliee
+                        ? 'Masquer les pages'
+                        : (pagesConcernees.length > 1
+                          ? `Voir les ${pagesConcernees.length} pages concernées`
+                          : 'Voir la page concernée')}
                     </button>
                   </>
+                )}
+
+                {/* La LISTE, et non un saut vers la premiere page concernee.
+                    L'ancien lien menait a la page du premier avertissement :
+                    quand c'etait celle ou l'on se trouvait deja (souvent la
+                    page 1), cliquer ne produisait rien de visible — "ca ne
+                    renvoie nulle part" (2026-09-14). Les pages sont aussi
+                    marquees d'un ⚠️ dans la bande de vignettes, pour les
+                    retrouver sans rouvrir cet ecran. */}
+                {listeDepliee && (
+                  <ul className="atelier-finish-quality-pages">
+                    {pagesConcernees.map((entree) => (
+                      <li key={entree.pageIndex}>
+                        <button
+                          type="button"
+                          className={`atelier-finish-quality-page ${entree.pire === 'insuffisant' ? 'is-severe' : ''}`}
+                          onClick={() => { onClose(); if (onViewPage) onViewPage(entree.pageIndex); }}
+                          disabled={!onViewPage}
+                        >
+                          <span className="atelier-finish-quality-page-num">Page {entree.pageIndex + 1}</span>
+                          <span className="atelier-finish-quality-page-count">
+                            {entree.count} photo{entree.count > 1 ? 's' : ''}
+                            {entree.pire === 'insuffisant' ? ' · résolution insuffisante' : ' · un peu juste'}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </li>
             )

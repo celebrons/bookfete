@@ -7,6 +7,7 @@ import {
   listPages,
   saveManualPage,
   clearPage,
+  getPrintQualityCheck,
   updatePageContent,
   fetchInteriorPagePreviewHtml,
   fetchCoverPreviewHtml,
@@ -163,6 +164,31 @@ export default function BookAtelierLuxe() {
   // bloque jamais la file (le maillon suivant s'enchaine quand meme).
   const pageWritesRef = useRef(new Map());
 
+  // Resynchronise la BIBLIOTHEQUE apres une ecriture de page.
+  //
+  // Le serveur supprime les souvenirs ecrits dans une page puis abandonnes
+  // (voir bookContentService.purgeAbandonedPageTexts) : sans ce
+  // rafraichissement, la vignette d'un souvenir deja supprime resterait
+  // affichee dans l'onglet "Souvenirs", cliquable, et poserait un id mort.
+  //
+  // Attend d'abord la file d'ecriture de la page concernee : relire avant que
+  // l'ecriture soit arrivee renverrait l'etat d'AVANT, donc le souvenir
+  // toujours present. Declenche uniquement sur les trois gestes qui peuvent
+  // abandonner un texte (retirer un emplacement, changer de mise en page,
+  // vider la page) — jamais a chaque frappe.
+  const resyncItemsAfterWrite = useCallback(async (pageIndex) => {
+    if (!bookId) return;
+    try {
+      const enCours = pageWritesRef.current.get(pageIndex);
+      if (enCours) await enCours;
+      const frais = await listContentItems(bookId);
+      setItems(frais || []);
+    } catch (_err) {
+      // Non bloquant : au pire la bibliotheque se resynchronise au prochain
+      // chargement de l'atelier.
+    }
+  }, [bookId]);
+
   const queuePageWrite = useCallback((pageIndex, run) => {
     const previous = pageWritesRef.current.get(pageIndex) || Promise.resolve();
     const next = previous.then(run, run);
@@ -184,6 +210,30 @@ export default function BookAtelierLuxe() {
   // automatique alors qu'on est deja sur la premiere double-page) : l'effet
   // de chargement ci-dessous ne se redeclenche que sur un changement de
   // dependance, jamais sur un simple `setCoverHtml(null)` isole.
+  // Photos signalees par le controle qualite d'impression, regroupees PAR
+  // PAGE : { [pageIndex]: nombre }.
+  //
+  // Jusqu'ici ce controle n'etait consulte qu'a l'ouverture de "Terminer mon
+  // livre", et son unique lien sautait a la PREMIERE page concernee. Quand
+  // celle-ci etait la page ou l'on se trouvait deja (cas frequent : page 1),
+  // cliquer ne produisait rien de visible — "ca ne renvoie nulle part"
+  // (2026-09-14). La reponse est de MONTRER ou sont les problemes plutot que
+  // d'y teleporter : une pastille sur chaque vignette concernee.
+  //
+  // Jamais bloquant : un echec laisse simplement la carte vide, l'atelier
+  // fonctionne exactement comme avant.
+  const [qualityWarnings, setQualityWarnings] = useState([]);
+
+  const refreshQualityWarnings = useCallback(async () => {
+    if (!bookId) return;
+    try {
+      const result = await getPrintQualityCheck(bookId);
+      setQualityWarnings(Array.isArray(result?.warnings) ? result.warnings : []);
+    } catch (_err) {
+      setQualityWarnings([]);
+    }
+  }, [bookId]);
+
   const [refreshToken, setRefreshToken] = useState(0);
   // Incremente UNIQUEMENT par loadAll (rechargement delibere des donnees).
   // Sert de declencheur a l initialisation du brouillon de page : une
@@ -221,6 +271,33 @@ export default function BookAtelierLuxe() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Le controle qualite depend du CONTENU des pages ET du format d'impression
+  // (les cadres changent de taille en mm, donc la definition requise aussi).
+  // Il est donc relance a chaque changement de pages plutot qu'une seule fois
+  // au chargement — sinon la pastille resterait sur une page qu'on vient de
+  // corriger, ou manquerait sur une photo qu'on vient de poser.
+  //
+  // `pages.length` et non `pages` : l'objet change d'identite a chaque
+  // sauvegarde automatique, ce qui relancerait un appel reseau a chaque
+  // frappe. Un rafraichissement explicite est declenche a l'ouverture de
+  // "Terminer mon livre", la ou le chiffre doit etre exact.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { refreshQualityWarnings(); }, [refreshQualityWarnings, pages.length, book?.print_format]);
+
+  // { [pageIndex]: nombre de photos signalees }. Seules les PHOTOS comptent
+  // ici : le controle renvoie aussi des avertissements de texte, qui ont leur
+  // propre signalement et ne parlent pas de nettete.
+  const qualityWarningsByPage = useMemo(() => {
+    const parPage = {};
+    qualityWarnings
+      .filter((entry) => entry.kind !== 'texte')
+      .forEach((entry) => {
+        if (entry.pageIndex == null) return;
+        parPage[entry.pageIndex] = (parPage[entry.pageIndex] || 0) + 1;
+      });
+    return parPage;
+  }, [qualityWarnings]);
 
   const photos = useMemo(() => items.filter((item) => item.kind === 'photo'), [items]);
   const souvenirs = useMemo(() => items.filter((item) => item.kind === 'texte'), [items]);
@@ -739,6 +816,11 @@ export default function BookAtelierLuxe() {
       releaseSpreadSibling(currentPageIndex);
     }
     captureUndo();
+    // Tous les emplacements repartent a null : les textes qui y etaient ecrits
+    // sont abandonnes, le serveur les supprime.
+    if (draftSlotItemIds.some((id) => id && itemsById[id]?.kind === 'texte')) {
+      resyncItemsAfterWrite(currentPageIndex);
+    }
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(new Array(atelierLayout.slots.length).fill(null));
     setDraftPhotoAdjustments({});
@@ -771,6 +853,9 @@ export default function BookAtelierLuxe() {
     if (removedItemId) {
       const retire = itemsById[removedItemId];
       captureUndo(retire?.kind === 'texte' ? 'remettre le souvenir retiré' : 'remettre la photo retirée');
+      // Un souvenir ecrit dans cette page vient peut-etre d'etre abandonne :
+      // le serveur le supprimera, la bibliotheque doit suivre.
+      if (retire?.kind === 'texte') resyncItemsAfterWrite(currentPageIndex);
     }
     setDraftSlotItemIds((previous) => {
       const next = [...previous];
@@ -869,7 +954,12 @@ export default function BookAtelierLuxe() {
     setSaveStatus('saving');
     setSaveError('');
     try {
-      const created = await addTextItem(book.id, value, items.length);
+      // 'page' : ce souvenir n'existe que pour l'emplacement ou il vient
+      // d'etre ecrit. S'il en sort (retire, mise en page changee, page videe),
+      // le serveur le supprime au lieu de le laisser encombrer la
+      // bibliotheque — celle-ci sert d'abord aux souvenirs des contributeurs
+      // (regle produit 2026-09-14).
+      const created = await addTextItem(book.id, value, items.length, 'page');
       setItems((previous) => [...previous, created]);
       setDraftTextRoles((previous) => ({ ...previous, [created.id]: role }));
       setDraftTextStyles((previous) => ({ ...previous, [created.id]: styleOverrides || {} }));
@@ -956,6 +1046,7 @@ export default function BookAtelierLuxe() {
       setDraftTextRoles({});
       setDraftTextStyles({});
       setSaveStatus('idle');
+      await resyncItemsAfterWrite(currentPageIndex);
       await refreshPagePreview(currentPageIndex);
     } catch (err) {
       setSaveStatus('error');
@@ -1058,7 +1149,9 @@ export default function BookAtelierLuxe() {
     if (!book?.id || !text.trim()) return;
     setSidebarAddError('');
     try {
-      const created = await addTextItem(book.id, text.trim(), items.length);
+      // 'library' : geste explicite de l'utilisateur, ce souvenir reste
+      // disponible qu'il soit pose sur une page ou non.
+      const created = await addTextItem(book.id, text.trim(), items.length, 'library');
       setItems((previous) => [...previous, created]);
     } catch (err) {
       setSidebarAddError(err.message || "L'ajout du souvenir a echoue.");
@@ -1603,6 +1696,7 @@ export default function BookAtelierLuxe() {
       {book.page_count ? (
         <AtelierPageFilmstrip
           pageStatuses={finishStats.pageStatuses}
+          qualityWarningsByPage={qualityWarningsByPage}
           activeTarget={viewKind === 'cover' ? 'cover' : viewKind === 'back-cover' ? 'back-cover' : currentPageIndex}
           printFormat={book.print_format}
           onSelect={goToFilmstripTarget}
@@ -1638,6 +1732,8 @@ export default function BookAtelierLuxe() {
         onContinue={() => navigate(`/book/${bookId}/apercu`)}
         bookId={book?.id}
         onViewPage={goToFilmstripTarget}
+        warnings={qualityWarnings}
+        onRefreshQuality={refreshQualityWarnings}
       />
     </div>
   );

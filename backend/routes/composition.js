@@ -267,10 +267,38 @@ router.get('/api/books/:bookId/content-items', authenticate, requireOwnedBook, a
   }
 });
 
+// D'OU VIENT UN SOUVENIR ECRIT PAR LE CREATEUR (metadata.origin).
+//
+// Deux origines, et elles n'ont pas la meme duree de vie (regle produit
+// 2026-09-14) :
+//
+//   'page'    — ecrit directement DANS un emplacement de page. Il n'existe
+//               que pour remplir cet emplacement : s'il en sort, il n'a plus
+//               de raison d'etre et ne doit PAS encombrer la bibliotheque.
+//   'library' — ajoute deliberement via le bouton "Ajouter" de la
+//               bibliotheque. C'est un geste explicite : il reste, qu'il soit
+//               utilise ou non.
+//
+// Les contributions (source 'contribution') ne sont jamais concernees : la
+// bibliotheque sert AVANT TOUT a recueillir les souvenirs des contributeurs,
+// ils ne s'effacent jamais tout seuls.
+//
+// Absente ou inconnue -> 'library', c'est-a-dire le comportement d'avant :
+// un souvenir existant, ou cree par un appelant qui ignore ce champ, n'est
+// jamais supprime automatiquement.
+function sanitizeItemOrigin(raw) {
+  const valeur = raw?.metadata?.origin;
+  return valeur === 'page' ? 'page' : 'library';
+}
+
 // POST /api/books/:bookId/content-items
 router.post('/api/books/:bookId/content-items', authenticate, requireOwnedBook, async (req, res) => {
   try {
-    const data = await bookContentService.createContentItem(req.params.bookId, req.body);
+    const payload = {
+      ...req.body,
+      metadata: { ...(req.body?.metadata || {}), origin: sanitizeItemOrigin(req.body) }
+    };
+    const data = await bookContentService.createContentItem(req.params.bookId, payload);
     res.status(201).json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -713,21 +741,29 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, async (
 
     const { pages: formatPages, pageCount } = composeBookForFormat({ items, existingPages, template, layouts, formatId });
 
+    // Le livre TEL QU'IL SERA IMPRIME, pas seulement ses pages de contenu :
+    // une page laissee blanche est une vraie page, imprimee et facturee (voir
+    // bookContentService.listPagesForRender). Comparer le seul `pageCount`
+    // du moteur refusait a tort un livre compose a la main mais peu dense —
+    // devenu frequent depuis que le changement de format ne remplit plus le
+    // livre avec du contenu jamais place (2026-09-14, voir formatComposer).
+    const pagesImprimees = bookContentService.pageExtent(formatPages, book.page_count);
+
     // Meme plancher dur que POST /compose (voir son commentaire) — ce chemin
     // n'avait JUSQU'ICI aucune protection : un livre a contenu maigre
     // pouvait changer de format et se retrouver avec moins de pages que le
     // minimum imprimable Gelato, sans le moindre avertissement.
-    if (pageCount < layoutEngine.MIN_PRINTABLE_PAGES) {
+    if (pagesImprimees < layoutEngine.MIN_PRINTABLE_PAGES) {
       return res.status(422).json({
-        error: `Il faut ajouter du contenu pour atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum avec ce format (votre contenu actuel remplit environ ${pageCount} page${pageCount > 1 ? 's' : ''}). Ajoutez des photos ou des souvenirs, puis reessayez.`
+        error: `Il faut atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum avec ce format (votre livre en compte ${pagesImprimees}). Ajoutez des pages ou du contenu, puis reessayez.`
       });
     }
 
     // Plafond symetrique (voir layoutEngine.MAX_PRINTABLE_PAGES / son
     // commentaire dans POST /compose ci-dessus).
-    if (pageCount > layoutEngine.MAX_PRINTABLE_PAGES) {
+    if (pagesImprimees > layoutEngine.MAX_PRINTABLE_PAGES) {
       return res.status(422).json({
-        error: `Votre contenu remplit environ ${pageCount} pages avec ce format, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`
+        error: `Votre livre compterait ${pagesImprimees} pages avec ce format, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`
       });
     }
 
@@ -1056,6 +1092,9 @@ router.put('/api/books/:bookId/pages/:pageIndex', authenticate, requireOwnedBook
       else delete payload.content.photoCaptions;
     }
     const data = await bookContentService.upsertPage(req.params.bookId, pageIndex, payload);
+    // Un souvenir ecrit DANS un emplacement et qui n'y est plus n'a plus de
+    // raison d'exister (voir purgeAbandonedPageTexts). Jamais bloquant.
+    await bookContentService.purgeAbandonedPageTexts(req.params.bookId);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1194,6 +1233,10 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
       content: annotated.content,
       locked: true
     });
+    // Meme nettoyage que sur la route generique : un texte sorti de son
+    // emplacement (change de mise en page, remplace) ne doit pas rester dans
+    // la bibliotheque.
+    await bookContentService.purgeAbandonedPageTexts(book.id);
     res.json(data);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message });

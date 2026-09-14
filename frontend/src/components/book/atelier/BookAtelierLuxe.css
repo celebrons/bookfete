@@ -141,6 +141,26 @@
   color: var(--gold);
 }
 
+/* Pastille qualite sur la vignette (2026-09-14). Repond au retour "faut
+   peut etre marquer les pages concernees et/ou les images d'un asterix ou
+   d'un avertissement". Meme coin que le ✓ (qu'elle remplace) : deux signaux
+   cote a cote sur une vignette de 40 px se contrediraient. */
+.atelier-filmstrip-cell-warning {
+  position: absolute;
+  top: 0;
+  right: 1px;
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Le lisere rend la page reperable SANS lire la pastille : sur un livre de
+   40 vignettes on balaie la bande du regard, on ne lit pas chaque coin. */
+.atelier-filmstrip-cell.has-quality-warning {
+  border-color: #d9822b;
+  box-shadow: inset 0 0 0 1px rgba(217, 130, 43, 0.55);
+}
+
 /* --- Deplacement d'une page (glisser-deposer dans la bande) -------------
    Volontairement DISCRET, comme demande : aucun bouton ni poignee visible au
    repos. Le curseur de deplacement au survol est le seul indice permanent,
@@ -153,7 +173,8 @@
    pointeur du bouton a son numero declenche un dragleave sur le bouton, et le
    trait d'insertion clignote pendant tout le glissement. */
 .atelier-filmstrip-cell-label,
-.atelier-filmstrip-cell-check { pointer-events: none; }
+.atelier-filmstrip-cell-check,
+.atelier-filmstrip-cell-warning { pointer-events: none; }
 
 /* La vignette prise en main s'efface : on suit le TRAIT d'insertion, pas
    elle. */
@@ -255,6 +276,61 @@
   cursor: pointer;
 }
 .atelier-finish-quality-link:hover { color: var(--ink); }
+
+/* Liste des pages concernees, depliable sous l'avertissement (2026-09-14).
+   Remplace l'ancien lien qui sautait a la PREMIERE page signalee : quand
+   c'etait celle ou l'on se trouvait deja, cliquer ne produisait rien de
+   visible. Hauteur bornee et defilement interne : un livre peut porter
+   37 avertissements, la liste ne doit jamais repousser le bouton principal
+   hors de l'ecran. */
+.atelier-finish-quality-pages {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.atelier-finish-quality-page {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 8px;
+  background: var(--white, #fffdf8);
+  padding: 7px 10px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.atelier-finish-quality-page:hover:not(:disabled) {
+  border-color: var(--gold, #c9a35f);
+  background: rgba(201, 163, 95, 0.08);
+}
+
+.atelier-finish-quality-page:disabled { cursor: default; opacity: 0.7; }
+
+/* Liseré orange sur les pages dont une photo est REELLEMENT insuffisante,
+   pas seulement juste : les deux cas n'appellent pas la meme reaction. */
+.atelier-finish-quality-page.is-severe { border-left: 3px solid #d9822b; }
+
+.atelier-finish-quality-page-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink, #241f18);
+  white-space: nowrap;
+}
+
+.atelier-finish-quality-page-count {
+  font-size: 12px;
+  color: var(--text-light, #7a7266);
+}
 
 /* --- Explications de prise en main (AtelierOnboarding) ------------------ */
 

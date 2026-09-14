@@ -269,3 +269,103 @@ describe('bookContentService — nombre de pages', () => {
     expect(requiredPageCount([], 0)).toBe(30);
   });
 });
+
+// Un souvenir ECRIT DANS UNE PAGE puis abandonne ne doit pas rester dans la
+// bibliotheque. Regle produit 2026-09-14 : « il ne faut jamais ajouter des
+// souvenirs ecrits dans une page puis abandonnes ; l'onglet Souvenirs sert
+// surtout a recuperer les souvenirs des contributeurs ».
+//
+// Le perimetre de suppression est volontairement etroit : chaque test
+// ci-dessous protege une categorie de contenu qu'il serait grave de perdre.
+describe('bookContentService — souvenirs ecrits dans une page puis abandonnes', () => {
+  beforeEach(() => { jest.resetModules(); });
+
+  const texte = (id, origin, extra = {}) => ({
+    id, book_id: 'book-1', kind: 'texte', source: 'upload', text: 'Un souvenir',
+    metadata: origin ? { origin } : {}, display_order: 0, ...extra
+  });
+
+  const load = (items, pages) => {
+    const mock = createSupabaseMock({ book_content_items: items, book_pages: pages });
+    jest.doMock('../../config/supabase', () => mock);
+    return { mock, service: require('../../services/composition/bookContentService') };
+  };
+  const restants = (mock) => mock.__table('book_content_items').map((i) => i.id).sort();
+
+  it('supprime un texte ecrit dans une page et retire depuis', async () => {
+    const { mock, service } = load(
+      [texte('t-abandonne', 'page')],
+      [{ id: 'pg-0', book_id: 'book-1', page_index: 0, content: { itemIds: [null] } }]
+    );
+    const supprimes = await service.purgeAbandonedPageTexts('book-1');
+    expect(supprimes.map((i) => i.id)).toEqual(['t-abandonne']);
+    expect(restants(mock)).toEqual([]);
+  });
+
+  it('GARDE le meme texte tant qu il est pose sur une page', async () => {
+    const { mock, service } = load(
+      [texte('t-pose', 'page')],
+      [{ id: 'pg-0', book_id: 'book-1', page_index: 0, content: { itemIds: ['t-pose'] } }]
+    );
+    await service.purgeAbandonedPageTexts('book-1');
+    expect(restants(mock)).toEqual(['t-pose']);
+  });
+
+  it('le trouve aussi quand il n est reference que par un BLOC de la page', async () => {
+    // Les deux formes coexistent selon le chemin d'ecriture : ignorer les
+    // blocs supprimerait un texte pourtant bien present dans le livre.
+    const { mock, service } = load(
+      [texte('t-bloc', 'page')],
+      [{ id: 'pg-0', book_id: 'book-1', page_index: 0, content: { itemIds: [], blocks: [{ itemIds: ['t-bloc'] }] } }]
+    );
+    await service.purgeAbandonedPageTexts('book-1');
+    expect(restants(mock)).toEqual(['t-bloc']);
+  });
+
+  it('ne touche JAMAIS un souvenir ajoute via le bouton "Ajouter" (origin library)', async () => {
+    const { mock, service } = load([texte('t-biblio', 'library')], []);
+    await service.purgeAbandonedPageTexts('book-1');
+    expect(restants(mock)).toEqual(['t-biblio']);
+  });
+
+  it('ne touche JAMAIS un souvenir anterieur a cette regle (aucune origine)', async () => {
+    const { mock, service } = load([texte('t-ancien', null)], []);
+    await service.purgeAbandonedPageTexts('book-1');
+    expect(restants(mock)).toEqual(['t-ancien']);
+  });
+
+  it('ne touche JAMAIS une contribution, meme non posee', async () => {
+    // La bibliotheque existe d'abord pour recueillir les souvenirs des
+    // contributeurs : les supprimer serait le pire defaut possible.
+    const { mock, service } = load(
+      [texte('t-contrib', 'page', { source: 'contribution', contribution_id: 'c-1' })],
+      []
+    );
+    await service.purgeAbandonedPageTexts('book-1');
+    expect(restants(mock)).toEqual(['t-contrib']);
+  });
+
+  it('ne touche JAMAIS une photo, meme non posee', async () => {
+    const { mock, service } = load(
+      [{ id: 'ph-1', book_id: 'book-1', kind: 'photo', source: 'upload', url: 'u', metadata: { origin: 'page' }, display_order: 0 }],
+      []
+    );
+    await service.purgeAbandonedPageTexts('book-1');
+    expect(restants(mock)).toEqual(['ph-1']);
+  });
+
+  it('ne supprime que les abandonnes, jamais les autres, en une seule passe', async () => {
+    const { mock, service } = load(
+      [
+        texte('t-pose', 'page'),
+        texte('t-abandonne-1', 'page'),
+        texte('t-abandonne-2', 'page'),
+        texte('t-biblio', 'library')
+      ],
+      [{ id: 'pg-0', book_id: 'book-1', page_index: 0, content: { itemIds: ['t-pose', null] } }]
+    );
+    const supprimes = await service.purgeAbandonedPageTexts('book-1');
+    expect(supprimes.map((i) => i.id).sort()).toEqual(['t-abandonne-1', 't-abandonne-2']);
+    expect(restants(mock)).toEqual(['t-biblio', 't-pose']);
+  });
+});
