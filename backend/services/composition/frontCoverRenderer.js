@@ -46,10 +46,22 @@ function pt(value, scale) {
 // plus souvent dans la moitie haute d'un portrait qu'au centre exact) ;
 // toute autre orientation reste centree. Jamais applique aux vignettes de
 // COVER_MULTI_PHOTO (trop petites pour qu'un biais serve a quelque chose).
-function coverImgFrame(item, { biasPortrait = true } = {}) {
-  const frame = imgFrame(item?.url);
+// `adjustment` : { focalX, focalY, zoom, fitMode } choisi a la main sur la
+// couverture (cover_overrides.frontPhotoAdjust / backPhotoAdjust, voir
+// coverComposer). Absent = cadrage automatique centre, exactement le rendu
+// d'avant — aucun appelant existant n'a besoin de changer.
+//
+// Sans lui, la photo de couverture etait TOUJOURS recadree au centre et rien
+// ne permettait de la corriger : un visage decentre se retrouvait coupe, sans
+// recours (retour utilisateur 2026-09-15 : « il faut pouvoir ajuster la photo
+// de la 4e de couverture, la photo est tronquee »).
+function coverImgFrame(item, { biasPortrait = true, adjustment = null } = {}) {
+  const frame = imgFrame(item?.url, adjustment);
   if (biasPortrait && item?.metadata?.orientation === 'portrait') {
-    return frame.replace('class="photo-frame"', 'class="photo-frame cvr-bias-portrait"');
+    // Remplacement sur le DEBUT de l'attribut seulement : imgFrame peut avoir
+    // ajoute "is-contain" (mode photo entiere), et un remplacement exact
+    // n'aurait alors rien trouve.
+    return frame.replace('class="photo-frame', 'class="photo-frame cvr-bias-portrait');
   }
   return frame;
 }
@@ -119,7 +131,7 @@ function renderCoverPhoto(content, theme, scale) {
 
   return `
     <figure class="cvr-photo-zone" style="height:80%;margin:0;">
-      ${photoItem ? coverImgFrame(photoItem) : ''}
+      ${photoItem ? coverImgFrame(photoItem, { adjustment: content.photoAdjust }) : ''}
     </figure>
     <div class="cvr-safe cvr-band" style="height:20%;${backgroundStyleFor(theme, theme.paper)};">
       ${kickerHtml(content.kicker)}
@@ -138,7 +150,7 @@ function renderCoverPhotoTitle(content, theme, scale) {
 
   return `
     <figure class="cvr-photo-full" style="height:100%;margin:0;">
-      ${photoItem ? coverImgFrame(photoItem) : ''}
+      ${photoItem ? coverImgFrame(photoItem, { adjustment: content.photoAdjust }) : ''}
     </figure>
     <div class="cvr-scrim" aria-hidden="true"></div>
     <div class="cvr-safe cvr-on-photo">
@@ -200,7 +212,7 @@ function renderCoverSplit(content, theme, scale) {
   return `
     <div class="cvr-split">
       <figure class="cvr-split-photo" style="margin:0;">
-        ${photoItem ? coverImgFrame(photoItem) : ''}
+        ${photoItem ? coverImgFrame(photoItem, { adjustment: content.photoAdjust }) : ''}
       </figure>
       <div class="cvr-safe cvr-split-text" style="${backgroundStyleFor(theme, theme.paper)};">
         ${kickerHtml(content.kicker)}
@@ -224,7 +236,7 @@ function renderCoverFramed(content, theme, scale) {
   return `
     <div class="cvr-safe cvr-framed-stack" style="${backgroundStyleFor(theme, theme.bg)};">
       <figure class="cvr-framed-photo">
-        ${photoItem ? coverImgFrame(photoItem) : ''}
+        ${photoItem ? coverImgFrame(photoItem, { adjustment: content.photoAdjust }) : ''}
       </figure>
       <div class="cvr-framed-text">
         ${kickerHtml(content.kicker)}

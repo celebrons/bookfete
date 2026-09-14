@@ -33,6 +33,12 @@ function AtelierPhotoAdjustModal({
   layoutSlug,
   slotIndex,
   printFormat,
+  // Dimensions REELLES du cadre, en mm, quand elles ne se deduisent pas d'une
+  // mise en page (couverture : il n'y a ni layoutSlug ni emplacement). Sans
+  // elles, l'apercu retombait sur un carre — l'utilisateur aurait regle son
+  // cadrage contre une forme qui n'est pas celle qui sera imprimee, ce qui
+  // rend l'outil trompeur plutot qu'utile.
+  frameSizeMm,
   adjustment,
   onSave,
   onReset,
@@ -76,7 +82,7 @@ function AtelierPhotoAdjustModal({
 
   if (!isOpen || !item) return null;
 
-  const frame = resolveSlotSizeMm(layoutSlug, slotIndex, printFormat);
+  const frame = frameSizeMm || resolveSlotSizeMm(layoutSlug, slotIndex, printFormat);
   const ratio = frame ? frame.widthMm / frame.heightMm : 1;
   const imageUrl = item.metadata?.previewUrl || item.url;
   const photoRatio = item.metadata?.width && item.metadata?.height

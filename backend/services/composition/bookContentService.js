@@ -419,6 +419,129 @@ async function listPagesForRender(bookId, pageCount) {
   ));
 }
 
+// --- Point de restauration (voir sql/phase19_book_snapshots.sql) ----------
+//
+// UN SEUL point par livre : le filet du dernier geste destructeur, pas un
+// historique. Pose avant une generation automatique, retire une fois retabli.
+//
+// JAMAIS BLOQUANT, dans les deux sens. Si la table n'existe pas encore (la
+// migration se lance a la main dans Supabase, elle peut ne pas avoir ete
+// jouee), poser un instantane echoue silencieusement et la generation se
+// deroule exactement comme avant — mieux vaut un livre genere sans filet
+// qu'une generation qui refuse de partir pour une table manquante. La
+// restauration, elle, dit clairement qu'il n'y a rien a retablir.
+const SNAPSHOT_REASON_COMPOSE = 'compose';
+
+async function saveSnapshot(bookId, { reason = SNAPSHOT_REASON_COMPOSE } = {}) {
+  try {
+    const pages = await listPages(bookId);
+    const { data: book } = await supabase.from('books').select('page_count').eq('id', bookId).single();
+
+    const { error } = await supabase
+      .from('book_snapshots')
+      .upsert([{
+        book_id: bookId,
+        // On ne garde que ce qui reconstruit la page : ni id ni horodatage,
+        // qui seraient reecrits a la restauration de toute facon.
+        pages: pages.map((page) => ({
+          page_index: page.page_index,
+          layout_id: page.layout_id,
+          content: page.content || {},
+          locked: page.locked === true
+        })),
+        page_count: book?.page_count ?? null,
+        reason,
+        created_at: new Date().toISOString()
+      }], { onConflict: 'book_id' });
+    if (error) throw error;
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+// Decrit le point disponible sans le retablir : de quand il date, combien de
+// pages il contient, combien etaient faites a la main. C'est ce qui permet de
+// proposer « revenir a mon livre d'avant (30 pages, dont 12 faites a la
+// main) » plutot qu'un « Annuler » aveugle.
+async function describeSnapshot(bookId) {
+  try {
+    const { data, error } = await supabase
+      .from('book_snapshots')
+      .select('*')
+      .eq('book_id', bookId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+
+    const pages = Array.isArray(data.pages) ? data.pages : [];
+    return {
+      createdAt: data.created_at,
+      reason: data.reason,
+      pageCount: data.page_count ?? pageExtent(pages),
+      manualPages: pages.filter((page) => page.locked).length,
+      filledPages: pages.filter((page) => (page.content?.itemIds || []).filter(Boolean).length > 0).length
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+// Retablit le livre tel qu'il etait. Remplace TOUTES les pages — y compris les
+// verrouillees : l'instantane est la verite d'avant, un tri partiel
+// laisserait un livre hybride que personne n'a jamais vu.
+//
+// replaceBookPages ne convient PAS ici, justement parce qu'il protege les
+// pages verrouillees : retablir doit pouvoir defaire une page verrouillee
+// creee APRES l'instantane.
+async function restoreSnapshot(bookId) {
+  const { data, error: readError } = await supabase
+    .from('book_snapshots')
+    .select('*')
+    .eq('book_id', bookId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!data) return null;
+
+  const pages = Array.isArray(data.pages) ? data.pages : [];
+
+  // Table rase puis reecriture : deux passes, jamais un upsert partiel. Une
+  // page creee depuis l'instantane n'a aucune raison de survivre a un retour
+  // en arriere, et la laisser produirait un livre incoherent.
+  const { error: deleteError } = await supabase.from('book_pages').delete().eq('book_id', bookId);
+  if (deleteError) throw deleteError;
+
+  if (pages.length > 0) {
+    const { error: insertError } = await supabase.from('book_pages').insert(
+      pages.map((page) => ({
+        book_id: bookId,
+        page_index: page.page_index,
+        layout_id: page.layout_id,
+        content: page.content || {},
+        locked: page.locked === true
+      }))
+    );
+    if (insertError) throw insertError;
+  }
+
+  const pageCount = await syncPageCount(bookId, data.page_count || 0);
+
+  // Le point est CONSOMME : le garder laisserait croire qu'on peut revenir
+  // encore en arriere, alors qu'il decrit maintenant l'etat courant.
+  await supabase.from('book_snapshots').delete().eq('book_id', bookId);
+
+  return { pages: await listPages(bookId), pageCount };
+}
+
+async function discardSnapshot(bookId) {
+  try {
+    await supabase.from('book_snapshots').delete().eq('book_id', bookId);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 // --- Nombre de pages : une seule autorite ---------------------------------
 //
 // `books.page_count` et les lignes de `book_pages` DOIVENT toujours decrire le
@@ -515,6 +638,11 @@ module.exports = {
   isPageEmpty,
   listPagesForRender,
   purgeAbandonedPageTexts,
+  saveSnapshot,
+  describeSnapshot,
+  restoreSnapshot,
+  discardSnapshot,
+  SNAPSHOT_REASON_COMPOSE,
   movePage,
   upsertPage,
   MIN_BOOK_PAGES,

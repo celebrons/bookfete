@@ -21,7 +21,7 @@ const GRID_GAP_MM = 3;
 const MIXTE_GAP_MM = 5;
 const MIXTE_SLUGS = new Set(['PHOTO_TEXT', 'TEXT_PHOTO', 'TWO_PHOTOS_TEXT']);
 
-const FORMAT_DIMENSIONS_MM = {
+export const FORMAT_DIMENSIONS_MM = {
   livret: { widthMm: 200, heightMm: 200 },
   standard: { widthMm: 210, heightMm: 280 },
   luxe: { widthMm: 210, heightMm: 280 }

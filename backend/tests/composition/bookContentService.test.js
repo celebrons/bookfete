@@ -369,3 +369,120 @@ describe('bookContentService — souvenirs ecrits dans une page puis abandonnes'
     expect(restants(mock)).toEqual(['t-biblio', 't-pose']);
   });
 });
+
+// Point de restauration avant une generation automatique (phase19).
+//
+// Demande utilisateur 2026-09-15 : « j'aimerais tester le mode automatique
+// mais sans detruire ce que je viens de faire manuellement (possibilite de
+// revenir sur mon travail manuel termine) ».
+//
+// UN SEUL point par livre : le filet du dernier geste destructeur, pas un
+// historique.
+describe('bookContentService — point de restauration', () => {
+  beforeEach(() => { jest.resetModules(); });
+
+  const page = (index, locked, itemIds) => ({
+    id: 'pg-' + index,
+    book_id: 'book-1',
+    page_index: index,
+    layout_id: 'l1',
+    content: { kind: 'photo', itemIds },
+    locked
+  });
+
+  const load = (tables) => {
+    const mock = createSupabaseMock(tables);
+    jest.doMock('../../config/supabase', () => mock);
+    return { mock, service: require('../../services/composition/bookContentService') };
+  };
+
+  const livreDeDepart = () => ({
+    books: [{ id: 'book-1', page_count: 30 }],
+    book_pages: [page(0, true, ['a']), page(1, true, ['b']), page(2, false, ['c'])],
+    book_snapshots: []
+  });
+
+  it('enregistre le livre entier : pages, verrouillage et nombre annonce', async () => {
+    const { mock, service } = load(livreDeDepart());
+    const ok = await service.saveSnapshot('book-1');
+    expect(ok).toBe(true);
+
+    const [point] = mock.__table('book_snapshots');
+    expect(point.book_id).toBe('book-1');
+    expect(point.page_count).toBe(30);
+    expect(point.reason).toBe('compose');
+    expect(point.pages).toHaveLength(3);
+    expect(point.pages.map((p2) => p2.locked)).toEqual([true, true, false]);
+  });
+
+  it('le decrit sans rien retablir', async () => {
+    const { mock, service } = load(livreDeDepart());
+    await service.saveSnapshot('book-1');
+    const avant = JSON.stringify(mock.__table('book_pages'));
+
+    const description = await service.describeSnapshot('book-1');
+    expect(description).toMatchObject({ pageCount: 30, manualPages: 2, filledPages: 3, reason: 'compose' });
+    // Decrire ne doit JAMAIS ecrire : c'est tout l'interet de l'avoir separe.
+    expect(JSON.stringify(mock.__table('book_pages'))).toBe(avant);
+  });
+
+  it('retablit exactement le livre d avant, y compris ce qui a ete cree depuis', async () => {
+    const { mock, service } = load(livreDeDepart());
+    await service.saveSnapshot('book-1');
+
+    // La generation passe par la : elle remplace la page automatique et en
+    // ajoute d'autres.
+    mock.__table('book_pages').length = 0;
+    mock.__table('book_pages').push(
+      page(0, true, ['a']),
+      page(1, true, ['b']),
+      page(2, false, ['z']),
+      page(3, false, ['y']),
+      // Une page VERROUILLEE creee APRES l'instantane : elle n'a aucune raison
+      // de survivre a un retour en arriere.
+      page(4, true, ['x'])
+    );
+
+    const resultat = await service.restoreSnapshot('book-1');
+    expect(resultat).not.toBeNull();
+
+    const apres = mock.__table('book_pages').sort((a, b) => a.page_index - b.page_index);
+    expect(apres).toHaveLength(3);
+    expect(apres.map((p2) => p2.page_index)).toEqual([0, 1, 2]);
+    expect(apres.map((p2) => p2.content.itemIds[0])).toEqual(['a', 'b', 'c']);
+    expect(apres.map((p2) => p2.locked)).toEqual([true, true, false]);
+  });
+
+  it('CONSOMME le point une fois retabli : on ne revient pas deux fois au meme endroit', async () => {
+    const { mock, service } = load(livreDeDepart());
+    await service.saveSnapshot('book-1');
+    await service.restoreSnapshot('book-1');
+
+    expect(mock.__table('book_snapshots')).toHaveLength(0);
+    expect(await service.describeSnapshot('book-1')).toBeNull();
+    expect(await service.restoreSnapshot('book-1')).toBeNull();
+  });
+
+  it('un seul point par livre : le second remplace le premier', async () => {
+    const { mock, service } = load(livreDeDepart());
+    await service.saveSnapshot('book-1');
+    mock.__table('book_pages').push(page(3, false, ['d']));
+    await service.saveSnapshot('book-1');
+
+    expect(mock.__table('book_snapshots')).toHaveLength(1);
+    expect(mock.__table('book_snapshots')[0].pages).toHaveLength(4);
+  });
+
+  it('« je garde cette version » retire le point', async () => {
+    const { mock, service } = load(livreDeDepart());
+    await service.saveSnapshot('book-1');
+    await service.discardSnapshot('book-1');
+    expect(mock.__table('book_snapshots')).toHaveLength(0);
+  });
+
+  it('sans point enregistre, decrire et retablir repondent sans erreur', async () => {
+    const { service } = load(livreDeDepart());
+    expect(await service.describeSnapshot('book-1')).toBeNull();
+    expect(await service.restoreSnapshot('book-1')).toBeNull();
+  });
+});

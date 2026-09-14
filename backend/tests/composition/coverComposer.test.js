@@ -707,3 +707,84 @@ describe('coverComposer — la photo de 4e ne depend pas du format du livre', ()
     });
   });
 });
+
+// La photo de couverture doit etre RECADRABLE (2026-09-15) : « il faut
+// pouvoir ajuster la photo de la 4e de couverture, la photo est tronquee ».
+//
+// Jusqu'ici coverImgFrame appelait imgFrame(url) SANS ajustement : la photo
+// etait donc toujours rognee au centre, sur les deux faces, sans recours.
+//
+// Le reglage vit dans cover_overrides.frontPhotoAdjust / backPhotoAdjust,
+// ecrit DIRECTEMENT par le navigateur : il n'a jamais transite par une
+// validation serveur, d'ou les tests de bornes ci-dessous.
+describe('coverComposer — cadrage manuel de la photo de couverture', () => {
+  const { renderSinglePageHtml } = require('../../services/composition/pageRenderer');
+  const { resolveCoverFormat } = require('../../services/composition/coverFormat');
+
+  const items = [
+    { id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg', display_order: 0, metadata: { width: 3000, height: 2000, orientation: 'landscape' } },
+    { id: 'p2', kind: 'photo', url: 'https://cdn.test/2.jpg', display_order: 1, metadata: { width: 2400, height: 3200, orientation: 'portrait' } },
+    { id: 't1', kind: 'texte', text: 'Un souvenir', display_order: 2 },
+    { id: 't2', kind: 'texte', text: 'Un autre souvenir', display_order: 3 }
+  ];
+  const format = { formatId: 'standard', ...resolveCoverFormat('standard') };
+
+  // Le <style> du document contient les NOMS DE CLASSES : chercher
+  // "is-contain" dans le HTML entier trouverait le selecteur CSS, pas le
+  // rendu. Toute verification se limite au <body>.
+  const corpsDe = (html) => html.slice(html.indexOf('<body>'));
+
+  const rendre = (coverOverrides, face) => {
+    const book = { id: 'b1', title: 'Voyage', collection_mode: 'solo', cover_overrides: coverOverrides };
+    const pages = composeCoversIntoPages({ book, items, template: null, interiorPages: [], format });
+    const page = face === 'back' ? pages[pages.length - 1] : pages[0];
+    return corpsDe(renderSinglePageHtml({ book, page, items, layouts: [], format }));
+  };
+
+  const BASE_BACK = { backVariant: 'BACK_PHOTO_STATS', backPhotoId: 'p2' };
+
+  it('sans reglage : cadrage automatique centre — le rendu d avant, inchange', () => {
+    const html = rendre(BASE_BACK, 'back');
+    expect(html).toMatch(/--fx:50%;--fy:50%;--zoom:1;/);
+    expect(html).not.toMatch(/is-contain/);
+  });
+
+  it('applique le point focal et le zoom choisis sur la 4e', () => {
+    const html = rendre({ ...BASE_BACK, backPhotoAdjust: { focalX: 0.25, focalY: 0.8, zoom: 1.4, fitMode: 'cover' } }, 'back');
+    expect(html).toMatch(/--fx:25%/);
+    expect(html).toMatch(/--fy:80%/);
+    expect(html).toMatch(/--zoom:1\.4;/);
+  });
+
+  it('le mode "photo entiere" arrive bien sur la 4e — plus rien de tronque', () => {
+    const html = rendre({ ...BASE_BACK, backPhotoAdjust: { focalX: 0.5, focalY: 0.5, zoom: 1, fitMode: 'contain' } }, 'back');
+    expect(html).toMatch(/photo-frame is-contain/);
+  });
+
+  it('le recto a son propre cadrage, independant de celui de la 4e', () => {
+    const overrides = {
+      frontVariant: 'COVER_PHOTO_TITLE',
+      frontPhotoId: 'p1',
+      frontPhotoAdjust: { focalX: 0.1, focalY: 0.1, zoom: 1, fitMode: 'cover' },
+      ...BASE_BACK,
+      backPhotoAdjust: { focalX: 0.9, focalY: 0.9, zoom: 2, fitMode: 'cover' }
+    };
+    expect(rendre(overrides, 'front')).toMatch(/--fx:10%/);
+    expect(rendre(overrides, 'back')).toMatch(/--fx:90%/);
+  });
+
+  // cover_overrides vient du navigateur : une valeur absurde ne doit jamais
+  // produire une couverture cassee, seulement etre ramenee dans les bornes.
+  it('borne une valeur absurde au lieu de la rendre telle quelle', () => {
+    const html = rendre({ ...BASE_BACK, backPhotoAdjust: { focalX: 42, focalY: -7, zoom: 999, fitMode: 'n importe quoi' } }, 'back');
+    expect(html).toMatch(/--fx:100%/);
+    expect(html).toMatch(/--fy:0%/);
+    expect(html).toMatch(/--zoom:2\.5;/); // PHOTO_ZOOM_MAX
+    expect(html).not.toMatch(/is-contain/);
+  });
+
+  it('ignore un reglage qui n est meme pas un objet, sans casser la page', () => {
+    const html = rendre({ ...BASE_BACK, backPhotoAdjust: 'pas un objet' }, 'back');
+    expect(html).toMatch(/--fx:50%;--fy:50%;--zoom:1;/);
+  });
+});

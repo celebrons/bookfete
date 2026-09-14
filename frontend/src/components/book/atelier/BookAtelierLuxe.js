@@ -8,6 +8,9 @@ import {
   saveManualPage,
   clearPage,
   getPrintQualityCheck,
+  getBookSnapshot,
+  restoreBookSnapshot,
+  discardBookSnapshot,
   updatePageContent,
   fetchInteriorPagePreviewHtml,
   fetchCoverPreviewHtml,
@@ -35,6 +38,7 @@ import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
 import AtelierPageActions from './AtelierPageActions';
 import { findAtelierLayout } from './atelierLayouts';
+import { FORMAT_DIMENSIONS_MM } from './photoQuality';
 import AnonymousBanner from '../../common/AnonymousBanner';
 import '../../../styles/luxe-theme.css';
 import './BookAtelierLuxe.css';
@@ -99,6 +103,11 @@ export default function BookAtelierLuxe() {
   // une legende sur la photo en cliquant dessus"). Meme mecanique que
   // draftPhotoAdjustments de bout en bout.
   const [draftPhotoCaptions, setDraftPhotoCaptions] = useState({});
+  // Face dont on recadre la photo de couverture ('front' | 'back' | null).
+  // Distinct de adjustTargetSlotIndex (pages interieures) : ce sont deux
+  // reglages stockes a des endroits differents (cover_overrides vs
+  // content.photoAdjustments), meme si la modale est la meme.
+  const [adjustCoverFace, setAdjustCoverFace] = useState(null);
   // Roles et reglages typographiques par itemId (cahier des charges
   // typographique §3/§6) — meme mecanique que draftPhotoAdjustments : etat
   // local, compare dans l'effet d'autosauvegarde, persiste par
@@ -171,16 +180,13 @@ export default function BookAtelierLuxe() {
   // rafraichissement, la vignette d'un souvenir deja supprime resterait
   // affichee dans l'onglet "Souvenirs", cliquable, et poserait un id mort.
   //
-  // Attend d'abord la file d'ecriture de la page concernee : relire avant que
-  // l'ecriture soit arrivee renverrait l'etat d'AVANT, donc le souvenir
-  // toujours present. Declenche uniquement sur les trois gestes qui peuvent
-  // abandonner un texte (retirer un emplacement, changer de mise en page,
-  // vider la page) — jamais a chaque frappe.
-  const resyncItemsAfterWrite = useCallback(async (pageIndex) => {
+  // Appele UNIQUEMENT apres qu'une ecriture de page a repondu : c'est le
+  // serveur qui decide quels souvenirs disparaissent, relire avant son
+  // verdict renverrait l'etat d'AVANT. Et jamais a chaque frappe : seulement
+  // quand un texte a reellement quitte la page (voir les appelants).
+  const resyncItems = useCallback(async () => {
     if (!bookId) return;
     try {
-      const enCours = pageWritesRef.current.get(pageIndex);
-      if (enCours) await enCours;
       const frais = await listContentItems(bookId);
       setItems(frais || []);
     } catch (_err) {
@@ -223,6 +229,27 @@ export default function BookAtelierLuxe() {
   // Jamais bloquant : un echec laisse simplement la carte vide, l'atelier
   // fonctionne exactement comme avant.
   const [qualityWarnings, setQualityWarnings] = useState([]);
+
+  // Point de restauration disponible ({createdAt, pageCount, manualPages, ...}
+  // ou null). Pose automatiquement avant une generation automatique — c'est ce
+  // qui rend le bouton essayable : « j'aimerais le tester mais sans detruire
+  // ce que je viens de faire manuellement » (2026-09-15).
+  //
+  // Null aussi quand la migration phase19 n'a pas encore ete jouee : dans ce
+  // cas aucun retour en arriere n'est propose, plutot qu'une promesse qui
+  // echouerait au moment ou l'utilisateur compte dessus.
+  const [snapshot, setSnapshot] = useState(null);
+  const [restoringSnapshot, setRestoringSnapshot] = useState(false);
+
+  const refreshSnapshot = useCallback(async () => {
+    if (!bookId) return;
+    try {
+      const { snapshot: point } = await getBookSnapshot(bookId);
+      setSnapshot(point || null);
+    } catch (_err) {
+      setSnapshot(null);
+    }
+  }, [bookId]);
 
   const refreshQualityWarnings = useCallback(async () => {
     if (!bookId) return;
@@ -284,6 +311,8 @@ export default function BookAtelierLuxe() {
   // "Terminer mon livre", la ou le chiffre doit etre exact.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { refreshQualityWarnings(); }, [refreshQualityWarnings, pages.length, book?.print_format]);
+
+  useEffect(() => { refreshSnapshot(); }, [refreshSnapshot]);
 
   // { [pageIndex]: nombre de photos signalees }. Seules les PHOTOS comptent
   // ici : le controle renvoie aussi des avertissements de texte, qui ont leur
@@ -601,6 +630,18 @@ export default function BookAtelierLuxe() {
     const pageRow = pages.find((page) => page.page_index === currentPageIndex);
     const filledIds = draftSlotItemIds.filter(Boolean);
 
+    // Un SOUVENIR vient-il de quitter cette page ? Si oui, le serveur va
+    // peut-etre le supprimer (voir bookContentService.purgeAbandonedPageTexts
+    // : un texte ecrit dans un emplacement n'existe que pour cet emplacement).
+    // Il faudra donc relire la bibliotheque APRES l'ecriture — sinon sa
+    // vignette resterait affichee, cliquable, et poserait un id mort.
+    // Calcule ICI, avant d'ecrire : apres, la page enregistree ne contient
+    // plus l'ancienne liste.
+    const encorePoses = new Set(filledIds);
+    const texteSorti = (pageRow?.content?.itemIds || [])
+      .filter(Boolean)
+      .some((id) => !encorePoses.has(id) && itemsById[id]?.kind === 'texte');
+
     if (filledIds.length === 0) {
       if (!pageRow) return undefined; // rien enregistre, rien a effacer
       let cancelledEmpty = false;
@@ -617,6 +658,7 @@ export default function BookAtelierLuxe() {
           if (cancelledEmpty) return undefined;
           setPages((previous) => previous.filter((page) => page.page_index !== currentPageIndex));
           setSaveStatus('idle');
+          if (texteSorti) resyncItems();
           return refreshPagePreview(currentPageIndex);
         })
         .catch((err) => {
@@ -684,6 +726,7 @@ export default function BookAtelierLuxe() {
         if (cancelled) return undefined;
         setPages((previous) => [...previous.filter((page) => page.page_index !== currentPageIndex), savedPage]);
         setSaveStatus(isComplete ? 'saved' : 'idle');
+        if (texteSorti) resyncItems();
         // Photo sur DOUBLE PAGE : la page jumelle doit porter exactement la
         // meme chose, sinon on n'obtient qu'une moitie d'image. Le rendu
         // deduit la moitie a afficher de la parite du numero de page, donc
@@ -816,11 +859,6 @@ export default function BookAtelierLuxe() {
       releaseSpreadSibling(currentPageIndex);
     }
     captureUndo();
-    // Tous les emplacements repartent a null : les textes qui y etaient ecrits
-    // sont abandonnes, le serveur les supprime.
-    if (draftSlotItemIds.some((id) => id && itemsById[id]?.kind === 'texte')) {
-      resyncItemsAfterWrite(currentPageIndex);
-    }
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(new Array(atelierLayout.slots.length).fill(null));
     setDraftPhotoAdjustments({});
@@ -853,9 +891,6 @@ export default function BookAtelierLuxe() {
     if (removedItemId) {
       const retire = itemsById[removedItemId];
       captureUndo(retire?.kind === 'texte' ? 'remettre le souvenir retiré' : 'remettre la photo retirée');
-      // Un souvenir ecrit dans cette page vient peut-etre d'etre abandonne :
-      // le serveur le supprimera, la bibliotheque doit suivre.
-      if (retire?.kind === 'texte') resyncItemsAfterWrite(currentPageIndex);
     }
     setDraftSlotItemIds((previous) => {
       const next = [...previous];
@@ -972,6 +1007,80 @@ export default function BookAtelierLuxe() {
     }
   };
 
+  // Photo REELLEMENT affichee sur la face courante. On ne la redevine pas :
+  // le choix automatique est pris par le serveur (coverComposer), et une
+  // surcharge explicite (cover_overrides) peut ne plus correspondre a rien
+  // (photo supprimee depuis). On lit donc l'apercu deja rendu, qui est la
+  // verite affichee — meme source que ce qui sera imprime.
+  const coverPhotoItem = useMemo(() => {
+    if (viewKind !== 'cover' && viewKind !== 'back-cover') return null;
+    const html = viewKind === 'cover' ? coverHtml : backCoverHtml;
+    if (!html) return null;
+    // L'apercu est du HTML complet : on y retrouve l'URL de la photo posee.
+    const trouve = photos.find((photo) => photo.url && html.includes(photo.url));
+    return trouve || null;
+  }, [viewKind, coverHtml, backCoverHtml, photos]);
+
+  // Reglage enregistre pour cette face (cover_overrides.frontPhotoAdjust /
+  // backPhotoAdjust) — la meme forme que pour une photo interieure, donc la
+  // meme modale sans adaptation.
+  const coverAdjustment = adjustCoverFace
+    ? (book?.cover_overrides || {})[adjustCoverFace === 'front' ? 'frontPhotoAdjust' : 'backPhotoAdjust'] || null
+    : null;
+
+  // Dimensions REELLES du cadre photo de chaque face, en mm.
+  //
+  // MIROIR des regles CSS de backend/services/composition/{front,back}
+  // CoverRenderer.js — meme convention de duplication assumee que les autres
+  // petites tables partagees de ce projet (dimensions de format, palette de
+  // texte). Elles doivent rester coherentes : c'est ce cadre que l'utilisateur
+  // voit dans la modale de recadrage, et un cadre faux rendrait le reglage
+  // trompeur.
+  //
+  // 4e de couverture (.cvr-back-photo) : 55% x 28% de la page, moins 8 mm de
+  // marge interieure de chaque cote — connu exactement.
+  // Recto : la forme depend de la variante choisie (pleine page, bandeau 80%,
+  // duo, encadree), que le client ne connait pas. On prend la PAGE ENTIERE,
+  // qui est le cas des variantes pleine page et la meilleure approximation
+  // pour les autres — assume, et jamais pire qu'un carre arbitraire.
+  const coverFrameSizeMm = useMemo(() => {
+    if (!adjustCoverFace) return null;
+    const dims = FORMAT_DIMENSIONS_MM[book?.print_format] || FORMAT_DIMENSIONS_MM.standard;
+    if (adjustCoverFace === 'back') {
+      return {
+        widthMm: Math.max(1, dims.widthMm * 0.55 - 16),
+        heightMm: Math.max(1, dims.heightMm * 0.28 - 16)
+      };
+    }
+    return { widthMm: dims.widthMm, heightMm: dims.heightMm };
+  }, [adjustCoverFace, book?.print_format]);
+
+  const handleSaveCoverAdjustment = async (_itemId, adjustment) => {
+    const face = adjustCoverFace;
+    if (!face) return;
+    const champ = face === 'front' ? 'frontPhotoAdjust' : 'backPhotoAdjust';
+    setAdjustCoverFace(null);
+    try {
+      await handleUpdateBook({ cover_overrides: { ...(book?.cover_overrides || {}), [champ]: adjustment } });
+      handleCoverSaved();
+    } catch (_err) {
+      // Non bloquant, meme philosophie que le reste de l'atelier.
+    }
+  };
+
+  const handleResetCoverAdjustment = async () => {
+    const face = adjustCoverFace;
+    if (!face) return;
+    const champ = face === 'front' ? 'frontPhotoAdjust' : 'backPhotoAdjust';
+    setAdjustCoverFace(null);
+    try {
+      const suivant = { ...(book?.cover_overrides || {}) };
+      delete suivant[champ];
+      await handleUpdateBook({ cover_overrides: suivant });
+      handleCoverSaved();
+    } catch (_err) { /* non bloquant */ }
+  };
+
   const handleSavePhotoAdjustment = (itemId, adjustment) => {
     setDraftPhotoAdjustments((previous) => ({ ...previous, [itemId]: adjustment }));
     setAdjustTargetSlotIndex(null);
@@ -1046,7 +1155,7 @@ export default function BookAtelierLuxe() {
       setDraftTextRoles({});
       setDraftTextStyles({});
       setSaveStatus('idle');
-      await resyncItemsAfterWrite(currentPageIndex);
+      await resyncItems();
       await refreshPagePreview(currentPageIndex);
     } catch (err) {
       setSaveStatus('error');
@@ -1057,6 +1166,42 @@ export default function BookAtelierLuxe() {
   // Meme snippet que BookPageLuxe.js:handleUpdateBook — deliberement duplique
   // plutot que factorise (meme choix deja fait pour BookConfigLuxe.js/
   // l'ancien BookCoverDesignerLuxe.js, voir memoire cover-system-build-status).
+  // Revenir au livre d'avant la generation. Remplace TOUTES les pages, y
+  // compris verrouillees : l'instantane est la verite d'avant, un retour
+  // partiel laisserait un livre hybride que personne n'a jamais vu.
+  const handleRestoreSnapshot = async () => {
+    if (!bookId || restoringSnapshot) return;
+    setRestoringSnapshot(true);
+    try {
+      const { book: updatedBook, pages: restored } = await restoreBookSnapshot(bookId);
+      setBook((previous) => ({ ...previous, ...updatedBook }));
+      setPages(restored || []);
+      setSnapshot(null);
+      // Tout l'affichage derive des pages : les apercus en cache decrivent
+      // maintenant un livre qui n'existe plus.
+      setPagePreviewCache({});
+      setCoverHtml(null);
+      setBackCoverHtml(null);
+      setUndoSnapshot(null);
+      setContentVersion((previous) => previous + 1);
+      setRefreshToken((previous) => previous + 1);
+    } catch (err) {
+      setGenerateError(err.message || "Le retour en arriere a echoue.");
+    } finally {
+      setRestoringSnapshot(false);
+    }
+  };
+
+  const handleDiscardSnapshot = async () => {
+    if (!bookId) return;
+    setSnapshot(null); // la proposition disparait tout de suite, c'est un geste decide
+    try {
+      await discardBookSnapshot(bookId);
+    } catch (_err) {
+      // Non bloquant : au pire le point sera ecrase a la prochaine generation.
+    }
+  };
+
   const handleUpdateBook = async (updates) => {
     const { error: updateError } = await supabase.from('books').update(updates).eq('id', bookId);
     if (updateError) throw updateError;
@@ -1329,6 +1474,11 @@ export default function BookAtelierLuxe() {
       setPagePreviewCache({});
       setCoverHtml(null);
       setBackCoverHtml(null);
+      // Le serveur vient de poser un point de restauration (ou n'a pas pu :
+      // voir routes/composition.js POST /compose). On le relit plutot que de
+      // le deduire, pour ne proposer un retour en arriere que s'il existe
+      // reellement.
+      await refreshSnapshot();
       setIsGenerateModalOpen(false);
       setViewIndex(1);
       setSelectedSide('left');
@@ -1476,6 +1626,47 @@ export default function BookAtelierLuxe() {
     </button>
   ) : null;
 
+  // Retour au livre d'AVANT la derniere generation automatique. Distinct du
+  // bandeau "Annuler" ci-dessus, qui ne concerne que la page courante : celui-ci
+  // porte sur le livre ENTIER.
+  //
+  // Il dit precisement ce qu'on retablit (« 30 pages, dont 12 faites a la
+  // main ») plutot qu'un "Annuler" aveugle : revenir en arriere sur un livre
+  // entier est un geste qu'on ne fait pas sans savoir ou l'on atterrit. Et il
+  // offre la sortie symetrique, « Je garde cette version » — sans elle, la
+  // proposition resterait affichee indefiniment.
+  const snapshotBar = snapshot ? (
+    <div className="atelier-snapshot-bar">
+      <span className="atelier-snapshot-bar-text">
+        <strong>Vous testez la version automatique.</strong>
+        {' '}Votre livre d'avant est conservé
+        {snapshot.pageCount ? ` (${snapshot.pageCount} page${snapshot.pageCount > 1 ? 's' : ''}` : ''}
+        {snapshot.pageCount && snapshot.manualPages
+          ? `, dont ${snapshot.manualPages} faite${snapshot.manualPages > 1 ? 's' : ''} à la main)`
+          : (snapshot.pageCount ? ')' : '')}
+        .
+      </span>
+      <span className="atelier-snapshot-bar-actions">
+        <button
+          type="button"
+          className="atelier-snapshot-bar-restore"
+          onClick={handleRestoreSnapshot}
+          disabled={restoringSnapshot}
+        >
+          {restoringSnapshot ? 'Retour en cours…' : "↩ Revenir à mon livre d'avant"}
+        </button>
+        <button
+          type="button"
+          className="atelier-snapshot-bar-keep"
+          onClick={handleDiscardSnapshot}
+          disabled={restoringSnapshot}
+        >
+          Je garde cette version
+        </button>
+      </span>
+    </div>
+  ) : null;
+
   const draftLayoutForOverlay = draftLayoutSlug ? findAtelierLayout(draftLayoutSlug) : null;
   const pageOverlay = viewKind === 'spread' && draftLayoutForOverlay ? (
     <AtelierPageOverlay
@@ -1562,20 +1753,29 @@ export default function BookAtelierLuxe() {
         manualPagesCount={pages.filter((page) => page.locked).length}
       />
 
+      {/* MEME modale pour une photo interieure et pour une couverture : le
+          geste est identique (deplacer, zoomer, "photo entiere"), seul
+          l'endroit ou le reglage est range change. La couverture n'a pas de
+          mise en page ni d'emplacement, d'ou layoutSlug/slotIndex a null —
+          la modale sait deja ne pas proposer de suggestion de mise en page
+          dans ce cas. */}
       <AtelierPhotoAdjustModal
-        isOpen={adjustTargetSlotIndex != null}
-        item={adjustTargetSlotIndex != null ? draftSlotItems[adjustTargetSlotIndex] : null}
-        layoutSlug={draftLayoutSlug}
-        slotIndex={adjustTargetSlotIndex}
+        isOpen={adjustTargetSlotIndex != null || adjustCoverFace != null}
+        item={adjustCoverFace
+          ? coverPhotoItem
+          : (adjustTargetSlotIndex != null ? draftSlotItems[adjustTargetSlotIndex] : null)}
+        layoutSlug={adjustCoverFace ? null : draftLayoutSlug}
+        slotIndex={adjustCoverFace ? null : adjustTargetSlotIndex}
         printFormat={book?.print_format}
-        adjustment={
-          adjustTargetSlotIndex != null && draftSlotItems[adjustTargetSlotIndex]
+        frameSizeMm={coverFrameSizeMm}
+        adjustment={adjustCoverFace
+          ? coverAdjustment
+          : (adjustTargetSlotIndex != null && draftSlotItems[adjustTargetSlotIndex]
             ? draftPhotoAdjustments[draftSlotItems[adjustTargetSlotIndex].id]
-            : null
-        }
-        onSave={handleSavePhotoAdjustment}
-        onReset={handleResetPhotoAdjustment}
-        onClose={() => setAdjustTargetSlotIndex(null)}
+            : null)}
+        onSave={adjustCoverFace ? handleSaveCoverAdjustment : handleSavePhotoAdjustment}
+        onReset={adjustCoverFace ? handleResetCoverAdjustment : handleResetPhotoAdjustment}
+        onClose={() => { setAdjustTargetSlotIndex(null); setAdjustCoverFace(null); }}
         onChooseSuggestedLayout={handleChooseSuggestedLayout}
       />
 
@@ -1621,6 +1821,7 @@ export default function BookAtelierLuxe() {
                 panneau de droite : sur telephone les colonnes sont empilees,
                 le panneau se retrouve loin sous le livre, donc le lien etait
                 invisible au moment precis ou l'on en a besoin. */}
+            {snapshotBar}
             {undoBar}
 
             <AtelierBookView
@@ -1643,6 +1844,8 @@ export default function BookAtelierLuxe() {
             pageActions={pageActions}
             printFormat={book.print_format}
             onAssignCoverPhoto={handleAssignCoverPhoto}
+            onAdjustCoverPhoto={(face) => setAdjustCoverFace(face)}
+            coverHasPhoto={Boolean(coverPhotoItem)}
             selectedSidebarItem={selectedSidebarItem}
             />
           </div>

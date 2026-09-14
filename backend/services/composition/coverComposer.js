@@ -16,6 +16,7 @@
 // Fonctions pures, aucun acces reseau/disque.
 
 const { rankPhotos } = require('./coverPhotoSelector');
+const { PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX } = require('./pageRenderer');
 const { resolveCoverTheme, applyFormatAccent, applyCoverColor } = require('./coverTheme');
 const { pickClosingPhrase, formatStatsLine } = require('./coverCopy');
 const { detectContentProfile } = require('./contentProfile');
@@ -60,6 +61,29 @@ function formatEventYear(value) {
 // Surcharges manuelles legeres (voir sql/phase09_cover_overrides.sql) :
 // toujours lues de facon defensive, jamais requises — un livre qui n'a
 // jamais ouvert cet ecran se comporte exactement comme avant (objet vide).
+// Cadrage manuel d'une photo de couverture ({focalX, focalY, zoom, fitMode}).
+//
+// LU DEFENSIVEMENT, toujours : `cover_overrides` est ecrit directement par le
+// navigateur (voir BookAtelierLuxe.handleUpdateBook), il n'a donc jamais
+// transite par une validation serveur. Une valeur absurde ne doit pas
+// produire une couverture cassee — elle est simplement ramenee dans les
+// bornes, ou ignoree. Les memes bornes que les photos interieures
+// (pageRenderer PHOTO_ZOOM_MIN/MAX), volontairement : un seul reglage a
+// comprendre dans toute l'application.
+function resolveCoverPhotoAdjust(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const borne = (valeur, min, max, defaut) => {
+    const n = Number(valeur);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : defaut;
+  };
+  return {
+    focalX: borne(raw.focalX, 0, 1, 0.5),
+    focalY: borne(raw.focalY, 0, 1, 0.5),
+    zoom: borne(raw.zoom, PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX, 1),
+    fitMode: raw.fitMode === 'contain' ? 'contain' : 'cover'
+  };
+}
+
 function resolveCoverOverrides(book) {
   return (book?.cover_overrides && typeof book.cover_overrides === 'object') ? book.cover_overrides : {};
 }
@@ -230,6 +254,11 @@ function composeFrontCover({ book, items, template, format }) {
       kind: 'front-cover',
       variant,
       itemIds: photos.map((photo) => photo.id),
+      // Cadrage manuel de la photo principale. Une seule valeur par face, pas
+      // une par photo : les variantes multi-photos (trio, duo) n'en tiennent
+      // deliberement pas compte — un reglage unique n'aurait aucun sens sur
+      // plusieurs photos de formes differentes.
+      photoAdjust: resolveCoverPhotoAdjust(overrides.frontPhotoAdjust),
       ...titleInfo,
       theme
     }
@@ -368,6 +397,7 @@ function composeBackCover({ book, items, template, format, frontCoverItemIds = [
       kind: 'back-cover',
       variant,
       itemIds: photoItem ? [photoItem.id] : [],
+      photoAdjust: resolveCoverPhotoAdjust(overrides.backPhotoAdjust),
       statsLine,
       phrase,
       theme

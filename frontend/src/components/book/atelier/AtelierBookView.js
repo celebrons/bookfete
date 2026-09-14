@@ -42,7 +42,7 @@ function ExpandIcon() {
 // emplacement (toute la page), pas une grille de slots. L'iframe en dessous
 // a pointer-events:none (BookAtelierLuxe.css), le clic passe donc
 // naturellement a travers jusqu'ici.
-function CoverPhotoOverlay({ onAssign, selectedSidebarItem }) {
+function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto }) {
   if (!onAssign) return null;
   const isPhotoSelected = selectedSidebarItem?.kind === 'photo';
   const hint = isPhotoSelected
@@ -55,7 +55,34 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem }) {
       title={hint}
     >
       <span className="atelier-cover-photo-overlay-hint">{hint}</span>
+      {/* Recadrer la photo de couverture. Un BOUTON a part, pas un clic sur
+          l'image : le clic sur l'image sert deja a REMPLACER la photo quand
+          une est selectionnee dans "Mes souvenirs", et les deux gestes ne
+          peuvent pas partager le meme declencheur.
+          Jusqu'au 2026-09-15, la couverture etait toujours recadree au centre
+          sans aucun recours — « il faut pouvoir ajuster la photo de la 4e de
+          couverture, la photo est tronquee ». */}
+      {onAdjust && hasPhoto && !isPhotoSelected && (
+        <button
+          type="button"
+          className="atelier-cover-adjust-btn"
+          onClick={(event) => { event.stopPropagation(); onAdjust(); }}
+          title="Ajuster le cadrage de cette photo"
+        >
+          <CropIcon />
+          Ajuster le cadrage
+        </button>
+      )}
     </div>
+  );
+}
+
+function CropIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6.5 2v13.5A1.5 1.5 0 0 0 8 17h13.5" />
+      <path d="M2.5 6.5H16A1.5 1.5 0 0 1 17.5 8v13.5" />
+    </svg>
   );
 }
 
@@ -182,6 +209,10 @@ function AtelierBookView({
   // (voir CoverPhotoOverlay ci-dessus) — absent -> aucun calque affiche
   // (repli neutre, ex. si jamais utilise sans cette fonctionnalite branchee).
   onAssignCoverPhoto,
+  // Recadrage de la photo de couverture (facultatif : sans lui, aucun bouton
+  // n'apparait et le comportement d'avant est inchange).
+  onAdjustCoverPhoto,
+  coverHasPhoto,
   selectedSidebarItem
 }) {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -264,6 +295,8 @@ function AtelierBookView({
               <CoverPhotoOverlay
                 onAssign={onAssignCoverPhoto ? (itemId) => onAssignCoverPhoto('front', itemId) : null}
                 selectedSidebarItem={selectedSidebarItem}
+                onAdjust={onAdjustCoverPhoto ? () => onAdjustCoverPhoto('front') : null}
+                hasPhoto={coverHasPhoto}
               />
             )}
           />
@@ -280,6 +313,8 @@ function AtelierBookView({
               <CoverPhotoOverlay
                 onAssign={onAssignCoverPhoto ? (itemId) => onAssignCoverPhoto('back', itemId) : null}
                 selectedSidebarItem={selectedSidebarItem}
+                onAdjust={onAdjustCoverPhoto ? () => onAdjustCoverPhoto('back') : null}
+                hasPhoto={coverHasPhoto}
               />
             )}
           />

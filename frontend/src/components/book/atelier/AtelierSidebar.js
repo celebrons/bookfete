@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import AtelierPhotoLightbox from './AtelierPhotoLightbox';
 
 // Colonne gauche de l'atelier : "Mes souvenirs" — photos et souvenirs
 // (textes) disponibles. Deux facons de placer un element dans un
@@ -15,6 +16,42 @@ import React, { useState } from 'react';
 // Les miniatures utilisent toujours metadata.thumbnailUrl quand disponible
 // (jamais l'original) — repli silencieux sur `url` pour les photos
 // uploadees avant l'introduction des miniatures (voir storageService.js).
+
+// Apercu AGRANDI d'une photo, au survol de sa vignette.
+//
+// Les vignettes de la bibliotheque font ~70 px : impossible d'y reconnaitre
+// une photo avant de la glisser dans une page (retour utilisateur 2026-09-15 :
+// « il faut pouvoir avoir un apercu des photos dans la bibliotheque pour voir
+// la photo avant de la glisser »).
+//
+// Position FIXE calculee a partir de la vignette survolee, pas un simple
+// positionnement relatif : la bibliotheque defile et rogne son contenu
+// (overflow), un apercu pose dedans serait coupe. Il est donc rendu par-dessus
+// tout, a droite de la vignette — et bascule a gauche quand il n'y a plus la
+// place, pour ne jamais sortir de l'ecran.
+//
+// Survol SEULEMENT : sur telephone il n'existe pas, d'ou le bouton loupe qui
+// l'accompagne — les deux repondent au meme besoin par deux chemins.
+const APERCU_LARGEUR = 260;
+const APERCU_MARGE = 12;
+
+function PhotoHoverPreview({ apercu }) {
+  if (!apercu) return null;
+  const placeADroite = apercu.rect.right + APERCU_MARGE + APERCU_LARGEUR <= window.innerWidth;
+  const left = placeADroite
+    ? apercu.rect.right + APERCU_MARGE
+    : Math.max(APERCU_MARGE, apercu.rect.left - APERCU_MARGE - APERCU_LARGEUR);
+  // Centre verticalement sur la vignette, sans jamais deborder en haut ni en bas.
+  const top = Math.min(
+    Math.max(APERCU_MARGE, apercu.rect.top + apercu.rect.height / 2 - APERCU_LARGEUR / 2),
+    Math.max(APERCU_MARGE, window.innerHeight - APERCU_LARGEUR - APERCU_MARGE)
+  );
+  return (
+    <div className="atelier-sidebar-hover-preview" style={{ left, top, width: APERCU_LARGEUR }}>
+      <img src={apercu.url} alt="" />
+    </div>
+  );
+}
 
 function AtelierSidebar({
   photos,
@@ -41,6 +78,31 @@ function AtelierSidebar({
   // jamais bloquee.
   usedItemIds
 }) {
+  // { url, rect } de la photo survolee, null sinon. `rect` est fige au moment
+  // du survol : l'apercu ne suit pas la souris, il reste ancre a sa vignette.
+  const [apercu, setApercu] = useState(null);
+  // Photo ouverte en grand (bouton loupe). Chemin tactile, ou simplement pour
+  // regarder la photo a sa vraie resolution.
+  const [photoOuverte, setPhotoOuverte] = useState(null);
+  const apercuTimer = useRef(null);
+
+  // Petit delai avant d'afficher : sans lui, balayer la grille du regard fait
+  // clignoter une dizaine d'apercus.
+  const survoler = (event, item) => {
+    if (item.kind !== 'photo') return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const url = item.metadata?.previewUrl || item.url;
+    clearTimeout(apercuTimer.current);
+    apercuTimer.current = setTimeout(() => {
+      setApercu({ url, rect: { top: rect.top, left: rect.left, right: rect.right, height: rect.height } });
+    }, 220);
+  };
+
+  const quitter = () => {
+    clearTimeout(apercuTimer.current);
+    setApercu(null);
+  };
+
   const [activeTab, setActiveTab] = useState(initialTab === 'souvenirs' ? 'souvenirs' : 'photos');
   const [newText, setNewText] = useState('');
   const items = activeTab === 'photos' ? photos : souvenirs;
@@ -181,8 +243,10 @@ function AtelierSidebar({
                 <button
                   type="button"
                   draggable
-                  onDragStart={(event) => handleDragStart(event, item)}
+                  onDragStart={(event) => { quitter(); handleDragStart(event, item); }}
                   onClick={() => onSelectItem(selectedItem?.id === item.id ? null : item)}
+                  onMouseEnter={(event) => survoler(event, item)}
+                  onMouseLeave={quitter}
                   className={`atelier-sidebar-item ${selectedItem?.id === item.id ? 'is-selected' : ''} ${isUsed ? 'is-used' : ''}`}
                   title={item.kind === 'photo' ? (isUsed ? 'Photo (deja utilisee sur une page)' : 'Photo') : item.text}
                 >
@@ -193,6 +257,25 @@ function AtelierSidebar({
                   )}
                   {isUsed && <span className="atelier-sidebar-item-used-badge">✓ utilisee</span>}
                 </button>
+                {/* Loupe : voir la photo en grand AVANT de la placer. Double
+                    emploi assume avec l'apercu au survol — celui-ci n'existe
+                    pas sur telephone, et regarder une photo a sa vraie
+                    resolution reste utile meme a la souris. */}
+                {item.kind === 'photo' && (
+                  <button
+                    type="button"
+                    className="atelier-sidebar-item-zoom"
+                    onClick={(event) => { event.stopPropagation(); quitter(); setPhotoOuverte(item.url); }}
+                    aria-label="Voir la photo en grand"
+                    title="Voir la photo en grand"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                      <circle cx="10.5" cy="10.5" r="6.5" />
+                      <path d="M15.5 15.5 21 21" />
+                      <path d="M10.5 7.5v6M7.5 10.5h6" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   type="button"
                   className="atelier-sidebar-item-remove"
@@ -207,6 +290,11 @@ function AtelierSidebar({
           })}
         </div>
       )}
+
+      {/* Rendus en DERNIER et en position fixe : la bibliotheque defile et
+          rogne son contenu, un apercu pose dedans serait coupe. */}
+      <PhotoHoverPreview apercu={apercu} />
+      <AtelierPhotoLightbox url={photoOuverte} onClose={() => setPhotoOuverte(null)} />
     </aside>
   );
 }

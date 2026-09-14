@@ -452,6 +452,16 @@
 
 /* Message de garantie (ce qui NE sera PAS touche) : vert sobre, pour se
    distinguer au premier coup d'oeil d'un avertissement. */
+/* Ce qui NE sera PAS preserve : ambre, distinct du vert de la garantie.
+   Les deux se lisent ensemble, c'est le couple qui est honnete. */
+.atelier-hint-warning {
+  border-left: 3px solid #d9822b;
+  background: rgba(217, 130, 43, 0.07);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+  color: #8a5418;
+}
+
 .atelier-hint-safe {
   border-left: 3px solid #2f7a4f;
   background: rgba(47, 122, 79, 0.06);
@@ -811,6 +821,74 @@
 }
 .atelier-sidebar-item-wrap:hover .atelier-sidebar-item-remove { opacity: 1; }
 .atelier-sidebar-item-remove:hover { background: #b42318; }
+
+/* Loupe : voir la photo en grand AVANT de la placer (2026-09-15). Coin
+   INFERIEUR gauche, a l'oppose de la croix de suppression : les deux boutons
+   apparaissent ensemble au survol, et confondre "agrandir" et "supprimer"
+   coute beaucoup plus cher dans un sens que dans l'autre. */
+.atelier-sidebar-item-zoom {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(36, 31, 24, 0.65);
+  color: var(--white);
+  cursor: pointer;
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+
+.atelier-sidebar-item-wrap:hover .atelier-sidebar-item-zoom { opacity: 1; }
+.atelier-sidebar-item-zoom:hover { background: var(--gold, #c9a35f); color: #241f18; }
+.atelier-sidebar-item-zoom:focus-visible { opacity: 1; outline: 2px solid var(--gold, #c9a35f); outline-offset: 1px; }
+
+/* Apercu au survol. Position FIXE, calculee en JS depuis la vignette : la
+   bibliotheque defile et rogne son contenu, un apercu pose dedans serait
+   coupe. `pointer-events: none` est essentiel — sans lui, l'apercu passerait
+   sous le curseur, declencherait un mouseleave sur la vignette, disparaitrait,
+   et se remettrait a clignoter. */
+.atelier-sidebar-hover-preview {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--white, #fffdf8);
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  box-shadow: 0 12px 34px rgba(36, 31, 24, 0.24);
+  animation: apercu-apparition 0.12s ease-out;
+}
+
+.atelier-sidebar-hover-preview img {
+  display: block;
+  width: 100%;
+  max-height: 248px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+@keyframes apercu-apparition {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atelier-sidebar-hover-preview { animation: none; }
+}
+
+/* Sur un ecran tactile, le survol n'existe pas : la loupe prend le relais et
+   reste visible en permanence. */
+@media (hover: none) {
+  .atelier-sidebar-hover-preview { display: none; }
+  .atelier-sidebar-item-zoom { opacity: 1; }
+}
 
 .atelier-sidebar-text-preview {
   display: -webkit-box;
@@ -1180,6 +1258,39 @@
   transition: var(--transition-fast);
 }
 .atelier-cover-photo-overlay:hover .atelier-cover-photo-overlay-hint { opacity: 1; }
+
+/* Recadrer la photo de couverture (2026-09-15). Un bouton a part, pose en bas
+   du calque : le clic sur l'image sert deja a REMPLACER la photo quand une
+   est selectionnee dans "Mes souvenirs" — les deux gestes ne peuvent pas
+   partager le meme declencheur. Revele au survol, comme le reste du calque,
+   pour ne pas encombrer l'apercu au repos. */
+.atelier-cover-adjust-btn {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  opacity: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: rgba(36, 31, 24, 0.82);
+  color: var(--white);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.atelier-cover-photo-overlay:hover .atelier-cover-adjust-btn { opacity: 1; }
+.atelier-cover-adjust-btn:hover { background: var(--gold, #c9a35f); color: #241f18; }
+/* Toujours visible au clavier : sans ca, l'opacite 0 le rendrait inatteignable
+   pour qui ne survole pas a la souris. */
+.atelier-cover-adjust-btn:focus-visible { opacity: 1; outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
 
 .atelier-overlay-slot {
   position: absolute;
@@ -1716,6 +1827,76 @@
    les colonnes sont empilees, le panneau se retrouve tres loin sous le livre
    et le lien etait donc invisible au moment ou l'on en a besoin (signale le
    2026-09-14 apres un remplacement de photo). */
+/* --- Retour au livre d'AVANT une generation automatique -----------------
+   Distinct du bandeau "Annuler" (qui ne concerne qu'une page) : celui-ci porte
+   sur le livre ENTIER, d'ou un traitement plus present — une bordure pleine et
+   deux actions explicites plutot qu'un simple lien. Place au-dessus du livre
+   pour la meme raison que le bandeau "Annuler" : sur telephone, le panneau de
+   droite se retrouve loin sous le livre. */
+.atelier-snapshot-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(184, 146, 74, 0.45);
+  border-left: 3px solid var(--gold, #c9a35f);
+  border-radius: 0 10px 10px 0;
+  background: rgba(201, 163, 95, 0.09);
+}
+
+.atelier-snapshot-bar-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink, #241f18);
+}
+
+.atelier-snapshot-bar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.atelier-snapshot-bar-restore {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: var(--gold, #c9a35f);
+  color: #241f18;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.atelier-snapshot-bar-restore:disabled { opacity: 0.6; cursor: default; }
+
+/* Sortie symetrique, volontairement DISCRETE : garder la version automatique
+   est le cas le plus frequent, mais c'est un choix — sans ce bouton la
+   proposition resterait affichee indefiniment. */
+.atelier-snapshot-bar-keep {
+  border: none;
+  background: none;
+  padding: 8px 4px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-light, #7a7266);
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.atelier-snapshot-bar-keep:hover { color: var(--ink, #241f18); }
+
+@media (max-width: 720px) {
+  .atelier-snapshot-bar { flex-direction: column; align-items: stretch; }
+  .atelier-snapshot-bar-actions { justify-content: space-between; }
+}
+
 .atelier-undo-bar {
   display: flex;
   align-items: center;

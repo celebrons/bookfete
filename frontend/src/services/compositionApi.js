@@ -328,6 +328,25 @@ export const updatePageContent = (bookId, pageIndex, { layoutId, content, locked
 // §20/21) — utilise par AtelierFinishModal a l'ouverture ("Terminer mon
 // livre"), un seul appel, jamais bloquant. { pagesCount, photosCount,
 // lowQualityPhotos:[{pageIndex,itemId,level,dpi,emoji,label}], allGood }.
+// --- Point de restauration avant generation automatique ---------------------
+// Voir backend/sql/phase19_book_snapshots.sql. UN SEUL point par livre : le
+// filet du dernier geste destructeur, pas un historique.
+//
+// `snapshot` vaut null quand il n'y a rien a retablir — ce n'est pas une
+// erreur, c'est une reponse.
+export const getBookSnapshot = (bookId) => request(`/books/${bookId}/snapshot`);
+
+export const restoreBookSnapshot = (bookId) => request(
+  `/books/${bookId}/snapshot/restore`,
+  { method: 'POST' }
+);
+
+// « Je garde cette version » : abandonne le retour en arriere.
+export const discardBookSnapshot = (bookId) => request(
+  `/books/${bookId}/snapshot`,
+  { method: 'DELETE' }
+);
+
 export const getPrintQualityCheck = (bookId) => request(`/books/${bookId}/print-quality-check`);
 
 // --- Lien de partage collaboratif (public, sans compte) ---------------------

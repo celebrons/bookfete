@@ -61,7 +61,7 @@ function renderBackPhotoStats(content, theme, scale) {
   return `
     <div class="cvr-safe cvr-back-stack" style="${backgroundStyleFor(theme, theme.bg)};">
       <div class="cvr-back-spacer"></div>
-      ${photoItem ? `<figure class="cvr-back-photo">${coverImgFrame(photoItem, { biasPortrait: false })}</figure>` : ''}
+      ${photoItem ? `<figure class="cvr-back-photo">${coverImgFrame(photoItem, { biasPortrait: false, adjustment: content.photoAdjust })}</figure>` : ''}
       ${phraseHtml(content.phrase, pt(TYPE_SCALE.phrasePhoto, scale))}
       ${statsHtml(content.statsLine, pt(TYPE_SCALE.stats, scale))}
       <div class="cvr-back-spacer"></div>

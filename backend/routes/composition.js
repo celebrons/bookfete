@@ -665,12 +665,76 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
       layouts,
       formatId: book.print_format
     });
+    // POINT DE RESTAURATION, pose AVANT de remplacer quoi que ce soit.
+    //
+    // La generation preserve deja les pages verrouillees (c est verifie), mais
+    // elle remplace tout le reste sans retour possible — le bouton en devenait
+    // inutilisable par prudence : « j aimerais le tester mais sans detruire ce
+    // que je viens de faire manuellement » (2026-09-15).
+    //
+    // Jamais bloquant : si l instantane echoue (table absente tant que la
+    // migration phase19 n a pas ete jouee), la generation se deroule comme
+    // avant. Le champ snapshot de la reponse dit au client s il peut proposer
+    // un retour en arriere — plutot que de le proposer et d echouer au moment
+    // ou l utilisateur compte dessus.
+    const snapshotSaved = await bookContentService.saveSnapshot(book.id, {
+      reason: bookContentService.SNAPSHOT_REASON_COMPOSE
+    });
+
     const pages = await bookContentService.replaceBookPages(book.id, annotatedPagesWithText);
     // Une seule autorite sur le nombre de pages (plancher 30, parite, jamais
     // de contenu au-dela du compte annonce) — voir syncPageCount.
     const pageCount = await bookContentService.syncPageCount(book.id, pages.length);
 
-    res.json({ pages, pageCount, overflow: result.overflow, underflow: result.underflow, pageBudget: result.pageBudget });
+    res.json({ pages, pageCount, snapshot: snapshotSaved, overflow: result.overflow, underflow: result.underflow, pageBudget: result.pageBudget });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/books/:bookId/snapshot
+// Y a-t-il un livre d avant vers lequel revenir ? Decrit le point disponible
+// sans rien retablir (date, nombre de pages, dont combien faites a la main) :
+// de quoi proposer « revenir a mon livre d avant (30 pages, dont 12 faites a
+// la main) » plutot qu un « Annuler » aveugle.
+//
+// 200 avec snapshot a null quand il n y en a pas — jamais un 404 : l absence
+// de point n est pas une erreur, c est une reponse.
+router.get('/api/books/:bookId/snapshot', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const snapshot = await bookContentService.describeSnapshot(req.book.id);
+    res.json({ snapshot });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/books/:bookId/snapshot/restore
+// Retablit le livre tel qu il etait avant la derniere generation automatique.
+// Le point est CONSOMME au passage (voir restoreSnapshot) : on ne revient pas
+// deux fois au meme endroit.
+router.post('/api/books/:bookId/snapshot/restore', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const restored = await bookContentService.restoreSnapshot(req.book.id);
+    if (!restored) {
+      return res.status(404).json({ error: "Il n'y a pas de version precedente a retablir." });
+    }
+    const { data: updatedBook, error: readError } = await supabase
+      .from('books').select('*').eq('id', req.book.id).single();
+    if (readError) throw readError;
+    res.json({ book: updatedBook, pages: restored.pages, pageCount: restored.pageCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/books/:bookId/snapshot
+// « Je garde cette version » : abandonne le retour en arriere. Geste explicite
+// de l utilisateur, pour que la proposition cesse de s afficher.
+router.delete('/api/books/:bookId/snapshot', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    await bookContentService.discardSnapshot(req.book.id);
+    res.json({ discarded: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
