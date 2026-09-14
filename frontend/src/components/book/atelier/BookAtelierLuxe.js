@@ -551,7 +551,15 @@ export default function BookAtelierLuxe() {
         if (cancelled) return undefined;
         setPages((previous) => [...previous.filter((page) => page.page_index !== currentPageIndex), savedPage]);
         setSaveStatus(isComplete ? 'saved' : 'idle');
-        return refreshPagePreview(currentPageIndex);
+        // Photo sur DOUBLE PAGE : la page jumelle doit porter exactement la
+        // meme chose, sinon on n'obtient qu'une moitie d'image. Le rendu
+        // deduit la moitie a afficher de la parite du numero de page, donc
+        // les deux pages recoivent un contenu IDENTIQUE (voir
+        // pageRenderer, .photo-spread).
+        const mirror = isComplete && atelierLayout.spread
+          ? mirrorSpread(currentPageIndex, realLayout.id)
+          : Promise.resolve();
+        return mirror.then(() => refreshPagePreview(currentPageIndex));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -560,12 +568,77 @@ export default function BookAtelierLuxe() {
       });
 
     return () => { cancelled = true; };
+    // `mirrorSpread` volontairement absent des dependances : il est recree a
+    // chaque rendu, l'y mettre relancerait cet effet en boucle. Il n'a pas
+    // besoin d'y figurer — il ne lit que des valeurs qui SONT deja des
+    // dependances (brouillon, page courante), donc sa fermeture est fraiche
+    // a chaque execution de l'effet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftTextRoles, draftTextStyles, draftPageIndex, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
+
+  // --- Photo sur double page -------------------------------------------
+  // Les deux pages d'une double page forment la paire (2k, 2k+1) — meme
+  // convention que leftPageIndex/rightPageIndex plus haut.
+  const siblingPageIndex = (index) => (index % 2 === 0 ? index + 1 : index - 1);
+  const isSpreadLayout = (slug) => findAtelierLayout(slug)?.spread === true;
+
+  // La page ENREGISTREE porte-t-elle une double page ? On interroge la page
+  // sauvegardee et non le brouillon : "Changer de mise en page" remet le
+  // brouillon a zero, et se fier a lui faisait oublier qu'on venait d'une
+  // double page (voir releaseSpreadSibling et ses appelants).
+  const savedPageIsSpread = (index) => {
+    const row = pages.find((page) => page.page_index === index);
+    const slug = row?.layout_id ? layoutsById[row.layout_id]?.slug : null;
+    return isSpreadLayout(slug);
+  };
+
+  // Ecrit sur la page jumelle le MEME contenu que la page courante. Volontaire-
+  // ment appele APRES la sauvegarde de la page courante, jamais en parallele :
+  // deux ecritures concurrentes sur la meme double page se marcheraient dessus.
+  const mirrorSpread = async (pageIndex, layoutId) => {
+    const jumelle = siblingPageIndex(pageIndex);
+    if (jumelle < 0 || jumelle >= totalPages || !book?.id) return;
+    try {
+      const saved = await saveManualPage(book.id, jumelle, {
+        layoutId,
+        itemIds: draftSlotItemIds,
+        photoAdjustments: draftPhotoAdjustments,
+        textRoles: draftTextRoles,
+        textStyles: draftTextStyles
+      });
+      setPages((previous) => [...previous.filter((page) => page.page_index !== jumelle), saved]);
+      await refreshPagePreview(jumelle);
+    } catch (_err) {
+      // Non bloquant : la page courante est deja enregistree. L'utilisateur
+      // verra une demi-image plutot qu'un message d'erreur trompeur sur une
+      // sauvegarde qui, elle, a reussi.
+      setSaveError("La seconde page de la double page n'a pas pu etre enregistree.");
+    }
+  };
+
+  // Quitter la double page (autre mise en page, ou page videe) doit LIBERER la
+  // page jumelle : sans ca, il resterait une demi-photo orpheline a cote.
+  const releaseSpreadSibling = async (pageIndex) => {
+    const jumelle = siblingPageIndex(pageIndex);
+    if (jumelle < 0 || jumelle >= totalPages || !book?.id) return;
+    const row = pages.find((page) => page.page_index === jumelle);
+    const slug = row?.layout_id ? layoutsById[row.layout_id]?.slug : null;
+    if (!isSpreadLayout(slug)) return;
+    try {
+      await clearPage(book.id, jumelle);
+      setPages((previous) => previous.filter((page) => page.page_index !== jumelle));
+      await refreshPagePreview(jumelle);
+    } catch (_err) { /* non bloquant, meme raison que ci-dessus */ }
+  };
 
   // Instantane de ce qui est actuellement sur la page, AVANT de le remplacer.
   // Ne fait rien si la page est deja vide : il n'y aurait rien a retablir, et
   // proposer "Annuler" sans objet brouillerait le signal.
-  const captureUndo = () => {
+  // `label` dit ce qu'on retablit, en toutes lettres : un "Annuler" seul
+  // n'apprend pas ce qu'on va recuperer, et c'est justement ce qui manquait
+  // quand l'utilisateur a remplace une photo sans trouver comment revenir
+  // (2026-09-14).
+  const captureUndo = (label) => {
     if (!draftLayoutSlug || draftSlotItemIds.filter(Boolean).length === 0) return;
     setUndoSnapshot({
       pageIndex: currentPageIndex,
@@ -574,7 +647,7 @@ export default function BookAtelierLuxe() {
       photoAdjustments: { ...draftPhotoAdjustments },
       textRoles: { ...draftTextRoles },
       textStyles: { ...draftTextStyles },
-      label: findAtelierLayout(draftLayoutSlug)?.label || 'la mise en page precedente'
+      label: label || `revenir à « ${findAtelierLayout(draftLayoutSlug)?.label || 'la mise en page précédente'} » avec son contenu`
     });
   };
 
@@ -601,6 +674,11 @@ export default function BookAtelierLuxe() {
   const handleChooseLayout = (slug) => {
     const atelierLayout = findAtelierLayout(slug);
     if (!atelierLayout) return;
+    // On quitte une double page pour autre chose : liberer la jumelle avant
+    // tout, sinon la moitie d'a cote reste affichee seule.
+    if (currentPageIndex != null && savedPageIsSpread(currentPageIndex) && !atelierLayout.spread) {
+      releaseSpreadSibling(currentPageIndex);
+    }
     captureUndo();
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(new Array(atelierLayout.slots.length).fill(null));
@@ -610,6 +688,17 @@ export default function BookAtelierLuxe() {
   };
 
   const handleAssignSlot = (slotIndex, itemId) => {
+    // REMPLACEMENT d'un emplacement deja occupe : c'est une perte, au meme
+    // titre qu'un changement de mise en page, et elle n'avait AUCUN retour en
+    // arriere jusqu'au 2026-09-14 ("j'ai change une image, je n'ai pas vu le
+    // bouton retour pour revenir sur l'image d'avant"). Poser simplement un
+    // element dans un emplacement VIDE n'efface rien : pas d'instantane, pour
+    // ne pas noyer le signal sous des "Annuler" sans objet.
+    const remplace = Boolean(draftSlotItemIds[slotIndex]) && draftSlotItemIds[slotIndex] !== itemId;
+    if (remplace) {
+      const ancien = itemsById[draftSlotItemIds[slotIndex]];
+      captureUndo(ancien?.kind === 'texte' ? 'remettre le souvenir précédent' : 'remettre la photo précédente');
+    }
     setDraftSlotItemIds((previous) => {
       const next = [...previous];
       next[slotIndex] = itemId;
@@ -620,6 +709,10 @@ export default function BookAtelierLuxe() {
 
   const handleRemoveSlot = (slotIndex) => {
     const removedItemId = draftSlotItemIds[slotIndex];
+    if (removedItemId) {
+      const retire = itemsById[removedItemId];
+      captureUndo(retire?.kind === 'texte' ? 'remettre le souvenir retiré' : 'remettre la photo retirée');
+    }
     setDraftSlotItemIds((previous) => {
       const next = [...previous];
       next[slotIndex] = null;
@@ -750,6 +843,11 @@ export default function BookAtelierLuxe() {
     const firstPhotoSlot = atelierLayout.slots.findIndex((type) => type === 'photo');
     const next = new Array(atelierLayout.slots.length).fill(null);
     if (firstPhotoSlot >= 0) next[firstPhotoSlot] = itemId;
+    // Meme liberation que dans handleChooseLayout : on quitte peut-etre une
+    // double page.
+    if (currentPageIndex != null && savedPageIsSpread(currentPageIndex) && !atelierLayout.spread) {
+      releaseSpreadSibling(currentPageIndex);
+    }
     captureUndo();
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(next);
@@ -759,7 +857,10 @@ export default function BookAtelierLuxe() {
 
   const handleClearPage = async () => {
     if (currentPageIndex == null || !book?.id) return;
-    captureUndo();
+    captureUndo('restaurer le contenu de cette page');
+    // Vider une moitie de double page vide aussi l'autre : une demi-photo
+    // seule n'a aucun sens.
+    if (savedPageIsSpread(currentPageIndex)) await releaseSpreadSibling(currentPageIndex);
     setSaveStatus('saving');
     setSaveError('');
     try {
@@ -1177,6 +1278,19 @@ export default function BookAtelierLuxe() {
     />
   ) : null;
 
+  // Bandeau "Annuler". Visible des qu'un instantane existe pour CETTE page —
+  // un seul pas en arriere, jusqu'a la prochaine action ou au changement de
+  // page. La condition precedente (seulement tant que la nouvelle mise en
+  // page etait vide) ne valait que pour le changement de mise en page ; elle
+  // masquait le lien apres un remplacement de photo, cas ou il est justement
+  // le plus utile.
+  const undoBar = undoSnapshot && undoSnapshot.pageIndex === currentPageIndex ? (
+    <button type="button" className="atelier-undo-bar" onClick={handleUndo}>
+      <span aria-hidden="true">↩</span>
+      <span>Annuler — {undoSnapshot.label}</span>
+    </button>
+  ) : null;
+
   const draftLayoutForOverlay = draftLayoutSlug ? findAtelierLayout(draftLayoutSlug) : null;
   const pageOverlay = viewKind === 'spread' && draftLayoutForOverlay ? (
     <AtelierPageOverlay
@@ -1307,7 +1421,21 @@ export default function BookAtelierLuxe() {
             usedItemIds={usedItemIds}
           />
 
-          <AtelierBookView
+          {/* Colonne centrale. Le bandeau "Annuler" et le livre sont
+              REGROUPES dans ce conteneur, et non poses cote a cote : les
+              enfants directs de .atelier-workspace sont les elements d'une
+              grille a TROIS colonnes. En ajouter un quatrieme decalait tout
+              d'un cran — le livre passait dans la colonne de droite et le
+              panneau de mise en page sortait de l'ecran (regression introduite
+              puis corrigee le 2026-09-14, signalee sur capture). */}
+          <div className="atelier-center-column">
+            {/* Retour en arriere place AU-DESSUS DU LIVRE et non dans le
+                panneau de droite : sur telephone les colonnes sont empilees,
+                le panneau se retrouve loin sous le livre, donc le lien etait
+                invisible au moment precis ou l'on en a besoin. */}
+            {undoBar}
+
+            <AtelierBookView
             viewKind={viewKind}
             loading={loadingPreview}
             singleHtml={viewKind === 'cover' ? coverHtml : viewKind === 'back-cover' ? backCoverHtml : null}
@@ -1328,7 +1456,8 @@ export default function BookAtelierLuxe() {
             printFormat={book.print_format}
             onAssignCoverPhoto={handleAssignCoverPhoto}
             selectedSidebarItem={selectedSidebarItem}
-          />
+            />
+          </div>
 
           {viewKind === 'spread' ? (
             <AtelierLayoutPanel
@@ -1340,6 +1469,14 @@ export default function BookAtelierLuxe() {
               onAssignSlot={handleAssignSlot}
               onRemoveSlot={handleRemoveSlot}
               onChangeFormat={() => {
+                // Surtout NE RIEN liberer ici : ce bouton ouvre seulement la
+                // galerie, il n'engage aucun changement. Le faire cassait la
+                // double page des le clic, avant meme que l'utilisateur ait
+                // choisi quoi que ce soit — "quand je clique sur changer la
+                // mise en page sans choisir de nouveau format, il remet la
+                // photo sur une seule page" (2026-09-14). La liberation se
+                // fait au moment du CHOIX reel, a partir de la page
+                // enregistree (voir savedPageIsSpread).
                 captureUndo();
                 setDraftLayoutSlug(null);
                 setDraftSlotItemIds([]);
@@ -1355,19 +1492,6 @@ export default function BookAtelierLuxe() {
               availableSlugs={availableLayoutSlugs}
               // "Vider cette page" et "Position dans le livre" sont passes sur
               // la page elle-meme (voir pageActions plus bas).
-              // Propose le retour en arriere UNIQUEMENT tant que la nouvelle
-              // mise en page est encore vide : des que l'utilisateur y a place
-              // quelque chose, "Annuler" detruirait ce travail neuf au lieu de
-              // reparer une erreur. La fenetre offerte est exactement celle ou
-              // l'on se rend compte de sa meprise.
-              onUndo={
-                undoSnapshot
-                  && undoSnapshot.pageIndex === currentPageIndex
-                  && draftSlotItemIds.filter(Boolean).length === 0
-                  ? handleUndo
-                  : null
-              }
-              undoLabel={undoSnapshot?.label}
             />
           ) : (
             <AtelierCoverPanel

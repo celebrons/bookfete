@@ -1,0 +1,148 @@
+/* En-tete du site.
+   ECRIT le 2026-09-14. Tout l'en-tete etait auparavant en styles INLINE, ce
+   qui interdit toute regle @media : sur un telephone (390 px), la navigation
+   debordait de 189 px et poussait "Deconnexion" hors de l'ecran — sur TOUTES
+   les pages du site, mesure a l'appui. C'est la seule et meme cause qui
+   rendait l'accueil, le tableau de bord et l'atelier non utilisables sur
+   mobile. Les styles vivent donc ici, ou l'on peut reellement adapter. */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background-color: var(--white);
+  border-bottom: var(--border-fine);
+}
+
+.site-header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-xl);
+}
+
+.site-header-logo {
+  flex: none;
+  text-decoration: none;
+  font-family: var(--font-primary);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.site-header-logo-dot { color: var(--gold); }
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+}
+
+.site-nav-link {
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+.site-nav-link:hover { color: var(--gold); }
+.site-nav-link.is-admin { color: var(--gold); font-weight: 700; }
+
+.site-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: 1px solid var(--mist);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  transition: all var(--transition-fast);
+}
+.site-nav-icon:hover {
+  color: var(--gold);
+  border-color: rgba(184, 146, 74, 0.45);
+  background-color: rgba(184, 146, 74, 0.08);
+}
+
+.site-nav .btn { padding: 8px 24px; cursor: pointer; white-space: nowrap; }
+
+/* Le libelle de l'engrenage n'existe QUE dans le menu deroulant : dans la
+   barre horizontale, l'icone seule suffit et le texte l'allongerait.
+   Declare AVANT la regle @media qui le reaffiche : a specificite egale, c'est
+   la derniere declaree qui gagne — pose apres, il masquait le libelle jusque
+   dans le menu, ou l'engrenage seul ne dit rien. */
+.site-nav-icon-label { display: none; }
+
+/* Bouton d'ouverture du menu : masque tant que la navigation tient en
+   largeur. */
+.site-header-burger {
+  display: none;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--mist);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.site-header-burger:hover { border-color: rgba(184, 146, 74, 0.45); color: var(--gold); }
+
+/* --- Ecrans etroits ---------------------------------------------------
+   860 px et non 720 : la navigation connectee (4 liens + 2 boutons) cesse
+   de tenir bien avant le seuil "mobile" habituel, et un menu qui deborde
+   silencieusement est pire qu'un menu replie un peu tot. */
+@media (max-width: 860px) {
+  .site-header-inner { padding: var(--space-sm) var(--space-md); }
+  .site-header-burger { display: inline-flex; }
+
+  /* Le menu passe en panneau deroulant sous l'en-tete, pleine largeur. */
+  .site-nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 6px;
+    background: var(--white);
+    border-bottom: var(--border-fine);
+    box-shadow: 0 12px 28px rgba(36, 31, 24, 0.14);
+    max-height: calc(100vh - 100%);
+    overflow-y: auto;
+  }
+  .site-nav[hidden] { display: none; }
+
+  /* Cibles tactiles : 44 px de haut, la hauteur communement retenue pour
+     etre atteinte au doigt sans viser. */
+  .site-nav-link,
+  .site-nav-icon,
+  .site-nav .btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 15px;
+    text-align: left;
+    justify-content: flex-start;
+  }
+  .site-nav-link:hover { background: rgba(184, 146, 74, 0.08); }
+  .site-nav-icon { gap: 10px; }
+  /* L'engrenage seul ne dit rien dans une liste : on lui ajoute son nom. */
+  .site-nav-icon-label { display: inline; }
+  .site-nav .btn { justify-content: center; margin-top: 6px; }
+}
+

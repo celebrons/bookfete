@@ -36,6 +36,8 @@ const SPACE_SCALE_BY_FORMAT = { livret: 0.62, standard: 1, luxe: 1.55 };
 // la vraie geometrie CSS. `null` = emplacement texte (jamais evalue).
 const PHOTO_SLOT_RATIOS = {
   FULL_PHOTO: ['page'],
+  // 'spread' : cadre de DEUX pages de large, a fond perdu — voir le backend.
+  FULL_PHOTO_SPREAD: ['spread'],
   PHOTO_WITH_CAPTION: ['page'],
   TWO_PHOTOS: [0.38, 0.38],
   TWO_PHOTOS_STACKED: [1.46, 1.46],
@@ -90,6 +92,13 @@ export function resolveSlotSizeMm(layoutSlug, slotIndex, printFormat) {
 
   const { widthMm: usableW, heightMm: usableH, gapMm: gap } = resolveUsableAreaMm(printFormat);
   if (rawRatio === 'page') return { widthMm: usableW, heightMm: usableH };
+  // Double page : on raisonne sur les dimensions de ROGNE (la photo deborde
+  // volontairement les marges), moins la bande avalee par la reliure. Miroir
+  // de photoQualityEngine.resolveSlotSizeMm — SPREAD_GUTTER_MM y vaut 4.
+  if (rawRatio === 'spread') {
+    const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
+    return { widthMm: Math.max(1, dims.widthMm * 2 - 8), heightMm: dims.heightMm };
+  }
 
   const columns = resolveSlotColumns(layoutSlug, slotIndex);
   if (!columns) return null;

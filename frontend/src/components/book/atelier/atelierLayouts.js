@@ -27,6 +27,10 @@ export const ATELIER_CATEGORIES = [
 
 export const ATELIER_LAYOUTS = [
   { slug: 'FULL_PHOTO', label: '1 grande photo', category: 'photo-single', slots: ['photo'] },
+  // Une seule photo etalee sur les DEUX pages. `spread: true` : choisir cette
+  // mise en page l'applique a la paire entiere, jamais a une page seule (voir
+  // BookAtelierLuxe : handleChooseLayout / l'alignement de la page jumelle).
+  { slug: 'FULL_PHOTO_SPREAD', label: '1 photo sur double page', category: 'photo-single', slots: ['photo'], spread: true },
   // Les deux arrangements d'une paire de photos. Les libelles decrivent la
   // forme des CADRES (ce que l'utilisateur voit et choisit), pas le sens de
   // l'empilement : "2 photos verticales" = cote a cote, cadres etroits et

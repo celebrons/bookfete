@@ -26,6 +26,11 @@ const MM_PER_INCH = 25.4;
 // module reste une fonction pure, sans dependance a un parseur CSS.
 const PAGE_PADDING_MM = 14;
 const GRID_GAP_MM = 3;
+// Bande centrale d'une photo sur double page, perdue dans la reliure et donc
+// imprimee nulle part. A garder egale a `--spread-gutter` dans le CSS du
+// renderer (pageRenderer.js, .photo-spread) : les desynchroniser donnerait
+// deux verites sur une meme geometrie.
+const SPREAD_GUTTER_MM = 4;
 
 // Surface reellement disponible pour le contenu d'une page (apres marges),
 // et gap de grille effectif — les deux mis a l'echelle par spaceScale
@@ -87,6 +92,21 @@ function resolveSlotSizeMm(layoutSlug, slotIndex, formatId) {
   // meme repli "page entiere" que PAGE_RATIO_BY_FORMAT dans layoutScoring.js.
   if (rawRatio === 'page') {
     return { widthMm: usableW, heightMm: usableH };
+  }
+
+  // 'spread' : une seule photo etalee sur DEUX pages, a fond perdu (voir
+  // pageRenderer, .photo-spread). On raisonne donc sur les dimensions de
+  // ROGNE, pas sur la zone de contenu : la photo deborde volontairement les
+  // marges. Moins la bande centrale, qui disparait dans la reliure et n'est
+  // imprimee nulle part.
+  //
+  // C'est le cas ou le controle de resolution compte le plus : la meme image
+  // est etiree sur ~42 cm, donc il faut deux fois plus de pixels que pour une
+  // pleine page. Se tromper ici, c'est laisser partir a l'impression une
+  // photo franchement floue sur la plus spectaculaire des pages.
+  if (rawRatio === 'spread') {
+    const { trimWidthMm, trimHeightMm } = resolveCoverFormat(formatId);
+    return { widthMm: Math.max(1, trimWidthMm * 2 - SPREAD_GUTTER_MM * 2), heightMm: trimHeightMm };
   }
 
   const columns = resolveSlotColumns(layoutSlug, slotIndex);

@@ -47,9 +47,29 @@ function MiniPhotoGlyph() {
 // main le cas des temoignages cote a cote ; la geometrie reelle le decrit
 // deja (TWO_TESTIMONIES/THREE_TESTIMONIES sont en colonnes), donc la
 // rustine n'a plus lieu d'etre.
-function LayoutMiniPreview({ slug, slots, printFormat }) {
+function LayoutMiniPreview({ slug, slots, printFormat, spread }) {
   const geometry = getOverlayGeometry(slug);
   const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
+
+  // Double page : la vignette doit montrer ce qu'on obtient, c'est-a-dire UNE
+  // image a cheval sur DEUX pages. La montrer comme une page seule
+  // decrirait une autre mise en page (retour utilisateur 2026-09-14) — le
+  // meme defaut que celui corrige sur "Grande photo, petite legende".
+  // Deux pages cote a cote, l'image par-dessus (fond perdu, comme au rendu),
+  // et un trait de pli au milieu pour que la double page se lise d'un coup.
+  if (spread) {
+    return (
+      <div
+        className="atelier-layout-mini is-spread"
+        style={{ aspectRatio: `${dims.widthMm * 2} / ${dims.heightMm}` }}
+      >
+        <span className="atelier-layout-mini-slot is-photo atelier-layout-mini-bleed">
+          <MiniPhotoGlyph />
+        </span>
+        <span className="atelier-layout-mini-fold" aria-hidden="true" />
+      </div>
+    );
+  }
 
   // Repli pour un slug sans geometrie : un empilement regulier. Aucun cas
   // aujourd'hui, mais une vignette vide serait pire qu'une vignette
@@ -102,7 +122,12 @@ function FormatGallery({ layouts, selectedSlug, onChoose, printFormat }) {
           className={`atelier-format-option ${selectedSlug === layout.slug ? 'is-selected' : ''}`}
           onClick={() => onChoose(layout.slug)}
         >
-          <LayoutMiniPreview slug={layout.slug} slots={layout.slots} printFormat={printFormat} />
+          <LayoutMiniPreview
+            slug={layout.slug}
+            slots={layout.slots}
+            printFormat={printFormat}
+            spread={layout.spread}
+          />
           <span className="atelier-format-label">{layout.label}</span>
         </button>
       ))}
@@ -239,12 +264,7 @@ function AtelierLayoutPanel({
   // arrive entre l'ajout d'un layout et l'execution de sa migration SQL
   // (2026-09-13, TWO_PHOTOS_STACKED). Non fourni -> aucun filtre, comportement
   // d'avant.
-  availableSlugs,
-  // Retour en arriere sur la derniere action qui a vide la page (voir
-  // BookAtelierLuxe : captureUndo/handleUndo). `null` quand il n'y a rien a
-  // retablir — le lien n'apparait alors pas du tout.
-  onUndo,
-  undoLabel
+  availableSlugs
 }) {
   const isAvailable = (slug) => !availableSlugs || availableSlugs.has(slug);
   const draftLayout = ATELIER_LAYOUTS.find((layout) => layout.slug === draftLayoutSlug) || null;
@@ -261,17 +281,6 @@ function AtelierLayoutPanel({
           </span>
         )}
       </div>
-
-      {/* Filet de securite apres coup. Il vaut mieux qu'une confirmation
-          AVANT : on ne sait qu'on s'est trompe qu'une fois le contenu parti,
-          et une confirmation de plus a chaque changement de mise en page
-          alourdirait le geste courant pour tout le monde. */}
-      {onUndo && (
-        <button type="button" className="atelier-layout-undo" onClick={onUndo}>
-          <span aria-hidden="true">↩</span>{' '}
-          Annuler — revenir à {undoLabel ? `« ${undoLabel} »` : 'la mise en page précédente'} avec son contenu
-        </button>
-      )}
 
       {!draftLayout ? (
         <>

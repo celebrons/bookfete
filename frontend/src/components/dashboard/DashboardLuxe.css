@@ -902,3 +902,16 @@
     flex-direction: column;
   }
 }
+
+/* --- Telephone (2026-09-14) ---------------------------------------------
+   Mesure sur un gabarit de 390 px : les actions de carte faisaient 28 px de
+   haut, sous le seuil atteignable au doigt. On agrandit la ZONE, pas le
+   texte — les cartes doivent rester denses. */
+@media (max-width: 640px) {
+  .dashboard-mini-action {
+    min-height: 40px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .dashboard-mini-action.is-icon { min-width: 40px; }
+}

@@ -234,13 +234,25 @@ function splitMetaFor(item, overridesByItemId) {
 // meme vide — mais sans <img> : simple espace blanc, comme sur la page
 // imprimee finale, jamais un cadre pointille ou un placeholder visible —
 // ca, c'est le role du panneau d'edition, pas du rendu reel).
-function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsByItemId = {}) {
+function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsByItemId = {}, pageIndex = 0) {
   const slotCount = rawItems.length;
   const orderedItems = presentationVariant === 1 && slotCount > 1 ? [...rawItems].reverse() : rawItems;
 
   if (slotCount === 1) {
     const item = orderedItems[0];
     if (!item) return '';
+
+    // Photo etalee sur la DOUBLE PAGE : la meme image est posee sur les deux
+    // pages, chacune n'en montrant que sa moitie. La moitie affichee se deduit
+    // de la PARITE du numero de page — index pair = page de gauche, impair =
+    // page de droite — exactement la convention de l'atelier
+    // (leftPageIndex = spread * 2). Aucune donnee supplementaire a stocker :
+    // la position de la page porte deja l'information.
+    if (slug === 'FULL_PHOTO_SPREAD') {
+      const moitie = pageIndex % 2 === 0 ? 'is-spread-left' : 'is-spread-right';
+      return `<figure class="block-photo photo-spread ${moitie}" data-layout="${escapeHtml(slug)}">${imgFrame(item.url, adjustmentsByItemId[item.id])}</figure>`;
+    }
+
     const inset = slug === 'photo-avec-marge' || (slug === 'FULL_PHOTO' && presentationVariant === 1);
     const cls = inset ? 'block-photo photo-solo photo-inset' : 'block-photo photo-solo';
     return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url, adjustmentsByItemId[item.id])}</figure>`;
@@ -451,7 +463,7 @@ function renderTitlePhotosBlock(rawItems, slug, adjustmentsByItemId = {}, textPr
   return `<div class="block-title-photos" data-layout="${escapeHtml(slug)}">${titleHtml}${photosHtml}</div>`;
 }
 
-const PHOTO_SLUGS = new Set(['FULL_PHOTO', 'TWO_PHOTOS', 'TWO_PHOTOS_STACKED', 'THREE_PHOTOS', 'FOUR_PHOTOS']);
+const PHOTO_SLUGS = new Set(['FULL_PHOTO', 'FULL_PHOTO_SPREAD', 'TWO_PHOTOS', 'TWO_PHOTOS_STACKED', 'THREE_PHOTOS', 'FOUR_PHOTOS']);
 const TEXTE_SLUGS = new Set(['ONE_TESTIMONY', 'TWO_TESTIMONIES', 'THREE_TESTIMONIES']);
 const MIXTE_ORDERED_SLUGS = new Set(['PHOTO_TEXT', 'TEXT_PHOTO', 'TWO_PHOTOS_TEXT']);
 const TITLE_PHOTO_SLUGS = new Set(['TITLE_TWO_PHOTOS', 'TITLE_FOUR_PHOTOS']);
@@ -459,7 +471,10 @@ const TITLE_PHOTO_SLUGS = new Set(['TITLE_TWO_PHOTOS', 'TITLE_FOUR_PHOTOS']);
 // `adjustmentsByItemId` : { [itemId]: {focalX, focalY, zoom, fitMode} },
 // source unique = page.content.photoAdjustments (voir renderPage/
 // renderSinglePageHtml) — jamais reconstruit ici, propage seulement.
-function renderBlock(block, itemsById, layoutsById, adjustmentsByItemId = {}, textPresentation = {}) {
+// `pageIndex` : necessaire au seul layout FULL_PHOTO_SPREAD, qui deduit de la
+// parite de la page la moitie de l image a afficher. Zero par defaut — tout
+// autre layout l ignore.
+function renderBlock(block, itemsById, layoutsById, adjustmentsByItemId = {}, textPresentation = {}, pageIndex = 0) {
   const items = block.itemIds.map((id) => itemsById[id]).filter(Boolean);
   if (items.length === 0) return '';
 
@@ -486,7 +501,7 @@ function renderBlock(block, itemsById, layoutsById, adjustmentsByItemId = {}, te
   // renderTexteBlock ("il faut absolument que les autres photos restent a
   // leur place lorsque je supprime une autre photo ou un autre texte").
   if (PHOTO_SLUGS.has(slug)) {
-    return renderPhotoBlock(block.itemIds.map((id) => itemsById[id]), slug, presentationVariant, adjustmentsByItemId);
+    return renderPhotoBlock(block.itemIds.map((id) => itemsById[id]), slug, presentationVariant, adjustmentsByItemId, pageIndex);
   }
   if (TEXTE_SLUGS.has(slug)) {
     return renderTexteBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId, presentationVariant, textPresentation);
@@ -572,7 +587,7 @@ function renderPage(page, itemsById, layoutsById, isLast, context = {}) {
     styles: textPresentation.styles
   });
   const blocksHtml = blocks
-    .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation))
+    .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, page.page_index))
     .join('');
   // "is-luxe" : marqueur LEGER pour scoper les 2 seuls details dores qui
   // restent sur une page ordinaire (filet sous .page-title + numero de page,
@@ -648,6 +663,32 @@ const BASE_CSS = `
   }
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .photo-solo { margin: 0; height: 100%; }
+  /* Une photo sur DOUBLE PAGE (FULL_PHOTO_SPREAD).
+     Chaque page porte la MEME image et n'en montre que sa moitie. Trois
+     decisions a connaitre :
+
+     1. PLEIN BORD. La figure est posee en absolu sur toute la page
+        (inset: 0), donc PAR-DESSUS la marge de page. Sans ca, les deux
+        moities se rejoindraient au niveau des marges et une bande blanche
+        courrait le long du pli — ce qui ruine exactement l'effet recherche.
+     2. LA RELIURE MANGE LE MILIEU. L'image est dessinee sur 200% + 2 x la
+        gouttiere, et chaque page en montre 100% depuis SON bord exterieur :
+        la bande centrale (2 x --spread-gutter) n'est affichee nulle part.
+        C'est volontaire — c'est precisement la portion qui disparait dans le
+        pli. Les deux moities se raccordent donc correctement sur un livre
+        ouvert, au lieu de se chevaucher.
+     3. Valeur absolue, non mise a l'echelle par spaceScale : la perte de
+        reliure est un fait physique de fabrication, pas un choix de densite
+        typographique. */
+  .photo-spread { position: absolute; inset: 0; margin: 0; overflow: hidden; }
+  .photo-spread .photo-frame {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: calc(200% + var(--spread-gutter, 4mm) * 2);
+  }
+  .photo-spread.is-spread-left .photo-frame { left: 0; }
+  .photo-spread.is-spread-right .photo-frame { right: 0; }
   .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
   .photo-inset .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
   .photo-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); height: 100%; }
@@ -924,7 +965,7 @@ function renderSinglePageHtml(input) {
       styles: textPresentation.styles
     });
     const blocksHtml = blocks
-      .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation))
+      .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, page.page_index))
       .join('');
     // Meme marqueur/numero de page discret que renderPage() ci-dessus (Luxe uniquement).
     const luxeClass = format?.formatId === 'luxe' ? ' is-luxe' : '';

@@ -205,6 +205,11 @@ function scoreLengthFit(layout, units) {
 const PHOTO_SLOT_RATIOS = {
   FULL_PHOTO: ['page'],
   PHOTO_WITH_CAPTION: ['page'],
+  // 'spread' : le cadre fait DEUX pages de large, a fond perdu (voir
+  // pageRenderer, .photo-spread). Resolu dynamiquement comme 'page', mais sur
+  // la largeur doublee — c'est ce qui rend le controle de resolution deux fois
+  // plus exigeant, ce qu'il doit etre : la meme photo y est etiree sur ~42 cm.
+  FULL_PHOTO_SPREAD: ['spread'],
   TWO_PHOTOS: [0.38, 0.38], // moitie largeur, pleine hauteur -> tres vertical
   // Symetrique du precedent (ajoute le 2026-09-13) : deux photos EMPILEES,
   // donc pleine largeur et demi-hauteur -> tres horizontal. C'est la mise en
@@ -278,7 +283,10 @@ function scoreOrientation(layout, units, context = {}) {
       const unit = units[index];
       const expected = expectedRatios[index];
       if (!unit?.ratio || expected == null) return; // photo pas encore sondee, ou layout hors table pour cette position -> neutre
-      const slotRatio = expected === 'page' ? pageRatio : expected;
+      // 'spread' = deux pages cote a cote : meme hauteur, largeur doublee.
+      const slotRatio = expected === 'page' ? pageRatio
+        : expected === 'spread' ? pageRatio * 2
+          : expected;
       const slotScore = slotRatioScore(unit.ratio, slotRatio);
       if (slotScore == null) return;
       total += slotScore;

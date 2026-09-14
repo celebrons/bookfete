@@ -1,9 +1,10 @@
 // C:\Users\USER\bookfete\frontend\src\components\layout\HeaderLuxe.js
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { checkIsAdmin } from '../../services/adminApi';
 import '../../styles/luxe-theme.css';
+import './HeaderLuxe.css';
 
 const IconGear = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -20,10 +21,51 @@ const IconGear = () => (
   </svg>
 );
 
+const IconBurger = ({ open }) => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    {open ? (
+      <>
+        <path d="M5 5 L15 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M15 5 L5 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </>
+    ) : (
+      <>
+        <path d="M3 6 H17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M3 10 H17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M3 14 H17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </>
+    )}
+  </svg>
+);
+
+// Sur un ecran etroit, la navigation se replie derriere un bouton (voir
+// HeaderLuxe.css). Elle etait auparavant entierement en styles inline, donc
+// impossible a adapter : elle debordait de 189 px sur un telephone, ce qui
+// poussait "Deconnexion" hors de l'ecran et creait un defilement lateral sur
+// TOUTES les pages du site (mesure le 2026-09-14).
 const HeaderLuxe = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = React.useState(null);
   const [isAdmin, setIsAdmin] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  // Largeur au-dela de laquelle la navigation tient sur une ligne — meme
+  // seuil que la regle @media, a garder synchronise. En dessous, le menu est
+  // masque tant qu'on ne l'ouvre pas ; au-dessus il doit rester visible en
+  // permanence, sans dependre de l'etat d'ouverture.
+  const [compact, setCompact] = React.useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
+  ));
+
+  React.useEffect(() => {
+    const media = window.matchMedia('(max-width: 860px)');
+    const apply = (event) => {
+      setCompact(event.matches);
+      if (!event.matches) setMenuOpen(false); // repasse en large : plus de menu ouvert qui traine
+    };
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, []);
 
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -47,76 +89,51 @@ const HeaderLuxe = () => {
     return () => { cancelled = true; };
   }, [user]);
 
+  // Naviguer referme le menu : sinon il resterait ouvert par-dessus la page
+  // qu'on vient de demander.
+  React.useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
+  React.useEffect(() => {
+    if (!menuOpen) return undefined;
+    const handleKey = (event) => { if (event.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [menuOpen]);
+
   const handleLogout = async () => {
+    setMenuOpen(false);
     await supabase.auth.signOut();
     navigate('/');
   };
 
   return (
-    <header
-      className="site-header"
-      style={{
-        backgroundColor: 'var(--white)',
-        borderBottom: 'var(--border-fine)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000
-      }}
-    >
-      <div className="container-luxe" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 'var(--space-md) var(--space-xl)'
-      }}>
-        {/* Logo */}
-        <Link to="/" style={{ textDecoration: 'none' }}>
-          <span style={{
-            fontFamily: 'var(--font-primary)',
-            fontSize: '24px',
-            fontWeight: '700',
-            color: 'var(--ink)',
-            letterSpacing: '-0.02em'
-          }}>
-            Célébrons<span style={{ color: 'var(--gold)' }}>.</span>
-          </span>
+    <header className="site-header">
+      <div className="container-luxe site-header-inner">
+        <Link to="/" className="site-header-logo">
+          Célébrons<span className="site-header-logo-dot">.</span>
         </Link>
 
-        {/* Navigation - liens sans soulignement */}
-        <nav style={{
-          display: 'flex',
-          gap: 'var(--space-xl)',
-          alignItems: 'center'
-        }}>
-          <Link 
-            to="/how-it-works" 
-            style={{ 
-              textDecoration: 'none',
-              color: 'var(--ink)',
-              fontSize: '14px',
-              fontWeight: '500',
-              transition: 'color var(--transition-fast)'
-            }}
-            onMouseEnter={(e) => e.target.style.color = 'var(--gold)'}
-            onMouseLeave={(e) => e.target.style.color = 'var(--ink)'}
-          >
+        <button
+          type="button"
+          className="site-header-burger"
+          onClick={() => setMenuOpen((previous) => !previous)}
+          aria-expanded={menuOpen}
+          aria-controls="site-nav"
+          aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+        >
+          <IconBurger open={menuOpen} />
+        </button>
+
+        {/* `hidden` seulement en mode compact : en large, la navigation est
+            toujours la, quel que soit l'etat du menu. */}
+        <nav id="site-nav" className="site-nav" hidden={compact && !menuOpen}>
+          <Link to="/how-it-works" className="site-nav-link">
             Comment ça marche
           </Link>
-          
+
           {user ? (
             <>
-              <Link 
-                to="/dashboard" 
-                style={{ 
-                  textDecoration: 'none',
-                  color: 'var(--ink)',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'color var(--transition-fast)'
-                }}
-                onMouseEnter={(e) => e.target.style.color = 'var(--gold)'}
-                onMouseLeave={(e) => e.target.style.color = 'var(--ink)'}
-              >
+              <Link to="/dashboard" className="site-nav-link">
                 Tableau de bord
               </Link>
               {/* Lien vers l'espace d'administration, affiche UNIQUEMENT aux
@@ -125,67 +142,25 @@ const HeaderLuxe = () => {
                   route admin est gardee independamment cote serveur — juste
                   de quoi ne pas avoir a retenir l'URL. */}
               {isAdmin && (
-                <Link
-                  to="/admin"
-                  title="Espace d'administration"
-                  style={{
-                    textDecoration: 'none',
-                    color: 'var(--gold)',
-                    fontSize: '14px',
-                    fontWeight: '700'
-                  }}
-                >
+                <Link to="/admin" className="site-nav-link is-admin" title="Espace d'administration">
                   Administration
                 </Link>
               )}
-              <Link
-                to="/account"
-                title="Espace client"
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  border: '1px solid var(--mist)',
-                  borderRadius: '10px',
-                  textDecoration: 'none',
-                  color: 'var(--ink)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all var(--transition-fast)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'var(--gold)';
-                  e.currentTarget.style.borderColor = 'rgba(184,146,74,0.45)';
-                  e.currentTarget.style.backgroundColor = 'rgba(184,146,74,0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--ink)';
-                  e.currentTarget.style.borderColor = 'var(--mist)';
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-                aria-label="Espace client"
-              >
+              <Link to="/account" className="site-nav-icon" title="Espace client" aria-label="Espace client">
                 <IconGear />
+                <span className="site-nav-icon-label">Espace client</span>
               </Link>
-              <button
-                onClick={handleLogout}
-                className="btn btn-outline"
-                style={{ padding: '8px 24px', cursor: 'pointer' }}
-              >
+              <button onClick={handleLogout} className="btn btn-outline">
                 Déconnexion
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" style={{ textDecoration: 'none' }}>
-                <button className="btn btn-outline" style={{ padding: '8px 24px', cursor: 'pointer' }}>
-                  Connexion
-                </button>
+              <Link to="/login" className="btn btn-outline">
+                Connexion
               </Link>
-              <Link to="/register" style={{ textDecoration: 'none' }}>
-                <button className="btn btn-primary" style={{ padding: '8px 24px', cursor: 'pointer' }}>
-                  Créer un livre
-                </button>
+              <Link to="/register" className="btn btn-primary">
+                Créer un livre
               </Link>
             </>
           )}

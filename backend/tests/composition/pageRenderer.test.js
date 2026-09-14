@@ -275,6 +275,42 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     expect(PHOTO_SLOT_RATIOS.TWO_PHOTOS_TEXT[1]).toBe(0.75);
   });
 
+  // Photo sur DOUBLE PAGE (2026-09-14). La moitie affichee se deduit de la
+  // PARITE du numero de page : c'est toute la mecanique, et rien d'autre ne
+  // la porte — si elle casse, le livre imprime montre deux fois la meme
+  // moitie sans que rien ne le signale.
+  it('FULL_PHOTO_SPREAD : la page PAIRE rend la moitie gauche, l IMPAIRE la moitie droite', () => {
+    const layouts = [{ id: 'l-spread', slug: 'FULL_PHOTO_SPREAD', kind: 'photo' }];
+    const items = [{ id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg' }];
+    const pageAt = (pageIndex) => bodyOf(renderBookHtml({
+      book: {},
+      items,
+      layouts,
+      pages: [{
+        page_index: pageIndex,
+        content: { kind: 'photo', blocks: [{ kind: 'photo', itemIds: ['p1'], layoutId: 'l-spread' }] }
+      }]
+    }));
+
+    expect(pageAt(0)).toContain('photo-spread is-spread-left');
+    expect(pageAt(1)).toContain('photo-spread is-spread-right');
+    expect(pageAt(4)).toContain('photo-spread is-spread-left');
+    expect(pageAt(7)).toContain('photo-spread is-spread-right');
+  });
+
+  it('FULL_PHOTO_SPREAD : la photo va a fond perdu et reserve une bande de reliure', () => {
+    const html = renderBookHtml({
+      book: {},
+      items: [{ id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
+      layouts: [{ id: 'l-spread', slug: 'FULL_PHOTO_SPREAD', kind: 'photo' }],
+      pages: [{ page_index: 0, content: { kind: 'photo', blocks: [{ kind: 'photo', itemIds: ['p1'], layoutId: 'l-spread' }] } }]
+    });
+    // Fond perdu : la figure est posee sur TOUTE la page, marges comprises.
+    expect(html).toMatch(/\.photo-spread \{[^}]*position: absolute;[^}]*inset: 0/);
+    // La bande centrale avalee par la reliure est bien reservee.
+    expect(html).toMatch(/width: calc\(200% \+ var\(--spread-gutter, 4mm\) \* 2\)/);
+  });
+
   it('PHOTO_WITH_CAPTION rend une figure avec figcaption, distincte de PHOTO_TEXT', () => {
     const withCaption = bodyOf(pageFor('PHOTO_WITH_CAPTION', ['p1', 't1'], 'mixte'));
     expect(withCaption).toContain('class="block-photo photo-with-caption"');

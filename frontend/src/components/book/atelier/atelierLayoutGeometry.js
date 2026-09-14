@@ -61,6 +61,12 @@ export const LAYOUT_GEOMETRY = {
   FULL_PHOTO: [
     { top: 0, left: 0, width: 100, height: 100 }
   ],
+  // Photo sur double page : sur CETTE page, l'emplacement occupe tout, comme
+  // une pleine page. L'autre moitie vit sur la page jumelle — l'incrustation
+  // ne decrit jamais qu'une page a la fois.
+  FULL_PHOTO_SPREAD: [
+    { top: 0, left: 0, width: 100, height: 100 }
+  ],
   TWO_PHOTOS: [
     { top: 0, left: 0, width: 48, height: 100 },
     { top: 0, left: 52, width: 48, height: 100 }

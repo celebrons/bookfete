@@ -88,12 +88,17 @@ describe('routes/books — CRUD', () => {
       expect(response.body.id).toBe(fixture.BOOK_ID);
     });
 
-    it('renvoie une erreur quand le livre est introuvable', async () => {
+    it('renvoie 404 quand le livre est introuvable', async () => {
       const response = await request(app)
         .get('/api/books/book-inexistant')
         .set('Authorization', 'Bearer valid-token');
 
-      expect(response.status).toBe(500);
+      // Ce test exigeait un 500 et echouait donc depuis que la route a ete
+      // corrigee : il verrouillait l'ANCIEN defaut. Un livre absent n'est pas
+      // une panne du serveur — c'est une ressource introuvable, et le client
+      // doit pouvoir distinguer les deux (proposer "ce livre n'existe plus"
+      // plutot qu'un message d'erreur technique).
+      expect(response.status).toBe(404);
       expect(response.body.error).toBeDefined();
     });
   });

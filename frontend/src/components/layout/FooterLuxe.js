@@ -2,36 +2,27 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import '../../styles/luxe-theme.css';
+import './FooterLuxe.css';
+
+// Styles sortis de l'inline vers FooterLuxe.css le 2026-09-14 : la grille
+// etait figee a 4 colonnes et debordait de 195 px sur un telephone, sur
+// toutes les pages du site. Le contenu et les liens sont inchanges.
+const PRODUIT = ['Comment ça marche', 'Tarifs', 'Exemples', 'FAQ'];
+const LEGAL = ['CGV', 'Confidentialité', 'Mentions légales'];
 
 const FooterLuxe = () => {
   return (
-    <footer style={{
-      backgroundColor: 'var(--silk)',
-      padding: 'var(--space-xl) 0',
-      marginTop: 'var(--space-xxl)',
-      borderTop: 'var(--border-fine)'
-    }}>
+    <footer className="site-footer">
       <div className="container-luxe">
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 1fr 1fr 1fr',
-          gap: 'var(--space-xl)'
-        }}>
+        <div className="site-footer-grid">
           {/* Colonne 1 - Marque */}
           <div>
-            <span style={{
-              fontSize: '20px',
-              fontWeight: '700',
-              color: 'var(--ink)',
-              letterSpacing: '-0.02em',
-              display: 'block',
-              marginBottom: 'var(--space-md)'
-            }}>
-              Célébrons<span style={{ color: 'var(--gold)' }}>.</span>
+            <span className="site-footer-brand">
+              Célébrons<span className="site-footer-brand-dot">.</span>
             </span>
             <p className="body-text" style={{ color: 'var(--text-light)' }}>
-              Créez des livres de souvenirs uniques, 
-              collaboratifs et magnifiques pour vos 
+              Créez des livres de souvenirs uniques,
+              collaboratifs et magnifiques pour vos
               événements les plus précieux.
             </p>
             <div className="separator-gold" style={{ marginTop: 'var(--space-lg)' }} />
@@ -40,18 +31,10 @@ const FooterLuxe = () => {
           {/* Colonne 2 - Produit */}
           <div>
             <span className="label-gold">Produit</span>
-            <ul style={{ listStyle: 'none', marginTop: 'var(--space-md)' }}>
-              {['Comment ça marche', 'Tarifs', 'Exemples', 'FAQ'].map(item => (
-                <li key={item} style={{ marginBottom: 'var(--space-sm)' }}>
-                  <Link 
-                    to={`/${item.toLowerCase().replace(' ', '-')}`}
-                    style={{
-                      textDecoration: 'none',
-                      color: 'var(--ink)',
-                      fontSize: '14px',
-                      fontWeight: '400'
-                    }}
-                  >
+            <ul className="site-footer-list">
+              {PRODUIT.map((item) => (
+                <li key={item}>
+                  <Link to={`/${item.toLowerCase().replace(' ', '-')}`} className="site-footer-link">
                     {item}
                   </Link>
                 </li>
@@ -62,18 +45,10 @@ const FooterLuxe = () => {
           {/* Colonne 3 - Légal */}
           <div>
             <span className="label-gold">Légal</span>
-            <ul style={{ listStyle: 'none', marginTop: 'var(--space-md)' }}>
-              {['CGV', 'Confidentialité', 'Mentions légales'].map(item => (
-                <li key={item} style={{ marginBottom: 'var(--space-sm)' }}>
-                  <Link 
-                    to={`/${item.toLowerCase().replace(' ', '-')}`}
-                    style={{
-                      textDecoration: 'none',
-                      color: 'var(--ink)',
-                      fontSize: '14px',
-                      fontWeight: '400'
-                    }}
-                  >
+            <ul className="site-footer-list">
+              {LEGAL.map((item) => (
+                <li key={item}>
+                  <Link to={`/${item.toLowerCase().replace(' ', '-')}`} className="site-footer-link">
                     {item}
                   </Link>
                 </li>
@@ -84,16 +59,9 @@ const FooterLuxe = () => {
           {/* Colonne 4 - Contact */}
           <div>
             <span className="label-gold">Contact</span>
-            <ul style={{ listStyle: 'none', marginTop: 'var(--space-md)' }}>
-              <li style={{ marginBottom: 'var(--space-sm)' }}>
-                <a 
-                  href="mailto:bonjour@celebrons.com"
-                  style={{
-                    textDecoration: 'none',
-                    color: 'var(--ink)',
-                    fontSize: '14px'
-                  }}
-                >
+            <ul className="site-footer-list">
+              <li>
+                <a href="mailto:bonjour@celebrons.com" className="site-footer-link">
                   bonjour@celebrons.com
                 </a>
               </li>
@@ -108,26 +76,18 @@ const FooterLuxe = () => {
 
         {/* Copyright */}
         <div className="separator" style={{ margin: 'var(--space-xl) 0 var(--space-md)' }} />
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        <div className="site-footer-bottom">
           <span className="body-text" style={{ fontSize: '12px', color: 'var(--text-light)' }}>
             © {new Date().getFullYear()} Célébrons. Tous droits réservés.
             {' '}
             <span style={{ color: 'var(--gold)' }}>· build test-deploy</span>
           </span>
-          <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
-            {['Instagram', 'Pinterest'].map(social => (
-              <a 
+          <div className="site-footer-social">
+            {['Instagram', 'Pinterest'].map((social) => (
+              <a
                 key={social}
                 href="#"
-                style={{
-                  textDecoration: 'none',
-                  color: 'var(--text-light)',
-                  fontSize: '12px'
-                }}
+                style={{ textDecoration: 'none', color: 'var(--text-light)', fontSize: '12px' }}
               >
                 {social}
               </a>
