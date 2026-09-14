@@ -468,6 +468,29 @@ function assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm = 0) {
     const pageWidthPt = (format.trimWidthMm + bleedMm * 2) * MM_TO_PT;
     const pageHeightPt = (format.trimHeightMm + bleedMm * 2) * MM_TO_PT;
     const doc = new PDFDocument({ autoFirstPage: false });
+
+    // PAGES EN VIS-A-VIS a l'ouverture (mode "livre").
+    //
+    // Une photo etalee sur la double page (FULL_PHOTO_SPREAD) est stockee
+    // comme deux demi-images sur deux pages consecutives : dans un lecteur
+    // PDF en mode "une page a la fois", on ne voit jamais l'image entiere —
+    // "sur le pdf, il faut afficher les deux pages cote a cote pour ne pas la
+    // perdre" (retour utilisateur 2026-09-14).
+    //
+    // /TwoPageRight = deux pages a la fois, les pages IMPAIRES a droite. La
+    // page 1 du PDF (la couverture) reste donc seule, puis les pages 2-3,
+    // 4-5... — soit exactement les doubles-pages du livre : la page
+    // interieure d'index 0 est bien une page de GAUCHE (atelier :
+    // leftPageIndex = spread * 2), et c'est la meme parite qui decide quelle
+    // moitie de l'image est affichee (voir pageRenderer .photo-spread).
+    //
+    // C'est une PREFERENCE D'AFFICHAGE inscrite dans le catalogue du PDF :
+    // aucune page n'est modifiee, fusionnee ni reordonnee. Le fichier envoye
+    // a l'imprimeur, lui, n'emprunte pas ce chemin (voir
+    // services/printing/gelatoPrintFile.js, qui assemble son propre document)
+    // : une page = une page, toujours.
+    if (doc._root?.data) doc._root.data.PageLayout = 'TwoPageRight';
+
     const stream = fs.createWriteStream(outputPath);
 
     stream.on('finish', () => resolve(outputPath));

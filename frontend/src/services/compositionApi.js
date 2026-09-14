@@ -286,9 +286,9 @@ export const fetchInteriorPagePreviewHtml = async (bookId, pageIndex) => {
 // { [itemId]: {align, color, sizePt} }. Egalement nettoyes/bornes cote
 // backend (sanitizeTextRoles/sanitizeTextStyles) : une valeur hors du cadre
 // est ecartee au profit de celle du role, jamais appliquee telle quelle.
-export const saveManualPage = (bookId, pageIndex, { layoutId, itemIds, photoAdjustments, textRoles, textStyles }) => request(
+export const saveManualPage = (bookId, pageIndex, { layoutId, itemIds, photoAdjustments, photoCaptions, textRoles, textStyles }) => request(
   `/books/${bookId}/pages/${pageIndex}/manual`,
-  { method: 'PUT', body: JSON.stringify({ layoutId, itemIds, photoAdjustments, textRoles, textStyles }) }
+  { method: 'PUT', body: JSON.stringify({ layoutId, itemIds, photoAdjustments, photoCaptions, textRoles, textStyles }) }
 );
 
 // Vide une page (retour a l'etat vierge, deverrouillee) : reutilise la route

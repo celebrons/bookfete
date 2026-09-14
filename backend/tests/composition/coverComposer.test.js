@@ -646,3 +646,64 @@ describe('coverComposer — habillage dore du format Luxe (coverTheme.applyForma
     expect(pages[1].content.theme.ornament).toBe('gold-frame'); // back
   });
 });
+
+// La 4e de couverture ne doit pas changer de photo quand le livre change de
+// FORMAT. Defaut reel constate le 2026-09-14 sur deux livres de production :
+// le score d'une photo depend du ratio de la page, et la 4e prend
+// deliberement la DERNIERE photo acceptable — la position la plus sensible au
+// moindre reordonnancement. Le simple fait de regarder le livre en Livret
+// changeait donc sa 4e ("la photo de 4e est modifiee par une photo aleatoire
+// en mode livret").
+describe('coverComposer — la photo de 4e ne depend pas du format du livre', () => {
+  const { resolveCoverFormat } = require('../../services/composition/coverFormat');
+
+  // Des photos de FORMES tres differentes : c'est exactement ce qui faisait
+  // bouger le classement d'un ratio de page a l'autre.
+  const items = [
+    { id: 'p-portrait', kind: 'photo', url: 'u1', display_order: 0, metadata: { width: 2400, height: 3200, orientation: 'portrait' } },
+    { id: 'p-paysage', kind: 'photo', url: 'u2', display_order: 1, metadata: { width: 3600, height: 2400, orientation: 'landscape' } },
+    { id: 'p-carre', kind: 'photo', url: 'u3', display_order: 2, metadata: { width: 2600, height: 2600, orientation: 'square' } },
+    { id: 'p-portrait-2', kind: 'photo', url: 'u4', display_order: 3, metadata: { width: 2200, height: 3000, orientation: 'portrait' } },
+    { id: 'p-carre-2', kind: 'photo', url: 'u5', display_order: 4, metadata: { width: 3000, height: 3000, orientation: 'square' } },
+    { id: 't-1', kind: 'texte', text: 'Un souvenir', display_order: 5 }
+  ];
+
+  // Recto FIXE (COVER_PHOTO = une seule photo) : sans ca, la variante du recto
+  // change elle-meme d'un format a l'autre, retire un nombre different de
+  // photos de la pioche, et le test ne mesurerait plus ce qu'il annonce.
+  const book = {
+    id: 'b1',
+    title: 'Les soixante ans de Jean',
+    collection_mode: 'solo',
+    cover_overrides: { frontVariant: 'COVER_PHOTO' }
+  };
+
+  const composer = (livre, formatId) => composeCoversIntoPages({
+    book: livre,
+    items,
+    template: null,
+    interiorPages: [],
+    format: { formatId, ...resolveCoverFormat(formatId) }
+  });
+
+  it('choisit la MEME photo en livret, standard et luxe', () => {
+    const photoDeLa4e = (formatId) => {
+      const pages = composer(book, formatId);
+      return pages[pages.length - 1].content.itemIds.join(',');
+    };
+
+    const livret = photoDeLa4e('livret');
+    // Sans photo sur la 4e, le test ne prouverait rien.
+    expect(livret).not.toBe('');
+    expect(photoDeLa4e('standard')).toBe(livret);
+    expect(photoDeLa4e('luxe')).toBe(livret);
+  });
+
+  it('un choix explicite de l utilisateur reste prioritaire dans tous les formats', () => {
+    const avecChoix = { ...book, cover_overrides: { ...book.cover_overrides, backPhotoId: 'p-carre-2' } };
+    ['livret', 'standard', 'luxe'].forEach((formatId) => {
+      const pages = composer(avecChoix, formatId);
+      expect(pages[pages.length - 1].content.itemIds).toEqual(['p-carre-2']);
+    });
+  });
+});

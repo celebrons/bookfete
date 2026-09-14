@@ -189,9 +189,14 @@ async function replaceBookPages(bookId, pages = []) {
 // jamais artificiellement (voir layoutEngine.compose), mais un utilisateur
 // qui choisit consciemment d'agrandir son livre n'est pas dans ce cas —
 // meme distinction que le principe deja documente ailleurs dans ce fichier.
-async function appendEmptyPages(bookId, count) {
+async function appendEmptyPages(bookId, count, declaredPageCount = 0) {
   const existing = await listPages(bookId);
-  const startIndex = existing.length;
+  // A LA FIN DU LIVRE, pas apres la derniere LIGNE : le nombre de lignes
+  // compte les pages SAUVEGARDEES, or une page restee vierge n'a pas de ligne
+  // du tout. Sur un livre de 30 pages dont 5 sont remplies, partir de 5 aurait
+  // insere des pages 5 et 6 — au MILIEU du livre — au lieu de 30 et 31
+  // (2026-09-14, meme famille d'erreur que l'ecart page_count / pages reelles).
+  const startIndex = pageExtent(existing, declaredPageCount);
   const newRows = Array.from({ length: count }, (_, offset) => ({
     book_id: bookId,
     page_index: startIndex + offset,
@@ -222,11 +227,27 @@ function isPageEmpty(page) {
 // Inspecte les `count` dernieres pages sans rien supprimer : dit a l'appelant
 // ce qui serait perdu. Separe de la suppression elle-meme pour que la route
 // puisse refuser AVANT d'ecrire quoi que ce soit.
-async function inspectTrailingPages(bookId, count) {
+//
+// Raisonne en NUMEROS DE PAGE, pas en lignes de la table : les pages restees
+// vierges n'ont pas de ligne, donc prendre "les `count` dernieres lignes"
+// visait des pages du milieu du livre. Sur un livre de 30 pages dont seules
+// les 5 premieres sont composees, retirer 2 pages doit viser les pages 29 et
+// 30 (vides, rien a perdre) et non les pages 4 et 5 (pleines).
+async function inspectTrailingPages(bookId, count, declaredPageCount = 0) {
   const existing = await listPages(bookId);
-  const doomed = count > 0 ? existing.slice(-count) : [];
+  const totalPages = pageExtent(existing, declaredPageCount);
+  const firstDoomed = Math.max(0, totalPages - Math.max(0, count));
+  const byIndex = new Map(existing.map((page) => [page.page_index, page]));
+
+  const doomed = count > 0
+    ? Array.from({ length: totalPages - firstDoomed }, (_, offset) => {
+      const index = firstDoomed + offset;
+      return byIndex.get(index) || { page_index: index, layout_id: null, content: {}, locked: false };
+    })
+    : [];
+
   return {
-    totalPages: existing.length,
+    totalPages,
     doomed,
     nonEmpty: doomed.filter((page) => !isPageEmpty(page)),
     locked: doomed.filter((page) => page?.locked === true)
@@ -246,8 +267,8 @@ async function inspectTrailingPages(bookId, count) {
 // Ne decide RIEN sur la perte de contenu : c'est la route qui verifie que les
 // pages visees sont vides et non verrouillees, ou que l'utilisateur a
 // explicitement confirme. Ici, on execute.
-async function removeTrailingPages(bookId, count) {
-  const { doomed } = await inspectTrailingPages(bookId, count);
+async function removeTrailingPages(bookId, count, declaredPageCount = 0) {
+  const { doomed } = await inspectTrailingPages(bookId, count, declaredPageCount);
   if (doomed.length === 0) return listPages(bookId);
 
   const { error } = await supabase
@@ -314,6 +335,29 @@ async function movePage(bookId, fromIndex, toIndex) {
   return listPages(bookId);
 }
 
+// Liste DENSE des pages interieures, pour tout ce qui rend le LIVRE ENTIER
+// (apercu final, PDF client, fichier d'impression).
+//
+// `listPages` ne renvoie que les pages ayant une ligne en base : une page
+// vide n'en a pas. Rendre cette liste telle quelle FAIT DISPARAITRE les pages
+// vides du document — un livre de 30 pages dont 24 sont remplies produisait un
+// PDF de 24 pages (constate le 2026-09-14 sur un livre reel : 30 annoncees,
+// 24 rendues). Consequences : le client recoit moins de pages qu'il n'en
+// paie, et le nombre de pages envoye a l'imprimeur ne correspond plus a la
+// commande.
+//
+// Une page absente est ici materialisee en page VIDE : c'est exactement ce
+// qu'elle est dans le livre imprime — une belle page blanche, pas un trou.
+async function listPagesForRender(bookId, pageCount) {
+  const pages = await listPages(bookId);
+  const total = pageExtent(pages, pageCount);
+  const byIndex = new Map(pages.map((page) => [page.page_index, page]));
+
+  return Array.from({ length: total }, (_, index) => (
+    byIndex.get(index) || { page_index: index, layout_id: null, content: {}, locked: false }
+  ));
+}
+
 // --- Nombre de pages : une seule autorite ---------------------------------
 //
 // `books.page_count` et les lignes de `book_pages` DOIVENT toujours decrire le
@@ -340,12 +384,22 @@ function normalizePageCount(value) {
   return Math.min(MAX_BOOK_PAGES, even);
 }
 
+// Etendue REELLE du livre : le plus grand des deux, ce qu'il annonce et ce
+// qu'il contient. Sans plancher ni parite, volontairement — c'est la mesure
+// honnete, celle qu'on rend et qu'on facture. Y appliquer le plancher produit
+// ferait imprimer 30 pages a un vieux livre qui en annonce 20 : plus de pages
+// imprimees que payees, exactement l'ecart qu'on cherche a supprimer.
+function pageExtent(pages = [], declared = 0) {
+  const maxIndex = pages.reduce((max, page) => Math.max(max, Number(page.page_index) || 0), -1);
+  return Math.max(Number(declared) || 0, maxIndex + 1);
+}
+
 // Nombre de pages que le livre DOIT annoncer, compte tenu de ce qu'il contient
 // reellement. `desired` permet a un appelant de demander davantage (ex. le
-// resultat d'une composition) — jamais moins que ce qui existe deja.
+// resultat d'une composition) — jamais moins que ce qui existe deja. C'est ici,
+// et seulement ici, que s'ajoutent le plancher produit et la parite.
 function requiredPageCount(pages = [], desired = 0) {
-  const maxIndex = pages.reduce((max, page) => Math.max(max, Number(page.page_index) || 0), -1);
-  return normalizePageCount(Math.max(Number(desired) || 0, maxIndex + 1));
+  return normalizePageCount(pageExtent(pages, desired));
 }
 
 // Aligne `books.page_count` sur la realite. Retourne le compte retenu.
@@ -398,11 +452,13 @@ module.exports = {
   inspectTrailingPages,
   removeTrailingPages,
   isPageEmpty,
+  listPagesForRender,
   movePage,
   upsertPage,
   MIN_BOOK_PAGES,
   MAX_BOOK_PAGES,
   normalizePageCount,
+  pageExtent,
   requiredPageCount,
   syncPageCount
 };

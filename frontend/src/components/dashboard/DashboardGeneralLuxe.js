@@ -467,42 +467,28 @@ const DashboardGeneralLuxe = () => {
           </div>
         )}
 
+        {/* Bandeau compact : trois compteurs sur UNE ligne chacun, au lieu
+            de trois blocs empiles (icone / grand nombre / details). Meme
+            information exactement — rien n a ete retire — mais la hauteur
+            passe de trois pavés a trois lignes, et la liste des livres, elle,
+            remonte au-dessus de la ligne de flottaison (retour utilisateur
+            2026-09-14 : "les cartes prennent bcp d espace pour rien"). */}
         <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-header">
-              <span className="stat-icon"><IconBook /></span>
-              <span className="stat-title">En cours</span>
+          {[
+            { cle: 'enCours', titre: 'En cours', icone: <IconBook />, valeurs: stats.enCours },
+            { cle: 'termines', titre: 'Termines', icone: <IconCheckCircle />, valeurs: stats.termines },
+            { cle: 'archives', titre: 'Archives', icone: <IconArchive />, valeurs: stats.archives }
+          ].map((carte) => (
+            <div className="stat-card" key={carte.cle}>
+              <span className="stat-icon">{carte.icone}</span>
+              <span className="stat-number">{carte.valeurs.count}</span>
+              <span className="stat-title">{carte.titre}</span>
+              <span className="stat-details">
+                <span className="stat-detail-item" title="Photos ajoutees"><IconPhoto />{carte.valeurs.photos}</span>
+                <span className="stat-detail-item" title="Contributions"><IconContribution />{carte.valeurs.contributions}</span>
+              </span>
             </div>
-            <div className="stat-number">{stats.enCours.count}</div>
-            <div className="stat-details">
-              <span className="stat-detail-item" title="Photos ajoutees"><IconPhoto />{stats.enCours.photos}</span>
-              <span className="stat-detail-item" title="Contributions"><IconContribution />{stats.enCours.contributions}</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-header">
-              <span className="stat-icon"><IconCheckCircle /></span>
-              <span className="stat-title">Termines</span>
-            </div>
-            <div className="stat-number">{stats.termines.count}</div>
-            <div className="stat-details">
-              <span className="stat-detail-item" title="Photos ajoutees"><IconPhoto />{stats.termines.photos}</span>
-              <span className="stat-detail-item" title="Contributions"><IconContribution />{stats.termines.contributions}</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-header">
-              <span className="stat-icon"><IconArchive /></span>
-              <span className="stat-title">Archives</span>
-            </div>
-            <div className="stat-number">{stats.archives.count}</div>
-            <div className="stat-details">
-              <span className="stat-detail-item" title="Photos ajoutees"><IconPhoto />{stats.archives.photos}</span>
-              <span className="stat-detail-item" title="Contributions"><IconContribution />{stats.archives.contributions}</span>
-            </div>
-          </div>
+          ))}
         </div>
 
         {!showArchived && (

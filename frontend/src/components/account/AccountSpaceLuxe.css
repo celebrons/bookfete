@@ -187,3 +187,41 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Adresse enregistree ---------------------------------------------------
+   Rappel de ce qui est REELLEMENT en base, distinct du formulaire juste en
+   dessous : sans lui, rien ne differenciait une adresse sauvegardee d'une
+   saisie en cours. */
+.account-address-saved {
+  border: 1px solid var(--border-soft, #e3ddd0);
+  border-left: 3px solid var(--gold, #c9a35f);
+  border-radius: 0 10px 10px 0;
+  background: rgba(201, 163, 95, 0.07);
+  padding: 12px 16px;
+  margin: 0 0 18px;
+}
+
+.account-address-saved-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-light, #7a7266);
+}
+
+.account-address-saved-text {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-dark, #241f18);
+}
+
+.account-address-saved-hint {
+  margin: 6px 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-light, #7a7266);
+}
+
+.account-address-saved .account-address-saved-hint { margin: 6px 0 0; }

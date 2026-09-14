@@ -38,6 +38,15 @@ function XIcon() {
   );
 }
 
+function CaptionIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h16M9 7v12" />
+      <path d="M4 17h5" />
+    </svg>
+  );
+}
+
 function EyeIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -50,6 +59,9 @@ function EyeIcon() {
 function AtelierPageOverlay({
   slug, slotTypes, slotItems, onAssignSlot, onRemoveSlot, onAdjustSlot,
   selectedSidebarItem, photoAdjustments, printFormat,
+  // Legende par photo ({ [itemId]: texte }) + son enregistrement. Absents =
+  // aucun bouton legende affiche : aucun appelant existant n est casse.
+  photoCaptions, onSaveCaption,
   // Edition du texte directement sur la page (§1). Absent = comportement
   // d'avant (clic sur un texte = retrait a deux temps), donc aucun appelant
   // existant n'est casse s'il ne fournit pas ces props.
@@ -59,6 +71,10 @@ function AtelierPageOverlay({
   // l'incrustation en pixels : celle-ci sert a convertir les points
   // typographiques en pixels ecran a la bonne echelle (WYSIWYG, §1).
   const [editingIndex, setEditingIndex] = useState(null);
+  // Emplacement dont on edite la LEGENDE (distinct de editingIndex, qui edite
+  // le texte d un emplacement texte) et sa valeur en cours de frappe.
+  const [captionIndex, setCaptionIndex] = useState(null);
+  const [captionDraft, setCaptionDraft] = useState('');
   const [overlayWidthPx, setOverlayWidthPx] = useState(0);
   const overlayRef = useRef(null);
   // Marges reelles de CE format (et non des valeurs A4 figees) : elles
@@ -236,6 +252,22 @@ function AtelierPageOverlay({
               {item && isPending && <span className="atelier-overlay-slot-confirm">Confirmer le retrait ?</span>}
               {item && !isPending && (
                 <div className="atelier-overlay-slot-actions">
+                  {slotType === 'photo' && onSaveCaption && (
+                    <button
+                      type="button"
+                      className={`atelier-overlay-slot-icon-btn atelier-overlay-slot-caption-btn ${photoCaptions?.[item.id] ? 'is-set' : ''}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPendingRemoveIndex(null);
+                        setCaptionDraft(photoCaptions?.[item.id] || '');
+                        setCaptionIndex(index);
+                      }}
+                      title={photoCaptions?.[item.id] ? 'Modifier la légende' : 'Ajouter une légende'}
+                      aria-label={photoCaptions?.[item.id] ? 'Modifier la légende' : 'Ajouter une légende'}
+                    >
+                      <CaptionIcon />
+                    </button>
+                  )}
                   {slotType === 'photo' && (
                     <button
                       type="button"
@@ -257,6 +289,32 @@ function AtelierPageOverlay({
                     <XIcon />
                   </button>
                 </div>
+              )}
+              {/* Saisie de la legende, posee au bas de l'emplacement — la ou
+                  elle s'imprimera. Entree valide, Echap annule ; vider le
+                  champ retire la legende. */}
+              {item && captionIndex === index && (
+                <form
+                  className="atelier-overlay-caption-form"
+                  onClick={(event) => event.stopPropagation()}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    onSaveCaption(item.id, captionDraft);
+                    setCaptionIndex(null);
+                  }}
+                >
+                  {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+                  <input
+                    type="text"
+                    autoFocus
+                    maxLength={140}
+                    value={captionDraft}
+                    placeholder="Légende de la photo"
+                    onChange={(event) => setCaptionDraft(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setCaptionIndex(null); } }}
+                  />
+                  <button type="submit" className="atelier-overlay-caption-ok">OK</button>
+                </form>
               )}
             </div>
           );

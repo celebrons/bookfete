@@ -79,7 +79,11 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
 
   try {
     const [interiorPages, items, layouts, template] = await Promise.all([
-      bookContentService.listPages(book.id),
+      // listPagesForRender, pas listPages : le FICHIER envoye a l imprimeur
+      // doit contenir exactement les pages FACTUREES. Une page laissee vierge
+      // n a pas de ligne en base ; la compter par lignes envoyait un livre plus
+      // court que celui paye (2026-09-14).
+      bookContentService.listPagesForRender(book.id, book.page_count),
       bookContentService.listContentItems(book.id),
       templateCatalog.listActiveLayouts(),
       book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null)

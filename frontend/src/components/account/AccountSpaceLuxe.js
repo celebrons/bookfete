@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { listOrders } from '../../services/ordersApi';
 import { getOrderStatusConfig } from '../../utils/orderWorkflow';
+import AddressAutocomplete from '../common/AddressAutocomplete';
 import '../../styles/luxe-theme.css';
 import './AccountSpaceLuxe.css';
 
@@ -102,6 +103,27 @@ const AccountSpaceLuxe = () => {
 
   const projectCount = books.length;
   const recentOrders = useMemo(() => orders.slice(0, 5), [orders]);
+
+  // Adresse REELLEMENT enregistree sur le compte, mise en une ligne lisible.
+  // Lue depuis user_metadata et non depuis addressForm : le formulaire peut
+  // contenir une saisie en cours, non sauvegardee — les confondre reviendrait
+  // a afficher comme "enregistre" ce qui ne l est pas.
+  const adresseEnregistree = useMemo(() => {
+    const a = user?.user_metadata?.shipping_address;
+    if (!a || typeof a !== 'object') return '';
+    const lignes = [
+      a.fullName,
+      a.line1,
+      a.line2,
+      [a.postalCode, a.city].filter(Boolean).join(' '),
+      a.country,
+      a.phone
+    ].map((v) => String(v || '').trim()).filter(Boolean);
+    // Une adresse sans rue ni ville n est pas une adresse : on prefere ne rien
+    // annoncer plutot que d afficher un nom seul comme "votre adresse".
+    if (!String(a.line1 || '').trim() && !String(a.city || '').trim()) return '';
+    return lignes.join(' · ');
+  }, [user]);
 
   const setAddressField = (event) => {
     const { name, value } = event.target;
@@ -287,6 +309,27 @@ const AccountSpaceLuxe = () => {
             <div className="account-panel-head">
               <h2>Mes adresses</h2>
             </div>
+
+            {/* L ADRESSE ENREGISTREE, en toutes lettres. Le formulaire seul ne
+                disait jamais ce qui etait REELLEMENT en base : on ne pouvait pas
+                distinguer une adresse sauvegardee d une saisie en cours, ni
+                savoir de quand elle datait (retour utilisateur 2026-09-14 :
+                "lorsqu on enregistre une adresse, on la voit pas"). Cette
+                carte lit user_metadata, pas le formulaire. */}
+            {adresseEnregistree ? (
+              <div className="account-address-saved">
+                <span className="account-address-saved-label">Adresse enregistrée</span>
+                <p className="account-address-saved-text">{adresseEnregistree}</p>
+                <p className="account-address-saved-hint">
+                  Elle est utilisée pour pré-remplir vos commandes. Modifiez-la ci-dessous si besoin.
+                </p>
+              </div>
+            ) : (
+              <p className="account-address-saved-hint">
+                Aucune adresse enregistrée pour le moment. Elle servira à pré-remplir vos commandes.
+              </p>
+            )}
+
             <form className="account-form" onSubmit={saveAddress}>
               <label htmlFor="fullName">Nom complet</label>
               <input
@@ -299,12 +342,15 @@ const AccountSpaceLuxe = () => {
               />
 
               <label htmlFor="line1">Adresse</label>
-              <input
-                id="line1"
-                name="line1"
-                className="input-luxe"
+              {/* Suggestions officielles (Base Adresse Nationale) : choisir une
+                  proposition remplit aussi le code postal et la ville. Voir
+                  AddressAutocomplete.js — jamais bloquant, saisie libre
+                  toujours possible. */}
+              <AddressAutocomplete
+                field="line1"
                 value={addressForm.line1}
-                onChange={setAddressField}
+                address={addressForm}
+                onChangeField={setAddressField}
                 placeholder="Ex: 12 rue de la Paix"
               />
 
@@ -321,12 +367,11 @@ const AccountSpaceLuxe = () => {
               <div className="account-form-row">
                 <div>
                   <label htmlFor="postalCode">Code postal</label>
-                  <input
-                    id="postalCode"
-                    name="postalCode"
-                    className="input-luxe"
+                  <AddressAutocomplete
+                    field="postalCode"
                     value={addressForm.postalCode}
-                    onChange={setAddressField}
+                    address={addressForm}
+                    onChangeField={setAddressField}
                     placeholder="75000"
                   />
                 </div>

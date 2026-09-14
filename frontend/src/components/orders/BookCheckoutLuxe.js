@@ -287,6 +287,41 @@ const BookCheckoutLuxe = () => {
     }
   }, [checkoutFormLocked, latestOrder]);
 
+  // Adresse enregistree dans le compte (Espace client > Mes adresses) :
+  // pre-remplissage, jamais un ecrasement.
+  //
+  // Les deux ecrans etaient jusqu'ici totalement deconnectes : on pouvait
+  // enregistrer son adresse dans les parametres sans qu'elle serve jamais a
+  // rien, et la saisir a la commande sans qu'elle apparaisse nulle part —
+  // "lorsqu'on enregistre une adresse, on la voit pas" (2026-09-14).
+  //
+  // Priorite absolue a l'adresse de la COMMANDE quand il y en a une (c'est
+  // celle que l'utilisateur vient de saisir pour CET envoi) : on ne remplit
+  // que les champs encore vides.
+  useEffect(() => {
+    if (checkoutFormLocked) return;
+    let annule = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const enregistree = data?.user?.user_metadata?.shipping_address;
+        if (annule || !enregistree || typeof enregistree !== 'object') return;
+        setAddress((previous) => {
+          const suivant = { ...previous };
+          let change = false;
+          Object.entries(enregistree).forEach(([champ, valeur]) => {
+            if (champ === 'updatedAt' || !valeur) return;
+            if (!String(suivant[champ] || '').trim()) { suivant[champ] = valeur; change = true; }
+          });
+          return change ? suivant : previous;
+        });
+      } catch (_error) {
+        // Jamais bloquant : la saisie manuelle reste le chemin normal.
+      }
+    })();
+    return () => { annule = true; };
+  }, [checkoutFormLocked]);
+
   const setAddressField = (event) => {
     const { name, value } = event.target;
     setAddress((previous) => ({ ...previous, [name]: value }));
@@ -685,6 +720,25 @@ const BookCheckoutLuxe = () => {
         quantity,
         shippingAddress: includesPrint(orderType) ? address : null
       });
+
+      // L'adresse d'expedition est aussi MEMORISEE sur le compte : elle
+      // s'affiche alors dans l'Espace client et pre-remplit la prochaine
+      // commande. Silencieux et non bloquant — un echec ici ne doit jamais
+      // empecher une commande deja creee d'aller au paiement.
+      if (includesPrint(orderType)) {
+        // Les autres cles de user_metadata sont recopiees explicitement (meme
+        // precaution que AccountSpaceLuxe.saveAddress) : on ne compte pas sur
+        // le comportement de fusion du fournisseur d'authentification pour ne
+        // pas perdre une donnee de compte.
+        supabase.auth.getUser()
+          .then(({ data }) => supabase.auth.updateUser({
+            data: {
+              ...(data?.user?.user_metadata || {}),
+              shipping_address: { ...address, updatedAt: new Date().toISOString() }
+            }
+          }))
+          .catch(() => {});
+      }
 
       const checkoutSession = await createStripeCheckoutSession(createdOrder.id);
       if (!checkoutSession?.checkoutUrl) {

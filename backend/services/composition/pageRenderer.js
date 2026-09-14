@@ -57,14 +57,26 @@ function clamp(value, min, max) {
 // les valeurs par defaut ci-dessous (centre, zoom 1) reproduisent alors
 // exactement l'ancien rendu "cover centre", donc aucun appelant existant
 // n'a besoin d'etre modifie pour rester correct.
-function imgFrame(url, adjustment) {
+//
+// `caption` (optionnel) : legende propre A CETTE PHOTO, issue de
+// content.photoCaptions[itemId] (voir routes/composition.js
+// sanitizePhotoCaptions). Deliberement portee par la PHOTO et non par le
+// format : l'utilisateur veut legender la photo qu'il regarde, sans avoir a
+// changer de mise en page pour un format qui prevoit une legende (retour
+// 2026-09-14). Elle se pose donc DANS le cadre, par-dessus le bas de
+// l'image — aucune geometrie de page n'est modifiee, et ca marche
+// identiquement sur une photo pleine page comme dans une grille.
+function imgFrame(url, adjustment, caption) {
   const fitMode = adjustment?.fitMode === 'contain' ? 'contain' : 'cover';
   const focalX = clamp(adjustment?.focalX, 0, 1) ?? 0.5;
   const focalY = clamp(adjustment?.focalY, 0, 1) ?? 0.5;
   const zoom = clamp(adjustment?.zoom, PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX) ?? 1;
   const cls = fitMode === 'contain' ? 'photo-frame is-contain' : 'photo-frame';
   const style = `--fx:${Math.round(focalX * 1000) / 10}%;--fy:${Math.round(focalY * 1000) / 10}%;--zoom:${zoom};`;
-  return `<span class="${cls}"><img src="${escapeHtml(url || '')}" alt="" style="${style}" /></span>`;
+  const legende = typeof caption === 'string' && caption.trim()
+    ? `<span class="photo-caption">${escapeHtml(caption.trim())}</span>`
+    : '';
+  return `<span class="${cls}"><img src="${escapeHtml(url || '')}" alt="" style="${style}" />${legende}</span>`;
 }
 
 // Fragment de texte affiche pour cet item : le texte reel de l'item, sauf si
@@ -234,7 +246,7 @@ function splitMetaFor(item, overridesByItemId) {
 // meme vide — mais sans <img> : simple espace blanc, comme sur la page
 // imprimee finale, jamais un cadre pointille ou un placeholder visible —
 // ca, c'est le role du panneau d'edition, pas du rendu reel).
-function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsByItemId = {}, pageIndex = 0) {
+function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsByItemId = {}, pageIndex = 0, captionsByItemId = {}) {
   const slotCount = rawItems.length;
   const orderedItems = presentationVariant === 1 && slotCount > 1 ? [...rawItems].reverse() : rawItems;
 
@@ -255,9 +267,9 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsBy
 
     const inset = slug === 'photo-avec-marge' || (slug === 'FULL_PHOTO' && presentationVariant === 1);
     const cls = inset ? 'block-photo photo-solo photo-inset' : 'block-photo photo-solo';
-    return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url, adjustmentsByItemId[item.id])}</figure>`;
+    return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id])}</figure>`;
   }
-  const cells = orderedItems.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>'));
+  const cells = orderedItems.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>'));
   // "duo-v" = les deux photos EMPILEES (une colonne, deux rangees), donc deux
   // cadres larges et bas. Piege de vocabulaire a garder en tete : l'empilement
   // est vertical, les cadres sont horizontaux — c'est ce que l'utilisateur
@@ -317,7 +329,7 @@ function renderTexteBlock(rawItems, slug, overridesByItemId = {}, presentationVa
   return `<div class="${cls}" data-layout="${escapeHtml(slug || '')}">${paragraphs}</div>`;
 }
 
-function renderContributionBlock(items, slug, overridesByItemId = {}, presentationVariant = 0, adjustmentsByItemId = {}, textPresentation = {}) {
+function renderContributionBlock(items, slug, overridesByItemId = {}, presentationVariant = 0, adjustmentsByItemId = {}, textPresentation = {}, captionsByItemId = {}) {
   const photos = items.filter((item) => item.kind === 'photo');
   const textes = items.filter((item) => item.kind === 'texte');
   const orderedPhotos = presentationVariant === 1 && photos.length > 1 ? [...photos].reverse() : photos;
@@ -325,7 +337,7 @@ function renderContributionBlock(items, slug, overridesByItemId = {}, presentati
 
   const photosHtml = orderedPhotos.length > 0
     ? `<div class="contribution-photos photo-grid photo-grid-${Math.min(orderedPhotos.length, 4)}">${orderedPhotos
-        .map((item) => imgFrame(item.url, adjustmentsByItemId[item.id]))
+        .map((item) => imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id]))
         .join('')}</div>`
     : '';
   const textHtml = textes
@@ -338,10 +350,10 @@ function renderContributionBlock(items, slug, overridesByItemId = {}, presentati
 
 // PHOTO_WITH_CAPTION (v2) : une photo pleine page avec une courte legende.
 // Sous-presentation : legende centree (defaut) ou alignee/encadree (variant).
-function renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant = 0, adjustmentsByItemId = {}, textPresentation = {}) {
+function renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant = 0, adjustmentsByItemId = {}, textPresentation = {}, captionsByItemId = {}) {
   const photo = items.find((item) => item.kind === 'photo');
   const caption = items.find((item) => item.kind === 'texte');
-  const photoHtml = photo ? imgFrame(photo.url, adjustmentsByItemId[photo.id]) : '';
+  const photoHtml = photo ? imgFrame(photo.url, adjustmentsByItemId[photo.id], captionsByItemId[photo.id]) : '';
   const captionHtml = caption ? `<figcaption${textPresentationStyle(caption.id, textPresentation)}>${escapeHtml(textFor(caption, overridesByItemId))}</figcaption>` : '';
   const cls = presentationVariant === 1 ? 'block-photo photo-with-caption is-framed' : 'block-photo photo-with-caption';
   return `<figure class="${cls}" data-layout="${escapeHtml(slug)}">${photoHtml}${captionHtml}</figure>`;
@@ -378,7 +390,7 @@ const MIXTE_SLOT_KINDS = {
 // C'est exactement le principe deja applique aux grilles de photos ("il faut
 // absolument que les autres photos restent a leur place") : un emplacement
 // vide garde sa bande, vide, pour que les autres ne bougent pas.
-function renderMixteOrderedBlock(rawItems, slug, overridesByItemId, presentationVariant = 0, adjustmentsByItemId = {}, textPresentation = {}) {
+function renderMixteOrderedBlock(rawItems, slug, overridesByItemId, presentationVariant = 0, adjustmentsByItemId = {}, textPresentation = {}, captionsByItemId = {}) {
   const slotKinds = MIXTE_SLOT_KINDS[slug] || [];
   // On travaille sur des paires (emplacement, item) pour que l'inversion de
   // presentation ne desynchronise jamais la nature de l'emplacement et son
@@ -393,7 +405,7 @@ function renderMixteOrderedBlock(rawItems, slug, overridesByItemId, presentation
     if (kind === 'photo') {
       // Emplacement photo vide : meme bande, simple espace blanc — jamais un
       // cadre pointille ni un placeholder, qui apparaitraient a l'impression.
-      const inner = item ? imgFrame(item.url, adjustmentsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>';
+      const inner = item ? imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>';
       return `<div class="mixte-photo">${inner}</div>`;
     }
     const inner = item
@@ -448,7 +460,7 @@ function renderTitleTextBlock(rawItems, slug, overridesByItemId = {}, textPresen
 // format (title-photos-grid-N base sur photoSlots.length, jamais sur le
 // compte reel de photos presentes), avec un .photo-frame vide pour tout
 // emplacement retire.
-function renderTitlePhotosBlock(rawItems, slug, adjustmentsByItemId = {}, textPresentation = {}) {
+function renderTitlePhotosBlock(rawItems, slug, adjustmentsByItemId = {}, textPresentation = {}, captionsByItemId = {}) {
   const title = rawItems[0];
   const photoSlots = rawItems.slice(1);
   // Titre absent : sa bande reste (meme raison que renderTitleTextBlock) —
@@ -458,7 +470,7 @@ function renderTitlePhotosBlock(rawItems, slug, adjustmentsByItemId = {}, textPr
     ? `<h2 class="page-title"${textPresentationStyle(title.id, textPresentation)}>${escapeHtml(title.text || '')}</h2>`
     : '<h2 class="page-title" aria-hidden="true"></h2>';
   const photosHtml = photoSlots.length > 0
-    ? `<div class="title-photos-grid title-photos-grid-${Math.min(photoSlots.length, 4)}">${photoSlots.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>')).join('')}</div>`
+    ? `<div class="title-photos-grid title-photos-grid-${Math.min(photoSlots.length, 4)}">${photoSlots.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>')).join('')}</div>`
     : '';
   return `<div class="block-title-photos" data-layout="${escapeHtml(slug)}">${titleHtml}${photosHtml}</div>`;
 }
@@ -474,7 +486,7 @@ const TITLE_PHOTO_SLUGS = new Set(['TITLE_TWO_PHOTOS', 'TITLE_FOUR_PHOTOS']);
 // `pageIndex` : necessaire au seul layout FULL_PHOTO_SPREAD, qui deduit de la
 // parite de la page la moitie de l image a afficher. Zero par defaut — tout
 // autre layout l ignore.
-function renderBlock(block, itemsById, layoutsById, adjustmentsByItemId = {}, textPresentation = {}, pageIndex = 0) {
+function renderBlock(block, itemsById, layoutsById, adjustmentsByItemId = {}, textPresentation = {}, pageIndex = 0, captionsByItemId = {}) {
   const items = block.itemIds.map((id) => itemsById[id]).filter(Boolean);
   if (items.length === 0) return '';
 
@@ -482,7 +494,7 @@ function renderBlock(block, itemsById, layoutsById, adjustmentsByItemId = {}, te
   const overridesByItemId = Object.fromEntries((block.textOverrides || []).map((override) => [override.itemId, override]));
   const presentationVariant = block.presentationVariant === 1 ? 1 : 0;
 
-  if (slug === 'PHOTO_WITH_CAPTION') return renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant, adjustmentsByItemId, textPresentation);
+  if (slug === 'PHOTO_WITH_CAPTION') return renderPhotoWithCaption(items, slug, overridesByItemId, presentationVariant, adjustmentsByItemId, textPresentation, captionsByItemId);
   // TITLE_TEXT/TITLE_PHOTO_SLUGS : jamais la liste compactee `items` — la
   // position 0 doit rester le titre meme quand un emplacement plus loin
   // est vide (voir renderTitleTextBlock/renderTitlePhotosBlock ci-dessus).
@@ -490,31 +502,31 @@ function renderBlock(block, itemsById, layoutsById, adjustmentsByItemId = {}, te
     return renderTitleTextBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId, textPresentation);
   }
   if (TITLE_PHOTO_SLUGS.has(slug)) {
-    return renderTitlePhotosBlock(block.itemIds.map((id) => itemsById[id]), slug, adjustmentsByItemId, textPresentation);
+    return renderTitlePhotosBlock(block.itemIds.map((id) => itemsById[id]), slug, adjustmentsByItemId, textPresentation, captionsByItemId);
   }
   // POSITIONNEL (block.itemIds, pas `items` compacte) : un emplacement vide
   // doit garder sa bande — voir renderMixteOrderedBlock.
   if (MIXTE_ORDERED_SLUGS.has(slug)) {
-    return renderMixteOrderedBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId, presentationVariant, adjustmentsByItemId, textPresentation);
+    return renderMixteOrderedBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId, presentationVariant, adjustmentsByItemId, textPresentation, captionsByItemId);
   }
   // PHOTO_SLUGS/TEXTE_SLUGS : idem, positionnel — voir renderPhotoBlock/
   // renderTexteBlock ("il faut absolument que les autres photos restent a
   // leur place lorsque je supprime une autre photo ou un autre texte").
   if (PHOTO_SLUGS.has(slug)) {
-    return renderPhotoBlock(block.itemIds.map((id) => itemsById[id]), slug, presentationVariant, adjustmentsByItemId, pageIndex);
+    return renderPhotoBlock(block.itemIds.map((id) => itemsById[id]), slug, presentationVariant, adjustmentsByItemId, pageIndex, captionsByItemId);
   }
   if (TEXTE_SLUGS.has(slug)) {
     return renderTexteBlock(block.itemIds.map((id) => itemsById[id]), slug, overridesByItemId, presentationVariant, textPresentation);
   }
 
-  if (block.kind === 'photo') return renderPhotoBlock(items, slug, presentationVariant, adjustmentsByItemId);
+  if (block.kind === 'photo') return renderPhotoBlock(items, slug, presentationVariant, adjustmentsByItemId, pageIndex, captionsByItemId);
   if (block.kind === 'texte') return renderTexteBlock(items, slug, overridesByItemId, presentationVariant, textPresentation);
-  if (block.kind === 'contribution') return renderContributionBlock(items, slug, overridesByItemId, presentationVariant, adjustmentsByItemId, textPresentation);
+  if (block.kind === 'contribution') return renderContributionBlock(items, slug, overridesByItemId, presentationVariant, adjustmentsByItemId, textPresentation, captionsByItemId);
   // 'mixte' ou inconnu, sans slug reconnu ci-dessus : repli generique
   // photo(s) puis texte(s), pour tout layout heritage non catalogue.
   const photos = items.filter((item) => item.kind === 'photo');
   const textes = items.filter((item) => item.kind === 'texte');
-  return `<div class="block-mixte">${photos.length ? renderPhotoBlock(photos, slug, presentationVariant, adjustmentsByItemId) : ''}${
+  return `<div class="block-mixte">${photos.length ? renderPhotoBlock(photos, slug, presentationVariant, adjustmentsByItemId, pageIndex, captionsByItemId) : ''}${
     textes.length ? renderTexteBlock(textes, slug, overridesByItemId, presentationVariant, textPresentation) : ''
   }</div>`;
 }
@@ -569,6 +581,8 @@ function renderPage(page, itemsById, layoutsById, isLast, context = {}) {
   // composition.js PUT .../manual) par itemId, propre a CETTE page — un
   // meme itemId ne peut de toute facon apparaitre que sur une seule page.
   const adjustmentsByItemId = page.content?.photoAdjustments || {};
+  // Legendes propres a chaque photo (voir imgFrame) — jamais liees au format.
+  const captionsByItemId = page.content?.photoCaptions || {};
   // Role et reglages typographiques choisis par l'utilisateur pour les
   // textes de CETTE page (voir textPresentationStyle). Le format est
   // necessaire ici : une meme taille de role n'a pas la meme valeur en
@@ -587,7 +601,7 @@ function renderPage(page, itemsById, layoutsById, isLast, context = {}) {
     styles: textPresentation.styles
   });
   const blocksHtml = blocks
-    .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, page.page_index))
+    .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, page.page_index, captionsByItemId))
     .join('');
   // "is-luxe" : marqueur LEGER pour scoper les 2 seuls details dores qui
   // restent sur une page ordinaire (filet sous .page-title + numero de page,
@@ -660,6 +674,34 @@ const BASE_CSS = `
     object-fit: contain;
     transform: scale(var(--zoom, 1));
     transform-origin: var(--fx, 50%) var(--fy, 50%);
+  }
+  /* Legende propre a UNE photo (content.photoCaptions), posee au bas de son
+     cadre. Elle vit DANS le cadre, jamais dans la grille de la page : elle ne
+     deplace donc rien, et le meme geste marche sur une photo pleine page
+     comme sur une vignette d'une grille de quatre.
+     Le degrade est indispensable a l'impression : sans lui, un texte clair
+     pose sur une zone claire de la photo devient illisible, et l'imprimeur ne
+     corrige rien. */
+  .photo-frame .photo-caption {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 5mm 4mm 3mm;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+    color: #fff;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 8.5pt;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  }
+  /* En mode "photo entiere", l'image ne touche plus les bords : la legende
+     se poserait sur le blanc du cadre, ou le degrade sombre ferait une barre
+     franche. Fond retire, texte en encre. */
+  .photo-frame.is-contain .photo-caption {
+    background: none;
+    color: #241f18;
+    text-shadow: none;
+    font-style: italic;
   }
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .photo-solo { margin: 0; height: 100%; }
@@ -785,7 +827,21 @@ const BASE_CSS = `
      "2 photos horizontales" et le mode "photo entiere" sont les vraies
      reponses quand la forme de la photo ne convient pas au cadre. */
   .mixte-multi-photo { flex-direction: row; flex-wrap: wrap; align-content: center; }
-  .mixte-multi-photo .mixte-photo { flex: 0 1 48%; aspect-ratio: 3 / 4; min-height: 0; max-height: 62%; }
+  /* La base tient compte de la GOUTTIERE, elle n'est pas un pourcentage rond.
+     Avec 48% + 48%, la somme des deux photos ET du gap depassait la largeur
+     disponible des que le gap devenait grand : en Luxe (--fmt-space-scale
+     1.55, gap 7.75mm) les deux photos passaient a la ligne, la page comptait
+     3 rangees au lieu de 2 et le bloc debordait de 31 px en haut ET en bas
+     (align-content: center) — c'est la page "deformee en mode luxe" signalee
+     le 2026-09-14. Le calcul ci-dessous soustrait exactement le gap avant de
+     partager, donc les deux photos tiennent cote a cote dans TOUS les
+     formats, quelle que soit l'echelle d'espacement. */
+  .mixte-multi-photo .mixte-photo {
+    flex: 0 1 calc((100% - 5mm * var(--fmt-space-scale, 1)) / 2);
+    aspect-ratio: 3 / 4;
+    min-height: 0;
+    max-height: 62%;
+  }
   .mixte-multi-photo .mixte-texte { flex-basis: 100%; }
   /* TITLE_TEXT / TITLE_TWO_PHOTOS / TITLE_FOUR_PHOTOS (atelier manuel) : le
      titre est toujours le premier item du bloc (voir renderTitleTextBlock/
@@ -948,6 +1004,7 @@ function renderSinglePageHtml(input) {
   } else {
     const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
     const adjustmentsByItemId = page.content?.photoAdjustments || {};
+    const captionsByItemId = page.content?.photoCaptions || {};
     // Meme presentation typographique que renderPage ci-dessus : c'est ce
     // chemin qu'empruntent l'apercu de l'atelier ET la capture PDF, ils
     // doivent donc appliquer exactement les memes reglages.
@@ -965,7 +1022,7 @@ function renderSinglePageHtml(input) {
       styles: textPresentation.styles
     });
     const blocksHtml = blocks
-      .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, page.page_index))
+      .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, page.page_index, captionsByItemId))
       .join('');
     // Meme marqueur/numero de page discret que renderPage() ci-dessus (Luxe uniquement).
     const luxeClass = format?.formatId === 'luxe' ? ' is-luxe' : '';

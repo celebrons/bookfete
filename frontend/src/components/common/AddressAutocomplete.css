@@ -1,0 +1,49 @@
+/* Suggestions d'adresse (AddressAutocomplete.js).
+   La liste est en position absolue AU-DESSUS du reste : elle ne doit jamais
+   pousser les champs voisins pendant la frappe — un formulaire qui bouge
+   sous les doigts est le meilleur moyen de cliquer a cote. */
+
+.adresse-auto {
+  position: relative;
+}
+
+.adresse-auto > input {
+  width: 100%;
+}
+
+.adresse-auto-liste {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--white, #fffdf8);
+  border: 1px solid var(--border-soft, #e3ddd0);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(36, 31, 24, 0.14);
+  max-height: 232px;
+  overflow-y: auto;
+}
+
+.adresse-auto-option {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text-dark, #241f18);
+  cursor: pointer;
+}
+
+.adresse-auto-option:hover,
+.adresse-auto-option.is-active {
+  background: rgba(201, 163, 95, 0.16);
+}

@@ -69,6 +69,27 @@ function sanitizePhotoAdjustments(raw, validItemIds) {
   return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
 
+// Nettoie { [itemId]: "legende" } venu du client — la legende attachee a UNE
+// photo (voir pageRenderer.imgFrame), independante du format de page.
+//
+// Deux bornes, jamais une erreur : une legende trop longue est COUPEE plutot
+// que rejetee (elle est saisie au fil de l'eau, refuser la sauvegarde ferait
+// perdre la frappe), et une legende vide retire l'entree au lieu d'ecrire une
+// chaine vide qui ferait afficher un bandeau sombre sans texte.
+const PHOTO_CAPTION_MAX = 140;
+
+function sanitizePhotoCaptions(raw, validItemIds) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const validSet = new Set(validItemIds);
+  const cleaned = {};
+  Object.entries(raw).forEach(([itemId, caption]) => {
+    if (!validSet.has(itemId) || typeof caption !== 'string') return;
+    const texte = caption.trim().slice(0, PHOTO_CAPTION_MAX);
+    if (texte) cleaned[itemId] = texte;
+  });
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
 // Nettoie { [itemId]: role } venu du client. Meme principe que
 // sanitizePhotoAdjustments : jamais bloquant, jamais d'itemId etranger a la
 // page, et surtout jamais un role invente — normalizeRole ramene toute
@@ -521,15 +542,37 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
       return res.status(422).json({ error: 'Choisissez un nombre de pages avant de composer le livre.' });
     }
 
-    const [template, layouts, items] = await Promise.all([
+    const [template, layouts, allItems, existingPages] = await Promise.all([
       templateCatalog.getTemplateById(book.template_id),
       templateCatalog.listActiveLayouts(),
-      bookContentService.listContentItems(book.id)
+      bookContentService.listContentItems(book.id),
+      bookContentService.listPages(book.id)
     ]);
 
     if (!template) {
       return res.status(422).json({ error: 'Template introuvable ou inactif.' });
     }
+
+    // Le contenu deja pose a la main ne repart PAS dans la pioche.
+    //
+    // replaceBookPages preserve deja les pages verrouillees (une page l'est
+    // des qu'on y pose un premier element dans l'atelier) : la generation
+    // automatique n'a jamais detruit le travail manuel. En revanche, elle
+    // redistribuait AILLEURS les photos et souvenirs de ces pages — la meme
+    // photo se retrouvait donc deux fois dans le livre. C'est ce qui rendait
+    // "passer en mode automatique" effrayant a juste titre (retour
+    // utilisateur 2026-09-14 : "j'ai peur que ca foute tout ce que j'ai fait
+    // manuellement en l'air").
+    //
+    // Meme regle, meme code que composeBookForFormat (formatComposer.js), ou
+    // ce point etait deja traite et ou cet angle mort etait note.
+    const lockedItemIds = new Set(
+      existingPages
+        .filter((page) => page.locked)
+        .flatMap((page) => (page.content?.itemIds || []).filter(Boolean))
+    );
+    const items = allItems.filter((item) => !lockedItemIds.has(item.id));
+    const lockedPageCount = existingPages.filter((page) => page.locked).length;
 
     const variant = Number.isInteger(req.body?.variant) ? req.body.variant : 0;
     // Ambiance de composition (voir layoutScoring.MOOD_LAYOUT_WEIGHTS) :
@@ -560,18 +603,23 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
     // artificiel"). Le frontend gate deja ce cas cote atelier
     // (BookAtelierLuxe.js: MIN_AUTO_PAGES + AtelierGenerateModal), ce garde
     // serveur est le filet de securite pour tout appelant direct de cette route.
-    if (result.pages.length < layoutEngine.MIN_PRINTABLE_PAGES) {
+    // Le livre ENTIER, pages manuelles comprises : celles-ci restent en
+    // place (replaceBookPages ne les touche pas) et comptent donc autant que
+    // les autres. Ne compter que les pages generees refuserait la generation
+    // a un livre deja majoritairement compose a la main.
+    const totalApresGeneration = result.pages.length + lockedPageCount;
+    if (totalApresGeneration < layoutEngine.MIN_PRINTABLE_PAGES) {
       return res.status(422).json({
-        error: `Il faut ajouter du contenu pour atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum (votre contenu actuel remplit environ ${result.pages.length} page${result.pages.length > 1 ? 's' : ''}). Ajoutez des photos ou des souvenirs, puis reessayez.`
+        error: `Il faut ajouter du contenu pour atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum (votre contenu actuel remplit environ ${totalApresGeneration} page${totalApresGeneration > 1 ? 's' : ''}). Ajoutez des photos ou des souvenirs, puis reessayez.`
       });
     }
 
     // Plafond symetrique (voir layoutEngine.MAX_PRINTABLE_PAGES) : au-dela,
     // aucun produit imprimable chez Gelato — mieux vaut le signaler ici
     // qu'au moment d'une vraie commande.
-    if (result.pages.length > layoutEngine.MAX_PRINTABLE_PAGES) {
+    if (totalApresGeneration > layoutEngine.MAX_PRINTABLE_PAGES) {
       return res.status(422).json({
-        error: `Votre contenu remplit environ ${result.pages.length} pages, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`
+        error: `Votre contenu remplit environ ${totalApresGeneration} pages, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`
       });
     }
 
@@ -579,13 +627,13 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
     // v2, §4) — le client ne l'envoie jamais, il ne fait que le lire.
     const annotatedPages = photoQualityEngine.annotatePagesWithPhotoFit({
       pages: result.pages,
-      items,
+      items: allItems,
       layouts,
       formatId: book.print_format
     });
     const annotatedPagesWithText = textQualityEngine.annotatePagesWithTextFit({
       pages: annotatedPages,
-      items,
+      items: allItems,
       layouts,
       formatId: book.print_format
     });
@@ -737,7 +785,11 @@ router.get('/api/books/:bookId/preview.html', authenticate, requireOwnedBook, as
   try {
     const { book } = req;
     const [interiorPages, items, layouts, template] = await Promise.all([
-      bookContentService.listPages(req.params.bookId),
+      // listPagesForRender, pas listPages : une page laissee vierge n'a pas
+      // de ligne en base. L apercu final et le PDF doivent pourtant la montrer,
+      // sinon le livre imprime ne compte plus le meme nombre de pages que celui
+      // facture (constate 2026-09-14 : 30 pages annoncees, 24 rendues).
+      bookContentService.listPagesForRender(req.params.bookId, book.page_count),
       bookContentService.listContentItems(req.params.bookId),
       templateCatalog.listActiveLayouts(),
       book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null)
@@ -801,7 +853,11 @@ router.get('/api/books/:bookId/preview.pdf', authenticate, requireOwnedBook, asy
   try {
     const { book } = req;
     const [interiorPages, items, layouts, template] = await Promise.all([
-      bookContentService.listPages(req.params.bookId),
+      // listPagesForRender, pas listPages : une page laissee vierge n'a pas
+      // de ligne en base. L apercu final et le PDF doivent pourtant la montrer,
+      // sinon le livre imprime ne compte plus le meme nombre de pages que celui
+      // facture (constate 2026-09-14 : 30 pages annoncees, 24 rendues).
+      bookContentService.listPagesForRender(req.params.bookId, book.page_count),
       bookContentService.listContentItems(req.params.bookId),
       templateCatalog.listActiveLayouts(),
       book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null)
@@ -846,7 +902,7 @@ router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, a
       return res.status(400).json({ error: 'Le nombre de pages ajoutees doit etre pair.' });
     }
 
-    const pages = await bookContentService.appendEmptyPages(book.id, count);
+    const pages = await bookContentService.appendEmptyPages(book.id, count, book.page_count);
     const newPageCount = pages.length;
 
     // Meme autorite unique que partout ailleurs (plancher, parite, couverture
@@ -885,7 +941,7 @@ router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, a
       return res.status(400).json({ error: 'Le nombre de pages retirees doit etre pair.' });
     }
 
-    const { totalPages, doomed, nonEmpty, locked } = await bookContentService.inspectTrailingPages(book.id, count);
+    const { totalPages, doomed, nonEmpty, locked } = await bookContentService.inspectTrailingPages(book.id, count, book.page_count);
 
     if (doomed.length < count) {
       return res.status(400).json({ error: 'Ce livre ne contient pas assez de pages pour en retirer autant.' });
@@ -915,7 +971,7 @@ router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, a
       });
     }
 
-    const pages = await bookContentService.removeTrailingPages(book.id, count);
+    const pages = await bookContentService.removeTrailingPages(book.id, count, book.page_count);
 
     // `pages.length` n'est PAS le nombre de pages du livre : une page vide n'a
     // pas de ligne en base. On passe donc le nombre VOULU (remaining) a
@@ -988,7 +1044,17 @@ router.put('/api/books/:bookId/pages/:pageIndex', authenticate, requireOwnedBook
       });
     }
 
+    // Legendes bornees ici AUSSI, pas seulement sur la route /manual : cette
+    // route generique est le chemin d'une page seulement PARTIELLEMENT
+    // remplie (voir compositionApi.updatePageContent), et une legende y
+    // arriverait sinon sans aucune limite de longueur.
     const payload = await annotateSinglePagePayload(book, req.body);
+    if (payload?.content && typeof payload.content === 'object') {
+      const itemIds = (payload.content.itemIds || []).filter(Boolean);
+      const captions = sanitizePhotoCaptions(payload.content.photoCaptions, itemIds);
+      if (captions) payload.content.photoCaptions = captions;
+      else delete payload.content.photoCaptions;
+    }
     const data = await bookContentService.upsertPage(req.params.bookId, pageIndex, payload);
     res.json(data);
   } catch (error) {
@@ -1092,6 +1158,11 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
     // hors de son perimetre de validation structurelle photo/texte).
     const photoAdjustments = sanitizePhotoAdjustments(req.body?.photoAdjustments, itemIds);
     if (photoAdjustments) content.photoAdjustments = photoAdjustments;
+
+    // Legendes par photo (2026-09-14) : memes garanties, meme place dans le
+    // content — un reglage attache a l'item, pas au format de la page.
+    const photoCaptions = sanitizePhotoCaptions(req.body?.photoCaptions, itemIds);
+    if (photoCaptions) content.photoCaptions = photoCaptions;
 
     // Roles et reglages typographiques (cahier des charges typographique
     // §3/§6), memes garanties que photoAdjustments : jamais d'itemId etranger

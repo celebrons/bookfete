@@ -2044,7 +2044,10 @@ function deletePdfExportFiles(job) {
 async function generateFinalBookPdfFiles({ book, jobId }) {
   const safeBookName = normalizePdfFileName(cleanText(book?.title, 120), 'livre');
   const [interiorPages, items, layouts, template] = await Promise.all([
-    bookContentService.listPages(book.id),
+    // listPagesForRender, pas listPages : voir routes/composition.js
+    // (preview.pdf). Une page vierge n a pas de ligne en base, et doit
+    // pourtant figurer dans le PDF final remis au client.
+    bookContentService.listPagesForRender(book.id, book.page_count),
     bookContentService.listContentItems(book.id),
     templateCatalog.listActiveLayouts(),
     book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null)

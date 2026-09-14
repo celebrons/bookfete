@@ -15,7 +15,10 @@ function AtelierGenerateModal({
   loadingEstimate,
   // Repli seulement : l'appelant passe toujours MIN_AUTO_PAGES
   // (BookAtelierLuxe.js), aligne sur layoutEngine.PAGE_COUNT_TIERS[0].
-  minPages = 30
+  minPages = 30,
+  // Nombre de pages deja composees A LA MAIN — sert uniquement a dire a
+  // l utilisateur ce qui leur arrivera (rien).
+  manualPagesCount = 0
 }) {
   const [selectedMood, setSelectedMood] = useState('classique');
   // Le moteur automatique ne repete jamais une photo/un texte pour "boucher
@@ -55,6 +58,22 @@ function AtelierGenerateModal({
           photo et chaque texte utilise une seule fois. Vous pourrez ensuite ajuster n'importe quelle page a la
           main, ou regenerer avec une autre ambiance.
         </p>
+
+        {/* Dit noir sur blanc ce qui arrive aux pages deja faites a la main.
+            La garantie est REELLE, pas rassurante : le serveur preserve les
+            pages composees manuellement et retire leur contenu de la pioche
+            (voir backend routes/composition.js POST /compose). Sans ce
+            message, le bouton restait inutilisable par peur — "j'ai peur que
+            ca foute tout ce que j'ai fait manuellement en l'air"
+            (2026-09-14). */}
+        {manualPagesCount > 0 && (
+          <p className="atelier-hint atelier-hint-safe">
+            Vos {manualPagesCount} page{manualPagesCount > 1 ? 's' : ''} composée{manualPagesCount > 1 ? 's' : ''} à
+            la main {manualPagesCount > 1 ? 'sont conservées' : 'est conservée'} telle
+            {manualPagesCount > 1 ? 's quelles' : ' quelle'} : la génération ne remplit que les pages restantes, et
+            n'y replace jamais une photo ou un souvenir que vous y avez déjà posé.
+          </p>
+        )}
 
         {loadingEstimate && <p className="atelier-hint">Verification du contenu...</p>}
 

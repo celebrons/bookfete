@@ -9605,6 +9605,30 @@
   color: var(--text-light);
 }
 
+/* Passage recto <-> 4e de couverture. Discret (un lien, pas un bouton
+   d'action) : c'est un raccourci de navigation, pas un reglage. */
+.coverlite-face-switch {
+  display: block;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border-soft, #e3ddd0);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-light);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.coverlite-face-switch:hover {
+  color: var(--text-dark, #241f18);
+  border-color: var(--accent, #c9a35f);
+}
+
 .coverlite-hint {
   margin: 0;
   font-size: 12.5px;

@@ -56,6 +56,11 @@ import './BookAtelierLuxe.css';
 // un nouveau livre reste un premier contact avec l'atelier.
 const ONBOARDING_SEEN_KEY_PREFIX = 'atelierOnboardingSeen_';
 
+// Mise en page pre-selectionnee en arrivant sur une page encore vierge —
+// la plus courante de tres loin. Un simple brouillon : rien n'est ecrit
+// tant qu'aucun emplacement n'est rempli (voir l'effet d'initialisation).
+const DEFAULT_EMPTY_PAGE_LAYOUT = 'FULL_PHOTO';
+
 export default function BookAtelierLuxe() {
   const { bookId } = useParams();
   const [searchParams] = useSearchParams();
@@ -87,6 +92,12 @@ export default function BookAtelierLuxe() {
   // zoom "toujours disponible", confirme avec l'utilisateur) — elle s'ouvre
   // desormais au clic sur la photo (voir AtelierPhotoAdjustModal.js).
   const [draftPhotoAdjustments, setDraftPhotoAdjustments] = useState({});
+  // Legende propre a chaque photo ({ [itemId]: "texte" }). Attachee a la
+  // PHOTO, pas au format : legender ne doit pas obliger a changer de mise en
+  // page (retour utilisateur 2026-09-14 : "il faut la possibilite d ajouter
+  // une legende sur la photo en cliquant dessus"). Meme mecanique que
+  // draftPhotoAdjustments de bout en bout.
+  const [draftPhotoCaptions, setDraftPhotoCaptions] = useState({});
   // Roles et reglages typographiques par itemId (cahier des charges
   // typographique §3/§6) — meme mecanique que draftPhotoAdjustments : etat
   // local, compare dans l'effet d'autosauvegarde, persiste par
@@ -134,6 +145,30 @@ export default function BookAtelierLuxe() {
   // reecrire, sinon l'effacement peut arriver au serveur apres la
   // restauration et re-vider la page.
   const clearInFlightRef = useRef(null);
+
+  // File d'ecriture PAR PAGE : une seule requete en vol a la fois pour une
+  // meme page, servie dans l'ordre d'emission.
+  //
+  // Sans elle, chaque modification du brouillon partait immediatement : poser
+  // trois photos puis cliquer "Vider cette page" lancait quatre requetes en
+  // parallele, et rien ne garantissait leur ordre d'arrivee. L'effacement
+  // pouvait etre double par une sauvegarde plus lente partie AVANT lui — les
+  // anciennes photos revenaient, et le seul moyen de s'en sortir etait de
+  // changer de mise en page (retour utilisateur 2026-09-14 : "le vidage ne
+  // fonctionne pas lorsque je fais plusieurs modifs sur la page, il remet les
+  // anciennes photos").
+  //
+  // Chaque ecriture porte le contenu COMPLET de la page (jamais un delta) :
+  // les serialiser suffit donc, la derniere emise est la bonne. Un echec ne
+  // bloque jamais la file (le maillon suivant s'enchaine quand meme).
+  const pageWritesRef = useRef(new Map());
+
+  const queuePageWrite = useCallback((pageIndex, run) => {
+    const previous = pageWritesRef.current.get(pageIndex) || Promise.resolve();
+    const next = previous.then(run, run);
+    pageWritesRef.current.set(pageIndex, next.then(() => {}, () => {}));
+    return next;
+  }, []);
 
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   // { done, total, failed } pendant un envoi de lot, null sinon.
@@ -205,6 +240,7 @@ export default function BookAtelierLuxe() {
   const pagesRef = useRef(pages); pagesRef.current = pages;
   const layoutsByIdRef = useRef(layoutsById); layoutsByIdRef.current = layoutsById;
   const itemsByIdRef = useRef(itemsById); itemsByIdRef.current = itemsById;
+  const layoutsRef = useRef(layouts); layoutsRef.current = layouts;
 
   // Elements deja places sur UNE page interieure quelconque du livre (pas
   // seulement la page en cours) — retour utilisateur : eviter les doublons
@@ -369,6 +405,7 @@ export default function BookAtelierLuxe() {
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
       setDraftPhotoAdjustments({});
+      setDraftPhotoCaptions({});
       setDraftTextRoles({});
       setDraftTextStyles({});
       return;
@@ -392,12 +429,28 @@ export default function BookAtelierLuxe() {
       const cleanedItemIds = pageRow.content.itemIds.map((id) => (id && itemsByIdRef.current[id] ? id : null));
       setDraftSlotItemIds(cleanedItemIds);
       setDraftPhotoAdjustments(pageRow.content?.photoAdjustments || {});
+      setDraftPhotoCaptions(pageRow.content?.photoCaptions || {});
       setDraftTextRoles(pageRow.content?.textRoles || {});
       setDraftTextStyles(pageRow.content?.textStyles || {});
     } else {
-      setDraftLayoutSlug(null);
-      setDraftSlotItemIds([]);
+      // Page vierge : on PRE-SELECTIONNE "1 grande photo" plutot que de
+      // laisser choisir un format d'abord (retour utilisateur 2026-09-14 :
+      // "par defaut lorsqu'on arrive sur une page, afficher le template de la
+      // grande photo"). C'est de loin le format le plus utilise, et ca fait
+      // passer la page d'un ecran de choix a un emplacement ou deposer
+      // directement une photo.
+      //
+      // Brouillon SEULEMENT, jamais une ecriture : la sauvegarde automatique
+      // ne touche a rien tant qu'aucun emplacement n'est rempli (voir son
+      // garde-fou `if (!pageRow) return`). Une page simplement feuilletee
+      // reste donc vide en base, et le format se change d'un clic.
+      const defaut = layoutsRef.current.some((entry) => entry.slug === DEFAULT_EMPTY_PAGE_LAYOUT)
+        ? findAtelierLayout(DEFAULT_EMPTY_PAGE_LAYOUT)
+        : null;
+      setDraftLayoutSlug(defaut ? defaut.slug : null);
+      setDraftSlotItemIds(defaut ? new Array(defaut.slots.length).fill(null) : []);
       setDraftPhotoAdjustments({});
+      setDraftPhotoCaptions({});
       setDraftTextRoles({});
       setDraftTextStyles({});
     }
@@ -476,7 +529,7 @@ export default function BookAtelierLuxe() {
       let cancelledEmpty = false;
       setSaveStatus('saving');
       setSaveError('');
-      const clearPromise = clearPage(book.id, currentPageIndex);
+      const clearPromise = queuePageWrite(currentPageIndex, () => clearPage(book.id, currentPageIndex));
       // Publie pour handleUndo (voir clearInFlightRef) ; retire des qu'elle
       // est terminee, quelle qu'en soit l'issue.
       clearInFlightRef.current = clearPromise;
@@ -513,6 +566,7 @@ export default function BookAtelierLuxe() {
     const alreadySaved = Array.isArray(pageRow?.content?.itemIds)
       && JSON.stringify(pageRow.content.itemIds) === JSON.stringify(draftSlotItemIds)
       && JSON.stringify(pageRow.content?.photoAdjustments || {}) === JSON.stringify(draftPhotoAdjustments)
+      && JSON.stringify(pageRow.content?.photoCaptions || {}) === JSON.stringify(draftPhotoCaptions)
       && JSON.stringify(pageRow.content?.textRoles || {}) === JSON.stringify(draftTextRoles)
       && JSON.stringify(pageRow.content?.textStyles || {}) === JSON.stringify(draftTextStyles);
     if (alreadySaved) return undefined;
@@ -525,11 +579,12 @@ export default function BookAtelierLuxe() {
     setSaveError('');
 
     const kind = realLayout.kind === 'photo' || realLayout.kind === 'texte' ? realLayout.kind : 'mixte';
-    const persistPromise = isComplete
+    const persistPromise = queuePageWrite(currentPageIndex, () => (isComplete
       ? saveManualPage(book.id, currentPageIndex, {
           layoutId: realLayout.id,
           itemIds: draftSlotItemIds,
           photoAdjustments: draftPhotoAdjustments,
+          photoCaptions: draftPhotoCaptions,
           textRoles: draftTextRoles,
           textStyles: draftTextStyles
         })
@@ -540,11 +595,12 @@ export default function BookAtelierLuxe() {
             itemIds: draftSlotItemIds,
             blocks: [{ itemIds: draftSlotItemIds, kind, layoutId: realLayout.id, presentationVariant: 0 }],
             photoAdjustments: draftPhotoAdjustments,
+            photoCaptions: draftPhotoCaptions,
             textRoles: draftTextRoles,
             textStyles: draftTextStyles
           },
           locked: true
-        });
+        })));
 
     persistPromise
       .then((savedPage) => {
@@ -574,7 +630,7 @@ export default function BookAtelierLuxe() {
     // dependances (brouillon, page courante), donc sa fermeture est fraiche
     // a chaque execution de l'effet.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftTextRoles, draftTextStyles, draftPageIndex, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
+  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftPhotoCaptions, draftTextRoles, draftTextStyles, draftPageIndex, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
 
   // --- Photo sur double page -------------------------------------------
   // Les deux pages d'une double page forment la paire (2k, 2k+1) — meme
@@ -599,13 +655,14 @@ export default function BookAtelierLuxe() {
     const jumelle = siblingPageIndex(pageIndex);
     if (jumelle < 0 || jumelle >= totalPages || !book?.id) return;
     try {
-      const saved = await saveManualPage(book.id, jumelle, {
+      const saved = await queuePageWrite(jumelle, () => saveManualPage(book.id, jumelle, {
         layoutId,
         itemIds: draftSlotItemIds,
         photoAdjustments: draftPhotoAdjustments,
+        photoCaptions: draftPhotoCaptions,
         textRoles: draftTextRoles,
         textStyles: draftTextStyles
-      });
+      }));
       setPages((previous) => [...previous.filter((page) => page.page_index !== jumelle), saved]);
       await refreshPagePreview(jumelle);
     } catch (_err) {
@@ -625,7 +682,7 @@ export default function BookAtelierLuxe() {
     const slug = row?.layout_id ? layoutsById[row.layout_id]?.slug : null;
     if (!isSpreadLayout(slug)) return;
     try {
-      await clearPage(book.id, jumelle);
+      await queuePageWrite(jumelle, () => clearPage(book.id, jumelle));
       setPages((previous) => previous.filter((page) => page.page_index !== jumelle));
       await refreshPagePreview(jumelle);
     } catch (_err) { /* non bloquant, meme raison que ci-dessus */ }
@@ -645,6 +702,7 @@ export default function BookAtelierLuxe() {
       layoutSlug: draftLayoutSlug,
       slotItemIds: [...draftSlotItemIds],
       photoAdjustments: { ...draftPhotoAdjustments },
+      photoCaptions: { ...draftPhotoCaptions },
       textRoles: { ...draftTextRoles },
       textStyles: { ...draftTextStyles },
       label: label || `revenir à « ${findAtelierLayout(draftLayoutSlug)?.label || 'la mise en page précédente'} » avec son contenu`
@@ -664,6 +722,7 @@ export default function BookAtelierLuxe() {
     setDraftLayoutSlug(snapshot.layoutSlug);
     setDraftSlotItemIds(snapshot.slotItemIds);
     setDraftPhotoAdjustments(snapshot.photoAdjustments);
+    setDraftPhotoCaptions(snapshot.photoCaptions || {});
     setDraftTextRoles(snapshot.textRoles);
     setDraftTextStyles(snapshot.textStyles);
     // La sauvegarde automatique reecrit la page toute seule : le brouillon ne
@@ -725,6 +784,12 @@ export default function BookAtelierLuxe() {
     // tres different en forme).
     if (removedItemId) {
       setDraftPhotoAdjustments((previous) => {
+        if (!previous[removedItemId]) return previous;
+        const next = { ...previous };
+        delete next[removedItemId];
+        return next;
+      });
+      setDraftPhotoCaptions((previous) => {
         if (!previous[removedItemId]) return previous;
         const next = { ...previous };
         delete next[removedItemId];
@@ -822,6 +887,23 @@ export default function BookAtelierLuxe() {
     setAdjustTargetSlotIndex(null);
   };
 
+  // Legende d'UNE photo. Une chaine vide retire la legende (et non une
+  // legende vide) : c'est ainsi qu'on l'efface, sans bouton supplementaire.
+  // La sauvegarde automatique s'occupe du reste, comme pour le cadrage.
+  const handleSaveCaption = (itemId, texte) => {
+    const valeur = (texte || '').trim();
+    setDraftPhotoCaptions((previous) => {
+      if (!valeur) {
+        if (!previous[itemId]) return previous;
+        const next = { ...previous };
+        delete next[itemId];
+        return next;
+      }
+      if (previous[itemId] === valeur) return previous;
+      return { ...previous, [itemId]: valeur };
+    });
+  };
+
   const handleResetPhotoAdjustment = (itemId) => {
     setDraftPhotoAdjustments((previous) => {
       if (!previous[itemId]) return previous;
@@ -852,6 +934,7 @@ export default function BookAtelierLuxe() {
     setDraftLayoutSlug(slug);
     setDraftSlotItemIds(next);
     setDraftPhotoAdjustments({}); // le cadre change de forme : l'ancien cadrage n'a plus de sens
+    // Les legendes, elles, SURVIVENT : elles decrivent la photo, pas le cadre.
     setAdjustTargetSlotIndex(null);
   };
 
@@ -864,11 +947,12 @@ export default function BookAtelierLuxe() {
     setSaveStatus('saving');
     setSaveError('');
     try {
-      await clearPage(book.id, currentPageIndex);
+      await queuePageWrite(currentPageIndex, () => clearPage(book.id, currentPageIndex));
       setPages((previous) => previous.filter((page) => page.page_index !== currentPageIndex));
       setDraftLayoutSlug(null);
       setDraftSlotItemIds([]);
       setDraftPhotoAdjustments({});
+      setDraftPhotoCaptions({});
       setDraftTextRoles({});
       setDraftTextStyles({});
       setSaveStatus('idle');
@@ -894,9 +978,17 @@ export default function BookAtelierLuxe() {
   // chaque appel, jamais mis en cache cote serveur). Le simple fait de
   // remettre coverHtml/backCoverHtml a null NE relance PAS l'effet de
   // chargement (il ne depend pas de ces valeurs) : refreshToken s'en charge.
+  //
+  // Les DEUX faces, jamais seulement celle affichee : couverture, dos et 4e
+  // ne forment qu'UNE seule feuille (voir coverComposer.composeBackCover —
+  // meme teinte, meme habillage), et la photo de 4e est choisie en excluant
+  // celle du recto. Changer le recto change donc la 4e. N'invalider que la
+  // face visible laissait l'autre affichee dans son ancien etat (retour
+  // utilisateur 2026-09-14 : "j'ai mis a jour la couverture, la 4e n'a pas
+  // suivi").
   const handleCoverSaved = () => {
-    if (viewKind === 'cover') setCoverHtml(null);
-    else if (viewKind === 'back-cover') setBackCoverHtml(null);
+    setCoverHtml(null);
+    setBackCoverHtml(null);
     setRefreshToken((previous) => previous + 1);
   };
 
@@ -1303,6 +1395,8 @@ export default function BookAtelierLuxe() {
       onAdjustSlot={handleOpenAdjust}
       selectedSidebarItem={selectedSidebarItem}
       photoAdjustments={draftPhotoAdjustments}
+      photoCaptions={draftPhotoCaptions}
+      onSaveCaption={handleSaveCaption}
       printFormat={book?.print_format}
       onSaveText={handleSaveText}
       onCreateText={handleCreateText}
@@ -1372,6 +1466,7 @@ export default function BookAtelierLuxe() {
         estimatedPages={estimatedPages}
         loadingEstimate={loadingEstimate}
         minPages={MIN_AUTO_PAGES}
+        manualPagesCount={pages.filter((page) => page.locked).length}
       />
 
       <AtelierPhotoAdjustModal
@@ -1499,6 +1594,7 @@ export default function BookAtelierLuxe() {
               face={viewKind === 'cover' ? 'front' : 'back'}
               onUpdateBook={handleUpdateBook}
               onSaved={handleCoverSaved}
+              onSwitchFace={() => goToView(viewKind === 'cover' ? lastViewIndex : 0)}
             />
           )}
         </div>

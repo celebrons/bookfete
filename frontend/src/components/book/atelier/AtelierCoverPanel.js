@@ -242,7 +242,7 @@ const buildInitialState = (book) => {
 
 const getStateSignature = (state) => JSON.stringify(state);
 
-function AtelierCoverPanel({ book, face, onUpdateBook, onSaved }) {
+function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) {
   const [photos, setPhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(true);
   const [formState, setFormState] = useState(() => buildInitialState(book));
@@ -351,6 +351,17 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved }) {
           </span>
         )}
       </div>
+
+      {/* Passage direct d'une face a l'autre. Les deux faces sont aux deux
+          EXTREMITES opposees du livre : pour aller du recto a la 4e il
+          fallait feuilleter tout le livre, ou repasser par la pellicule
+          (retour utilisateur 2026-09-14). Or on les regle ensemble — meme
+          teinte, meme habillage, la photo de l'une depend de l'autre. */}
+      {onSwitchFace && (
+        <button type="button" className="coverlite-face-switch" onClick={onSwitchFace}>
+          {face === 'front' ? 'Aller à la 4e de couverture →' : '← Revenir à la couverture'}
+        </button>
+      )}
 
       {face === 'front' ? (
         <>

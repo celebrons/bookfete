@@ -811,3 +811,79 @@ describe('renderBookHtml — TITLE_TEXT : chaque emplacement garde sa bande', ()
     expect(html.indexOf('page-title')).toBeLessThan(html.indexOf('title-photos-grid'));
   });
 });
+
+// Legende attachee a UNE photo (content.photoCaptions), demandee le
+// 2026-09-14 : "il faut la possibilite d'ajouter une legende sur la photo en
+// cliquant dessus". Volontairement INDEPENDANTE du format de page — elle
+// doit donc apparaitre sur n'importe quelle mise en page photo, y compris
+// celles qui n'ont aucun emplacement texte.
+describe('renderBookHtml — legende par photo (content.photoCaptions)', () => {
+  const items = [
+    { id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg' },
+    { id: 'photo-2', kind: 'photo', url: 'https://cdn.test/2.jpg' }
+  ];
+
+  const pageAvec = (slug, itemIds, photoCaptions) => ({
+    page_index: 0,
+    content: { kind: 'photo', blocks: [{ kind: 'photo', itemIds, layoutId: 'l1' }], photoCaptions }
+  });
+  const layouts = [
+    { id: 'l1', slug: 'FULL_PHOTO', kind: 'photo' },
+    { id: 'l2', slug: 'TWO_PHOTOS', kind: 'photo' }
+  ];
+
+  it('affiche la legende dans le cadre de la photo, sur une mise en page SANS emplacement texte', () => {
+    const html = renderBookHtml({
+      book: {},
+      items,
+      layouts,
+      pages: [pageAvec('FULL_PHOTO', ['photo-1'], { 'photo-1': 'Jean souffle ses bougies' })]
+    });
+    const body = bodyOf(html);
+    expect(body).toContain('<span class="photo-caption">Jean souffle ses bougies</span>');
+    // Dans le cadre, jamais dans la grille de la page : aucune geometrie
+    // n'est deplacee par l'ajout d'une legende.
+    expect(body).toMatch(/<span class="photo-frame">.*photo-caption/s);
+  });
+
+  it('n affiche rien du tout quand la photo n a pas de legende', () => {
+    const html = renderBookHtml({
+      book: {}, items, layouts, pages: [pageAvec('FULL_PHOTO', ['photo-1'])]
+    });
+    expect(bodyOf(html)).not.toContain('photo-caption');
+  });
+
+  it('une legende vide ou blanche ne produit pas de bandeau vide', () => {
+    const html = renderBookHtml({
+      book: {}, items, layouts,
+      pages: [pageAvec('FULL_PHOTO', ['photo-1'], { 'photo-1': '   ' })]
+    });
+    expect(bodyOf(html)).not.toContain('photo-caption');
+  });
+
+  it('legende CHAQUE photo d une grille, sans melanger les deux', () => {
+    const page = {
+      page_index: 0,
+      content: {
+        kind: 'photo',
+        blocks: [{ kind: 'photo', itemIds: ['photo-1', 'photo-2'], layoutId: 'l2' }],
+        photoCaptions: { 'photo-1': 'Le matin', 'photo-2': 'Le soir' }
+      }
+    };
+    const body = bodyOf(renderBookHtml({ book: {}, items, layouts, pages: [page] }));
+    expect(body).toContain('>Le matin<');
+    expect(body).toContain('>Le soir<');
+    // La legende de la 1ere photo doit se trouver AVANT la seconde image.
+    expect(body.indexOf('Le matin')).toBeLessThan(body.indexOf('2.jpg'));
+  });
+
+  it('echappe le HTML d une legende (jamais de balise injectee dans le livre)', () => {
+    const html = renderBookHtml({
+      book: {}, items, layouts,
+      pages: [pageAvec('FULL_PHOTO', ['photo-1'], { 'photo-1': '<img onerror=x> & co' })]
+    });
+    const body = bodyOf(html);
+    expect(body).toContain('&lt;img onerror=x&gt; &amp; co');
+    expect(body).not.toContain('<img onerror=x>');
+  });
+});

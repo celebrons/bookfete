@@ -599,7 +599,13 @@ describe('routes/composition', () => {
       }
     });
 
-    it('preview.html sur un livre sans aucune page interieure affiche quand meme recto + verso (2 pages)', async () => {
+    // Un livre dont AUCUNE page n'a jamais ete composee n'a aucune ligne en
+    // base — mais il annonce quand meme un nombre de pages, et c est ce
+    // nombre-la qui est facture et imprime. L apercu doit donc montrer le
+    // livre ENTIER, pages blanches comprises (2026-09-14 : il n en montrait
+    // que 24 sur 30, le client recevait moins de pages qu il n en payait).
+    it('preview.html sur un livre sans aucune page composee montre quand meme toutes ses pages, blanches', async () => {
+      const book = supabaseMock.__table('books').find((b) => b.id === 'book-test-3');
       const response = await request(app)
         .get('/api/books/book-test-3/preview.html')
         .set('Authorization', 'Bearer valid-token');
@@ -607,7 +613,8 @@ describe('routes/composition', () => {
       expect(response.status).toBe(200);
       expect(response.text).toContain('data-cvr-role="front-cover"');
       expect(response.text).toContain('data-cvr-role="back-cover"');
-      expect(response.text).not.toContain('class="page-blocks"');
+      const interieures = (response.text.match(/class="page-blocks"/g) || []).length;
+      expect(interieures).toBe(book.page_count);
     });
 
     it('GET cover-preview.html renvoie le recto seul par defaut (?face omis), une seule page', async () => {
@@ -728,13 +735,18 @@ describe('routes/composition', () => {
       pdfService.renderPdfFromPages.mockClear();
 
       const interiorPagesBefore = supabaseMock.__table('book_pages').filter((p) => p.book_id === BOOK_ID);
+      const bookRow = supabaseMock.__table('books').find((b) => b.id === BOOK_ID);
 
       await request(app)
         .get(`/api/books/${BOOK_ID}/preview.pdf`)
         .set('Authorization', 'Bearer valid-token');
 
       const callArgs = pdfService.renderPdfFromPages.mock.calls[0][0];
-      expect(callArgs.pages).toHaveLength(interiorPagesBefore.length + 2);
+      // Le livre ENTIER, pas seulement ses pages sauvegardees : une page
+      // laissee vierge n a pas de ligne en base et doit pourtant etre
+      // imprimee. + 2 pour le recto et la 4e de couverture.
+      expect(callArgs.pages).toHaveLength(bookRow.page_count + 2);
+      expect(interiorPagesBefore.length).toBeLessThan(bookRow.page_count);
       expect(callArgs.pages[0].content.kind).toBe('front-cover');
       expect(callArgs.pages[callArgs.pages.length - 1].content.kind).toBe('back-cover');
     });

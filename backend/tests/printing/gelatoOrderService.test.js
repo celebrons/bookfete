@@ -5,7 +5,7 @@
 // est testee ici.
 
 jest.mock('../../services/composition/bookContentService', () => ({
-  listPages: jest.fn(async () => ([{ page_index: 0, layout_id: null, content: { kind: 'photo', blocks: [] } }])),
+  listPagesForRender: jest.fn(async () => ([{ page_index: 0, layout_id: null, content: { kind: 'photo', blocks: [] } }])),
   listContentItems: jest.fn(async () => ([]))
 }));
 jest.mock('../../services/composition/templateCatalog', () => ({
@@ -132,7 +132,7 @@ describe('gelatoOrderService', () => {
   });
 
   it('un livre sans page interieure produit une erreur geree (pas de throw), enregistree en metadata', async () => {
-    bookContentService.listPages.mockResolvedValueOnce([]);
+    bookContentService.listPagesForRender.mockResolvedValueOnce([]);
     const updateSpy = jest.fn();
 
     const result = await submitPrintOrderToGelato({ db: makeDb(updateSpy), book, order: baseOrder });

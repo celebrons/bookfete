@@ -24,6 +24,13 @@ const { FRONT_COVER_VARIANTS } = require('./frontCoverRenderer');
 const { BACK_COVER_VARIANTS } = require('./backCoverRenderer');
 const { EVENT_TYPE_LABELS } = require('../../utils/bookCreationSchema');
 
+// Format de reference pour le classement des photos de 4e de couverture.
+// Fixe volontairement (voir composeBackCover) : la 4e ne doit pas changer de
+// photo parce que le livre change de format. La valeur exacte importe peu —
+// seul compte le fait quelle ne varie jamais ; on prend celle du format le
+// plus courant.
+const BACK_COVER_RANKING_FORMAT = resolveCoverFormat('standard');
+
 // Seuils de score (coverPhotoSelector.scorePhoto, [0,1]) — points de depart,
 // ajustables independamment.
 const COVER_PHOTO_THRESHOLDS = {
@@ -300,7 +307,24 @@ function composeBackCover({ book, items, template, format, frontCoverItemIds = [
   // Photo de la 4e : jamais celle du recto (exclusion appliquee une seule
   // fois ici, reutilisee par les deux branches ci-dessous — ne doit jamais
   // concurrencer la couverture, choix manuel inclus).
-  const ranked = rankPhotos(items, format).filter((entry) => !frontCoverItemIds.includes(entry.item.id));
+  // Classement sur un format de REFERENCE FIXE, pas sur celui du livre.
+  //
+  // Le score d une photo depend du ratio de la page (coverPhotoSelector
+  // .scorePhoto) : passer le livre en Livret (carre) au lieu de Standard
+  // (portrait) reordonnait donc les candidates. Le recto n en souffrait pas,
+  // il prend la MEILLEURE (ranked[0], une position stable) ; la 4e, elle,
+  // prend deliberement la DERNIERE acceptable — la position la plus sensible
+  // au moindre reordonnancement. Resultat constate sur deux livres reels le
+  // 2026-09-14 : le simple fait de regarder un autre format changeait la photo
+  // de 4e, sans que rien ne l ait demande ("la photo de 4e est modifiee par
+  // une photo aleatoire en mode livret").
+  //
+  // La 4e n a rien a y gagner : sa photo est une vignette dans un encart de
+  // taille fixe, et on y cherche justement une photo QUI NE CONCURRENCE PAS
+  // le recto — pas la mieux cadree. Un classement stable vaut donc mieux
+  // qu un classement adapte. Un choix explicite de l utilisateur
+  // (cover_overrides.backPhotoId) reste evidemment prioritaire.
+  const ranked = rankPhotos(items, BACK_COVER_RANKING_FORMAT).filter((entry) => !frontCoverItemIds.includes(entry.item.id));
   // Photo choisie explicitement par l'utilisateur (surcharge,
   // cover_overrides.backPhotoId — meme principe que overrides.frontPhotoId
   // cote recto, voir composeFrontCover) : repli silencieux sur la selection
