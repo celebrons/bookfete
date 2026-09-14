@@ -314,6 +314,64 @@ async function movePage(bookId, fromIndex, toIndex) {
   return listPages(bookId);
 }
 
+// --- Nombre de pages : une seule autorite ---------------------------------
+//
+// `books.page_count` et les lignes de `book_pages` DOIVENT toujours decrire le
+// meme livre. Les laisser diverger coute de l'argent en silence : le PRIX se
+// calcule sur page_count (routes/orders.js) tandis que le FICHIER envoye a
+// l'imprimeur se construit sur les pages reelles (gelatoOrderService).
+// Constate sur un livre reel le 2026-09-14 : 30 pages facturees, 40 imprimees.
+//
+// Trois regles, appliquees ICI et nulle part ailleurs, pour qu'aucun chemin
+// d'ecriture ne puisse les contourner :
+//   1. PLANCHER de MIN_BOOK_PAGES (30). C'est un choix PRODUIT : l'imprimeur
+//      accepte des 28 pages (voir gelatoCatalog: minPages). Le forcer evite
+//      qu'un livre se retrouve non commandable sans que rien ne l'ait dit.
+//   2. PARITE : l'imprimeur n'accepte que des nombres pairs (pageStep 2).
+//   3. Le compte couvre TOUTE page existante : jamais de contenu au-dela du
+//      nombre annonce.
+const MIN_BOOK_PAGES = 30;
+const MAX_BOOK_PAGES = 200;
+
+function normalizePageCount(value) {
+  const n = Math.ceil(Number(value) || 0);
+  const floored = Math.max(MIN_BOOK_PAGES, n);
+  const even = floored % 2 === 0 ? floored : floored + 1;
+  return Math.min(MAX_BOOK_PAGES, even);
+}
+
+// Nombre de pages que le livre DOIT annoncer, compte tenu de ce qu'il contient
+// reellement. `desired` permet a un appelant de demander davantage (ex. le
+// resultat d'une composition) — jamais moins que ce qui existe deja.
+function requiredPageCount(pages = [], desired = 0) {
+  const maxIndex = pages.reduce((max, page) => Math.max(max, Number(page.page_index) || 0), -1);
+  return normalizePageCount(Math.max(Number(desired) || 0, maxIndex + 1));
+}
+
+// Aligne `books.page_count` sur la realite. Retourne le compte retenu.
+// Idempotente : n'ecrit que si la valeur change.
+async function syncPageCount(bookId, desired = 0) {
+  const pages = await listPages(bookId);
+  const pageCount = requiredPageCount(pages, desired);
+
+  const { data: book, error: readError } = await supabase
+    .from('books')
+    .select('page_count')
+    .eq('id', bookId)
+    .single();
+  if (readError) throw readError;
+
+  if (book.page_count !== pageCount) {
+    const { error } = await supabase
+      .from('books')
+      .update({ page_count: pageCount, updated_at: new Date().toISOString() })
+      .eq('id', bookId);
+    if (error) throw error;
+  }
+
+  return pageCount;
+}
+
 async function upsertPage(bookId, pageIndex, payload = {}) {
   const { data, error } = await supabase
     .from('book_pages')
@@ -341,5 +399,10 @@ module.exports = {
   removeTrailingPages,
   isPageEmpty,
   movePage,
-  upsertPage
+  upsertPage,
+  MIN_BOOK_PAGES,
+  MAX_BOOK_PAGES,
+  normalizePageCount,
+  requiredPageCount,
+  syncPageCount
 };

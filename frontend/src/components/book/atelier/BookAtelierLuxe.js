@@ -1516,7 +1516,11 @@ export default function BookAtelierLuxe() {
           removingPages={removingPages}
           // Le serveur reste l'autorite (il refuse en 422), mais griser le
           // bouton evite de proposer une action qu'on sait deja impossible.
-          canRemovePages={(pages.length || 0) - 2 >= MIN_AUTO_PAGES}
+          // `totalPages` (book.page_count) et NON `pages.length` : une page
+          // vide n'a pas de ligne en base, donc compter les lignes sous-estime
+          // le livre et grisait le bouton a tort sur un livre peu rempli
+          // (2026-09-14, meme famille que l'ecart page_count / pages reelles).
+          canRemovePages={totalPages - 2 >= MIN_AUTO_PAGES}
           minPages={MIN_AUTO_PAGES}
           onMovePage={handleMovePage}
           movingPage={movingPage}

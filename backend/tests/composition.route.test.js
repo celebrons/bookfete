@@ -423,6 +423,34 @@ describe('routes/composition', () => {
       expect(response.body.overflow).toBe(false);
     });
 
+    // 2026-09-14 : la composition ne mettait PAS a jour books.page_count. Les
+    // pages verrouillees survivant a une recomposition, le livre pouvait
+    // contenir plus de pages qu'il n'en declarait — et comme le PRIX se
+    // calcule sur page_count tandis que le FICHIER D'IMPRESSION se construit
+    // sur les pages reelles, on facturait un nombre de pages et on en
+    // imprimait un autre (constate sur un livre reel : 30 facturees, 40
+    // imprimees).
+    it('synchronise books.page_count avec le livre reel (plancher 30, nombre PAIR, aucune page au-dela)', async () => {
+      const supabase = require('../config/supabase');
+      const { MIN_BOOK_PAGES } = require('../services/composition/bookContentService');
+      const response = await request(app)
+        .post(`/api/books/${BOOK_ID}/compose`)
+        .set('Authorization', 'Bearer valid-token')
+        .send({ variant: 0 });
+
+      expect(response.status).toBe(200);
+      const { data: book } = await supabase.from('books').select('*').eq('id', BOOK_ID).single();
+
+      // Le compte n'est pas forcement `pages.length` : une composition peut
+      // produire un nombre IMPAIR (mesure : 33), que l'imprimeur refuse — il
+      // est alors arrondi au pair superieur. Ce sont les trois garanties
+      // ci-dessous qui comptent, pas l'egalite stricte.
+      expect(book.page_count).toBeGreaterThanOrEqual(MIN_BOOK_PAGES);
+      expect(book.page_count % 2).toBe(0);
+      expect(book.page_count).toBeGreaterThanOrEqual(response.body.pages.length);
+      expect(response.body.pageCount).toBe(book.page_count);
+    });
+
     it('accepte une ambiance (mood) valide', async () => {
       const response = await request(app)
         .post(`/api/books/${BOOK_ID}/compose`)

@@ -1193,6 +1193,44 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
 
+    // GARDE-FOU DE FACTURATION (2026-09-14). Le prix se calcule sur
+    // `book.page_count`, mais le fichier envoye a l'imprimeur est construit a
+    // partir des pages REELLEMENT composees (gelatoOrderService :
+    // interiorPages.length). Si le livre contient des pages de contenu
+    // au-dela du nombre declare, le client paierait un nombre de pages et en
+    // recevrait un autre.
+    //
+    // Constate sur un livre reel : 30 pages facturees, 40 envoyees a
+    // l'impression. La cause est corrigee (la composition synchronise
+    // desormais page_count), mais un livre deja dans cet etat ne doit pas
+    // pouvoir partir en commande sans que ce soit dit.
+    //
+    // On ne compte QUE les pages porteuses de contenu : une page vide n'a pas
+    // de ligne en base, donc "moins de lignes que page_count" est normal et
+    // ne doit jamais declencher ce garde-fou.
+    if (type === 'print' || type === 'pack') {
+      const { data: pageRows } = await db
+        .from('book_pages')
+        .select('page_index,content')
+        .eq('book_id', book.id);
+      const declared = Number(book.page_count || 0);
+      const auDela = (pageRows || []).filter((row) => (
+        row.page_index >= declared
+        && Array.isArray(row.content?.itemIds)
+        && row.content.itemIds.filter(Boolean).length > 0
+      ));
+      if (auDela.length > 0) {
+        return res.status(422).json({
+          error: `Votre livre contient ${auDela.length} page(s) de contenu au-dela des ${declared} pages annoncees. `
+            + 'Relancez une composition ou ajustez le nombre de pages : le prix et le fichier envoye a '
+            + "l'imprimeur doivent porter sur le meme livre.",
+          pageCountMismatch: true,
+          declaredPageCount: declared,
+          realPageCount: declared + auDela.length
+        });
+      }
+    }
+
     const pricing = computeOrderPricing({ book, type, quantity });
     const snapshot = {
       bookId: book.id,

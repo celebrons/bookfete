@@ -590,7 +590,11 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
       formatId: book.print_format
     });
     const pages = await bookContentService.replaceBookPages(book.id, annotatedPagesWithText);
-    res.json({ pages, overflow: result.overflow, underflow: result.underflow, pageBudget: result.pageBudget });
+    // Une seule autorite sur le nombre de pages (plancher 30, parite, jamais
+    // de contenu au-dela du compte annonce) — voir syncPageCount.
+    const pageCount = await bookContentService.syncPageCount(book.id, pages.length);
+
+    res.json({ pages, pageCount, overflow: result.overflow, underflow: result.underflow, pageBudget: result.pageBudget });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -703,15 +707,22 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, async (
     });
     const pages = await bookContentService.replaceBookPages(book.id, annotatedFormatPagesWithText);
 
-    const { data: updatedBook, error: updateError } = await supabase
+    const { error: formatError } = await supabase
       .from('books')
-      .update({ print_format: formatId, page_count: pageCount })
-      .eq('id', book.id)
-      .select()
-      .single();
-    if (updateError) throw updateError;
+      .update({ print_format: formatId })
+      .eq('id', book.id);
+    if (formatError) throw formatError;
 
-    res.json({ book: updatedBook, pages, pageCount });
+    // Le nombre de pages passe par l'autorite unique : le `pageCount` calcule
+    // par le moteur est une DEMANDE, jamais le dernier mot — des pages
+    // verrouillees peuvent survivre a la recomposition et depasser ce compte.
+    const realPageCount = await bookContentService.syncPageCount(book.id, pageCount);
+
+    const { data: updatedBook, error: readError } = await supabase
+      .from('books').select('*').eq('id', book.id).single();
+    if (readError) throw readError;
+
+    res.json({ book: updatedBook, pages, pageCount: realPageCount });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -838,13 +849,13 @@ router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, a
     const pages = await bookContentService.appendEmptyPages(book.id, count);
     const newPageCount = pages.length;
 
-    const { data: updatedBook, error: updateError } = await supabase
-      .from('books')
-      .update({ page_count: newPageCount, updated_at: new Date().toISOString() })
-      .eq('id', book.id)
-      .select()
-      .single();
-    if (updateError) throw updateError;
+    // Meme autorite unique que partout ailleurs (plancher, parite, couverture
+    // des pages reelles) : cette route ne decide pas du compte, elle le
+    // DEMANDE.
+    await bookContentService.syncPageCount(book.id, newPageCount);
+    const { data: updatedBook, error: readError } = await supabase
+      .from('books').select('*').eq('id', book.id).single();
+    if (readError) throw readError;
 
     res.json({ book: updatedBook, pages });
   } catch (error) {
@@ -906,13 +917,14 @@ router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, a
 
     const pages = await bookContentService.removeTrailingPages(book.id, count);
 
-    const { data: updatedBook, error: updateError } = await supabase
-      .from('books')
-      .update({ page_count: pages.length, updated_at: new Date().toISOString() })
-      .eq('id', book.id)
-      .select()
-      .single();
-    if (updateError) throw updateError;
+    // `pages.length` n'est PAS le nombre de pages du livre : une page vide n'a
+    // pas de ligne en base. On passe donc le nombre VOULU (remaining) a
+    // l'autorite unique, qui refusera de descendre sous le plancher et
+    // couvrira toute page reellement presente.
+    await bookContentService.syncPageCount(book.id, remaining);
+    const { data: updatedBook, error: readError } = await supabase
+      .from('books').select('*').eq('id', book.id).single();
+    if (readError) throw readError;
 
     res.json({ book: updatedBook, pages, removed: count });
   } catch (error) {
@@ -965,8 +977,15 @@ router.put('/api/books/:bookId/pages/:pageIndex', authenticate, requireOwnedBook
   try {
     const { book } = req;
     const pageIndex = Number(req.params.pageIndex);
-    if (!Number.isInteger(pageIndex) || pageIndex < 0) {
-      return res.status(400).json({ error: 'pageIndex invalide.' });
+    // Borne HAUTE indispensable, pas seulement `>= 0` : sans elle, cette route
+    // acceptait d'ecrire une page 999 sur un livre de 30 pages, et
+    // `books.page_count` restait a 30. C'etait la derniere breche par
+    // laquelle le nombre de pages annonce pouvait diverger du livre reel
+    // (2026-09-14). La route soeur /manual verifiait deja cette borne.
+    if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= Number(book.page_count || 0)) {
+      return res.status(400).json({
+        error: `pageIndex invalide : ce livre compte ${Number(book.page_count || 0)} pages.`
+      });
     }
 
     const payload = await annotateSinglePagePayload(book, req.body);

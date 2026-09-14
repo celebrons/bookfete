@@ -228,3 +228,44 @@ describe('bookContentService.deleteContentItemsByKind', () => {
     expect(deuxieme).toEqual([]);
   });
 });
+
+// --- Nombre de pages : autorite unique (2026-09-14) ------------------------
+// `books.page_count` et les lignes de `book_pages` doivent toujours decrire le
+// meme livre : le PRIX se calcule sur l'un, le FICHIER D'IMPRESSION sur
+// l'autre. Les laisser diverger coute de l'argent en silence (constate sur un
+// livre reel : 30 pages facturees, 40 imprimees).
+describe('bookContentService — nombre de pages', () => {
+  const { normalizePageCount, requiredPageCount, MIN_BOOK_PAGES } = require('../../services/composition/bookContentService');
+
+  it('applique le plancher produit de 30 pages', () => {
+    expect(MIN_BOOK_PAGES).toBe(30);
+    [0, 1, 12, 28, 29].forEach((n) => expect(normalizePageCount(n)).toBe(30));
+  });
+
+  it('arrondit toujours au nombre PAIR superieur (l imprimeur refuse les impairs)', () => {
+    expect(normalizePageCount(31)).toBe(32);
+    expect(normalizePageCount(33)).toBe(34);
+    expect(normalizePageCount(40)).toBe(40);
+    expect(normalizePageCount(199)).toBe(200);
+  });
+
+  it('ne depasse jamais le plafond imprimable', () => {
+    expect(normalizePageCount(500)).toBe(200);
+  });
+
+  it('couvre TOUTE page existante, meme au-dela du nombre demande', () => {
+    // Le cas reel : une composition demande 30 pages, mais des pages
+    // verrouillees survivent jusqu'a l'index 39 — le livre en compte donc 40.
+    const pages = Array.from({ length: 40 }, (_, i) => ({ page_index: i }));
+    expect(requiredPageCount(pages, 30)).toBe(40);
+  });
+
+  it('une page vide (sans ligne en base) ne fait pas baisser le compte', () => {
+    // Seules les pages 0 et 29 existent : le livre compte bien 30 pages.
+    expect(requiredPageCount([{ page_index: 0 }, { page_index: 29 }], 30)).toBe(30);
+  });
+
+  it('un livre sans aucune page annonce quand meme le plancher', () => {
+    expect(requiredPageCount([], 0)).toBe(30);
+  });
+});
