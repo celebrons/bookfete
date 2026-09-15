@@ -83,9 +83,20 @@ function sanitizePhotoCaptions(raw, validItemIds) {
   const validSet = new Set(validItemIds);
   const cleaned = {};
   Object.entries(raw).forEach(([itemId, caption]) => {
-    if (!validSet.has(itemId) || typeof caption !== 'string') return;
-    const texte = caption.trim().slice(0, PHOTO_CAPTION_MAX);
-    if (texte) cleaned[itemId] = texte;
+    if (!validSet.has(itemId)) return;
+    // Deux formes acceptees : une simple chaine (legendes ecrites avant
+    // l'ajout de la couleur — jamais de migration de donnees) ou
+    // { texte, couleur }. Toujours NORMALISE vers la seconde a l'ecriture,
+    // pour qu'il n'y ait qu'une forme a lire en base a partir de maintenant.
+    const brut = typeof caption === 'string' ? { texte: caption } : caption;
+    if (!brut || typeof brut !== 'object' || typeof brut.texte !== 'string') return;
+    const texte = brut.texte.trim().slice(0, PHOTO_CAPTION_MAX);
+    if (!texte) return;
+    // DEUX couleurs, jamais une palette : le seul vrai choix est "clair sur
+    // sombre" ou "sombre sur clair". Toute autre valeur retombe sur le
+    // blanc plutot que d'atterrir dans le rendu (decision produit
+    // 2026-09-15). Voir pageRenderer.imgFrame pour le rendu.
+    cleaned[itemId] = { texte, couleur: brut.couleur === 'noir' ? 'noir' : 'blanc' };
   });
   return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
@@ -548,7 +559,12 @@ router.get('/api/books/:bookId/recommended-page-count', authenticate, requireOwn
       templateCatalog.listActiveLayouts()
     ]);
 
-    const recommendation = layoutEngine.recommendPageCount({ items, template, layouts });
+    // `targetPages` : sans lui, la reponse dirait sur combien de pages le
+    // contenu tient NATURELLEMENT (21), pas combien seront remplies dans ce
+    // livre-ci (30). C'est le second chiffre qui interesse l'utilisateur.
+    const recommendation = layoutEngine.recommendPageCount({
+      items, template, layouts, targetPages: book.page_count
+    });
     res.json(recommendation);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -563,23 +579,28 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
   try {
     const { book } = req;
 
-    if (!book.template_id) {
-      return res.status(422).json({ error: 'Choisissez un template avant de composer le livre.' });
-    }
+    // Le template n'est PAS requis (2026-09-15). Ce n'est qu'une liste blanche
+    // de mises en page — « vide = pas de restriction » (voir
+    // layoutEngine.buildPages : le catalogue complet sert alors de pioche).
+    // L'exiger interdisait purement et simplement le mode automatique aux
+    // livres crees par le parcours actuel, qui n'en pose aucun : « Voyage a
+    // Montreal », 47 photos, template AUCUN. Les deux autres chemins de
+    // composition (recommendPageCount, composeBookForFormat) s'en passaient
+    // deja sans probleme.
     if (!book.page_count) {
       return res.status(422).json({ error: 'Choisissez un nombre de pages avant de composer le livre.' });
     }
 
     const [template, layouts, allItems, existingPages] = await Promise.all([
-      templateCatalog.getTemplateById(book.template_id),
+      book.template_id ? templateCatalog.getTemplateById(book.template_id) : Promise.resolve(null),
       templateCatalog.listActiveLayouts(),
       bookContentService.listContentItems(book.id),
       bookContentService.listPages(book.id)
     ]);
 
-    if (!template) {
-      return res.status(422).json({ error: 'Template introuvable ou inactif.' });
-    }
+    // Template absent ou devenu inactif : on compose avec le catalogue complet
+    // plutot que de refuser — un livre n'a pas a devenir incomposable parce
+    // qu'un style a ete retire du catalogue.
 
     // Le contenu deja pose a la main ne repart PAS dans la pioche.
     //
@@ -633,12 +654,30 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async 
     // serveur est le filet de securite pour tout appelant direct de cette route.
     // Le livre ENTIER, pages manuelles comprises : celles-ci restent en
     // place (replaceBookPages ne les touche pas) et comptent donc autant que
-    // les autres. Ne compter que les pages generees refuserait la generation
-    // a un livre deja majoritairement compose a la main.
+    // les autres.
     const totalApresGeneration = result.pages.length + lockedPageCount;
-    if (totalApresGeneration < layoutEngine.MIN_PRINTABLE_PAGES) {
+
+    // PLUS DE BLOCAGE SUR LE PLANCHER DE 30 PAGES (2026-09-15).
+    //
+    // Cette route refusait de generer tant que le contenu ne remplissait pas
+    // 30 pages. Le message etait arithmetiquement juste — 47 photos tiennent
+    // reellement en 21 pages, le moteur en posant plusieurs par page — mais le
+    // refus, lui, ne l'etait plus : depuis que les pages blanches sont des
+    // pages a part entiere (rendues, comptees, facturees — voir
+    // listPagesForRender), un livre de 30 pages dont 21 composees et 9 vierges
+    // est parfaitement valide. C'est d'ailleurs exactement ce qu'est deja un
+    // livre compose a la main.
+    //
+    // Concretement le plancher etait deja tenu SANS ce garde : syncPageCount
+    // ramene toujours le compte a 30 minimum. Le refus n'empechait donc rien,
+    // il interdisait seulement d'utiliser le mode automatique — signale le
+    // 2026-09-15 : « pourtant il y a 47 photos en bibliotheque ».
+    //
+    // Il reste un plancher, mais le vrai : generer ZERO page viderait le livre
+    // sans rien mettre a la place.
+    if (totalApresGeneration === 0) {
       return res.status(422).json({
-        error: `Il faut ajouter du contenu pour atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum (votre contenu actuel remplit environ ${totalApresGeneration} page${totalApresGeneration > 1 ? 's' : ''}). Ajoutez des photos ou des souvenirs, puis reessayez.`
+        error: "Il n'y a aucun contenu a mettre en page. Ajoutez des photos ou des souvenirs dans « Mes souvenirs », puis reessayez."
       });
     }
 

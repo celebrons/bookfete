@@ -327,6 +327,11 @@ export default function BookPreviewFinalLuxe() {
   const canGoNext = viewIndex < totalViews - 1;
   const goPrevious = useCallback(() => setViewIndex((index) => Math.max(0, index - 1)), []);
   const goNext = useCallback(() => setViewIndex((index) => Math.min(totalViews - 1, index + 1)), [totalViews]);
+  // Sauts directs aux deux extremites. Sans eux, atteindre la 4e d'un livre
+  // de 30 pages demandait 16 clics — et autant pour revenir (retour
+  // utilisateur 2026-09-15 : « on est obliges de feuilleter tout l'album »).
+  const goToCover = useCallback(() => setViewIndex(0), []);
+  const goToBackCover = useCallback(() => setViewIndex(totalViews - 1), [totalViews]);
 
   // Feuilleter le livre entier SANS quitter le plein ecran (fleches clavier
   // + boutons dans le calque) — reutilise les memes handlers/etat que la
@@ -520,6 +525,15 @@ export default function BookPreviewFinalLuxe() {
             </ScaledPageFrame>
           )}
           <div className="preview-final-nav">
+            <button
+              type="button"
+              className="btn btn-outline preview-final-nav-jump"
+              onClick={goToCover}
+              disabled={!canGoPrevious}
+              title="Aller à la couverture"
+            >
+              ⇤ Couverture
+            </button>
             <button type="button" className="btn btn-outline" onClick={goPrevious} disabled={!canGoPrevious}>
               ‹
             </button>
@@ -527,13 +541,22 @@ export default function BookPreviewFinalLuxe() {
             <button type="button" className="btn btn-outline" onClick={goNext} disabled={!canGoNext}>
               ›
             </button>
+            <button
+              type="button"
+              className="btn btn-outline preview-final-nav-jump"
+              onClick={goToBackCover}
+              disabled={!canGoNext}
+              title="Aller à la 4e de couverture"
+            >
+              4e ⇥
+            </button>
           </div>
         </div>
 
         <aside className="preview-final-sidebar">
           <div className="preview-final-sidebar-section">
             <span className="preview-final-sidebar-label">Votre livre</span>
-            <p className="preview-final-book-title">{book.title}</p>
+            <p className="preview-final-book-title">{book.title || 'Livre sans titre'}</p>
             <p className="preview-final-book-stats">
               📖 {totalPages} pages · 📷 {photosCount} photos · ✍️ {souvenirsCount} souvenirs
             </p>
@@ -673,12 +696,18 @@ export default function BookPreviewFinalLuxe() {
 
             <div className="preview-final-fullscreen-footer" onClick={(event) => event.stopPropagation()}>
               <div className="preview-final-fullscreen-nav">
+                <button type="button" className="btn btn-outline preview-final-nav-jump" onClick={goToCover} disabled={!canGoPrevious} title="Aller à la couverture">
+                  ⇤ Couverture
+                </button>
                 <button type="button" className="btn btn-outline" onClick={goPrevious} disabled={!canGoPrevious}>
                   ‹ Précédent
                 </button>
                 <span className="preview-final-fullscreen-nav-label">{viewLabel}</span>
                 <button type="button" className="btn btn-outline" onClick={goNext} disabled={!canGoNext}>
                   Suivant ›
+                </button>
+                <button type="button" className="btn btn-outline preview-final-nav-jump" onClick={goToBackCover} disabled={!canGoNext} title="Aller à la 4e de couverture">
+                  4e ⇥
                 </button>
               </div>
               <ZoomControls zoom={zoom} onZoomChange={setZoom} />

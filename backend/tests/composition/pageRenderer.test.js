@@ -840,7 +840,9 @@ describe('renderBookHtml — legende par photo (content.photoCaptions)', () => {
       pages: [pageAvec('FULL_PHOTO', ['photo-1'], { 'photo-1': 'Jean souffle ses bougies' })]
     });
     const body = bodyOf(html);
-    expect(body).toContain('<span class="photo-caption">Jean souffle ses bougies</span>');
+    // La classe de couleur fait partie du rendu : sans elle, aucun voile ne
+    // s'applique et la legende devient illisible sur une photo claire.
+    expect(body).toContain('<span class="photo-caption is-blanc">Jean souffle ses bougies</span>');
     // Dans le cadre, jamais dans la grille de la page : aucune geometrie
     // n'est deplacee par l'ajout d'une legende.
     expect(body).toMatch(/<span class="photo-frame">.*photo-caption/s);
@@ -875,6 +877,51 @@ describe('renderBookHtml — legende par photo (content.photoCaptions)', () => {
     expect(body).toContain('>Le soir<');
     // La legende de la 1ere photo doit se trouver AVANT la seconde image.
     expect(body.indexOf('Le matin')).toBeLessThan(body.indexOf('2.jpg'));
+  });
+
+  // NOIR ajoute le 2026-09-15 : « ajouter le NOIR comme possibilite de
+  // couleur du texte » — une legende blanche devient illisible sur une photo
+  // tres claire. Deux couleurs seulement, jamais une palette.
+  it('affiche une legende en NOIR quand la couleur est choisie', () => {
+    const page = {
+      page_index: 0,
+      content: {
+        kind: 'photo',
+        blocks: [{ kind: 'photo', itemIds: ['photo-1'], layoutId: 'l1' }],
+        photoCaptions: { 'photo-1': { texte: 'Sur la plage', couleur: 'noir' } }
+      }
+    };
+    const body = bodyOf(renderBookHtml({ book: {}, items, layouts, pages: [page] }));
+    expect(body).toContain('<span class="photo-caption is-noir">Sur la plage</span>');
+  });
+
+  it('une couleur inconnue retombe sur le blanc, jamais sur une classe inventee', () => {
+    const page = {
+      page_index: 0,
+      content: {
+        kind: 'photo',
+        blocks: [{ kind: 'photo', itemIds: ['photo-1'], layoutId: 'l1' }],
+        photoCaptions: { 'photo-1': { texte: 'Sur la plage', couleur: 'fuchsia' } }
+      }
+    };
+    const body = bodyOf(renderBookHtml({ book: {}, items, layouts, pages: [page] }));
+    expect(body).toContain('photo-caption is-blanc');
+    expect(body).not.toContain('fuchsia');
+  });
+
+  // Les legendes ecrites AVANT l'ajout du noir sont de simples chaines : elles
+  // doivent continuer de s'afficher sans migration de donnees.
+  it('accepte encore une legende sous forme de simple chaine (ancien format)', () => {
+    const page = {
+      page_index: 0,
+      content: {
+        kind: 'photo',
+        blocks: [{ kind: 'photo', itemIds: ['photo-1'], layoutId: 'l1' }],
+        photoCaptions: { 'photo-1': 'Une ancienne legende' }
+      }
+    };
+    const body = bodyOf(renderBookHtml({ book: {}, items, layouts, pages: [page] }));
+    expect(body).toContain('<span class="photo-caption is-blanc">Une ancienne legende</span>');
   });
 
   it('echappe le HTML d une legende (jamais de balise injectee dans le livre)', () => {

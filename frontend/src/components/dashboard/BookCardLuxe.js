@@ -198,7 +198,9 @@ const BookCardLuxe = ({
       <Link to={`/book/${book.id}/atelier`} className="dashboard-book-link">
         <div className="dashboard-book-hero-minimal">
           <div>
-            <h3 className="dashboard-book-title">{book.title}</h3>
+            {/* Repli : un livre peut legitimement n'avoir pas encore de titre
+                — il ne se saisit plus qu'a l'etape couverture (2026-09-15). */}
+            <h3 className="dashboard-book-title">{book.title || 'Livre sans titre'}</h3>
             <p className="dashboard-book-date">Cree le {formatDate(book.created_at)}</p>
           </div>
         </div>

@@ -220,6 +220,32 @@
   justify-content: center;
 }
 
+/* Sauts directs aux extremites (2026-09-15). Volontairement plus DISCRETS
+   que precedent/suivant : ce sont des raccourcis, pas le geste principal de
+   lecture. Sur ecran etroit seul le pictogramme reste — le libelle est la
+   premiere chose a sacrifier, la fleche suffit a comprendre. */
+.preview-final-nav-jump {
+  font-size: 12px;
+  padding: 6px 12px;
+  opacity: 0.85;
+}
+
+.preview-final-nav-jump:hover:not(:disabled) { opacity: 1; }
+
+@media (max-width: 640px) {
+  .preview-final-nav-jump {
+    font-size: 0;
+    padding: 6px 10px;
+  }
+  /* Le pictogramme est un caractere du libelle : on le fait reapparaitre
+     seul, via un contenu genere, plutot que de dupliquer le balisage. */
+  .preview-final-nav-jump::before {
+    font-size: 15px;
+    content: '⇤';
+  }
+  .preview-final-nav-jump:last-child::before { content: '⇥'; }
+}
+
 .preview-final-nav-label {
   min-width: 140px;
   text-align: center;

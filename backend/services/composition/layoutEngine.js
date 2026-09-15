@@ -313,6 +313,7 @@ function buildPageEntry(pageIndex, layout, consumedUnits, presentationVariant) {
  * @param {string} input.seedBase
  * @param {string} [input.mood] - ambiance de composition (voir layoutScoring.MOOD_LAYOUT_WEIGHTS), absent = comportement standard
  * @param {string} [input.formatId] - 'livret'|'standard'|'luxe' (voir layoutScoring.scoreOrientation), absent = ratio de page par defaut (standard/luxe)
+ * @param {number} [input.targetPages] - nombre de pages A REMPLIR. Absent/0 = densite naturelle, comportement d'avant.
  * @returns {{ pages: Array }}
  */
 function buildPages(input) {
@@ -323,6 +324,7 @@ function buildPages(input) {
   const seedBase = input.seedBase || 'no-template:0';
   const mood = input.mood || undefined;
   const formatId = input.formatId || undefined;
+  const targetPages = Math.max(0, clampInt(input.targetPages, 0));
 
   const pool = allowedSlugs.length > 0
     ? layouts.filter((layout) => allowedSlugs.includes(layout.slug) || GUARANTEED_FALLBACK_SLUGS.includes(layout.slug))
@@ -339,6 +341,36 @@ function buildPages(input) {
 
     let candidates = resolveCandidates(pool, window);
     if (candidates.length === 0) candidates = resolveCandidates(fallbackPool, window);
+
+    // REPARTIR plutot qu'EMPILER, quand le livre a de la place.
+    //
+    // Sans cette etape, le moteur remplit chaque page au maximum de ce que la
+    // mise en page la mieux notee accepte — et s'arrete des qu'il n'a plus de
+    // contenu. Resultat constate le 2026-09-15 : 47 photos tenaient en 21
+    // pages, laissant 9 pages blanches a la fin d'un livre de 30. Or il y
+    // avait largement de quoi remplir le livre entier, simplement en posant
+    // moins de photos par page.
+    //
+    // Regle : tant qu'il reste des pages a remplir, on ne retient que les
+    // mises en page qui consomment au plus la "ration" restante
+    // (unites restantes / pages restantes, arrondie au superieur). Avec 59
+    // unites pour 30 pages, la ration vaut 2 : les formats a 3 ou 4 photos
+    // sont ecartes, ceux a 1 ou 2 restent — et le livre se remplit.
+    //
+    // Trois garde-fous, chacun important :
+    //   - au moins 1 : une ration de 0 ecarterait tout.
+    //   - si le filtre ne laisse RIEN (aucune mise en page assez petite pour
+    //     ce contenu), on garde les candidats d'origine : mieux vaut une page
+    //     dense qu'un contenu perdu.
+    //   - au-dela de la cible (contenu plus abondant que le livre), le filtre
+    //     ne s'applique plus : on reprend la densite naturelle, et compose()
+    //     signalera l'overflow.
+    if (targetPages > 0 && pages.length < targetPages) {
+      const rationParPage = Math.max(1, Math.ceil(queue.length / (targetPages - pages.length)));
+      const assezLegers = candidates.filter((layout) => (consumedCount(layout, window) || 1) <= rationParPage);
+      if (assezLegers.length > 0) candidates = assezLegers;
+    }
+
     if (candidates.length === 0) {
       // Filet de securite ultime (catalogue incomplet/mal configure) : place
       // au moins l'unite de tete seule plutot que de perdre du contenu ou de
@@ -382,7 +414,8 @@ function buildPages(input) {
  * @param {Array} [input.layouts] - layout_definitions actifs (necessaire pour une estimation precise)
  * @param {object} [input.template] - book_templates row (pour allowed_layouts ; optionnel)
  * @param {number} [input.fixedPages]
- * @returns {{ recommended: number, estimatedPages: number, tiers: Array<{pageCount:number, fits:boolean}> }}
+ * @param {number} [input.targetPages] - nombre de pages du livre, pour savoir combien seront REELLEMENT remplies
+ * @returns {{ recommended: number, estimatedPages: number, filledPages: number, tiers: Array<{pageCount:number, fits:boolean}> }}
  */
 function recommendPageCount(input = {}) {
   const items = Array.isArray(input.items) ? input.items : [];
@@ -396,10 +429,26 @@ function recommendPageCount(input = {}) {
   const { pages } = buildPages({ units, layouts, allowedSlugs, profile, seedBase });
 
   const estimatedPages = units.length === 0 ? 0 : fixedPages + pages.length;
+
+  // Combien de pages seront REELLEMENT remplies dans CE livre-ci.
+  //
+  // `estimatedPages` repond a une autre question : « sur combien de pages ce
+  // contenu tient-il naturellement ? » — utile pour recommander un palier a
+  // la creation. Mais depuis que le moteur repartit le contenu sur le nombre
+  // de pages demande (voir buildPages, "REPARTIR plutot qu'EMPILER"), les deux
+  // chiffres divergent : 47 photos "tiennent" en 21 pages mais en remplissent
+  // 30 si le livre en compte 30. Annoncer le premier ferait promettre des
+  // pages blanches qui n'existeront pas.
+  const targetPages = Math.max(0, clampInt(input.targetPages, 0));
+  const filledPages = units.length === 0
+    ? 0
+    : (targetPages > 0
+      ? buildPages({ units, layouts, allowedSlugs, profile, seedBase, targetPages }).pages.length
+      : pages.length);
   const recommended = PAGE_COUNT_TIERS.find((tier) => tier >= estimatedPages) || PAGE_COUNT_TIERS[PAGE_COUNT_TIERS.length - 1];
   const tiers = PAGE_COUNT_TIERS.map((pageCount) => ({ pageCount, fits: pageCount >= estimatedPages }));
 
-  return { recommended, estimatedPages, tiers };
+  return { recommended, estimatedPages, filledPages, tiers };
 }
 
 /**
@@ -428,7 +477,24 @@ function compose(input) {
 
   const units = buildUnitsFromItems(items);
   const { profile } = detectContentProfile(items);
-  const { pages: contentPages } = buildPages({ units, layouts, allowedSlugs, profile, seedBase, mood, formatId });
+  // Le moteur vise le nombre de pages DEMANDE : avec assez de contenu, le
+  // livre se remplit entierement au lieu de s'arreter des que le contenu est
+  // place (voir buildPages, "REPARTIR plutot qu'EMPILER").
+  //
+  // La cible est le nombre de pages ENTIER, pas `pagesAvailable`. Les
+  // `fixedPages` (garde + page de titre) sont une RESERVATION DE BUDGET que
+  // rien ne materialise : aucune page de garde ni de titre n'est produite nulle
+  // part (seules les couvertures s'ajoutent, et elles sont hors budget — voir
+  // coverComposer). Viser le budget ampute laissait donc systematiquement 2
+  // pages blanches en fin de livre, alors qu'il y avait de quoi les remplir :
+  // 47 photos pour 30 pages s'arretaient a 28 (2026-09-15).
+  //
+  // `pagesAvailable` reste la reference pour overflow/underflow : ces deux
+  // signaux n'ont pas change de sens, et d'autres ecrans s'en servent.
+  const { pages: contentPages } = buildPages({
+    units, layouts, allowedSlugs, profile, seedBase, mood, formatId,
+    targetPages: clampInt(input.pageCount, 0)
+  });
 
   // Le livre compte EXACTEMENT le nombre de pages que le contenu occupe,
   // jamais plus : aucune page blanche n'est jamais inseree pour atteindre un

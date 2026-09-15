@@ -1406,6 +1406,46 @@
   background: #fff;
 }
 .atelier-overlay-caption-form input:focus { outline: none; border-color: var(--gold, #c9a35f); }
+/* Blanc / noir (2026-09-15). Les deux pastilles montrent le RESULTAT — texte
+   clair sur fond sombre, texte sombre sur fond clair — plutot qu'un carre de
+   couleur : c'est le contraste qu'on choisit, pas la teinte. */
+.atelier-overlay-caption-colors {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.atelier-overlay-caption-color {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-soft, #e3ddd0);
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.atelier-overlay-caption-color.is-blanc { background: #241f18; color: #fff; }
+.atelier-overlay-caption-color.is-noir { background: #fff; color: #241f18; }
+
+.atelier-overlay-caption-color.is-active {
+  border-color: var(--gold, #c9a35f);
+  box-shadow: 0 0 0 2px rgba(201, 163, 95, 0.4);
+}
+
+/* Le champ de saisie prend la couleur choisie : on juge la lisibilite AVANT
+   de valider, pas apres avoir fermé l'editeur. */
+.atelier-overlay-caption-form.is-blanc input {
+  background: #3a332a;
+  color: #fff;
+  border-color: #554c40;
+}
+
+.atelier-overlay-caption-form.is-blanc input::placeholder { color: rgba(255, 255, 255, 0.55); }
+
 .atelier-overlay-caption-ok {
   border: none;
   border-radius: 4px;
@@ -1537,6 +1577,30 @@
   display: flex;
   align-items: center;
   gap: var(--space-md);
+}
+
+/* Sauts directs aux extremites (2026-09-15) — memes principes que dans
+   l'apercu final : raccourcis discrets, libelle sacrifie en premier quand la
+   place manque. */
+.atelier-book-nav-jump {
+  font-size: 12px;
+  padding: 6px 12px;
+  opacity: 0.85;
+}
+
+.atelier-book-nav-jump:hover:not(:disabled) { opacity: 1; }
+
+@media (max-width: 820px) {
+  .atelier-book-nav-controls { gap: var(--space-sm); }
+  .atelier-book-nav-jump {
+    font-size: 0;
+    padding: 6px 10px;
+  }
+  .atelier-book-nav-jump::before {
+    font-size: 15px;
+    content: '⇤';
+  }
+  .atelier-book-nav-jump:last-child::before { content: '⇥'; }
 }
 
 .atelier-book-nav-label {

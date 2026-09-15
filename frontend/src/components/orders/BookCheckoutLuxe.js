@@ -37,6 +37,10 @@ import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
 
 const DEFAULT_ADDRESS = {
+  // Porte par la COMMANDE, pas seulement par le compte : c'est ce qui permet
+  // d'ecrire au client sans lui imposer un mot de passe, et c'est la seule
+  // adresse dont dispose le webhook Stripe (non authentifie).
+  email: '',
   fullName: '',
   line1: '',
   line2: '',
@@ -304,6 +308,12 @@ const BookCheckoutLuxe = () => {
     (async () => {
       try {
         const { data } = await supabase.auth.getUser();
+        // L'adresse email du compte pre-remplit le champ quand il y en a une :
+        // un utilisateur connecte n'a pas a la retaper.
+        const emailCompte = data?.user?.email;
+        if (!annule && emailCompte) {
+          setAddress((previous) => (previous.email ? previous : { ...previous, email: emailCompte }));
+        }
         const enregistree = data?.user?.user_metadata?.shipping_address;
         if (annule || !enregistree || typeof enregistree !== 'object') return;
         setAddress((previous) => {

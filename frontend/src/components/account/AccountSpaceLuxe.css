@@ -225,3 +225,20 @@
 }
 
 .account-address-saved .account-address-saved-hint { margin: 6px 0 0; }
+
+/* Marche a suivre pour activer les emails. Numerotee : ce sont trois etapes
+   a faire dans l'ordre, dont deux hors de l'application. */
+.account-email-setup {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-dark, #241f18);
+}
+
+.account-email-setup code {
+  background: rgba(36, 31, 24, 0.06);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 13px;
+}

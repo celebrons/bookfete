@@ -6,6 +6,8 @@ const authenticate = require('../middleware/auth');
 const { submitPrintOrderToGelato, isGelatoLiveOrdersEnabled } = require('../services/printing/gelatoOrderService');
 const gelatoClient = require('../services/printing/gelatoClient');
 const gelatoTracking = require('../services/printing/gelatoTracking');
+const emails = require('../services/email/transactionalEmails');
+const { emailValide } = require('../services/email/resendClient');
 let Stripe = null;
 
 try {
@@ -218,6 +220,7 @@ const createOrderNumber = () => {
 
 const sanitizeAddress = (rawAddress) => {
   const address = rawAddress && typeof rawAddress === 'object' ? rawAddress : {};
+  const email = cleanString(address.email, 180).toLowerCase();
   return {
     fullName: cleanString(address.fullName, 120),
     line1: cleanString(address.line1, 180),
@@ -225,7 +228,21 @@ const sanitizeAddress = (rawAddress) => {
     postalCode: cleanString(address.postalCode, 24),
     city: cleanString(address.city, 120),
     country: cleanString(address.country, 120) || 'France',
-    phone: cleanString(address.phone, 40)
+    phone: cleanString(address.phone, 40),
+    // EMAIL PORTE PAR LA COMMANDE, et pas seulement par le compte.
+    //
+    // C'est ce qui permet d'ecrire au client sans qu'il ait cree un compte
+    // classique (decision produit 2026-09-15 : « ne pas imposer un compte
+    // avec mot de passe, demander simplement son adresse e-mail »). C'est
+    // aussi la seule adresse dont dispose le webhook Stripe, qui n'est pas
+    // authentifie : sans elle, la confirmation de paiement n'aurait aucun
+    // destinataire.
+    //
+    // Retenue seulement si elle ressemble a une adresse : une chaine
+    // fantaisiste brulerait du quota d'envoi et de la reputation pour rien.
+    // `emailValide` vient du client d'envoi : une seule definition de ce
+    // qu'est une adresse acceptable, partagee par la validation et l'envoi.
+    ...(emailValide(email) ? { email } : {})
   };
 };
 
@@ -245,6 +262,15 @@ const FORMAT_PRICING = {
 const DEFAULT_PRINT_FORMAT = 'standard';
 
 const resolveFormatPricing = (printFormat) => FORMAT_PRICING[printFormat] || FORMAT_PRICING[DEFAULT_PRINT_FORMAT];
+
+// Prix de DEPART d'un format : celui du livre au plancher produit (30 pages).
+// C'est ce que "a partir de XX EUR" doit annoncer — calcule avec la MEME
+// formule que le prix reel d'une commande (computeOrderPricing), jamais un
+// tarif d'affichage saisi a part qui finirait par diverger.
+const startingPriceCents = (printFormat, pages) => {
+  const pricing = resolveFormatPricing(printFormat);
+  return Math.max(pricing.minCents, pricing.baseCents + Math.round(pages * pricing.perPageCents));
+};
 
 // book.page_count (pas book.pages, une colonne heritee de l'ancien flux IA
 // jamais mise a jour par le moteur de composition actuel) : la vraie valeur,
@@ -941,6 +967,19 @@ const handleStripeWebhook = async (req, res) => {
     // a la route de confirmation ci-dessous) — voir triggerGelatoSubmissionIfNeeded.
     triggerGelatoSubmissionIfNeeded({ db: supabase, order: updatedOrder });
 
+    // Confirmation de paiement, envoyee ICI et nulle part ailleurs.
+    //
+    // Le webhook est le SEUL point ou le paiement est certain : la route de
+    // confirmation cote navigateur peut ne jamais etre atteinte (onglet
+    // ferme, reseau coupe) et n'est donc pas une source fiable. Brancher les
+    // deux enverrait deux fois le meme email au meme client.
+    //
+    // Pas d'adresse de compte ici : le webhook n'est pas authentifie. On
+    // s'appuie sur l'adresse portee par la commande (voir
+    // transactionalEmails.destinataireDe) — si elle manque, rien ne part,
+    // plutot qu'un email a une adresse devinee.
+    emails.envoyerPaiementRecu({ order: updatedOrder }).catch(() => {});
+
     return res.json({
       received: true,
       orderId: updatedOrder.id,
@@ -951,6 +990,88 @@ const handleStripeWebhook = async (req, res) => {
     return res.status(status).json({ error: error.message });
   }
 };
+
+// GET /api/orders/email/status
+// L'envoi d'emails est-il reellement actif ? Repond SANS envoyer quoi que ce
+// soit : c'est ce qui permet a l'interface de dire « configure » ou « pas
+// encore » sans bruler un email pour le savoir.
+router.get('/email/status', authenticate, (req, res) => {
+  res.json({
+    enabled: emails.isEmailEnabled(),
+    from: (process.env.EMAIL_FROM || "").trim() || null,
+    siteUrl: emails.siteUrl(),
+    // Adresse du compte : en offre gratuite Resend, c'est la SEULE vers
+    // laquelle on peut ecrire tant qu'aucun domaine n'est verifie.
+    suggestedTo: req.user?.email || null
+  });
+});
+
+// POST /api/orders/email/test
+// Envoie un VRAI email d'essai. Declenche explicitement par l'utilisateur,
+// jamais automatiquement : un envoi est irreversible et sort du produit.
+//
+// Destinataire : l'adresse du compte connecte, et elle seule. Accepter une
+// adresse libre ferait de cette route un relais ouvert — on pourrait
+// envoyer du courrier a n'importe qui depuis notre domaine.
+router.post('/email/test', authenticate, async (req, res) => {
+  try {
+    const destinataire = req.user?.email;
+    if (!destinataire) {
+      return res.status(400).json({ error: "Aucune adresse email connue pour ce compte." });
+    }
+    if (!emails.isEmailEnabled()) {
+      return res.status(422).json({
+        error: "L'envoi d'emails n'est pas configure : posez RESEND_API_KEY dans le fichier .env du backend, puis redemarrez-le.",
+        enabled: false
+      });
+    }
+
+    const resultat = await emails.envoyerEssai({ to: destinataire });
+    if (!resultat.sent) {
+      return res.status(502).json({ error: resultat.error || resultat.skipped, to: destinataire });
+    }
+    res.json({ sent: true, to: destinataire, id: resultat.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/orders/formats
+// Les trois formats, avec dimensions reelles et prix de depart — a afficher
+// AVANT que le livre existe (choix du format dans le parcours de creation).
+//
+// Pourquoi une route plutot qu'une table recopiee cote client : le prix vient
+// de la MEME formule que celui facture a la commande (computeOrderPricing).
+// Un tarif recopie dans le navigateur finirait par diverger du prix reel, et
+// c'est exactement le genre d'ecart qui se paie en confiance.
+//
+// Publique (pas de authenticate) : le choix du format arrive avant toute
+// session dans le parcours, et il n'y a la aucune donnee personnelle.
+router.get('/formats', (_req, res) => {
+  const { MIN_BOOK_PAGES } = require('../services/composition/bookContentService');
+  const { COVER_FORMATS } = require('../services/composition/coverFormat');
+
+  const LIBELLES = {
+    livret: { nom: 'Livret', accroche: 'Simple & élégant' },
+    standard: { nom: 'Standard', accroche: 'Le meilleur équilibre entre élégance, qualité et prix', recommande: true },
+    luxe: { nom: 'Luxe', accroche: 'Premium & intemporel' }
+  };
+
+  const formats = Object.keys(LIBELLES).map((formatId) => {
+    const dims = COVER_FORMATS[formatId];
+    return {
+      formatId,
+      ...LIBELLES[formatId],
+      widthMm: dims.trimWidthMm,
+      heightMm: dims.trimHeightMm,
+      // "a partir de" : le prix au plancher produit, pas un prix moyen.
+      minPages: MIN_BOOK_PAGES,
+      startingPriceCents: startingPriceCents(formatId, MIN_BOOK_PAGES)
+    };
+  });
+
+  res.json({ formats, defaultFormatId: DEFAULT_PRINT_FORMAT });
+});
 
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -1489,6 +1610,18 @@ router.post('/:orderId/status', authenticate, async (req, res) => {
       bookId: order.book_id,
       orderStatus: nextStatus
     });
+
+    // Email d'etape. APRES l'ecriture, jamais avant : on n'annonce que ce qui
+    // est reellement enregistre. Et jamais attendu par la reponse — un email
+    // lent ou en panne ne doit pas retarder ni faire echouer un changement de
+    // statut deja effectue. Seuls les statuts qui ont un message dedie
+    // declenchent quelque chose (voir emailTemplates.ETAPES).
+    emails.envoyerEtapeFabrication({
+      order: data,
+      ownerEmail: req.user?.email,
+      statut: nextStatus,
+      suivi: data?.metadata?.tracking
+    }).catch(() => {});
 
     return res.json(getApiSafeOrder(data));
   } catch (error) {

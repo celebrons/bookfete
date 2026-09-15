@@ -451,6 +451,50 @@ describe('routes/composition', () => {
       expect(response.body.pageCount).toBe(book.page_count);
     });
 
+    // DEUX BLOCAGES RETIRES LE 2026-09-15, tous deux constates sur des livres
+    // reels de l utilisateur.
+    //
+    // 1. Le plancher de 30 pages refusait la generation tant que le CONTENU ne
+    //    remplissait pas 30 pages. Le calcul etait juste (47 photos tiennent
+    //    en ~21 pages, le moteur en posant plusieurs par page) mais le refus
+    //    ne l etait plus : depuis que les pages blanches sont des pages a part
+    //    entiere (rendues, comptees, facturees), un livre de 30 pages dont 21
+    //    composees est parfaitement valide — c est deja ce qu est un livre
+    //    compose a la main. Et syncPageCount tient le plancher de toute facon.
+    // 2. Un template etait exige, alors que ce n est qu une liste blanche de
+    //    mises en page (vide = pas de restriction). Les livres crees par le
+    //    parcours actuel n en ont aucun : le mode automatique leur etait
+    //    purement et simplement inaccessible.
+    it('genere meme quand le contenu ne remplit pas tout le livre (pages blanches a la fin)', async () => {
+      const response = await request(app)
+        .post('/api/books/book-test-5/compose')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ variant: 0 });
+
+      expect(response.status).toBe(200);
+      expect(response.body.pages.length).toBeGreaterThan(0);
+      // Le plancher produit reste tenu par l autorite unique, pas par un refus.
+      const { MIN_BOOK_PAGES } = require('../services/composition/bookContentService');
+      expect(response.body.pageCount).toBeGreaterThanOrEqual(MIN_BOOK_PAGES);
+    });
+
+    it('genere aussi un livre SANS template (le catalogue complet sert de pioche)', async () => {
+      const livre = supabaseMock.__table('books').find((b) => b.id === 'book-test-5');
+      const templatePrecedent = livre.template_id;
+      livre.template_id = null;
+      try {
+        const response = await request(app)
+          .post('/api/books/book-test-5/compose')
+          .set('Authorization', 'Bearer valid-token')
+          .send({ variant: 0 });
+
+        expect(response.status).toBe(200);
+        expect(response.body.pages.length).toBeGreaterThan(0);
+      } finally {
+        livre.template_id = templatePrecedent;
+      }
+    });
+
     it('accepte une ambiance (mood) valide', async () => {
       const response = await request(app)
         .post(`/api/books/${BOOK_ID}/compose`)

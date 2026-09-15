@@ -75,6 +75,10 @@ function AtelierPageOverlay({
   // le texte d un emplacement texte) et sa valeur en cours de frappe.
   const [captionIndex, setCaptionIndex] = useState(null);
   const [captionDraft, setCaptionDraft] = useState('');
+  // Couleur de la legende en cours d'edition. DEUX valeurs seulement : une
+  // legende blanche devient illisible sur une photo tres claire, et c'est le
+  // seul vrai choix a offrir (decision produit 2026-09-15). Pas de palette.
+  const [captionColor, setCaptionColor] = useState('blanc');
   const [overlayWidthPx, setOverlayWidthPx] = useState(0);
   const overlayRef = useRef(null);
   // Marges reelles de CE format (et non des valeurs A4 figees) : elles
@@ -259,7 +263,9 @@ function AtelierPageOverlay({
                       onClick={(event) => {
                         event.stopPropagation();
                         setPendingRemoveIndex(null);
-                        setCaptionDraft(photoCaptions?.[item.id] || '');
+                        const existante = photoCaptions?.[item.id];
+                        setCaptionDraft(typeof existante === 'string' ? existante : (existante?.texte || ''));
+                        setCaptionColor(existante?.couleur === 'noir' ? 'noir' : 'blanc');
                         setCaptionIndex(index);
                       }}
                       title={photoCaptions?.[item.id] ? 'Modifier la légende' : 'Ajouter une légende'}
@@ -295,11 +301,11 @@ function AtelierPageOverlay({
                   champ retire la legende. */}
               {item && captionIndex === index && (
                 <form
-                  className="atelier-overlay-caption-form"
+                  className={`atelier-overlay-caption-form is-${captionColor}`}
                   onClick={(event) => event.stopPropagation()}
                   onSubmit={(event) => {
                     event.preventDefault();
-                    onSaveCaption(item.id, captionDraft);
+                    onSaveCaption(item.id, captionDraft, captionColor);
                     setCaptionIndex(null);
                   }}
                 >
@@ -313,6 +319,28 @@ function AtelierPageOverlay({
                     onChange={(event) => setCaptionDraft(event.target.value)}
                     onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setCaptionIndex(null); } }}
                   />
+                  {/* Blanc / noir. Les deux pastilles montrent le RESULTAT
+                      (texte clair sur fond sombre, texte sombre sur fond
+                      clair) plutot qu'un simple carre de couleur : c'est le
+                      contraste qu'on choisit, pas la teinte. */}
+                  <span className="atelier-overlay-caption-colors" role="group" aria-label="Couleur de la légende">
+                    {[
+                      { id: 'blanc', libelle: 'Texte blanc' },
+                      { id: 'noir', libelle: 'Texte noir' }
+                    ].map((choix) => (
+                      <button
+                        key={choix.id}
+                        type="button"
+                        className={`atelier-overlay-caption-color is-${choix.id} ${captionColor === choix.id ? 'is-active' : ''}`}
+                        onClick={() => setCaptionColor(choix.id)}
+                        title={choix.libelle}
+                        aria-label={choix.libelle}
+                        aria-pressed={captionColor === choix.id}
+                      >
+                        Aa
+                      </button>
+                    ))}
+                  </span>
                   <button type="submit" className="atelier-overlay-caption-ok">OK</button>
                 </form>
               )}

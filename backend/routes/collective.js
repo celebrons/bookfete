@@ -17,6 +17,7 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const emailsTransactionnels = require('../services/email/transactionalEmails');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
@@ -250,6 +251,22 @@ router.post('/api/books/:bookId/collective/participants', authenticate, requireO
       .select();
 
     if (error) throw error;
+
+    // INVITATIONS, envoyees apres l'ecriture et sans l'attendre.
+    //
+    // Apres : on n'invite que des participants reellement enregistres. Sans
+    // l'attendre : inviter 20 personnes ne doit pas faire patienter le
+    // createur 20 allers-retours devant un ecran fige — et un email qui
+    // echoue ne doit pas annuler l'ajout du participant, qui garde de toute
+    // facon son lien individuel, recopiable a la main.
+    //
+    // Rien ne part tant qu'aucune cle Resend n'est posee (voir
+    // resendClient) : le lien reste alors le seul canal, exactement comme
+    // avant.
+    (data || []).forEach((participant) => {
+      emailsTransactionnels.envoyerInvitationParticipant({ participant, book: req.book }).catch(() => {});
+    });
+
     res.status(201).json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -280,7 +297,9 @@ router.put('/api/books/:bookId/collective/participants/:participantId', authenti
 
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Participant introuvable.' });
-    res.json(data);
+
+    const envoi = await emailsTransactionnels.envoyerRelanceParticipant({ participant: data, book: req.book });
+    res.json({ ...data, emailSent: envoi.sent === true, emailSkipped: envoi.skipped || null });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -301,11 +320,16 @@ router.delete('/api/books/:bookId/collective/participants/:participantId', authe
   }
 });
 
-// POST .../participants/:id/remind — marque la relance ; l'envoi email reel
-// n'est pas branche pour l'instant (pas de SMTP configure, voir le plan) :
-// le frontend affiche/recopie le lien individuel pour un envoi manuel par
-// le createur. Brancher sendInviteEmail (services/emailService.js) ici sera
-// le seul changement necessaire une fois SMTP configure.
+// POST .../participants/:id/remind — relance un participant.
+//
+// L'email part REELLEMENT depuis le 2026-09-15 (via Resend, voir
+// services/email/). L'horodatage `last_reminder_sent_at` reste pose dans tous
+// les cas : il dit « une relance a ete demandee », ce qui reste vrai meme si
+// l'envoi echoue — et c'est lui qui evite d'en renvoyer trois d'affilee.
+//
+// Le lien individuel reste affiche cote createur : c'est le canal de repli
+// quand aucune cle d'envoi n'est configuree, et la reponse dit precisement si
+// l'email est parti (`emailSent`) plutot que de le laisser deviner.
 router.post('/api/books/:bookId/collective/participants/:participantId/remind', authenticate, requireOwnedBook, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -455,6 +479,40 @@ router.post('/api/public/collectif/:token/finish', resolveParticipantByToken, as
       .select()
       .single();
     if (error) throw error;
+
+    // PREVIENT LE CREATEUR, une seule fois : quand le participant declare
+    // avoir fini.
+    //
+    // Pas a chaque photo deposee : quelqu'un qui en envoie quinze
+    // declencherait quinze emails, et le createur finirait par tous les
+    // ignorer. « J'ai termine » est le seul moment qui merite un message.
+    //
+    // Sans l'attendre, et sans jamais faire echouer la contribution : le
+    // participant a fait sa part, il n'a pas a voir une erreur parce qu'un
+    // email n'est pas parti.
+    (async () => {
+      const { data: livre } = await supabase
+        .from('books')
+        .select('id,title,owner_id,owner_email')
+        .eq('id', req.participant.book_id)
+        .maybeSingle();
+      if (!livre?.owner_email) return; // destinataire inconnu : on n'invente pas
+
+      const { data: contenus } = await supabase
+        .from('book_content_items')
+        .select('kind')
+        .eq('book_id', livre.id)
+        .eq('contribution_id', req.participant.id);
+
+      await emailsTransactionnels.envoyerNouvelleContribution({
+        to: livre.owner_email,
+        book: livre,
+        contributeur: data?.name || data?.email,
+        photos: (contenus || []).filter((c) => c.kind === 'photo').length,
+        souvenirs: (contenus || []).filter((c) => c.kind === 'texte').length
+      });
+    })().catch(() => {});
+
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });

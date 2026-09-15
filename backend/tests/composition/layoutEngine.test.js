@@ -312,12 +312,45 @@ describe('layoutEngine.compose — ambiance (mood)', () => {
     expect(withClassique.pages).toEqual(withoutMood.pages);
   });
 
-  it("'aere' produit davantage de pages que 'compact' pour le meme contenu tres riche en photos (rythme visiblement different)", () => {
-    const aere = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 1, mood: 'aere' });
-    const compact = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 1, mood: 'compact' });
+  // L'ecart de RYTHME ne se mesure que quand le contenu est assez abondant
+  // pour que le moteur ait le choix.
+  //
+  // Depuis le 2026-09-15, le moteur repartit le contenu sur le nombre de pages
+  // demande au lieu de l'empiler (voir buildPages, "REPARTIR plutot
+  // qu'EMPILER") : avec 12 photos pour 24 pages, TOUTES les ambiances sont
+  // contraintes a une photo par page et donnent forcement le meme nombre de
+  // pages — l'ancien jeu d'essai mesurait donc une difference que la regle de
+  // remplissage a, legitimement, supprimee. Avec assez de photos, l'ecart
+  // reapparait (verifie sur un livre reel : 34 pages en 'aere' contre 30 en
+  // 'compact' pour 47 photos).
+  const contenuAbondant = Array.from({ length: 60 }, (_, i) => photoItem(`pa${i}`, i));
+
+  it("'aere' produit davantage de pages que 'compact' quand le contenu est abondant (rythme visiblement different)", () => {
+    const aere = compose({ items: contenuAbondant, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 1, mood: 'aere' });
+    const compact = compose({ items: contenuAbondant, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 1, mood: 'compact' });
     expect(aere.pages.length).toBeGreaterThan(compact.pages.length);
     // Meme contenu place au total, seul le rythme (nombre de pages/densite) change.
     expect(placedItemIds(aere.pages)).toEqual(placedItemIds(compact.pages));
+  });
+
+  // Le corollaire de la regle de remplissage, et c'est ce que l'utilisateur a
+  // demande : « du moment que le nombre de photos depasse le nombre de pages,
+  // le mode automatique devrait pouvoir generer un livre entier ».
+  it('remplit le livre entier des qu il y a plus de photos que de pages, quelle que soit l ambiance', () => {
+    const pageCount = 24;
+    ['classique', 'aere', 'compact', 'chapitre', 'collage'].forEach((mood) => {
+      const r = compose({ items: contenuAbondant, template: TEMPLATE, layouts: LAYOUTS, pageCount, variant: 0, mood });
+      expect(r.pages.length).toBeGreaterThanOrEqual(pageCount);
+    });
+  });
+
+  // Et l'inverse : sans assez de contenu, le moteur n'invente rien. Une photo
+  // n'est JAMAIS repetee pour combler — le livre reste plus court, c'est
+  // assume (cahier des charges §2/§10).
+  it('ne repete jamais une photo pour combler : moins de contenu = moins de pages composees', () => {
+    const r = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 24, variant: 0, mood: 'classique' });
+    expect(r.pages.length).toBeLessThan(24);
+    expect(placedItemIds(r.pages)).toHaveLength(items.length);
   });
 
   it('un id de mood inconnu degrade silencieusement vers le comportement standard (aucune erreur, aucun contenu perdu)', () => {

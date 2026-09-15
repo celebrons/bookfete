@@ -73,8 +73,18 @@ function imgFrame(url, adjustment, caption) {
   const zoom = clamp(adjustment?.zoom, PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX) ?? 1;
   const cls = fitMode === 'contain' ? 'photo-frame is-contain' : 'photo-frame';
   const style = `--fx:${Math.round(focalX * 1000) / 10}%;--fy:${Math.round(focalY * 1000) / 10}%;--zoom:${zoom};`;
-  const legende = typeof caption === 'string' && caption.trim()
-    ? `<span class="photo-caption">${escapeHtml(caption.trim())}</span>`
+  // La legende accepte DEUX formes : une chaine (couleur par defaut) ou
+  // { texte, couleur }. L'ancienne forme reste valide telle quelle — les
+  // legendes ecrites avant l'ajout du noir s'affichent exactement pareil,
+  // sans migration de donnees.
+  const legendeTexte = typeof caption === 'string' ? caption : caption?.texte;
+  // Seulement DEUX couleurs, jamais une palette : une legende posee sur une
+  // photo doit rester lisible, et le seul vrai choix est "clair sur sombre"
+  // ou "sombre sur clair". Une valeur inconnue retombe sur le blanc, le
+  // comportement d'avant (decision produit 2026-09-15).
+  const legendeCouleur = (caption && typeof caption === 'object' && caption.couleur === 'noir') ? 'noir' : 'blanc';
+  const legende = typeof legendeTexte === 'string' && legendeTexte.trim()
+    ? `<span class="photo-caption is-${legendeCouleur}">${escapeHtml(legendeTexte.trim())}</span>`
     : '';
   return `<span class="${cls}"><img src="${escapeHtml(url || '')}" alt="" style="${style}" />${legende}</span>`;
 }
@@ -686,18 +696,32 @@ const BASE_CSS = `
     position: absolute;
     left: 0; right: 0; bottom: 0;
     padding: 5mm 4mm 3mm;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
-    color: #fff;
     font-family: 'Inter', -apple-system, sans-serif;
     font-size: 8.5pt;
     line-height: 1.3;
     letter-spacing: 0.01em;
+  }
+  /* Deux couleurs, et le VOILE SUIT LE TEXTE. C'est lui qui fait la
+     lisibilite, pas la couleur seule : un texte blanc sur une photo
+     surexposee disparait sans voile sombre, et un texte noir sur une photo
+     sombre disparait sans voile clair. Les deux sont indissociables — d'ou
+     un degrade par couleur, jamais une simple bascule de color. */
+  .photo-frame .photo-caption.is-blanc {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+    color: #fff;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  }
+  .photo-frame .photo-caption.is-noir {
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0));
+    color: #241f18;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
   }
   /* En mode "photo entiere", l'image ne touche plus les bords : la legende
      se poserait sur le blanc du cadre, ou le degrade sombre ferait une barre
      franche. Fond retire, texte en encre. */
-  .photo-frame.is-contain .photo-caption {
+  .photo-frame.is-contain .photo-caption,
+  .photo-frame.is-contain .photo-caption.is-blanc,
+  .photo-frame.is-contain .photo-caption.is-noir {
     background: none;
     color: #241f18;
     text-shadow: none;

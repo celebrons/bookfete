@@ -21,12 +21,20 @@ function AtelierGenerateModal({
   manualPagesCount = 0
 }) {
   const [selectedMood, setSelectedMood] = useState('classique');
-  // Le moteur automatique ne repete jamais une photo/un texte pour "boucher
-  // les trous" — un contenu trop maigre pour atteindre le palier minimum
-  // produirait donc un livre visiblement incomplet. Bloque plutot que de
-  // generer quand meme (l'estimation echouee/en cours ne bloque jamais,
-  // seule une estimation reelle et insuffisante le fait).
-  const insufficientContent = estimatedPages != null && estimatedPages < minPages;
+
+  // `estimatedPages` porte ici le nombre de pages REELLEMENT remplies dans ce
+  // livre (recommendPageCount.filledPages), pas la densite naturelle du
+  // contenu — les deux divergent depuis que le moteur repartit le contenu sur
+  // le livre entier au lieu de l'empiler (2026-09-15 : 47 photos tiennent en
+  // 21 pages mais en remplissent 30).
+  //
+  // Il ne reste donc des pages blanches que lorsqu'il n'y a VRAIMENT pas assez
+  // de contenu — et le moteur ne repete jamais une photo ni un souvenir pour
+  // combler. Ce n'est pas un blocage : un livre de 30 pages dont 13 composees
+  // reste parfaitement valide, c'est a l'utilisateur de decider.
+  const pagesRestantes = estimatedPages != null && estimatedPages < minPages
+    ? minPages - estimatedPages
+    : 0;
 
   // Echap pour fermer + bloque le defilement derriere, meme principe que la
   // loupe plein ecran de BookCoverDesignerLuxe.js.
@@ -90,23 +98,23 @@ function AtelierGenerateModal({
 
         {loadingEstimate && <p className="atelier-hint">Verification du contenu...</p>}
 
-        {insufficientContent && (
-          <div className="wizard-error">
-            Il faut ajouter du contenu pour arriver à {minPages} pages minimum (votre contenu actuel remplit
-            environ {estimatedPages} page{estimatedPages > 1 ? 's' : ''}) — Celebrons ne repete jamais une photo
-            ou un texte pour combler l'espace. Ajoutez des photos ou des souvenirs dans "Mes souvenirs", puis
-            reessayez.
-          </div>
+        {pagesRestantes > 0 && (
+          <p className="atelier-hint atelier-hint-warning">
+            Votre contenu remplit environ {estimatedPages} page{estimatedPages > 1 ? 's' : ''} sur les {minPages} de
+            votre livre : les {pagesRestantes} dernière{pagesRestantes > 1 ? 's' : ''} resteront blanche
+            {pagesRestantes > 1 ? 's' : ''}. Celebrons ne répète jamais une photo ni un souvenir pour combler
+            l'espace — vous pourrez les composer à la main, ou ajouter du contenu dans « Mes souvenirs ».
+          </p>
         )}
 
-        <div className={`atelier-mood-grid ${insufficientContent ? 'is-disabled' : ''}`}>
+        <div className="atelier-mood-grid">
           {ATELIER_MOODS.map((mood) => (
             <button
               key={mood.id}
               type="button"
               className={`atelier-mood-card ${selectedMood === mood.id ? 'is-selected' : ''}`}
               onClick={() => setSelectedMood(mood.id)}
-              disabled={isGenerating || insufficientContent}
+              disabled={isGenerating}
             >
               <span className="atelier-mood-card-label">{mood.label}</span>
               <span className="atelier-mood-card-description">{mood.description}</span>
@@ -124,7 +132,7 @@ function AtelierGenerateModal({
             type="button"
             className="btn btn-primary"
             onClick={() => onGenerate(selectedMood)}
-            disabled={isGenerating || insufficientContent || loadingEstimate}
+            disabled={isGenerating || loadingEstimate}
           >
             {isGenerating ? 'Generation...' : 'Generer'}
           </button>

@@ -14,6 +14,14 @@ import AddressAutocomplete from '../../common/AddressAutocomplete';
 // Purement facultatif — la saisie libre reste possible partout, et le service
 // n'est jamais bloquant.
 const FIELDS = [
+  // L'EMAIL EN PREMIER, et porte par la COMMANDE.
+  //
+  // C'est lui qui permet d'ecrire au client — confirmation, paiement,
+  // expedition — sans lui imposer de creer un compte avec mot de passe
+  // (decision produit 2026-09-15). C'est aussi la seule adresse dont dispose
+  // le webhook Stripe, qui n'est pas authentifie : sans elle, la
+  // confirmation de paiement n'a aucun destinataire.
+  { name: 'email', placeholder: 'Votre adresse e-mail', type: 'email' },
   { name: 'fullName', placeholder: 'Nom complet' },
   { name: 'line1', placeholder: 'Adresse', autocomplete: true },
   { name: 'line2', placeholder: 'Complement' },
@@ -43,6 +51,7 @@ function StepAddress({ address, onChangeField, locked, incomplete }) {
             key={field.name}
             className="input-luxe"
             name={field.name}
+            type={field.type || 'text'}
             value={address[field.name] || ''}
             onChange={onChangeField}
             placeholder={field.placeholder}
@@ -50,6 +59,10 @@ function StepAddress({ address, onChangeField, locked, incomplete }) {
           />
         )))}
       </div>
+      <p className="orders-disclaimer">
+        Nous utiliserons votre adresse e-mail pour confirmer votre commande, vous envoyer les mises à jour et vous
+        permettre de retrouver votre livre.
+      </p>
       {incomplete && (
         <p className="orders-disclaimer">
           Nom, adresse, code postal, ville et pays sont necessaires pour l'expedition.

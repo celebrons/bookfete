@@ -213,6 +213,10 @@ function AtelierBookView({
   // n'apparait et le comportement d'avant est inchange).
   onAdjustCoverPhoto,
   coverHasPhoto,
+  // Sauts directs aux deux extremites du livre. Facultatifs : sans eux, la
+  // barre se comporte exactement comme avant.
+  onGoToCover,
+  onGoToBackCover,
   selectedSidebarItem
 }) {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -353,6 +357,22 @@ function AtelierBookView({
       <div className="atelier-book-nav">
         <div className="atelier-book-nav-side" aria-hidden="true" />
         <div className="atelier-book-nav-controls">
+          {/* Sauts directs aux deux extremites. Sans eux, atteindre la 4e d'un
+              livre de 30 pages demandait 16 clics, et autant pour revenir
+              (retour utilisateur 2026-09-15 : « on est obliges de feuilleter
+              tout l'album »). La pellicule du bas offre deja ces deux cibles,
+              mais elle defile : sur un livre long elles en sortent. */}
+          {onGoToCover && (
+            <button
+              type="button"
+              className="btn btn-outline atelier-book-nav-jump"
+              onClick={onGoToCover}
+              disabled={!canGoPrevious}
+              title="Aller à la couverture"
+            >
+              ⇤ Couverture
+            </button>
+          )}
           <button type="button" className="btn btn-outline" onClick={onPrevious} disabled={!canGoPrevious}>
             ← precedente
           </button>
@@ -362,6 +382,17 @@ function AtelierBookView({
           <button type="button" className="btn btn-outline" onClick={onNext} disabled={!canGoNext}>
             suivante →
           </button>
+          {onGoToBackCover && (
+            <button
+              type="button"
+              className="btn btn-outline atelier-book-nav-jump"
+              onClick={onGoToBackCover}
+              disabled={!canGoNext}
+              title="Aller à la 4e de couverture"
+            >
+              4e ⇥
+            </button>
+          )}
         </div>
         {/* Deplace hors du coin de page (retour utilisateur : "le rendre
             plus visible/permanent renforcerait la confiance avant Terminer

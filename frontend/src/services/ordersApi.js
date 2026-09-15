@@ -139,3 +139,38 @@ export const sendOrderToGelatoTest = (orderId) => request(`/orders/${orderId}/ge
 export const getOrderTracking = (orderId) => request(`/orders/${orderId}/tracking`);
 
 export const getApiBaseUrl = buildApiBaseUrl;
+
+// Catalogue des formats d'impression : dimensions reelles et prix de depart.
+// PUBLIQUE (aucune session requise) : le format se choisit dans le parcours de
+// creation, avant toute authentification. Le prix vient du serveur et non
+// d'une table recopiee ici — il est calcule avec la meme formule que celui
+// facture a la commande, donc les deux ne peuvent pas diverger.
+export const listPrintFormats = async () => {
+  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}/orders/formats`);
+  if (!response.ok) throw new Error('Formats indisponibles');
+  return response.json();
+};
+
+// --- Emails transactionnels -------------------------------------------------
+// `enabled` dit si une cle Resend est reellement posee cote serveur : il faut
+// pouvoir l'afficher SANS envoyer d'email pour le savoir.
+export const getEmailStatus = async () => {
+  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}/orders/email/status`, {
+    headers: await buildHeaders()
+  });
+  if (!response.ok) throw new Error('Etat des emails indisponible');
+  return response.json();
+};
+
+// Envoie un VRAI email d'essai, a l'adresse du compte connecte et a elle
+// seule (le serveur n'accepte aucune adresse libre : ce serait un relais
+// ouvert). Declenche explicitement par l'utilisateur.
+export const sendTestEmail = async () => {
+  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}/orders/email/test`, {
+    method: 'POST',
+    headers: await buildHeaders()
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "L'envoi a echoue.");
+  return data;
+};

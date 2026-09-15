@@ -19,3 +19,111 @@
   cursor: pointer;
 }
 .ab-back-link:hover { color: var(--ink); }
+
+/* --- Choix du format, avant l'atelier (2026-09-15) ----------------------
+   Le format n'est pas un reglage cosmetique : il decide de la densite de
+   composition, de la taille reelle des cadres photo — donc de la resolution
+   necessaire — et du prix. Il se choisit donc AVANT de composer, et son prix
+   est visible des cet ecran. */
+
+.ab-step-hint {
+  margin: -6px 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-light, #7a7266);
+}
+
+.format-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.format-choice-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px 16px 16px;
+  border: 1px solid var(--border-soft, #e3ddd0);
+  border-radius: 14px;
+  background: var(--white, #fffdf8);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.format-choice-card:hover {
+  border-color: var(--gold, #c9a35f);
+  transform: translateY(-2px);
+}
+
+.format-choice-card.is-selected {
+  border-color: var(--gold, #c9a35f);
+  box-shadow: 0 0 0 2px rgba(201, 163, 95, 0.32);
+}
+
+/* La recommandation se voit AVANT la selection : c'est un conseil, pas un
+   etat. Une carte recommandee mais non choisie garde donc son liseré. */
+.format-choice-card.is-recommended { border-color: rgba(201, 163, 95, 0.55); }
+
+.format-choice-badge {
+  position: absolute;
+  top: -9px;
+  left: 14px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--gold, #c9a35f);
+  color: #241f18;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.format-choice-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink, #241f18);
+}
+
+.format-choice-size {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-light, #7a7266);
+  font-variant-numeric: tabular-nums;
+}
+
+.format-choice-pitch {
+  margin: 6px 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink, #241f18);
+  opacity: 0.85;
+}
+
+.format-choice-price {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink, #241f18);
+  font-variant-numeric: tabular-nums;
+}
+
+.format-choice-price small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-light, #7a7266);
+}
+
+@media (max-width: 720px) {
+  .format-choice-grid { grid-template-columns: 1fr; }
+  .format-choice-card { padding: 16px 14px 14px; }
+  .format-choice-pitch { margin-bottom: 8px; }
+}

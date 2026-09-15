@@ -1089,8 +1089,9 @@ export default function BookAtelierLuxe() {
   // Legende d'UNE photo. Une chaine vide retire la legende (et non une
   // legende vide) : c'est ainsi qu'on l'efface, sans bouton supplementaire.
   // La sauvegarde automatique s'occupe du reste, comme pour le cadrage.
-  const handleSaveCaption = (itemId, texte) => {
+  const handleSaveCaption = (itemId, texte, couleur) => {
     const valeur = (texte || '').trim();
+    const teinte = couleur === 'noir' ? 'noir' : 'blanc';
     setDraftPhotoCaptions((previous) => {
       if (!valeur) {
         if (!previous[itemId]) return previous;
@@ -1098,8 +1099,13 @@ export default function BookAtelierLuxe() {
         delete next[itemId];
         return next;
       }
-      if (previous[itemId] === valeur) return previous;
-      return { ...previous, [itemId]: valeur };
+      const actuelle = previous[itemId];
+      const inchangee = actuelle
+        && typeof actuelle === 'object'
+        && actuelle.texte === valeur
+        && actuelle.couleur === teinte;
+      if (inchangee) return previous;
+      return { ...previous, [itemId]: { texte: valeur, couleur: teinte } };
     });
   };
 
@@ -1365,7 +1371,12 @@ export default function BookAtelierLuxe() {
     setLoadingEstimate(true);
     try {
       const recommendation = await getRecommendedPageCount(book.id);
-      setEstimatedPages(recommendation?.estimatedPages ?? null);
+      // filledPages : combien de pages seront REELLEMENT remplies dans CE
+      // livre. `estimatedPages` repond a une autre question (« sur combien de
+      // pages ce contenu tient-il naturellement ? ») et les deux divergent
+      // depuis que le moteur repartit le contenu sur le livre entier : 47
+      // photos tiennent en 21 pages mais en remplissent 30.
+      setEstimatedPages(recommendation?.filledPages ?? recommendation?.estimatedPages ?? null);
     } catch (_err) {
       // Non bloquant : en cas d'echec de l'estimation, on ne bloque pas la
       // generation (mieux vaut laisser essayer que bloquer sans raison sure).
@@ -1689,6 +1700,21 @@ export default function BookAtelierLuxe() {
     />
   ) : null;
 
+  // Libelle du format courant, pour l'en-tete. FORMAT_DIMENSIONS_MM est la
+  // meme table que celle utilisee par les miniatures et le controle qualite :
+  // une seule source, pas un troisieme jeu de dimensions.
+  const formatCourant = (() => {
+    const id = book?.print_format;
+    if (!id) return null;
+    const dims = FORMAT_DIMENSIONS_MM[id];
+    if (!dims) return null;
+    const noms = { livret: 'Livret', standard: 'Standard', luxe: 'Luxe' };
+    return {
+      nom: noms[id] || id,
+      taille: `${Math.round(dims.widthMm / 10)} × ${Math.round(dims.heightMm / 10)} cm`
+    };
+  })();
+
   const navLabel = viewKind === 'cover'
     ? 'Couverture'
     : viewKind === 'back-cover'
@@ -1715,7 +1741,17 @@ export default function BookAtelierLuxe() {
             au tableau de bord. */}
         <Link to="/dashboard" className="atelier-back-link">← Retour au tableau de bord</Link>
         <h1 className="atelier-title">{book.title || 'Mon livre'}</h1>
-        <span className="atelier-header-note">Atelier de creation personnalisee</span>
+        {/* Le FORMAT reste visible pendant toute la composition : il decide de
+            la taille reelle des cadres photo — donc de la resolution
+            necessaire — et du prix. Le choisir au depart puis l'oublier
+            reviendrait a composer sans savoir ce qu'on fabrique
+            (decision produit 2026-09-15). Les dimensions viennent de la meme
+            table que le rendu. */}
+        <span className="atelier-header-note">
+          {formatCourant
+            ? `${formatCourant.nom} · ${formatCourant.taille}`
+            : 'Atelier de creation personnalisee'}
+        </span>
         <button
           type="button"
           className="btn btn-outline atelier-help-btn"
@@ -1837,6 +1873,8 @@ export default function BookAtelierLuxe() {
             onSelectSide={setSelectedSide}
             onPrevious={() => canGoPrevious && goToView(viewIndex - 1)}
             onNext={() => canGoNext && goToView(viewIndex + 1)}
+            onGoToCover={() => goToView(0)}
+            onGoToBackCover={() => goToView(lastViewIndex)}
             canGoPrevious={canGoPrevious}
             canGoNext={canGoNext}
             navLabel={navLabel}
