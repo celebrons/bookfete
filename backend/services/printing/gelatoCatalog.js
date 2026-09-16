@@ -89,6 +89,29 @@ function isValidGelatoPageCount(pageCount, printFormat) {
 // Arrondit au palier imprimable valide le plus proche (toujours vers le
 // HAUT en cas d'egalite ou de valeur hors bornes basse — on ne coupe jamais
 // de contenu pour rentrer dans un palier inferieur).
+// Pages de garde : la PREMIERE et la DERNIERE page interieure d un livre
+// Gelato sont blanches — ce sont les gardes collees aux plats de la
+// couverture, non composables.
+//
+// Etabli le 2026-09-16 sur le gabarit officiel telecharge par le client
+// pour un livre declare a 32 pages : 33 pages en tout, la 1re etant la
+// couverture enveloppante, la 2e blanche, puis 30 pages a composer, puis
+// une derniere blanche. Donc pages interieures = nombre DECLARE, et pages
+// composables = declare - 2.
+//
+// C est ce qui explique le rattrapage manuel du client (« il a fallu lui
+// dire 32 pages pour qu il accepte ») : nous declarions le nombre de pages
+// COMPOSEES, sans compter les gardes.
+const GELATO_ENDPAPER_PAGES = 2;
+
+// Nombre de pages a DECLARER a Gelato pour un livre dont on a compose
+// contentPages pages. A utiliser partout plutot que clamp(contentPages),
+// qui oubliait les gardes.
+function resolveGelatoPageCount(contentPages, printFormat) {
+  const pages = Number(contentPages) || 0;
+  return clampToValidGelatoPageCount(pages + GELATO_ENDPAPER_PAGES, printFormat);
+}
+
 function clampToValidGelatoPageCount(pageCount, printFormat) {
   const product = resolveGelatoProduct(printFormat);
   const pages = Number(pageCount) || 0;
@@ -103,5 +126,7 @@ module.exports = {
   GELATO_PRODUCT_MAP,
   resolveGelatoProduct,
   isValidGelatoPageCount,
-  clampToValidGelatoPageCount
+  clampToValidGelatoPageCount,
+  resolveGelatoPageCount,
+  GELATO_ENDPAPER_PAGES
 };

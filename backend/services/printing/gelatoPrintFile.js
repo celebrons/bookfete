@@ -11,13 +11,20 @@
 //     pour du 21x28cm, soit 3mm de fond perdu par cote — confirme par un
 //     vrai message de rejet Gelato : "Product requires 216x286mm, content
 //     area 210x280mm").
-//   - N (nombre de pages interieures) doit atteindre EXACTEMENT
-//     dims.pagesCount (le meme total "+4" que cover-dimensions calcule
-//     deja pour la tranche — confirme empiriquement : 28 pages reelles
-//     envoyees a Gelato, ce validateur exige 32 interieures + 1 couverture
-//     = 33 au total). Complete par des pages blanches en fin de document
-//     UNIQUEMENT (jamais avant le contenu reel, pour ne pas decaler la
-//     numerotation deja gravee dans les captures).
+//   - Le cahier interieur compte EXACTEMENT `pageCount` pages, dont la
+//     PREMIERE et la DERNIERE sont blanches : ce sont les gardes, collees
+//     aux plats de la couverture. Il reste donc `pageCount - 2` pages
+//     composables.
+//
+//     Corrige le 2026-09-16 sur le gabarit officiel telecharge par le
+//     client (declare a 32 pages : 33 pages en tout = 1 couverture + 32
+//     interieures, dont 30 composables). On visait auparavant
+//     dims.pagesCount, soit declare + 4, en ajoutant les blanches a la fin
+//     seulement : le fichier portait 4 pages de trop et aucune garde en
+//     tete. dims.pagesCount ne compte pas les pages interieures — il ajoute
+//     les 4 pages de la couverture (verifie sur les 3 formats : la reponse
+//     vaut toujours exactement entree + 4, ce qui exclut un arrondi a un
+//     palier imprimable).
 //
 // REMPLACE l'approche precedente (2 fichiers separes, type:'default' +
 // type:'cover', voir gelatoClient.js) : cette derniere etait acceptee SANS
@@ -33,6 +40,7 @@ const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const pdfService = require('../composition/pdfService');
 const { composeGelatoWraparoundCover } = require('./gelatoCoverComposer');
+const { GELATO_ENDPAPER_PAGES } = require('./gelatoCatalog');
 
 const MM_TO_PT = 72 / 25.4;
 // Confirme empiriquement le 2026-09-10 via un vrai rejet du validateur
@@ -87,19 +95,25 @@ async function buildGelatoPrintReadyPdf({
     onProgress: ({ done, total }) => report('pages', done, total)
   });
 
-  // dims.pagesCount = le VRAI total interieur exige par Gelato pour ce
-  // pageCount (meme convention "+4" deja observee sur cover-dimensions,
-  // desormais confirmee necessaire aussi pour le fichier lui-meme, pas
-  // seulement pour le calcul de la tranche).
-  const targetInteriorCount = dims.pagesCount || realPages.length;
-  const missing = Math.max(0, targetInteriorCount - interiorImages.length);
-  if (missing > 0) {
-    const blankPage = { page_index: interiorImages.length, layout_id: null, content: {} };
-    const [blankImage] = await pdfService.capturePagesAsImages({
-      book, pages: [blankPage], items, layouts, format, scale, bleedMm: GELATO_BLEED_MM
-    });
-    for (let i = 0; i < missing; i += 1) interiorImages.push(blankImage);
-  }
+  // Le cahier interieur fait EXACTEMENT `pageCount` pages, garde blanche en
+  // tete et garde blanche en fin (voir l'en-tete de ce fichier). Une seule
+  // page blanche est rendue puis reutilisee : elles sont identiques.
+  const targetInteriorCount = Math.max(pageCount, realPages.length + GELATO_ENDPAPER_PAGES);
+  const [blankImage] = await pdfService.capturePagesAsImages({
+    book,
+    pages: [{ page_index: 0, layout_id: null, content: {} }],
+    items,
+    layouts,
+    format,
+    scale,
+    bleedMm: GELATO_BLEED_MM
+  });
+
+  // Garde de tete, puis le contenu, puis autant de blanches que necessaire
+  // pour atteindre le total declare (au minimum la garde de fin).
+  interiorImages.unshift(blankImage);
+  const missing = Math.max(1, targetInteriorCount - interiorImages.length);
+  for (let i = 0; i < missing; i += 1) interiorImages.push(blankImage);
 
   const interiorWidthPt = (format.trimWidthMm + GELATO_BLEED_MM * 2) * MM_TO_PT;
   const interiorHeightPt = (format.trimHeightMm + GELATO_BLEED_MM * 2) * MM_TO_PT;
@@ -135,7 +149,8 @@ async function buildGelatoPrintReadyPdf({
       height: format.trimHeightMm + GELATO_BLEED_MM * 2
     },
     realInteriorPages: realPages.length,
-    paddedInteriorPages: missing
+    // Toutes les blanches du cahier : la garde de tete + celles de la fin.
+    paddedInteriorPages: missing + 1
   };
 }
 

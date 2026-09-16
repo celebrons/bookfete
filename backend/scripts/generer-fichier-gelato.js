@@ -20,7 +20,7 @@ const supabase = require('../config/supabase');
 const bookContentService = require('../services/composition/bookContentService');
 const templateCatalog = require('../services/composition/templateCatalog');
 const { buildGelatoPrintReadyPdf } = require('../services/printing/gelatoPrintFile');
-const { resolveGelatoProduct, clampToValidGelatoPageCount } = require('../services/printing/gelatoCatalog');
+const { resolveGelatoProduct, resolveGelatoPageCount } = require('../services/printing/gelatoCatalog');
 const { resolveCoverFormat } = require('../services/composition/coverFormat');
 const { resolveFormatDensity } = require('../services/composition/formatDensity');
 
@@ -56,7 +56,7 @@ const recherche = args.filter((a, i) => !a.startsWith('--') && i !== iSortie + 1
   const formatId = livre.print_format;
   const format = { formatId, ...resolveCoverFormat(formatId), ...resolveFormatDensity(formatId) };
   const gelatoProduct = resolveGelatoProduct(formatId);
-  const pageCount = clampToValidGelatoPageCount(interiorPages.length, formatId);
+  const pageCount = resolveGelatoPageCount(interiorPages.length, formatId);
 
   const outputPath = sortieDemandee
     ? path.resolve(sortieDemandee)
@@ -88,7 +88,7 @@ const recherche = args.filter((a, i) => !a.startsWith('--') && i !== iSortie + 1
   console.log(`  fichier            : ${built.outputPath}`);
   console.log(`  poids              : ${(taille / 1024 / 1024).toFixed(1)} Mo`);
   console.log(`  pages              : ${built.totalPages} (1 couverture enveloppante + ${built.totalPages - 1} interieures)`);
-  console.log(`  pages completees   : ${built.paddedInteriorPages} vierges ajoutees a la fin`);
+  console.log(`  pages blanches     : ${built.paddedInteriorPages} (gardes de tete et de fin)`);
   console.log(`  couverture         : ${built.coverSizeMm.width} x ${built.coverSizeMm.height} mm (fond perdu compris)`);
   console.log(`  interieur          : ${built.interiorSizeMm.width} x ${built.interiorSizeMm.height} mm (fond perdu compris)`);
   console.log('');

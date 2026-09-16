@@ -27,7 +27,7 @@ const bookContentService = require('../composition/bookContentService');
 const templateCatalog = require('../composition/templateCatalog');
 const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../composition/coverFormat');
 const { resolveFormatDensity } = require('../composition/formatDensity');
-const { resolveGelatoProduct, clampToValidGelatoPageCount } = require('./gelatoCatalog');
+const { resolveGelatoProduct, resolveGelatoPageCount } = require('./gelatoCatalog');
 const { buildGelatoPrintReadyPdf } = require('./gelatoPrintFile');
 const { uploadPrintFile } = require('./printFileStorage');
 const { resolveCountryIso2 } = require('./countryCodes');
@@ -95,7 +95,7 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
 
     const format = resolveRenderFormat(book.print_format);
     const gelatoProduct = resolveGelatoProduct(book.print_format);
-    const pageCount = clampToValidGelatoPageCount(interiorPages.length, book.print_format);
+    const pageCount = resolveGelatoPageCount(interiorPages.length, book.print_format);
 
     const outputPath = require('path').join(
       require('../composition/pdfService').PDF_PREVIEW_DIR,

@@ -66,3 +66,40 @@ describe('gelatoCatalog', () => {
     });
   });
 });
+
+// Pagination declaree a Gelato : les GARDES comptent.
+//
+// Etabli le 2026-09-16 sur le gabarit officiel telecharge par le client pour
+// un livre declare a 32 pages : 33 pages en tout (1 couverture enveloppante,
+// 1 blanche, 30 a composer, 1 blanche). Donc composables = declare - 2.
+//
+// Nous declarions le nombre de pages COMPOSEES, d'ou le rattrapage manuel du
+// client : « il a fallu lui dire 32 pages pour qu'il accepte » alors que nous
+// envoyions 30.
+describe('resolveGelatoPageCount — les pages de garde comptent', () => {
+  const { resolveGelatoPageCount, GELATO_ENDPAPER_PAGES } = require('../../services/printing/gelatoCatalog');
+
+  it('un livre de 30 pages composees se declare a 32 — le cas reel du client', () => {
+    expect(resolveGelatoPageCount(30, 'luxe')).toBe(32);
+  });
+
+  it('ajoute exactement deux pages de garde', () => {
+    expect(GELATO_ENDPAPER_PAGES).toBe(2);
+    expect(resolveGelatoPageCount(40, 'standard')).toBe(42);
+  });
+
+  it('respecte le pas de 2 quand le nombre de pages composees est impair', () => {
+    // 29 + 2 = 31, qui n'est pas un palier valide : on monte a 32.
+    expect(resolveGelatoPageCount(29, 'luxe')).toBe(32);
+  });
+
+  it('reste borne par le minimum et le maximum du produit', () => {
+    expect(resolveGelatoPageCount(0, 'standard')).toBe(28);
+    expect(resolveGelatoPageCount(9999, 'standard')).toBe(200);
+  });
+
+  it('ne se confond pas avec clampToValidGelatoPageCount, qui ignore les gardes', () => {
+    expect(clampToValidGelatoPageCount(30, 'luxe')).toBe(30);
+    expect(resolveGelatoPageCount(30, 'luxe')).toBe(32);
+  });
+});

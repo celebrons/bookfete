@@ -30,7 +30,7 @@ const bookContentService = require('../services/composition/bookContentService')
 const templateCatalog = require('../services/composition/templateCatalog');
 const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../services/composition/coverFormat');
 const { resolveFormatDensity } = require('../services/composition/formatDensity');
-const { resolveGelatoProduct, clampToValidGelatoPageCount } = require('../services/printing/gelatoCatalog');
+const { resolveGelatoProduct, resolveGelatoPageCount } = require('../services/printing/gelatoCatalog');
 const { buildGelatoPrintReadyPdf, GELATO_BLEED_MM } = require('../services/printing/gelatoPrintFile');
 const { uploadPrintFile } = require('../services/printing/printFileStorage');
 const gelatoClient = require('../services/printing/gelatoClient');
@@ -81,7 +81,7 @@ async function main() {
   }
   const format = resolveRenderFormat(effectiveFormatId);
   const gelatoProduct = resolveGelatoProduct(effectiveFormatId);
-  const pageCount = clampToValidGelatoPageCount(interiorPages.length, effectiveFormatId);
+  const pageCount = resolveGelatoPageCount(interiorPages.length, effectiveFormatId);
   console.log(`Format: ${format.formatId} -> Gelato productUid=${gelatoProduct.productUid}`);
   console.log(`Pages reelles: ${interiorPages.length} (declarees a l'ordre: ${pageCount})`);
 
