@@ -20,6 +20,7 @@ const coverComposer = require('../services/composition/coverComposer');
 const pdfService = require('../services/composition/pdfService');
 const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../services/composition/coverFormat');
 const { resolveFormatDensity } = require('../services/composition/formatDensity');
+const emailsTransactionnels = require('../services/email/transactionalEmails');
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
@@ -480,6 +481,37 @@ function getPdfCompletionTargetStatus(orderType) {
   return 'pdf_ready';
 }
 
+// Prevenir que le PDF est pret. La commande liee (si elle existe) porte
+// parfois une adresse de livraison differente du compte : c'est elle qui
+// prime, comme pour tous les autres emails de commande.
+async function notifierPdfPret(job) {
+  const bookId = cleanText(job?.bookId, 120);
+  if (!bookId) return;
+
+  const { data: book } = await supabase
+    .from('books')
+    .select('id, title, page_count')
+    .eq('id', bookId)
+    .single();
+
+  let order = null;
+  if (job.orderId) {
+    const { data } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', job.orderId)
+      .eq('owner_id', job.ownerId)
+      .single();
+    order = data || null;
+  }
+
+  await emailsTransactionnels.envoyerPdfPret({
+    order,
+    book: book || { id: bookId },
+    ownerEmail: job.ownerEmail
+  });
+}
+
 async function syncOrderWithPdfJobResult({ job, outcome, errorMessage = '' }) {
   const orderId = cleanText(job?.orderId, 120);
   if (!orderId) {
@@ -658,7 +690,11 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
         ownerId: req.user.id
       });
 
-      if (linkedJob && ['queued', 'rendering', 'ready'].includes(String(linkedJob.status || '').toLowerCase())) {
+      if (
+        linkedJob
+        && ['queued', 'rendering', 'ready'].includes(String(linkedJob.status || '').toLowerCase())
+        && !isPdfExportJobStalled(linkedJob)
+      ) {
         return res.status(202).json({
           jobId: linkedJob.jobId,
           status: linkedJob.status,
@@ -678,10 +714,15 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
         db,
         bookId,
         ownerId: req.user.id,
+        ownerEmail: req.user.email || null,
         requestedJobId: linkedJobId || ''
       });
 
-      if (recoveredJob && ['queued', 'rendering', 'ready'].includes(String(recoveredJob.status || '').toLowerCase())) {
+      if (
+        recoveredJob
+        && ['queued', 'rendering', 'ready'].includes(String(recoveredJob.status || '').toLowerCase())
+        && !isPdfExportJobStalled(recoveredJob)
+      ) {
         return res.status(202).json({
           jobId: recoveredJob.jobId,
           status: recoveredJob.status,
@@ -699,9 +740,22 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       jobId,
       bookId,
       ownerId: req.user.id,
+      // Retenue au moment de la demande : le job survit a la fermeture de
+      // l'onglet, et c'est la seule adresse connue a coup sur au moment de
+      // prevenir que le PDF est pret.
+      ownerEmail: req.user.email || null,
       orderId: targetOrder?.id || null,
       status: 'queued',
       createdAt,
+      // Avancement REEL, en pages. Un rendu prend plusieurs minutes (mesure :
+      // ~8 s par page) : sans ce chiffre, l'ecran ne peut afficher qu'une
+      // animation decorative, et l'utilisateur ne sait pas s'il reste dix
+      // secondes ou cinq minutes — ni si quelque chose est bloque.
+      // Meme forme que la progression de l'envoi Gelato (routes/orders.js) :
+      // le meme composant d'affichage sert aux deux, et `updatedAt` vient du
+      // SERVEUR pour que l'estimation du temps restant reste juste meme si
+      // une reponse de sondage arrive en retard.
+      progress: { phase: 'starting', done: 0, total: 0, updatedAt: createdAt },
       startedAt: null,
       completedAt: null,
       error: null,
@@ -772,6 +826,7 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
         db,
         bookId,
         ownerId: req.user.id,
+        ownerEmail: req.user.email || null,
         requestedJobId: jobId
       });
     }
@@ -792,9 +847,29 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
       });
     }
 
+    // Un rendu qui n'avance plus est declare echoue, pas laisse en
+    // 'rendering' : sinon le client sonde indefiniment un travail mort et
+    // l'utilisateur n'a aucun moyen de comprendre ce qui se passe. Une fois
+    // l'echec annonce, le bouton « Régénérer le PDF » repart sur un job neuf
+    // (isPdfExportJobStalled est aussi verifie a la reutilisation).
+    const enlise = isPdfExportJobStalled(job);
+    if (enlise) {
+      job.status = 'failed';
+      job.error = 'La fabrication du PDF s’est interrompue. Relancez-la.';
+      pdfExportJobs.set(job.jobId, job);
+      try {
+        await syncOrderWithPdfJobResult({ job, outcome: 'failed', errorMessage: job.error });
+      } catch (syncError) {
+        console.error('Erreur sync commande PDF enlise:', syncError);
+      }
+    }
+
     return res.json({
       jobId: job.jobId,
       status: job.status,
+      // Progression reelle du rendu : une page capturee = une unite. Le
+      // total est connu des la premiere page, donc la barre ne saute pas.
+      progress: job.progress || null,
       createdAt: job.createdAt,
       startedAt: job.startedAt,
       completedAt: job.completedAt,
@@ -835,6 +910,7 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
         db,
         bookId,
         ownerId: req.user.id,
+        ownerEmail: req.user.email || null,
         requestedJobId: jobId
       });
     }
@@ -1731,6 +1807,28 @@ function createPdfExportJobId() {
   return crypto.randomBytes(10).toString('hex');
 }
 
+// Un rendu qui n'avance plus. Sans ce garde-fou, un job reste indefiniment
+// en 'rendering' apres, par exemple, la mort du navigateur headless : la
+// route d'export le REUTILISE (voir plus haut), donc l'utilisateur relance
+// et retombe sur le meme job mort — exactement le symptome signale le
+// 2026-09-15 (« il est bloque, relance depuis 15 minutes »).
+//
+// On mesure l'inactivite, pas la duree totale : un livre de 200 pages a le
+// droit de durer longtemps tant que le compteur de pages avance.
+const PDF_JOB_STALL_MS = 8 * 60 * 1000;
+
+function isPdfExportJobStalled(job) {
+  if (!job) return false;
+  const statut = String(job.status || '').toLowerCase();
+  if (statut !== 'queued' && statut !== 'rendering') return false;
+
+  const dernierSigneDeVie = Date.parse(
+    job.progress?.updatedAt || job.startedAt || job.createdAt || ''
+  );
+  if (Number.isNaN(dernierSigneDeVie)) return false;
+  return Date.now() - dernierSigneDeVie > PDF_JOB_STALL_MS;
+}
+
 function getOwnedPdfExportJob({ jobId, bookId, ownerId }) {
   const job = pdfExportJobs.get(jobId);
   if (!job) {
@@ -1787,6 +1885,7 @@ async function recoverMissingPdfExportJob({
   db = supabase,
   bookId,
   ownerId,
+  ownerEmail = null,
   requestedJobId = ''
 }) {
   const normalizedRequestedJobId = cleanText(requestedJobId, 120);
@@ -1897,9 +1996,11 @@ async function recoverMissingPdfExportJob({
     jobId: recoveredJobId,
     bookId,
     ownerId,
+    ownerEmail,
     orderId: targetOrder.id,
     status: 'queued',
     createdAt,
+    progress: { phase: 'starting', done: 0, total: 0, updatedAt: createdAt },
     startedAt: null,
     completedAt: null,
     error: null,
@@ -1959,7 +2060,23 @@ async function processPdfExportJob({
   try {
     const files = await generateFinalBookPdfFiles({
       book,
-      jobId
+      jobId,
+      // Jamais bloquant : un rapport d'avancement qui echoue ne doit pas
+      // faire echouer un rendu de plusieurs minutes.
+      onProgress: ({ phase, done, total }) => {
+        const enCours = pdfExportJobs.get(jobId);
+        if (!enCours) return;
+        enCours.progress = {
+          // La capture des pages ne se nomme pas elle-meme : c'est
+          // l'appelant qui sait de quelle phase il s'agit (meme convention
+          // que services/printing/gelatoPrintFile.js).
+          phase: phase || 'pages',
+          done,
+          total,
+          updatedAt: new Date().toISOString()
+        };
+        pdfExportJobs.set(jobId, enCours);
+      }
     });
     const readyJob = pdfExportJobs.get(jobId);
     if (!readyJob) {
@@ -1978,6 +2095,15 @@ async function processPdfExportJob({
       });
     } catch (syncError) {
       console.error('Erreur sync commande PDF ready:', syncError);
+    }
+
+    // L'interface invite l'utilisateur a fermer la page pendant la
+    // fabrication : cet email est la contrepartie de cette invitation.
+    // Jamais bloquant — un PDF pret le reste meme si l'email ne part pas.
+    try {
+      await notifierPdfPret(readyJob);
+    } catch (emailError) {
+      console.error('Erreur email PDF pret:', emailError);
     }
   } catch (error) {
     const failedJob = pdfExportJobs.get(jobId);
@@ -2041,7 +2167,7 @@ function deletePdfExportFiles(job) {
 // page par page (pdfService.js). Remplace l'ancien pipeline chapitres/HTML
 // (generateFinalBookPdfFileFromHtml/-Legacy ci-dessous, desormais orphelins
 // mais laisses en place — voir leur commentaire).
-async function generateFinalBookPdfFiles({ book, jobId }) {
+async function generateFinalBookPdfFiles({ book, jobId, onProgress }) {
   const safeBookName = normalizePdfFileName(cleanText(book?.title, 120), 'livre');
   const [interiorPages, items, layouts, template] = await Promise.all([
     // listPagesForRender, pas listPages : voir routes/composition.js
@@ -2062,6 +2188,9 @@ async function generateFinalBookPdfFiles({ book, jobId }) {
     items,
     layouts,
     format,
+    // capturePagesAsImages compte les pages CAPTUREES : c'est bien ce que
+    // l'utilisateur attend, et l'encodage suit en parallele.
+    onProgress,
     fileBaseName: `${safeBookName}-${jobId}-livre-final`
   });
 
@@ -4274,3 +4403,8 @@ function escapeHtml(value) {
 }
 
 module.exports = router;
+
+// Expose SEULEMENT pour les tests : simuler un rendu enlise demande de
+// vieillir un job sans attendre huit minutes. Rien dans l'application ne
+// lit cette propriete.
+module.exports.__pdfExportJobsForTests = pdfExportJobs;

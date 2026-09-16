@@ -29,6 +29,14 @@ const lienCommande = (orderId) => {
   return base && orderId ? `${base}/orders` : null;
 };
 
+// Le PDF se telecharge depuis l'ecran de suivi du parcours de commande,
+// pas depuis la liste des commandes : on envoie donc la ou se trouve
+// reellement le bouton.
+const lienTelechargementPdf = (bookId) => {
+  const base = siteUrl();
+  return base && bookId ? `${base}/book/${bookId}/checkout` : null;
+};
+
 const lienLivre = (bookId) => {
   const base = siteUrl();
   return base && bookId ? `${base}/book/${bookId}/atelier` : null;
@@ -87,6 +95,21 @@ async function envoyerPaiementRecu({ order, ownerEmail }) {
     totalCents: order?.total_cents,
     lien: lienCommande(order?.id)
   }), destinataireDe({ order, ownerEmail }), 'paiement recu');
+}
+
+/**
+ * PDF pret.
+ *
+ * Le rendu dure plusieurs minutes : l'interface invite l'utilisateur a
+ * fermer la page pendant ce temps. Cet email est la contrepartie de cette
+ * invitation — sans lui, la promesse serait fausse.
+ */
+async function envoyerPdfPret({ order, book, ownerEmail }) {
+  return envoyer(gabarits.pdfPret({
+    titreLivre: book?.title,
+    pages: book?.page_count,
+    lien: lienTelechargementPdf(book?.id || order?.book_id)
+  }), destinataireDe({ order, ownerEmail }), 'pdf pret');
 }
 
 /**
@@ -181,6 +204,7 @@ module.exports = {
   envoyerLienLivre,
   envoyerCommandeConfirmee,
   envoyerPaiementRecu,
+  envoyerPdfPret,
   envoyerEtapeFabrication,
   envoyerEssai,
   isEmailEnabled,

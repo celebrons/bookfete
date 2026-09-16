@@ -68,7 +68,7 @@
 }
 
 /* Barre de progression de la generation du fichier d'impression
-   (voir GelatoProgress dans StepTracking.js). Le pourcentage affiche est
+   (voir GenerationProgress.js). Le pourcentage affiche est
    REEL (pages rendues / total) ; les phases sans decompte utilisent une
    barre indeterminee plutot qu'un chiffre invente. */
 .gelato-progress { margin-top: var(--space-sm); }
@@ -128,4 +128,33 @@
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--text-light);
+}
+
+/* Fabrication du PDF client. Encadre plutot que fondu dans la page : c'est
+   une attente de plusieurs minutes, et le message qui autorise a fermer
+   l'onglet ne doit pas passer inapercu. */
+.pdf-build-block {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid rgba(201, 163, 95, 0.45);
+  border-radius: 10px;
+  background: rgba(201, 163, 95, 0.07);
+}
+
+.pdf-build-block h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.pdf-build-block .orders-disclaimer {
+  margin-top: var(--space-sm);
+}
+
+/* Issue de secours quand la fabrication semble arretee. Discret a dessein :
+   l'action normale est d'attendre, pas de relancer. */
+.pdf-build-relaunch {
+  margin-top: var(--space-sm);
+  font-size: 13px;
+  padding: 6px 12px;
 }

@@ -144,3 +144,9 @@ dist
 # Dumps d'exploration API imprimeur (Gelato) — donnees non sensibles mais
 # pas utiles a versionner, regenerees a la demande
 backend/scripts/.gelato-catalog-dump.json
+
+# Fichiers de travail du rendu PDF : previews HTML, PDF intermediaires,
+# captures. Regeneres a chaque rendu, parfois tres lourds (un PDF de livre
+# complet depasse 100 Mo, la limite de GitHub). N ont rien a faire dans le
+# depot.
+backend/tmp/

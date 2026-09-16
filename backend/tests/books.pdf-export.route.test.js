@@ -78,7 +78,25 @@ jest.mock('../config/supabase', () => {
 jest.mock('../services/composition/pdfService', () => ({
   resolveBrowserPath: jest.fn(() => '/fake/chrome'),
   renderPdfFromHtml: jest.fn(async () => require('path').join(__dirname, 'fixtures', 'fake.pdf')),
-  renderPdfFromPages: jest.fn(async () => require('path').join(__dirname, 'fixtures', 'fake.pdf'))
+  // Rapporte une progression, comme le vrai rendu : c'est ce que la route
+  // de statut doit republier au client.
+  renderPdfFromPages: jest.fn(async ({ onProgress }) => {
+    if (typeof onProgress === 'function') {
+      onProgress({ done: 3, total: 12 });
+    }
+    return require('path').join(__dirname, 'fixtures', 'fake.pdf');
+  })
+}));
+
+// L'email « PDF pret » est la contrepartie du message « vous pouvez fermer
+// cette page » : on verifie qu'il part vraiment.
+jest.mock('../services/email/transactionalEmails', () => ({
+  envoyerPdfPret: jest.fn(async () => ({ sent: true })),
+  envoyerCommandeConfirmee: jest.fn(async () => ({ sent: true })),
+  envoyerPaiementRecu: jest.fn(async () => ({ sent: true })),
+  envoyerEtapeFabrication: jest.fn(async () => ({ sent: true })),
+  envoyerLienLivre: jest.fn(async () => ({ sent: true })),
+  isEmailEnabled: jest.fn(() => true)
 }));
 
 const express = require('express');
@@ -169,5 +187,116 @@ describe('POST /api/books/:id/export-final-pdf — livre sans-IA (zero chapitre)
     // Le format vient de book.print_format (resolveRenderFormat), jamais de
     // PREVIEW_FORMATS (perime, ex. livret 148x210mm au lieu de 170x170mm).
     expect(callArgs.format.formatId).toBe('standard');
+  });
+});
+
+// Fabriquer un PDF prend plusieurs MINUTES (chaque page est capturee en
+// haute resolution). L'interface affiche donc une barre d'avancement et
+// invite l'utilisateur a fermer la page — deux promesses qui n'ont de sens
+// que si le serveur publie une progression reelle et previent par email.
+describe('Suivi de la fabrication du PDF', () => {
+  let app;
+
+  beforeAll(() => {
+    app = buildApp();
+  });
+
+  const lancerJob = async () => {
+    const reponse = await request(app)
+      .post(`/api/books/${BOOK_ID}/export-final-pdf`)
+      .set('Authorization', 'Bearer valid-token')
+      .send({ forceRegenerate: true });
+    expect(reponse.status).toBe(202);
+    return reponse.body.jobId;
+  };
+
+  const lireStatut = (jobId) => request(app)
+    .get(`/api/books/${BOOK_ID}/export-final-pdf/${jobId}/status`)
+    .set('Authorization', 'Bearer valid-token');
+
+  it('un job qui demarre annonce deja une progression (la barre ne part pas de rien)', async () => {
+    const jobId = await lancerJob();
+    const statut = await lireStatut(jobId);
+
+    expect(statut.status).toBe(200);
+    expect(statut.body.progress).toEqual(expect.objectContaining({
+      phase: expect.any(String),
+      done: expect.any(Number),
+      total: expect.any(Number),
+      updatedAt: expect.any(String)
+    }));
+  });
+
+  it('la progression rapportee par le rendu est republiee au client', async () => {
+    const jobId = await lancerJob();
+    await flushAsync();
+    await flushAsync();
+
+    const statut = await lireStatut(jobId);
+    // 3 pages sur 12, exactement ce que le rendu a annonce.
+    expect(statut.body.progress.done).toBe(3);
+    expect(statut.body.progress.total).toBe(12);
+  });
+
+  it('previent par email quand le PDF est pret', async () => {
+    const emails = require('../services/email/transactionalEmails');
+    emails.envoyerPdfPret.mockClear();
+
+    const jobId = await lancerJob();
+    await flushAsync();
+    await flushAsync();
+    await flushAsync();
+
+    const statut = await lireStatut(jobId);
+    expect(statut.body.status).toBe('ready');
+    expect(emails.envoyerPdfPret).toHaveBeenCalledTimes(1);
+
+    const argument = emails.envoyerPdfPret.mock.calls[0][0];
+    // L'adresse du demandeur est retenue a la creation du job : sans elle,
+    // un onglet ferme ne recevrait jamais rien.
+    expect(argument.ownerEmail).toBe('organisateur@test.local');
+    expect(argument.book.id).toBe(BOOK_ID);
+  });
+
+  it('un rendu qui n avance plus est declare echoue, pas laisse en cours', async () => {
+    const jobId = await lancerJob();
+    await flushAsync();
+
+    // On simule une machine morte : le job n'a plus donne signe de vie
+    // depuis longtemps. C'est le symptome signale (« bloque depuis 15
+    // minutes ») : sans garde-fou, le client sonde un travail mort.
+    const jobs = require('../routes/books').__pdfExportJobsForTests;
+    const job = jobs.get(jobId);
+    job.status = 'rendering';
+    job.files = null;
+    const vieux = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    job.createdAt = vieux;
+    job.startedAt = vieux;
+    job.progress = { phase: 'pages', done: 2, total: 40, updatedAt: vieux };
+    jobs.set(jobId, job);
+
+    const statut = await lireStatut(jobId);
+    expect(statut.body.status).toBe('failed');
+    expect(String(statut.body.error)).toMatch(/interrompue/i);
+  });
+
+  it('apres un enlisement, une relance repart sur un job NEUF', async () => {
+    const jobId = await lancerJob();
+    const jobs = require('../routes/books').__pdfExportJobsForTests;
+    const job = jobs.get(jobId);
+    job.status = 'rendering';
+    const vieux = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    job.progress = { phase: 'pages', done: 2, total: 40, updatedAt: vieux };
+    jobs.set(jobId, job);
+
+    // Relance SANS forceRegenerate : c'est le chemin qui reutilisait le
+    // job mort et laissait l'utilisateur tourner en rond.
+    const relance = await request(app)
+      .post(`/api/books/${BOOK_ID}/export-final-pdf`)
+      .set('Authorization', 'Bearer valid-token')
+      .send({});
+
+    expect(relance.status).toBe(202);
+    expect(relance.body.jobId).not.toBe(jobId);
   });
 });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPrint } from '../../../utils/orderWorkflow';
+import GenerationProgress from './GenerationProgress';
 import './StepTracking.css';
 
 // Ecran 4 : suivi REEL de production (2026-09-11). Jusqu'ici la page se
@@ -34,84 +35,22 @@ function buildTimeline(orderType, currentStatus) {
   });
 }
 
-// Libelle de chaque phase de la generation du fichier d'impression (le
-// backend les renvoie dans metadata.gelatoProgress). Le rendu des pages est
-// de loin la plus longue : c'est la seule qui a une progression chiffree,
-// les autres sont annoncees pour que la barre ne reste jamais figee sans
-// explication.
-const PROGRESS_LABELS = {
-  starting: 'Preparation...',
-  cover: 'Rendu de la couverture...',
-  pages: 'Rendu des pages',
-  assembling: 'Assemblage du PDF...',
-  uploading: 'Envoi du fichier a l\'imprimeur...',
-  submitting: 'Creation de la commande chez Gelato...'
-};
-
-function GelatoProgress({ progress }) {
-  // Premier point de mesure de la phase "pages", garde d'un rendu a
-  // l'autre. Il sert a deduire la CADENCE REELLE de la machine qui rend le
-  // livre : elle n'a rien a voir en local et sur Render (CPU bien plus
-  // lent), une constante en dur donnerait une promesse fausse la moitie du
-  // temps. Les horodatages viennent du serveur (progress.updatedAt), pas de
-  // l'horloge du navigateur : l'estimation reste juste meme si une reponse
-  // de sondage arrive en retard.
-  const paceRef = React.useRef(null);
-
-  const phase = progress?.phase;
-  const done = progress?.done || 0;
-  const total = progress?.total || 0;
-  const updatedAtMs = progress?.updatedAt ? Date.parse(progress.updatedAt) : NaN;
-
-  if (phase === 'pages' && done > 0 && !paceRef.current && !Number.isNaN(updatedAtMs)) {
-    paceRef.current = { done, at: updatedAtMs };
-  }
-
-  if (!progress) return null;
-
-  const hasCount = phase === 'pages' && total > 0;
-  // Pourcentage REEL quand on le connait (pages rendues / total). Pour les
-  // phases sans decompte, on n'invente pas de chiffre : barre indeterminee.
-  const percent = hasCount ? Math.round((done / total) * 100) : null;
-
-  // Duree restante : affichee seulement une fois qu'on a DEUX points de
-  // mesure. Avant ca, le decompte "x / y pages" suffit — mieux vaut ne rien
-  // annoncer qu'annoncer n'importe quoi.
-  const pace = paceRef.current;
-  let remainingLabel = null;
-  if (hasCount && pace && done > pace.done && !Number.isNaN(updatedAtMs)) {
-    const secondsPerPage = (updatedAtMs - pace.at) / 1000 / (done - pace.done);
-    if (secondsPerPage > 0) {
-      const remainingMin = Math.round(((total - done) * secondsPerPage) / 60);
-      remainingLabel = remainingMin >= 1
-        ? `Environ ${remainingMin} min restantes.`
-        : 'Plus que quelques secondes.';
-    }
-  }
-
-  return (
-    <div className="gelato-progress">
-      <div className="gelato-progress-head">
-        <span>{PROGRESS_LABELS[phase] || 'Generation en cours...'}</span>
-        {hasCount && <span className="gelato-progress-count">{done} / {total} pages</span>}
-      </div>
-      <div className={`gelato-progress-bar ${percent === null ? 'is-indeterminate' : ''}`}>
-        <div
-          className="gelato-progress-fill"
-          style={percent === null ? undefined : { width: `${percent}%` }}
-        />
-      </div>
-      {remainingLabel && <p className="gelato-progress-note">{remainingLabel}</p>}
-    </div>
-  );
-}
-
 function StepTracking({
   order,
   tracking,
   loadingTracking,
   onRefreshTracking,
   onDownloadPdf,
+  // Refabriquer le PDF. Le serveur reutilise celui deja produit tant qu'il
+  // existe — economie legitime (un rendu coute plusieurs minutes), mais sans
+  // ce bouton il devenait impossible d'obtenir un PDF a jour apres une
+  // correction du rendu (2026-09-15).
+  onRegeneratePdf,
+  regeneratingPdf,
+  // Avancement du PDF client, publie par le serveur (voir backend
+  // GET /books/:id/export-final-pdf/:jobId/status). Meme forme que la
+  // progression de l'envoi Gelato : meme composant d'affichage.
+  pdfJob,
   downloadingKind,
   gelatoTestAvailable,
   gelatoSending,
@@ -127,6 +66,19 @@ function StepTracking({
   const timeline = buildTimeline(order.type, status);
   const isPrint = includesPrint(order.type);
   const pdfReady = status === 'pdf_ready' || order?.metadata?.pdfReady;
+
+  // Le PDF est-il en train d'etre fabrique ?
+  //
+  // Le statut de la COMMANDE fait foi, pas seulement le job suivi par cet
+  // onglet : si la reponse du serveur s'est perdue (reveil d'instance,
+  // reseau), on n'a plus d'identifiant de job a suivre — et l'ecran
+  // n'affichait alors AUCUNE barre, juste une phrase. C'est exactement ce
+  // qui a ete signale le 2026-09-15. `regeneratingPdf` couvre en plus le
+  // court instant entre le clic et la premiere reponse.
+  const pdfEnCours = regeneratingPdf
+    || status === 'pdf_generating'
+    || pdfJob?.status === 'queued'
+    || pdfJob?.status === 'rendering';
 
   return (
     <article className="orders-panel">
@@ -180,6 +132,38 @@ function StepTracking({
         </p>
       )}
 
+      {/* Fabrication du PDF : plusieurs minutes de rendu haute resolution.
+          Le travail se poursuit cote serveur meme si l'onglet est ferme —
+          c'est ce qui autorise a le dire ici, et un email vient le
+          confirmer (backend : notifierPdfPret). */}
+      {pdfEnCours && (
+        <div className="pdf-build-block">
+          <h3>Votre PDF est en cours de fabrication</h3>
+          {/* Entre le clic et la premiere reponse du serveur, le job
+              n'existe pas encore : on affiche la meme valeur de depart que
+              le serveur, plutot qu'un blanc. */}
+          <GenerationProgress
+            progress={pdfJob?.progress || { phase: 'starting', done: 0, total: 0 }}
+            label="Fabrication du PDF..."
+          />
+          <p className="orders-disclaimer">
+            Il sera disponible dans quelques minutes. <strong>Vous serez informé par email</strong> dès
+            qu’il sera prêt : vous pouvez fermer cette page, la fabrication continue de notre côté.
+          </p>
+          {onRegeneratePdf && (
+            <button
+              type="button"
+              className="btn btn-outline pdf-build-relaunch"
+              onClick={onRegeneratePdf}
+              disabled={regeneratingPdf}
+              title="Repart de zero si la fabrication semble arretee"
+            >
+              {regeneratingPdf ? 'Relance…' : 'Relancer la fabrication'}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="orders-download-actions">
         {isPrint && (
           <button type="button" className="btn btn-outline" onClick={onRefreshTracking} disabled={loadingTracking}>
@@ -194,6 +178,17 @@ function StepTracking({
             disabled={downloadingKind === 'final'}
           >
             {downloadingKind === 'final' ? 'Telechargement...' : 'Telecharger le PDF final'}
+          </button>
+        )}
+        {pdfReady && onRegeneratePdf && (
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onRegeneratePdf}
+            disabled={regeneratingPdf}
+            title="Refabrique le PDF a partir de votre livre actuel"
+          >
+            {regeneratingPdf ? 'Regeneration…' : 'Régénérer le PDF'}
           </button>
         )}
       </div>
@@ -211,7 +206,7 @@ function StepTracking({
           <button type="button" className="btn btn-outline" disabled={gelatoSending} onClick={onSendGelatoTest}>
             {gelatoSending ? 'Generation en cours...' : 'Envoyer a Gelato (test)'}
           </button>
-          {gelatoSending && <GelatoProgress progress={gelatoProgress} />}
+          {gelatoSending && <GenerationProgress progress={gelatoProgress} />}
           {gelatoResult && (
             <p className="orders-disclaimer">
               {gelatoResult.skipped

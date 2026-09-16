@@ -152,7 +152,19 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
       gelatoError: errorMessage,
       gelatoErrorAt: nowIso
     };
-    await db.from('orders').update({ metadata: nextMetadata, updated_at: nowIso }).eq('id', order.id).catch(() => {});
+    // PAS de `.catch()` directement sur la requete : le constructeur de
+    // requetes Supabase est « thenable » (il a `.then`) mais n'expose PAS
+    // `.catch`. Ecrire `.eq(...).catch(...)` levait donc « .catch is not a
+    // function » — et cette erreur-la remplacait la VRAIE erreur Gelato
+    // qu'on essayait justement d'enregistrer. Le defaut ne se voyait que
+    // le jour ou une soumission echouait, c'est-a-dire au pire moment
+    // (constate le 2026-09-15 dans le journal serveur).
+    try {
+      await db.from('orders').update({ metadata: nextMetadata, updated_at: nowIso }).eq('id', order.id);
+    } catch (_persistError) {
+      // Ne jamais masquer l'erreur d'origine : c'est elle qui explique
+      // pourquoi la soumission a echoue.
+    }
     return { skipped: false, error: errorMessage };
   }
 }

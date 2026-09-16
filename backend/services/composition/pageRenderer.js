@@ -295,6 +295,21 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsBy
   return `<div class="block-photo photo-grid photo-grid-${Math.min(slotCount, 6)}" data-layout="${escapeHtml(slug || '')}">${cells.join('')}</div>`;
 }
 
+// Sur quelle page d'une double page se trouve-t-on ?
+//
+// La reponse se lit sur la parite de la page INTERIEURE : index pair =
+// page de gauche, impair = page de droite (convention de l'atelier,
+// leftPageIndex = spread * 2). Mais `page_index` ne porte pas toujours ce
+// sens : pour un export PDF, composeCoversIntoPages renumerote tout afin
+// de placer la couverture en tete, et decale donc la parite d'un cran.
+// Il conserve pour cela l'index d'origine dans `spreadIndex`, seul digne
+// de confiance ici. Deduire la moitie du seul `page_index` etait la cause
+// des moities echangees dans le PDF.
+function spreadIndexOf(page) {
+  if (Number.isInteger(page?.spreadIndex)) return page.spreadIndex;
+  return Number(page?.page_index) || 0;
+}
+
 // `rawItems` : positionnel (voir renderPhotoBlock ci-dessus, meme principe)
 // — ne sert reellement qu'a TWO_TESTIMONIES/THREE_TESTIMONIES (plusieurs
 // cartes cote a cote, ou retirer UN temoignage ne doit jamais faire glisser
@@ -611,7 +626,7 @@ function renderPage(page, itemsById, layoutsById, isLast, context = {}) {
     styles: textPresentation.styles
   });
   const blocksHtml = blocks
-    .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, page.page_index, captionsByItemId))
+    .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, spreadIndexOf(page), captionsByItemId))
     .join('');
   // "is-luxe" : marqueur LEGER pour scoper les 2 seuls details dores qui
   // restent sur une page ordinaire (filet sous .page-title + numero de page,
@@ -1046,7 +1061,7 @@ function renderSinglePageHtml(input) {
       styles: textPresentation.styles
     });
     const blocksHtml = blocks
-      .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, page.page_index, captionsByItemId))
+      .map((block) => renderBlock(block, itemsById, layoutsById, adjustmentsByItemId, textPresentation, spreadIndexOf(page), captionsByItemId))
       .join('');
     // Meme marqueur/numero de page discret que renderPage() ci-dessus (Luxe uniquement).
     const luxeClass = format?.formatId === 'luxe' ? ' is-luxe' : '';

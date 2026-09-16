@@ -202,8 +202,32 @@ async function renderPdfFromHtml(html, { fileBaseName = 'preview' } = {}) {
 // proche du standard impression (300dpi) — 2 (~192dpi) etait visiblement
 // trop bas pour un rendu destine a l'impression papier.
 const SCREENSHOT_SCALE = 3;
+
+// JPEG PLUTOT QUE PNG pour les pages assemblees (2026-09-15).
+//
+// Le PNG avait ete choisi pour eviter une SECONDE passe de compression avec
+// perte sur des photos deja JPEG. Le raisonnement etait juste, la conclusion
+// ne l'etait plus : un livre de 33 pages pesait 183 Mo, soit 5,5 Mo par page.
+// Au-dessus de la limite de 50 Mo du bucket Supabase, impossible a
+// telecharger pour un client, et lourd a produire sur une petite instance.
+//
+// Mesure sur une vraie page photo a l'echelle de production : PNG 3,58 Mo,
+// JPEG q95 0,86 Mo, q92 0,68 Mo (19%), q88 0,56 Mo. A q92 avec
+// chroma 4:4:4 (aucun sous-echantillonnage de la couleur), la perte est
+// invisible a l'oeil comme a l'impression — c'est le reglage standard des
+// flux d'impression professionnels.
+//
+// Et il n'y a qu'UNE passe avec perte, pas deux : la photo d'origine est
+// decodee, rendue, capturee sans perte par Chrome, puis encodee une seule
+// fois ici.
+const JPEG_QUALITY = 92;
 const MM_TO_PT = 72 / 25.4;
 const IMAGE_WAIT_TIMEOUT_MS = 8000;
+// Delai de garde du chargement de page. Genereux : une page de couverture
+// telecharge aussi les polices Google. Depasse, on capture quand meme —
+// c'est le comportement d'avant, mais devenu exceptionnel au lieu d'etre
+// la regle.
+const PAGE_LOAD_TIMEOUT_MS = 15000;
 const CDP_READY_TIMEOUT_MS = 10000;
 
 function mmToPx(mm) {
@@ -243,6 +267,14 @@ function cdpClient(wsUrl) {
   let nextId = 0;
   const pending = new Map();
 
+  // Abonnements aux EVENEMENTS du navigateur, par nom de methode.
+  //
+  // Ce client les ignorait entierement : seules les REPONSES aux appels
+  // etaient traitees. Consequence, on ne pouvait pas attendre qu'une page
+  // ait fini de se charger — et c'est exactement ce qui produisait des
+  // pages sans photos dans le PDF (voir la boucle de capture).
+  const listeners = new Map();
+
   ws.addEventListener('message', (event) => {
     const message = JSON.parse(event.data);
     if (message.id !== undefined && pending.has(message.id)) {
@@ -250,6 +282,13 @@ function cdpClient(wsUrl) {
       pending.delete(message.id);
       if (message.error) reject(new Error(message.error.message || 'Erreur CDP.'));
       else resolve(message.result);
+      return;
+    }
+    // Evenement : on reveille tous ceux qui l'attendaient, une seule fois.
+    if (message.method && listeners.has(message.method)) {
+      const attentes = listeners.get(message.method);
+      listeners.delete(message.method);
+      attentes.forEach((resolve) => resolve(message.params));
     }
   });
 
@@ -267,7 +306,23 @@ function cdpClient(wsUrl) {
     });
   }
 
-  return { call, close: () => ws.close() };
+  // Attend UN evenement, avec un delai de garde.
+  //
+  // Le delai n'est pas une precaution decorative : si l'evenement
+  // n'arrivait jamais (page en erreur, navigation annulee), la generation
+  // du PDF resterait bloquee pour toujours. Mieux vaut continuer et
+  // capturer ce qu'on a — c'est de toute facon ce qui se passait avant,
+  // mais a chaque page au lieu d'exceptionnellement.
+  function waitForEvent(method, timeoutMs) {
+    return new Promise((resolve) => {
+      const minuteur = setTimeout(() => resolve(null), timeoutMs);
+      const attentes = listeners.get(method) || [];
+      attentes.push((params) => { clearTimeout(minuteur); resolve(params); });
+      listeners.set(method, attentes);
+    });
+  }
+
+  return { call, waitForEvent, close: () => ws.close() };
 }
 
 // Attend que toutes les <img> de la page courante soient chargees ET que les
@@ -279,15 +334,29 @@ function cdpClient(wsUrl) {
 // telechargement de la police et retomber silencieusement sur la police de
 // repli (Georgia) de facon intermittente — un bug difficile a reproduire.
 async function waitForImages(cdp) {
+  // `decode()` et non `complete` : une image peut etre TELECHARGEE (complete
+  // === true) sans etre encore DECODEE, donc pas encore peignable. Capturer
+  // a cet instant donne une image partielle — c'est exactement la bande
+  // bleue tronquee observee en haut d'une page du PDF le 2026-09-15.
+  // `decode()` ne resout que lorsque l'image est reellement prete a etre
+  // dessinee.
+  //
+  // Le repli sur l'ancienne methode couvre les navigateurs ou `decode()`
+  // rejette sur une image deja en erreur : on ne veut pas bloquer une page
+  // entiere pour une seule photo introuvable.
   const expression = `
     Promise.race([
       Promise.all([
-        Promise.all(Array.from(document.images).map((img) =>
-          img.complete ? Promise.resolve() : new Promise((resolve) => {
+        Promise.all(Array.from(document.images).map((img) => {
+          const attendreEvenement = () => new Promise((resolve) => {
+            if (img.complete) { resolve(); return; }
             img.addEventListener('load', resolve, { once: true });
             img.addEventListener('error', resolve, { once: true });
-          })
-        )),
+          });
+          return attendreEvenement().then(() => (
+            typeof img.decode === 'function' ? img.decode().catch(() => {}) : undefined
+          ));
+        })),
         (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve()
       ]),
       new Promise((resolve) => setTimeout(resolve, ${IMAGE_WAIT_TIMEOUT_MS}))
@@ -393,7 +462,24 @@ async function capturePagesAsImages({ book, pages, items, layouts, format, scale
       tempHtmlPaths.push(htmlPath);
       await fsp.writeFile(htmlPath, html, 'utf8');
 
+      // ATTENDRE LE CHARGEMENT DE LA PAGE AVANT TOUT LE RESTE.
+      //
+      // `Page.navigate` rend la main des que la navigation COMMENCE, pas
+      // quand le document est pret. Sonder `document.images` juste apres
+      // interrogeait donc une page parfois meme pas encore analysee : la
+      // liste etait vide, l'attente se terminait instantanement, et on
+      // photographiait une page blanche.
+      //
+      // C'etait une COURSE : elle se gagnait sur les pages legeres et se
+      // perdait sur les autres — d'ou des photos manquantes de facon
+      // apparemment aleatoire dans le PDF (signale le 2026-09-15 : « beaucoup
+      // de photos n'apparaissent pas », dont la photo de 4e de couverture).
+      //
+      // L'abonnement est pose AVANT la navigation, sinon l'evenement peut
+      // arriver entre les deux appels et n'etre attendu par personne.
+      const chargement = cdp.waitForEvent('Page.loadEventFired', PAGE_LOAD_TIMEOUT_MS);
       await cdp.call('Page.navigate', { url: pathToFileURL(htmlPath).href });
+      await chargement;
       await waitForImages(cdp);
 
       const shot = await cdp.call('Page.captureScreenshot', { format: 'png' });
@@ -423,7 +509,7 @@ async function capturePagesAsImages({ book, pages, items, layouts, format, scale
         // et s'execute pendant la capture de la page suivante.
         const task = sharp(rawBuffer)
           .extend({ top: bleedPx, bottom: bleedPx, left: bleedPx, right: bleedPx, extendWith: 'mirror' })
-          .png({ compressionLevel: 9, effort: 6 })
+          .jpeg({ quality: JPEG_QUALITY, chromaSubsampling: '4:4:4', mozjpeg: true })
           .toBuffer();
         // Sans ce `catch` neutre, un echec d'encodage non encore attendu
         // remonterait en unhandledRejection. L'erreur reste portee par
@@ -438,7 +524,16 @@ async function capturePagesAsImages({ book, pages, items, layouts, format, scale
         }
         encodeTasks.push(task);
       } else {
-        encodeTasks.push(Promise.resolve(rawBuffer));
+        // Meme conversion sans fond perdu : c'est ce chemin qu'emprunte le
+        // PDF telechargeable par le client, celui qui pesait 183 Mo.
+        const task = sharp(rawBuffer)
+          .jpeg({ quality: JPEG_QUALITY, chromaSubsampling: '4:4:4', mozjpeg: true })
+          .toBuffer();
+        task.catch(() => {});
+        if (encodeTasks.length >= 2) {
+          await encodeTasks[encodeTasks.length - 2];
+        }
+        encodeTasks.push(task);
       }
       reportProgress(encodeTasks.length);
     }
@@ -463,7 +558,26 @@ async function capturePagesAsImages({ book, pages, items, layouts, format, scale
 // capturePagesAsImages (sinon les images, deja plus grandes que le trim,
 // seraient re-compressees dans une page PDF trop petite) — chaque cote de
 // la page PDF finale s'agrandit de bleedMm.
-function assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm = 0) {
+// `insertInsideCover` : glisse une page blanche juste apres la couverture.
+//
+// Ce n'est pas cosmetique, c'est ce qui fait que les DOUBLES PAGES se
+// raccordent chez tout le monde. Une photo etalee sur deux pages est stockee
+// en deux moities : la gauche sur un index PAIR, la droite sur l'impair
+// suivant. Sans page de garde, la moitie gauche tombe sur une page PAIRE du
+// PDF — or la quasi-totalite des lecteurs apparient (1,2), (3,4), (5,6)... et
+// placent les pages IMPAIRES a gauche. Les deux moities se retrouvaient donc
+// inversees (signale le 2026-09-15 : « la partie gauche se retrouve sur la
+// droite »).
+//
+// Avec la page de garde, la moitie gauche tombe sur une page impaire : elle
+// s'affiche a gauche, dans un lecteur conforme comme dans un lecteur naif.
+// Et cette page blanche n'est pas une verrue : elle represente exactement
+// l'interieur de la couverture, ce qu'on voit en ouvrant un vrai livre.
+//
+// Le fichier envoye a l'imprimeur n'emprunte PAS ce chemin (voir
+// services/printing/gelatoPrintFile.js, qui assemble son propre document) :
+// aucune page n'y est ajoutee.
+function assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm = 0, insertInsideCover = false) {
   return new Promise((resolve, reject) => {
     const pageWidthPt = (format.trimWidthMm + bleedMm * 2) * MM_TO_PT;
     const pageHeightPt = (format.trimHeightMm + bleedMm * 2) * MM_TO_PT;
@@ -489,7 +603,13 @@ function assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm = 0) {
     // a l'imprimeur, lui, n'emprunte pas ce chemin (voir
     // services/printing/gelatoPrintFile.js, qui assemble son propre document)
     // : une page = une page, toujours.
-    if (doc._root?.data) doc._root.data.PageLayout = 'TwoPageRight';
+    // /TwoPageLeft = deux pages a la fois, les IMPAIRES a gauche. C'est
+    // exactement l'appariement que font d'eux-memes les lecteurs qui
+    // ignorent ce reglage : les deux comportements coincident, et une double
+    // page se raccorde partout. (Avec /TwoPageRight, seuls les lecteurs
+    // conformes affichaient correctement — les autres inversaient les
+    // moities.)
+    if (doc._root?.data) doc._root.data.PageLayout = 'TwoPageLeft';
 
     const stream = fs.createWriteStream(outputPath);
 
@@ -498,10 +618,14 @@ function assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm = 0) {
     doc.on('error', reject);
     doc.pipe(stream);
 
-    for (const buffer of imageBuffers) {
+    imageBuffers.forEach((buffer, index) => {
       doc.addPage({ size: [pageWidthPt, pageHeightPt], margin: 0 });
       doc.image(buffer, 0, 0, { width: pageWidthPt, height: pageHeightPt });
-    }
+      // Apres la couverture (premiere image) uniquement.
+      if (insertInsideCover && index === 0) {
+        doc.addPage({ size: [pageWidthPt, pageHeightPt], margin: 0 });
+      }
+    });
 
     doc.end();
   });
@@ -532,12 +656,27 @@ async function renderPdfFromPages(input) {
     layouts: input.layouts,
     format,
     scale: input.scale,
+    onProgress: input.onProgress,
     bleedMm
   });
 
+  // Les pages sont rendues ; reste l'assemblage du document. Il dure
+  // quelques secondes sur un livre lourd : sans ce signal, la barre
+  // resterait figee a 100 % sans explication.
+  if (typeof input.onProgress === 'function') {
+    try {
+      input.onProgress({ phase: 'assembling', done: input.pages.length, total: input.pages.length });
+    } catch (_error) {
+      // jamais bloquant
+    }
+  }
+
   await fsp.mkdir(PDF_PREVIEW_DIR, { recursive: true });
   const outputPath = path.join(PDF_PREVIEW_DIR, `${input.fileBaseName || 'book'}-${Date.now()}.pdf`);
-  await assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm);
+  // La page de garde n'a de sens que si le document commence bien par une
+  // couverture — c'est le cas de tout PDF passe par composeCoversIntoPages.
+  const commenceParUneCouverture = input.pages?.[0]?.content?.kind === 'front-cover';
+  await assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm, commenceParUneCouverture);
   return outputPath;
 }
 

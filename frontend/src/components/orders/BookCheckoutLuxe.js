@@ -36,6 +36,13 @@ import StepTracking from './checkout/StepTracking';
 import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
 
+// Fabriquer un PDF demande plusieurs minutes de rendu haute resolution. Le
+// travail se poursuit cote serveur meme si l'onglet est ferme, et un email
+// annonce la fin (backend : notifierPdfPret) : on peut donc le dire
+// franchement, plutot que de retenir l'utilisateur devant un ecran d'attente.
+const MESSAGE_PDF_EN_COURS = 'Votre PDF sera disponible dans quelques minutes. '
+  + 'Vous serez informé par email dès qu’il sera prêt : vous pouvez fermer cette page.';
+
 const DEFAULT_ADDRESS = {
   // Porte par la COMMANDE, pas seulement par le compte : c'est ce qui permet
   // d'ecrire au client sans lui imposer un mot de passe, et c'est la seule
@@ -65,6 +72,15 @@ const getPdfFallbackName = (kind) => {
   return 'livre-final.pdf';
 };
 const NETWORK_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 20000);
+
+// Lancer un rendu est la requete la plus exposee au REVEIL du serveur :
+// une instance Render gratuite s'endort apres 15 minutes sans trafic et met
+// 30 a 60 s a repartir. Avec les 20 s des appels ordinaires, ce POST
+// expirait cote navigateur alors que le serveur acceptait la demande : on
+// perdait l'identifiant du job (donc la barre de progression, qui n'avait
+// plus rien a suivre) et l'ecran relancait une fabrication toutes les 15 s.
+// Constate le 2026-09-15 : « Le serveur met trop de temps a repondre ».
+const PDF_START_TIMEOUT_MS = Number(process.env.REACT_APP_PDF_START_TIMEOUT_MS || 90000);
 const PREVIEW_FORMAT_IDS = new Set(['livret', 'standard', 'luxe']);
 const PREVIEW_FORMAT_ALIASES = {
   prestige: 'standard',
@@ -350,7 +366,16 @@ const BookCheckoutLuxe = () => {
     };
   };
 
-  const startPdfExport = async (orderId = '') => {
+  // `forceRegenerate` : refabrique le PDF au lieu de renvoyer celui deja
+  // produit.
+  //
+  // Le serveur reutilise le PDF d'un job existant tant qu'il est `ready` —
+  // economie legitime, un rendu coute plusieurs minutes. Mais le frontend
+  // n'envoyait JAMAIS ce drapeau : une fois un PDF genere, il etait
+  // impossible d'en obtenir un autre, meme apres correction du rendu. C'est
+  // ce qui a fait croire qu'un defaut de double page persistait alors qu'il
+  // etait corrige — on retelechargeait l'ancien fichier (2026-09-15).
+  const startPdfExport = async (orderId = '', forceRegenerate = false) => {
     const headers = await getAuthHeaders();
     const normalizedOrderId = String(orderId || '').trim();
     const previewFormat = normalizePreviewFormat(book?.cover_config?.previewFormat);
@@ -363,6 +388,7 @@ const BookCheckoutLuxe = () => {
       ? book.cover_config.previewLayoutSettings
       : {};
     const payloadBody = {
+      ...(forceRegenerate ? { forceRegenerate: true } : {}),
       previewFormat,
       previewLayoutSettings: {
         textDensity: PREVIEW_TEXT_DENSITY_IDS.has(rawLayoutSettings.textDensity)
@@ -389,7 +415,7 @@ const BookCheckoutLuxe = () => {
         headers,
         body: JSON.stringify(payloadBody)
       },
-      NETWORK_TIMEOUT_MS
+      PDF_START_TIMEOUT_MS
     );
     if (!response.ok) {
       throw new Error(payload?.error || 'Impossible de lancer la generation PDF');
@@ -397,17 +423,36 @@ const BookCheckoutLuxe = () => {
     return payload;
   };
 
-  const startPdfExportWithRetry = async (orderId, maxAttempts = 4) => {
+  const [regeneratingPdf, setRegeneratingPdf] = useState(false);
+
+  // Refabrique le PDF depuis le livre ACTUEL, en ignorant celui deja produit.
+  const handleRegeneratePdf = async () => {
+    if (regeneratingPdf) return;
+    setRegeneratingPdf(true);
+    setNotice(null);
+    try {
+      const job = await startPdfExportWithRetry(latestOrder?.id || '', 2, true);
+      setPdfJob(job);
+      setNotice({ type: 'success', message: MESSAGE_PDF_EN_COURS });
+      await pollPdfJobUntilReady(job.jobId);
+    } catch (error) {
+      setNotice({ type: 'error', message: error.message });
+    } finally {
+      setRegeneratingPdf(false);
+    }
+  };
+
+  const startPdfExportWithRetry = async (orderId, maxAttempts = 4, forceRegenerate = false) => {
     let lastError = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         // eslint-disable-next-line no-await-in-loop
-        return await startPdfExport(orderId);
+        return await startPdfExport(orderId, forceRegenerate);
       } catch (error) {
         if (isPdfOrderLinkError(error) && orderId) {
           try {
             // eslint-disable-next-line no-await-in-loop
-            return await startPdfExport('');
+            return await startPdfExport('', forceRegenerate);
           } catch (fallbackError) {
             lastError = fallbackError;
           }
@@ -432,7 +477,12 @@ const BookCheckoutLuxe = () => {
 
   const pollPdfJobUntilReady = async (jobId) => {
     const headers = await getAuthHeaders();
-    const maxAttempts = 80;
+    // ~15 min de fenetre. Mesure sur un livre reel de 34 pages en luxe :
+    // environ 5 min de rendu en local, davantage sur Render (CPU plus
+    // lent). L'ancienne fenetre (80 x 2,5 s = 3 min 20) expirait AVANT la
+    // fin : l'utilisateur voyait une erreur alors que le serveur finissait
+    // correctement son travail, et relancait un rendu pour rien.
+    const maxAttempts = 360;
     const delayMs = 2500;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -443,7 +493,9 @@ const BookCheckoutLuxe = () => {
           method: 'GET',
           headers
         },
-        15000
+        // Meme raison que PDF_START_TIMEOUT_MS : le premier sondage peut
+        // tomber sur un serveur encore en train de se reveiller.
+        PDF_START_TIMEOUT_MS
       );
       if (!response.ok) {
         const errorMessage = String(payload?.error || 'Erreur pendant le suivi PDF');
@@ -475,7 +527,13 @@ const BookCheckoutLuxe = () => {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
-    throw new Error('Generation PDF trop longue. Reessayez depuis le livre.');
+    // La fabrication N'EST PAS annulee : seul le suivi dans cet onglet
+    // s'arrete. Le dire, sinon l'utilisateur relance un rendu de plusieurs
+    // minutes alors que le premier va aboutir.
+    throw new Error(
+      'La fabrication prend plus de temps que prevu. Elle continue de notre cote : '
+      + 'vous recevrez un email des que le PDF sera pret.'
+    );
   };
 
   const fetchPdfDownloadBlob = async ({ jobId, kind, headers }) => {
@@ -866,7 +924,7 @@ const BookCheckoutLuxe = () => {
             } catch (_pollError) {
               finalNotice = {
                 type: 'warning',
-                message: 'Paiement valide. Le PDF est en cours de generation et sera disponible sous peu.'
+                message: MESSAGE_PDF_EN_COURS
               };
               const refreshedOrder = await getOrderById(currentOrder.id).catch(() => null);
               if (refreshedOrder) {
@@ -1001,7 +1059,7 @@ const BookCheckoutLuxe = () => {
         setLatestOrder(updatedOrder);
         setNotice({
           type: 'warning',
-          message: 'Paiement valide. Le PDF est en cours de generation et sera disponible sous peu.'
+          message: MESSAGE_PDF_EN_COURS
         });
       } catch (_restartError) {
         if (!active) return;
@@ -1071,7 +1129,7 @@ const BookCheckoutLuxe = () => {
         setLatestOrder(currentOrder);
         setNotice({
           type: 'warning',
-          message: 'Paiement valide. Le PDF est en cours de generation et sera disponible sous peu.'
+          message: MESSAGE_PDF_EN_COURS
         });
       } catch (_error) {
         if (!active) return;
@@ -1205,6 +1263,9 @@ const BookCheckoutLuxe = () => {
               tracking={tracking}
               loadingTracking={loadingTracking}
               onRefreshTracking={() => refreshTracking(latestOrder?.id)}
+              onRegeneratePdf={handleRegeneratePdf}
+              regeneratingPdf={regeneratingPdf}
+              pdfJob={pdfJob}
               onDownloadPdf={downloadPdfFile}
               downloadingKind={downloadingKind}
               gelatoTestAvailable={Boolean(gelatoStatus?.testAvailable)}

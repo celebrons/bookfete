@@ -140,6 +140,25 @@ function commandeConfirmee({ numero, titreLivre, format, pages, totalCents, lien
   };
 }
 
+// Le PDF d'un livre complet demande PLUSIEURS MINUTES de rendu (chaque
+// page est capturee en haute resolution). On invite donc l'utilisateur a
+// fermer la page pendant ce temps — promesse qui n'a de sens que si un
+// email vient reellement le rappeler ensuite. C'est cet email.
+function pdfPret({ titreLivre, lien, pages }) {
+  const titre = 'Votre PDF est prêt';
+  const lignes = [
+    `Le fichier PDF${titreLivre ? ` de « ${titreLivre} »` : ''} a fini d’être fabriqué.`,
+    'Vous pouvez le télécharger dès maintenant depuis votre commande.'
+  ];
+  const details = [pages ? ['Pages', String(pages)] : null];
+  const bouton = lien ? { libelle: 'Télécharger mon PDF', url: lien } : null;
+  return {
+    subject: titreLivre ? `Votre PDF « ${titreLivre} » est prêt` : 'Votre PDF est prêt',
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details }),
+    text: texteDe({ titre, lignes, bouton, details })
+  };
+}
+
 function paiementRecu({ numero, totalCents, lien }) {
   const titre = 'Paiement reçu';
   const lignes = [
@@ -293,6 +312,7 @@ module.exports = {
   retrouverSonLivre,
   commandeConfirmee,
   paiementRecu,
+  pdfPret,
   etapeDeFabrication,
   essai,
   ETAPES,

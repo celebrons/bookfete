@@ -428,7 +428,18 @@ function composeCoversIntoPages({ book, items, template, interiorPages, format }
   });
 
   const pages = [front, ...(Array.isArray(interiorPages) ? interiorPages : []), back];
-  return pages.map((page, index) => ({ ...page, page_index: index }));
+  // La renumerotation ci-dessous insere la couverture en tete : la page
+  // interieure 0 devient l'index 1, et toutes les parites basculent. Or la
+  // moitie affichee d'une photo en DOUBLE PAGE se deduit justement de cette
+  // parite (voir pageRenderer.spreadIndexOf) — sans `spreadIndex`, les deux
+  // moities sortaient echangees dans le PDF, et seulement dans le PDF.
+  // Signale trois fois (2026-09-15/16) ; les controles precedents ne le
+  // voyaient pas car ils appelaient le rendu sans passer par ici.
+  return pages.map((page, index) => ({
+    ...page,
+    spreadIndex: Number.isInteger(page.page_index) ? page.page_index : index,
+    page_index: index
+  }));
 }
 
 module.exports = {
