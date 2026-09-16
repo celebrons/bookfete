@@ -75,10 +75,17 @@ function StepTracking({
   // n'affichait alors AUCUNE barre, juste une phrase. C'est exactement ce
   // qui a ete signale le 2026-09-15. `regeneratingPdf` couvre en plus le
   // court instant entre le clic et la premiere reponse.
-  const pdfEnCours = regeneratingPdf
+  // Un PDF PRET l emporte sur tout le reste. Le suivi du job vit dans cet
+  // onglet : si son sondage s interrompt (reseau, serveur occupe a rendre),
+  // pdfJob reste fige sur sa derniere valeur — « 15 / 32 pages » — alors que
+  // le serveur, lui, a fini et envoye l email. Sans cette garde, la barre
+  // restait affichee indefiniment sur un travail deja termine (2026-09-16).
+  const pdfEnCours = !pdfReady && (
+    regeneratingPdf
     || status === 'pdf_generating'
     || pdfJob?.status === 'queued'
-    || pdfJob?.status === 'rendering';
+    || pdfJob?.status === 'rendering'
+  );
 
   return (
     <article className="orders-panel">

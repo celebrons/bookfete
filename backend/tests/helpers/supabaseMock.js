@@ -49,7 +49,11 @@ function matchesFilters(row, filters) {
 function createSupabaseMock(tables = {}, options = {}) {
   const store = new Map(Object.entries(tables).map(([name, rows]) => [name, [...rows]]));
   const calls = [];
-  const { onInsert, onUpdate, onDelete, errors = {} } = options;
+  // `refuseDeletesOn` simule le comportement de RLS quand AUCUNE policy
+  // `delete` n existe : la suppression ne leve pas d erreur, elle supprime
+  // simplement zero ligne. C est exactement ce qui se passait sur
+  // public.orders (2026-09-16) et ce que le code appelant doit detecter.
+  const { onInsert, onUpdate, onDelete, errors = {}, refuseDeletesOn = [] } = options;
 
   const getRows = (table) => {
     if (!store.has(table)) store.set(table, []);
@@ -136,6 +140,9 @@ function createSupabaseMock(tables = {}, options = {}) {
       }
 
       if (state.operation === 'delete') {
+        if (refuseDeletesOn.includes(table)) {
+          return { data: [], error: null };
+        }
         const kept = [];
         const removed = [];
         rows.forEach((row) => (matchesFilters(row, state.filters) ? removed : kept).push(row));

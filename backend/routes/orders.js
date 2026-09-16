@@ -1247,13 +1247,26 @@ router.delete('/:orderId', authenticate, async (req, res) => {
       }
     }
 
-    const { error: deleteError } = await db
+    // `.select()` n'est PAS decoratif ici : sous RLS, une suppression que la
+    // base refuse ne leve aucune erreur — elle supprime zero ligne et rend la
+    // main comme si tout allait bien. Sans relire ce qui a reellement ete
+    // supprime, la route repondait « supprimee » alors que la commande etait
+    // toujours la (constate le 2026-09-16 : aucune policy `delete` sur
+    // public.orders, voir sql/phase20_orders_delete_policy.sql).
+    const { data: deletedRows, error: deleteError } = await db
       .from('orders')
       .delete()
       .eq('id', order.id)
-      .eq('owner_id', req.user.id);
+      .eq('owner_id', req.user.id)
+      .select('id');
 
     if (deleteError) throw deleteError;
+
+    if (!Array.isArray(deletedRows) || deletedRows.length === 0) {
+      return res.status(409).json({
+        error: "La base a refuse la suppression sans message d'erreur. Il manque probablement la regle 'delete' sur la table orders (sql/phase20_orders_delete_policy.sql)."
+      });
+    }
 
     return res.json({
       deleted: true,

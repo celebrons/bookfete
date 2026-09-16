@@ -82,5 +82,15 @@ html = rendre({
 check(!html.includes('pdf-build-block'), 'le bloc de fabrication a disparu');
 check(html.includes('Telecharger le PDF final'), 'le telechargement est propose');
 
+console.log('\nCas 4 — le suivi de cet onglet s est interrompu : pdfJob reste');
+console.log('        fige sur 15 / 32, alors que la commande dit le PDF pret.');
+console.log('        Signale le 2026-09-16 : « bloque sur Rendu des pages ».\n');
+html = rendre({
+  order: { id: 'o1', order_number: 'CMD-1', type: 'pdf', status: 'pdf_ready', metadata: { pdfReady: true } },
+  pdfJob: { status: 'rendering', progress: { phase: 'pages', done: 15, total: 32, updatedAt: new Date().toISOString() } }
+});
+check(!html.includes('pdf-build-block'), 'une barre figee ne survit pas a un PDF pret');
+check(html.includes('Telecharger le PDF final'), 'le telechargement est propose a la place');
+
 console.log(echecs === 0 ? '\nRESULTAT : OK' : `\nRESULTAT : ${echecs} echec(s)`);
 process.exit(echecs === 0 ? 0 : 1);

@@ -1036,6 +1036,16 @@ const BookCheckoutLuxe = () => {
       } catch (error) {
         if (!active) return;
         if (!isMissingPdfJobError(error)) {
+          // Le SUIVI s arrete, pas la fabrication : elle vit dans le serveur,
+          // pas dans cet onglet. Sans ce message, la barre restait figee sur
+          // sa derniere valeur sans rien dire (2026-09-16 : « bloque sur
+          // 15 / 32 pages » alors que le PDF etait deja pret et l email
+          // parti). L etat de la commande est relu toutes les 5 s par
+          // ailleurs : c est lui qui fera disparaitre la barre.
+          setNotice({
+            type: 'warning',
+            message: MESSAGE_PDF_EN_COURS
+          });
           return;
         }
       }
