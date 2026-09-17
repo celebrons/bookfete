@@ -818,10 +818,20 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
     const nextRank = mappedStatus ? ORDER_STATUS_SEQUENCE.indexOf(mappedStatus) : -1;
     const shouldAdvance = mappedStatus && nextRank > -1 && nextRank > currentRank;
 
+    // Un brouillon confirme depuis le tableau de bord Gelato devient une
+    // vraie commande sans que notre base le sache. On enregistre donc le
+    // type REEL a chaque consultation du suivi — jamais a l'envers : une
+    // commande devenue `order` ne peut plus redevenir `draft` chez nous,
+    // sinon une reponse inattendue desarmerait la protection.
+    const typeReel = gelatoTracking.readGelatoOrderType(gelatoOrder);
+    const typeConnu = order.metadata?.gelatoOrderType || null;
+    const typeRetenu = typeConnu === 'order' ? 'order' : (typeReel || typeConnu);
+
     const nowIso = getNowIso();
     const nextMetadata = {
       ...(order.metadata || {}),
       gelatoFulfillmentStatus: rawStatus || null,
+      gelatoOrderType: typeRetenu,
       gelatoCheckedAt: nowIso,
       tracking
     };
@@ -1246,6 +1256,41 @@ router.delete('/:orderId', authenticate, async (req, res) => {
       return res.status(409).json({
         error: "Cette commande est partie en production chez l'imprimeur : elle ne peut pas etre supprimee."
       });
+    }
+
+    // Nos metadonnees ne suffisent pas : un brouillon confirme depuis le
+    // tableau de bord Gelato devient une vraie commande, facturee et
+    // imprimee, sans que rien ne nous en informe. C'est exactement ce qui
+    // s'est produit le 2026-09-18. On demande donc son etat a Gelato avant
+    // de laisser supprimer quoi que ce soit.
+    //
+    // Si Gelato est injoignable, on REFUSE : entre risquer d'effacer le
+    // suivi d'un livre paye et faire patienter, le choix est vite fait
+    // (meme regle que pour une commande payee sans cle Stripe lisible).
+    const gelatoOrderId = order.metadata?.gelatoOrderId || null;
+    if (gelatoOrderId) {
+      let typeChezGelato = null;
+      try {
+        const distant = await gelatoClient.getOrder(gelatoOrderId);
+        typeChezGelato = gelatoTracking.readGelatoOrderType(distant);
+      } catch (error) {
+        return res.status(409).json({
+          error: "Impossible de verifier aupres de l'imprimeur si cette commande est partie en production. Par prudence, elle n'est pas supprimee. Reessayez plus tard."
+        });
+      }
+
+      if (typeChezGelato === 'order') {
+        // On corrige nos metadonnees au passage : la prochaine tentative
+        // sera refusee sans meme appeler Gelato.
+        await supabase
+          .from('orders')
+          .update({ metadata: { ...(order.metadata || {}), gelatoOrderType: 'order' }, updated_at: getNowIso() })
+          .eq('id', order.id);
+
+        return res.status(409).json({
+          error: "Cette commande est partie en production chez l'imprimeur : elle ne peut pas etre supprimee."
+        });
+      }
     }
 
     const status = String(order.status || '').toLowerCase();

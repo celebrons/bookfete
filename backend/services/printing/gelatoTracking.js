@@ -107,9 +107,29 @@ function readGelatoFulfillmentStatus(gelatoOrder) {
   );
 }
 
+// Une commande Gelato est-elle un simple BROUILLON, ou une commande qui
+// part vraiment en fabrication ?
+//
+// Un brouillon cree par l'application peut etre confirme depuis le tableau
+// de bord Gelato : il devient alors une vraie commande, facturee et
+// imprimee, sans que notre base en sache rien. Constate le 2026-09-18 — la
+// commande etait `order` / `paid` chez Gelato alors que nos metadonnees la
+// croyaient encore `draft`, ce qui desarmait le garde-fou qui empeche de
+// supprimer une commande partie en production.
+//
+// Lecture defensive : une valeur absente ou inattendue renvoie null, et
+// l'appelant garde ce qu'il savait plutot que d'ecraser avec du vide.
+function readGelatoOrderType(gelatoOrder) {
+  const brut = firstNonEmpty(gelatoOrder?.orderType, gelatoOrder?.type);
+  if (!brut) return null;
+  const normalise = String(brut).trim().toLowerCase();
+  return (normalise === 'order' || normalise === 'draft') ? normalise : null;
+}
+
 module.exports = {
   mapGelatoStatus,
   extractTracking,
   readGelatoFulfillmentStatus,
+  readGelatoOrderType,
   STATUS_MAP
 };
