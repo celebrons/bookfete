@@ -67,39 +67,50 @@ describe('gelatoCatalog', () => {
   });
 });
 
-// Pagination declaree a Gelato : les GARDES comptent.
+// Pagination Gelato : ce qu'on DECLARE et ce que le FICHIER doit contenir.
 //
-// Etabli le 2026-09-16 sur le gabarit officiel telecharge par le client pour
-// un livre declare a 32 pages : 33 pages en tout (1 couverture enveloppante,
-// 1 blanche, 30 a composer, 1 blanche). Donc composables = declare - 2.
+// Etabli le 2026-09-17 sur un refus de commande — la seule source qui fasse
+// foi ici. Avec pageCount = 30, Gelato repond :
 //
-// Nous declarions le nombre de pages COMPOSEES, d'ou le rattrapage manuel du
-// client : « il a fallu lui dire 32 pages pour qu'il accepte » alors que nous
-// envoyions 30.
-describe('resolveGelatoPageCount — les pages de garde comptent', () => {
-  const { resolveGelatoPageCount, GELATO_ENDPAPER_PAGES } = require('../../services/printing/gelatoCatalog');
+//   « Product requires exactly 33 page(s), while file(s) contain 35 page(s) »
+//
+// Donc : fichier = pageCount + 3 (1 couverture enveloppante + pageCount + 2
+// pages interieures). Les 2 gardes ne sont PAS comptees dans le declare.
+//
+// Le gabarit telechargeable induit en erreur : son champ « pages » designe le
+// cahier interieur (32 pour 30 pages composees), pas le pageCount de l'API.
+// Une premiere lecture de ce gabarit nous avait fait declarer 32 au lieu de
+// 30 — ces tests existent pour que la confusion ne revienne pas.
+describe('Pagination Gelato', () => {
+  const {
+    resolveGelatoPageCount,
+    interiorPagesForGelato,
+    totalFilePagesForGelato,
+    GELATO_ENDPAPER_PAGES
+  } = require('../../services/printing/gelatoCatalog');
 
-  it('un livre de 30 pages composees se declare a 32 — le cas reel du client', () => {
-    expect(resolveGelatoPageCount(30, 'luxe')).toBe(32);
+  it('on declare le nombre de pages COMPOSEES, gardes non comprises', () => {
+    expect(resolveGelatoPageCount(30, 'luxe')).toBe(30);
   });
 
-  it('ajoute exactement deux pages de garde', () => {
+  it('le cahier interieur ajoute les deux gardes', () => {
     expect(GELATO_ENDPAPER_PAGES).toBe(2);
-    expect(resolveGelatoPageCount(40, 'standard')).toBe(42);
+    expect(interiorPagesForGelato(30)).toBe(32);
   });
 
-  it('respecte le pas de 2 quand le nombre de pages composees est impair', () => {
-    // 29 + 2 = 31, qui n'est pas un palier valide : on monte a 32.
-    expect(resolveGelatoPageCount(29, 'luxe')).toBe(32);
+  it('le cas reel du refus : 30 declarees -> 33 pages exigees dans le fichier', () => {
+    expect(totalFilePagesForGelato(resolveGelatoPageCount(30, 'luxe'))).toBe(33);
   });
 
-  it('reste borne par le minimum et le maximum du produit', () => {
+  it('le fichier fait toujours pageCount + 3', () => {
+    [28, 30, 40, 64].forEach((declare) => {
+      expect(totalFilePagesForGelato(declare)).toBe(declare + 3);
+    });
+  });
+
+  it('respecte toujours le plancher et le pas du produit', () => {
     expect(resolveGelatoPageCount(0, 'standard')).toBe(28);
+    expect(resolveGelatoPageCount(29, 'luxe')).toBe(30);
     expect(resolveGelatoPageCount(9999, 'standard')).toBe(200);
-  });
-
-  it('ne se confond pas avec clampToValidGelatoPageCount, qui ignore les gardes', () => {
-    expect(clampToValidGelatoPageCount(30, 'luxe')).toBe(30);
-    expect(resolveGelatoPageCount(30, 'luxe')).toBe(32);
   });
 });

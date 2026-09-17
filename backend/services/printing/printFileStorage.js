@@ -47,7 +47,45 @@ async function uploadPrintFile(localFilePath, uploadPath) {
   return data.publicUrl;
 }
 
+// Supprime tous les fichiers d'impression d'une commande.
+//
+// Chaque envoi a l'imprimeur depose ~46 Mo sous orders/<id>/ et rien ne les
+// effacait ensuite : supprimer une commande laissait son fichier derriere
+// elle, indefiniment. Mesure le 2026-09-17 : 555 Mo de residus pour un seul
+// livre teste, sur un palier gratuit Supabase de 1 Go.
+//
+// Best effort, JAMAIS bloquant : un echec de menage ne doit pas empecher
+// l'utilisateur de supprimer sa commande. Le pire cas est un fichier
+// orphelin, que scripts/nettoyer-fichiers-impression.js sait retrouver.
+async function removePrintFilesForOrder(orderId) {
+  const prefixe = "orders/" + orderId;
+  try {
+    const { data: fichiers, error } = await supabase.storage
+      .from(PRINT_FILES_BUCKET)
+      .list(prefixe, { limit: 200 });
+
+    if (error || !Array.isArray(fichiers) || fichiers.length === 0) {
+      return { removed: 0 };
+    }
+
+    const chemins = fichiers.map((f) => prefixe + "/" + f.name);
+    const { error: erreurSuppression } = await supabase.storage
+      .from(PRINT_FILES_BUCKET)
+      .remove(chemins);
+
+    if (erreurSuppression) {
+      console.warn("Menage des fichiers d'impression impossible (" + prefixe + ") :", erreurSuppression.message);
+      return { removed: 0 };
+    }
+    return { removed: chemins.length };
+  } catch (err) {
+    console.warn("Menage des fichiers d'impression impossible (" + prefixe + ") :", err.message);
+    return { removed: 0 };
+  }
+}
+
 module.exports = {
   PRINT_FILES_BUCKET,
-  uploadPrintFile
+  uploadPrintFile,
+  removePrintFilesForOrder
 };

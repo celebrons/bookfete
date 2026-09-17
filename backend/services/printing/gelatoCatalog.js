@@ -93,15 +93,20 @@ function isValidGelatoPageCount(pageCount, printFormat) {
 // Gelato sont blanches — ce sont les gardes collees aux plats de la
 // couverture, non composables.
 //
-// Etabli le 2026-09-16 sur le gabarit officiel telecharge par le client
-// pour un livre declare a 32 pages : 33 pages en tout, la 1re etant la
-// couverture enveloppante, la 2e blanche, puis 30 pages a composer, puis
-// une derniere blanche. Donc pages interieures = nombre DECLARE, et pages
-// composables = declare - 2.
+// Etabli le 2026-09-17 sur un REFUS de commande Gelato, seule source qui
+// fasse foi ici :
 //
-// C est ce qui explique le rattrapage manuel du client (« il a fallu lui
-// dire 32 pages pour qu il accepte ») : nous declarions le nombre de pages
-// COMPOSEES, sans compter les gardes.
+//   pageCount declare : 30
+//   « Product requires exactly 33 page(s), while file(s) contain 35 page(s) »
+//
+// Donc le fichier doit compter pageCount + 3 pages : 1 couverture
+// enveloppante, puis pageCount + 2 pages interieures (les 2 gardes ne sont
+// PAS comptees dans le nombre declare).
+//
+// Le gabarit telechargeable induit en erreur sur ce point : son champ
+// « pages » designe le cahier INTERIEUR (32 pour 30 pages composees), pas
+// le pageCount de l API. Deux champs differents, faciles a confondre — une
+// premiere lecture de ce gabarit nous avait fait declarer 32 au lieu de 30.
 const GELATO_ENDPAPER_PAGES = 2;
 
 // Nombre de pages a DECLARER a Gelato pour un livre dont on a compose
@@ -109,7 +114,21 @@ const GELATO_ENDPAPER_PAGES = 2;
 // qui oubliait les gardes.
 function resolveGelatoPageCount(contentPages, printFormat) {
   const pages = Number(contentPages) || 0;
-  return clampToValidGelatoPageCount(pages + GELATO_ENDPAPER_PAGES, printFormat);
+  return clampToValidGelatoPageCount(pages, printFormat);
+}
+
+// Combien de pages le FICHIER doit-il contenir pour un pageCount donne ?
+//
+//   cahier interieur = pageCount + 2 gardes
+//   fichier complet  = 1 couverture enveloppante + cahier interieur
+//
+// Autrement dit, Gelato exige un fichier de pageCount + 3 pages.
+function interiorPagesForGelato(pageCount) {
+  return (Number(pageCount) || 0) + GELATO_ENDPAPER_PAGES;
+}
+
+function totalFilePagesForGelato(pageCount) {
+  return interiorPagesForGelato(pageCount) + 1;
 }
 
 function clampToValidGelatoPageCount(pageCount, printFormat) {
@@ -128,5 +147,7 @@ module.exports = {
   isValidGelatoPageCount,
   clampToValidGelatoPageCount,
   resolveGelatoPageCount,
+  interiorPagesForGelato,
+  totalFilePagesForGelato,
   GELATO_ENDPAPER_PAGES
 };

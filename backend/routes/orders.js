@@ -5,6 +5,23 @@ const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const { submitPrintOrderToGelato, isGelatoLiveOrdersEnabled } = require('../services/printing/gelatoOrderService');
 const gelatoClient = require('../services/printing/gelatoClient');
+const { removePrintFilesForOrder } = require('../services/printing/printFileStorage');
+
+// Envois a l'imprimeur EN COURS, par commande.
+//
+// Sans ce verrou, deux requetes simultanees sur la meme commande creent
+// DEUX brouillons chez Gelato : la garde d'idempotence de
+// gelatoOrderService s'appuie sur metadata.gelatoOrderId, que cette route
+// remet justement a null avant de renvoyer: les deux appels la lisent donc
+// vide et partent tous les deux. Constate le 2026-09-17 — la meme commande
+// apparaissait deux fois dans le tableau de bord Gelato, a la seconde pres.
+//
+// Portee : ce processus. C'est suffisant pour le cas reel (un double clic,
+// ou un rendu relance pendant qu'un autre tourne) et pour un deploiement a
+// une seule instance, qui est le notre. Un verrou reparti demanderait une
+// colonne dediee en base ; a faire le jour ou plusieurs instances servent
+// la meme commande.
+const gelatoSubmissionsEnCours = new Set();
 const gelatoTracking = require('../services/printing/gelatoTracking');
 const emails = require('../services/email/transactionalEmails');
 const { emailValide } = require('../services/email/resendClient');
@@ -550,6 +567,12 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
       });
     }
 
+    if (gelatoSubmissionsEnCours.has(req.params.orderId)) {
+      return res.status(409).json({
+        error: "Un envoi a l'imprimeur est deja en cours pour cette commande. Attendez qu'il se termine."
+      });
+    }
+
     const db = createUserScopedClient(req);
     const { data: order, error: orderError } = await db
       .from('orders')
@@ -703,6 +726,11 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
         .then(() => {}, () => {});
     };
 
+    // Le verrou est pris AVANT de repondre et relache dans le `finally` du
+    // travail detache : il couvre donc toute la duree du rendu (plusieurs
+    // minutes), pas seulement celle de la requete HTTP.
+    gelatoSubmissionsEnCours.add(order.id);
+
     (async () => {
       try {
         const result = await submitPrintOrderToGelato({
@@ -719,6 +747,8 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
           .from('orders')
           .update({ metadata: { ...(order.metadata || {}), gelatoError: error.message }, updated_at: getNowIso() })
           .eq('id', order.id);
+      } finally {
+        gelatoSubmissionsEnCours.delete(order.id);
       }
     })();
 
@@ -1268,11 +1298,22 @@ router.delete('/:orderId', authenticate, async (req, res) => {
       });
     }
 
+    // APRES la suppression effective, jamais avant : si la base avait refuse
+    // (voir juste au-dessus), on effacerait le fichier d'impression d'une
+    // commande toujours vivante — que Gelato peut encore avoir a telecharger.
+    //
+    // Ce fichier (~46 Mo) n'a plus rien a referencer une fois la commande
+    // partie ; sans ce menage, chaque essai en laissait un derriere lui
+    // (555 Mo mesures le 2026-09-17 pour un seul livre). Best effort, comme
+    // la suppression des brouillons Gelato plus haut.
+    const menage = await removePrintFilesForOrder(order.id);
+
     return res.json({
       deleted: true,
       orderId: order.id,
       orderNumber: order.order_number,
-      deletedGelatoDrafts: deletedDrafts
+      deletedGelatoDrafts: deletedDrafts,
+      deletedPrintFiles: menage.removed
     });
   } catch (error) {
     return res.status(error.status || 500).json({ error: error.message });

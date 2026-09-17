@@ -717,7 +717,11 @@ const BookCheckoutLuxe = () => {
   }, [isTrackingStep, latestOrder?.id]);
 
   const sendToGelatoTest = async () => {
-    if (!latestOrder?.id) return;
+    // gelatoSending garde le BOUTON, mais setGelatoSending est asynchrone :
+    // deux clics rapproches partent avant le re-rendu, et le serveur cree
+    // alors deux brouillons chez Gelato (constate le 2026-09-17). Cette garde
+    // ferme la fenetre cote client ; le serveur a la sienne, independante.
+    if (!latestOrder?.id || gelatoSending) return;
     setGelatoSending(true);
     setGelatoError('');
     setGelatoResult(null);

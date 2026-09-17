@@ -11,7 +11,7 @@
 //     pour du 21x28cm, soit 3mm de fond perdu par cote — confirme par un
 //     vrai message de rejet Gelato : "Product requires 216x286mm, content
 //     area 210x280mm").
-//   - Le cahier interieur compte EXACTEMENT `pageCount` pages, dont la
+//   - Le cahier interieur compte EXACTEMENT `pageCount` + 2 pages, dont la
 //     PREMIERE et la DERNIERE sont blanches : ce sont les gardes, collees
 //     aux plats de la couverture. Il reste donc `pageCount - 2` pages
 //     composables.
@@ -40,7 +40,7 @@ const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const pdfService = require('../composition/pdfService');
 const { composeGelatoWraparoundCover } = require('./gelatoCoverComposer');
-const { GELATO_ENDPAPER_PAGES } = require('./gelatoCatalog');
+const { GELATO_ENDPAPER_PAGES, interiorPagesForGelato } = require('./gelatoCatalog');
 
 const MM_TO_PT = 72 / 25.4;
 // Confirme empiriquement le 2026-09-10 via un vrai rejet du validateur
@@ -98,7 +98,7 @@ async function buildGelatoPrintReadyPdf({
   // Le cahier interieur fait EXACTEMENT `pageCount` pages, garde blanche en
   // tete et garde blanche en fin (voir l'en-tete de ce fichier). Une seule
   // page blanche est rendue puis reutilisee : elles sont identiques.
-  const targetInteriorCount = Math.max(pageCount, realPages.length + GELATO_ENDPAPER_PAGES);
+  const targetInteriorCount = interiorPagesForGelato(pageCount);
   const [blankImage] = await pdfService.capturePagesAsImages({
     book,
     pages: [{ page_index: 0, layout_id: null, content: {} }],
