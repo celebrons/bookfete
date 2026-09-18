@@ -407,11 +407,39 @@ async function capturePagesAsImages({ book, pages, items, layouts, format, scale
   }
 
   const port = cdpPort();
+  // BRIDER LE NAVIGATEUR.
+  //
+  // Le 2026-09-18, sur une machine de 2 Go, le noyau a tue Chrome en plein
+  // rendu : « Out of memory: Killed process (chrome) ». Le navigateur avait
+  // lance HUIT processus pour 407 Mo, a cote des 624 Mo de Node — plus d'un
+  // gigaoctet pour rendre des pages UNE PAR UNE.
+  //
+  // Chrome repartit normalement son travail entre plusieurs processus pour
+  // isoler les onglets les uns des autres. Ici il n'y a qu'un seul onglet,
+  // ouvert par nous, sur du HTML que nous avons ecrit : cette isolation ne
+  // protege de rien et coute la memoire qui manque.
   const child = spawn(browserPath, [
     '--headless=new',
     '--disable-gpu',
     '--no-sandbox',
     '--disable-dev-shm-usage',
+
+    // Un seul processus de rendu : nous n'affichons qu'une page a la fois.
+    '--renderer-process-limit=1',
+    // Supprime le processus « zygote », qui ne sert qu'a cloner rapidement
+    // de nouveaux processus de rendu — inutile quand il n'y en a qu'un.
+    '--no-zygote',
+
+    // Services que le rendu n'utilise pas, et qui tournent par defaut.
+    '--disable-extensions',
+    '--disable-background-networking',
+    '--disable-background-timer-throttling',
+    '--disable-default-apps',
+    '--disable-sync',
+    '--disable-translate',
+    '--mute-audio',
+    '--no-first-run',
+
     `--remote-debugging-port=${port}`,
     '--remote-allow-origins=*'
   ], { stdio: 'ignore' });
