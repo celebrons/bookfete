@@ -18,6 +18,7 @@ const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
 const { listEvents } = require('../services/events/eventLog');
+const { etatServeur } = require('../services/events/serverHealth');
 const bookContentService = require('../services/composition/bookContentService');
 const templateCatalog = require('../services/composition/templateCatalog');
 const pageRenderer = require('../services/composition/pageRenderer');
@@ -77,6 +78,27 @@ router.get('/me', authenticate, (req, res) => {
 //
 // Lecture seule, comme tout cet espace. Filtres facultatifs : orderId,
 // bookId, level.
+// Etat de sante du serveur : memoire, processeur, disque, rendus en cours,
+// derniere sauvegarde. Tout ce qui se lit depuis Node, donc disponible sur
+// les trois environnements.
+//
+// Les journaux systeme ne passent PAS par ici : lire journalctl demande des
+// privileges et n existe que sous Linux. Les erreurs applicatives sont dans
+// le journal des evenements, juste au-dessus.
+router.get('/health', authenticate, requireAdmin, (req, res) => {
+  try {
+    let rendusEnCours = null;
+    try {
+      // eslint-disable-next-line global-require
+      rendusEnCours = require('./books').countActivePdfJobs();
+    } catch (_error) { /* l information manque, ce n est pas une erreur */ }
+
+    return res.json(etatServeur({ rendusEnCours }));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/events', authenticate, requireAdmin, async (req, res) => {
   try {
     const evenements = await listEvents({

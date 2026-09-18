@@ -4457,3 +4457,16 @@ module.exports = router;
 // vieillir un job sans attendre huit minutes. Rien dans l'application ne
 // lit cette propriete.
 module.exports.__pdfExportJobsForTests = pdfExportJobs;
+
+// Combien de rendus tournent en ce moment. Lu par la page de supervision
+// (services/events/serverHealth.js) : un rendu prend plusieurs minutes et
+// ~600 Mo, savoir combien sont en vol explique a lui seul une machine qui
+// rame.
+module.exports.countActivePdfJobs = () => {
+  let actifs = 0;
+  pdfExportJobs.forEach((job) => {
+    const statut = String(job?.status || '').toLowerCase();
+    if (statut === 'queued' || statut === 'rendering') actifs += 1;
+  });
+  return actifs;
+};

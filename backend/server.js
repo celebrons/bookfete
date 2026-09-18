@@ -4,6 +4,7 @@ const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { logEvent } = require('./services/events/eventLog');
 require('dotenv').config();
 
 const quietStartup = process.env.QUIET_STARTUP !== '0';
@@ -222,8 +223,25 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   console.error('Server error:', err);
+
+  // Une erreur non rattrapee finissait uniquement dans les journaux du
+  // serveur — invisibles depuis Render, et introuvables sans SSH sur
+  // Scaleway. Elle rejoint desormais le journal des evenements, consultable
+  // depuis l espace d administration sur les trois environnements.
+  logEvent({
+    type: 'server.error',
+    level: 'error',
+    actor: req?.user?.email,
+    message: err.message,
+    metadata: {
+      route: req?.originalUrl,
+      methode: req?.method,
+      pile: String(err.stack || '').split(String.fromCharCode(10)).slice(0, 3).join(' | ')
+    }
+  });
+
   res.status(500).json({ error: err.message });
 });
 

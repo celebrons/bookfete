@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { checkIsAdmin, fetchBookPreviewHtml, listAllBooks } from '../../services/adminApi';
 import '../../styles/luxe-theme.css';
+import AdminHealth from './AdminHealth';
 import AdminEvents from './AdminEvents';
 import './AdminBooksLuxe.css';
 
@@ -224,6 +225,9 @@ export default function AdminBooksLuxe() {
           </div>
         </div>
       )}
+
+      {/* Ce que fait la machine en ce moment. */}
+      <AdminHealth />
 
       {/* Le journal des evenements : le deroule de ce qui est arrive aux
           livres et aux commandes, tous serveurs confondus. */}

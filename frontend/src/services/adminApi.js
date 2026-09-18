@@ -71,3 +71,8 @@ export const listEvents = ({ orderId, bookId, level, limit } = {}) => {
   const suffixe = params.toString();
   return request(`/events${suffixe ? `?${suffixe}` : ''}`);
 };
+
+// Etat de sante du serveur : memoire, processeur, disque, rendus en cours,
+// derniere sauvegarde. Ce qui se lit depuis Node, donc disponible sur les
+// trois environnements.
+export const fetchServerHealth = () => request('/health');
