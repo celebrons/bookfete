@@ -1,0 +1,25 @@
+# Declenche la sauvegarde chaque nuit a 3 h.
+#
+# Installer :
+#   systemctl enable --now celebrons-sauvegarde.timer
+#
+# Verifier la prochaine execution :
+#   systemctl list-timers celebrons-sauvegarde
+
+[Unit]
+Description=Sauvegarde nocturne de la base Celebrons
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+
+# Si la machine etait eteinte a 3 h, la sauvegarde se fait au demarrage
+# suivant plutot que d'etre sautee. Une nuit manquee est une nuit de donnees
+# non protegees.
+Persistent=true
+
+# Evite que toutes les machines du monde sollicitent Supabase a la meme
+# seconde.
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

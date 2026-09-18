@@ -1,0 +1,25 @@
+# Sauvegarde nocturne de la base.
+#
+# L'offre gratuite de Supabase n'inclut aucune sauvegarde : c'est le filet.
+# Declenche par celebrons-sauvegarde.timer, jamais directement.
+#
+# Le resultat se lit avec :  journalctl -u celebrons-sauvegarde -n 30
+
+[Unit]
+Description=Sauvegarde de la base Celebrons
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=celebrons
+WorkingDirectory=/home/celebrons/bookfete/backend
+EnvironmentFile=/home/celebrons/bookfete/backend/.env
+ExecStart=/usr/bin/node scripts/sauvegarder-base.js --dossier /home/celebrons/sauvegardes
+
+# Une sauvegarde qui traine ne doit pas bloquer la machine indefiniment.
+TimeoutStartSec=600
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=celebrons-sauvegarde
