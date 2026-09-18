@@ -146,3 +146,32 @@
   .site-nav .btn { justify-content: center; margin-top: 6px; }
 }
 
+/* Qui est connecte, a cote du bouton Deconnexion.
+
+   Discret a dessein : c'est un reperage, pas une information a lire. Une
+   adresse email peut etre longue — on la tronque plutot que de laisser la
+   barre de navigation deborder (le titre au survol donne la version
+   entiere). */
+.site-nav-user {
+  font-size: 13px;
+  color: var(--ink-soft, #7a7266);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Session sans compte : le meme emplacement, mais en italique — assez
+   different pour se remarquer, assez sobre pour ne pas alarmer. */
+.site-nav-user.is-anonyme {
+  font-style: italic;
+}
+
+@media (max-width: 860px) {
+  /* Dans le menu deroulant, la place ne manque plus : on affiche
+     l'adresse en entier. */
+  .site-nav-user {
+    max-width: none;
+    padding: 4px 0;
+  }
+}

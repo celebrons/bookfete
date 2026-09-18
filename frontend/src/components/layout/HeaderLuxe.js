@@ -150,6 +150,22 @@ const HeaderLuxe = () => {
                 <IconGear />
                 <span className="site-nav-icon-label">Espace client</span>
               </Link>
+              {/* QUI est connecte. Sans cette indication, rien ne
+                  distinguait deux comptes a l'ecran — genant des qu'on
+                  teste avec plusieurs adresses, et inquietant pour un
+                  client qui ne sait pas sous quelle identite il commande.
+
+                  Une session ANONYME n'a pas d'email : l'application
+                  autorise a composer un livre avant de creer un compte
+                  (voir services/anonymousSession.js). On le dit alors
+                  franchement plutot que de laisser un vide, parce que
+                  c'est justement l'etat ou il faut penser a s'inscrire. */}
+              <span
+                className={`site-nav-user${user.is_anonymous ? ' is-anonyme' : ''}`}
+                title={user.email || 'Vous composez sans compte : creez-en un pour retrouver votre livre'}
+              >
+                {user.email || 'Sans compte'}
+              </span>
               <button onClick={handleLogout} className="btn btn-outline">
                 Déconnexion
               </button>
