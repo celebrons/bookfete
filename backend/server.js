@@ -40,6 +40,26 @@ const compositionRoutes = require('./routes/composition');
 const productRoutes = require('./routes/products');
 const collectiveRoutes = require('./routes/collective');
 
+// DERRIERE UN PROXY ?
+//
+// Quand un serveur web (Caddy, le routeur de Render) se place devant
+// l'application, toutes les requetes lui arrivent de 127.0.0.1 : la vraie
+// adresse du visiteur est dans X-Forwarded-For. Sans ce reglage, la
+// limitation de debit compte donc TOUT LE MONDE dans le meme seau — un
+// seul visiteur un peu actif bloquerait tous les autres — et
+// express-rate-limit leve ERR_ERL_UNEXPECTED_X_FORWARDED_FOR (constate le
+// 2026-09-18 sur Scaleway, derriere Caddy).
+//
+// Volontairement DESACTIVE par defaut : faire confiance a cet en-tete sans
+// proxy devant permettrait a n'importe qui de l'inventer et de contourner
+// la limitation. TRUST_PROXY vaut le nombre de proxys traverses (1 dans
+// notre cas), et ne doit etre pose que la ou il y en a vraiment un.
+const proxysDeConfiance = Number(process.env.TRUST_PROXY);
+app.set(
+  'trust proxy',
+  Number.isInteger(proxysDeConfiance) && proxysDeConfiance > 0 ? proxysDeConfiance : false
+);
+
 // ORIGINES AUTORISEES.
 //
 // La liste etait ecrite en dur sur les deux adresses Render : tout autre
