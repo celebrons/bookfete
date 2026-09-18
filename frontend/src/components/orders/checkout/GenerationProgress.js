@@ -15,10 +15,18 @@ const PROGRESS_LABELS = {
   starting: 'Preparation...',
   cover: 'Rendu de la couverture...',
   pages: 'Rendu des pages',
+  photos: 'Preparation des photos',
   assembling: 'Assemblage du PDF...',
   uploading: 'Envoi du fichier a l\'imprimeur...',
   submitting: 'Creation de la commande chez Gelato...'
 };
+
+// Phases dont on connait un DECOMPTE, et le nom de ce qu on compte.
+//
+// Le rendu par captures comptait des pages ; le rendu par impression
+// (2026-09-19) n a plus de boucle page par page et compte des photos. Les
+// deux alimentent la meme barre, avec le bon mot.
+const PHASES_CHIFFREES = { pages: 'pages', photos: 'photos' };
 
 function GenerationProgress({ progress, label }) {
   // Premier point de mesure de la phase "pages", garde d'un rendu a
@@ -35,13 +43,17 @@ function GenerationProgress({ progress, label }) {
   const total = progress?.total || 0;
   const updatedAtMs = progress?.updatedAt ? Date.parse(progress.updatedAt) : NaN;
 
-  if (phase === 'pages' && done > 0 && !paceRef.current && !Number.isNaN(updatedAtMs)) {
-    paceRef.current = { done, at: updatedAtMs };
+  const unite = PHASES_CHIFFREES[phase];
+
+  // Une nouvelle phase repart de zero : melanger la cadence des photos et
+  // celle des pages donnerait une estimation absurde.
+  if (unite && done > 0 && paceRef.current?.phase !== phase && !Number.isNaN(updatedAtMs)) {
+    paceRef.current = { phase, done, at: updatedAtMs };
   }
 
   if (!progress) return null;
 
-  const hasCount = phase === 'pages' && total > 0;
+  const hasCount = Boolean(unite) && total > 0;
   // Pourcentage REEL quand on le connait (pages rendues / total). Pour les
   // phases sans decompte, on n'invente pas de chiffre : barre indeterminee.
   const percent = hasCount ? Math.round((done / total) * 100) : null;
@@ -51,7 +63,7 @@ function GenerationProgress({ progress, label }) {
   // annoncer qu'annoncer n'importe quoi.
   const pace = paceRef.current;
   let remainingLabel = null;
-  if (hasCount && pace && done > pace.done && !Number.isNaN(updatedAtMs)) {
+  if (hasCount && pace && pace.phase === phase && done > pace.done && !Number.isNaN(updatedAtMs)) {
     const secondsPerPage = (updatedAtMs - pace.at) / 1000 / (done - pace.done);
     if (secondsPerPage > 0) {
       const remainingMin = Math.round(((total - done) * secondsPerPage) / 60);
@@ -65,7 +77,7 @@ function GenerationProgress({ progress, label }) {
     <div className="gelato-progress">
       <div className="gelato-progress-head">
         <span>{PROGRESS_LABELS[phase] || label || 'Generation en cours...'}</span>
-        {hasCount && <span className="gelato-progress-count">{done} / {total} pages</span>}
+        {hasCount && <span className="gelato-progress-count">{done} / {total} {unite}</span>}
       </div>
       <div className={`gelato-progress-bar ${percent === null ? 'is-indeterminate' : ''}`}>
         <div

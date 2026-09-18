@@ -2212,8 +2212,8 @@ function deletePdfExportFiles(job) {
 
 // Pipeline sans-IA (voir routes/composition.js:preview.pdf, meme sequence
 // exacte) : contenu reel du livre (book_content_items/pages) + template +
-// format d'impression choisi -> pages composees -> capture Chrome headless
-// page par page (pdfService.js). Remplace l'ancien pipeline chapitres/HTML
+// format d'impression choisi -> pages composees -> PDF ecrit par Chrome
+// lui-meme (pdfService.renderPdfByPrinting). Remplace l'ancien pipeline chapitres/HTML
 // (generateFinalBookPdfFileFromHtml/-Legacy ci-dessous, desormais orphelins
 // mais laisses en place — voir leur commentaire).
 async function generateFinalBookPdfFiles({ book, jobId, onProgress }) {
@@ -2231,14 +2231,26 @@ async function generateFinalBookPdfFiles({ book, jobId, onProgress }) {
   const format = resolveRenderFormat(book.print_format);
   const pages = coverComposer.composeCoversIntoPages({ book, items, template, interiorPages, format });
 
-  const pdfPath = await pdfService.renderPdfFromPages({
+  // RENDU PAR IMPRESSION plutot que par captures d ecran (2026-09-19).
+  //
+  // Mesure sur ce meme livre : memoire 304 -> 138 Mo, duree 177 -> 125 s,
+  // photos 288 -> 366 dpi, fichier 36,7 -> 27,9 Mo. Plus leger ET plus fin,
+  // parce que Chrome integre chaque photo une seule fois au lieu d empiler
+  // une capture par page.
+  //
+  // EN PLANCHES : chaque feuille porte deux pages cote a cote. Une photo
+  // etalee sur une double page reste donc entiere quel que soit le lecteur,
+  // au lieu de dependre de son mode d affichage.
+  const pdfPath = await pdfService.renderPdfByPrinting({
     book,
     pages,
     items,
     layouts,
     format,
-    // capturePagesAsImages compte les pages CAPTUREES : c'est bien ce que
-    // l'utilisateur attend, et l'encodage suit en parallele.
+    spreadLayout: true,
+    // L impression n a plus de boucle page par page : ce qui se compte
+    // desormais, c est le chargement des photos (phase « photos »), de
+    // loin la partie la plus longue.
     onProgress,
     fileBaseName: `${safeBookName}-${jobId}-livre-final`
   });

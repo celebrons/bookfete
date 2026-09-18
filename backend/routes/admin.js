@@ -93,7 +93,13 @@ router.get('/health', authenticate, requireAdmin, (req, res) => {
       rendusEnCours = require('./books').countActivePdfJobs();
     } catch (_error) { /* l information manque, ce n est pas une erreur */ }
 
-    return res.json(etatServeur({ rendusEnCours }));
+    let rendusEnFile = null;
+    try {
+      // eslint-disable-next-line global-require
+      rendusEnFile = require('../services/composition/pdfService').nombreDeRendusEnFile();
+    } catch (_error) { /* idem */ }
+
+    return res.json(etatServeur({ rendusEnCours, rendusEnFile }));
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

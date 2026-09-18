@@ -98,7 +98,7 @@ function derniereSauvegarde() {
  * tiret. Une page de supervision qui plante au moment ou ca va mal serait
  * une mauvaise plaisanterie.
  */
-function etatServeur({ rendusEnCours = null } = {}) {
+function etatServeur({ rendusEnCours = null, rendusEnFile = null } = {}) {
   const memoireProcessus = process.memoryUsage();
   const coeurs = os.cpus().length || 1;
   const charge = os.loadavg();
@@ -134,6 +134,10 @@ function etatServeur({ rendusEnCours = null } = {}) {
     disque: disque(),
     navigateursDeRendu: navigateursDeRendu(),
     rendusEnCours,
+    // Depuis le 2026-09-19 les rendus passent un par un : ce nombre dit
+    // combien attendent leur tour. Un chiffre qui ne redescend pas est le
+    // signe d un rendu bloque.
+    rendusEnFile,
     derniereSauvegarde: derniereSauvegarde(),
     mesureLe: new Date().toISOString()
   };

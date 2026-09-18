@@ -646,7 +646,7 @@ const BASE_CSS = `
   .page {
     width: var(--page-width-mm);
     height: var(--page-height-mm);
-    padding: calc(14mm * var(--fmt-space-scale, 1));
+    padding: calc(14mm * var(--fmt-space-scale, 1) + var(--bleed-mm, 0mm));
     background: #fffdf8;
     position: relative;
     overflow: hidden;
@@ -961,6 +961,24 @@ const BASE_CSS = `
  * @returns {string} document HTML complet, autonome
  */
 function renderBookHtml(input) {
+  // Fond perdu en millimetres. Zero pour le PDF telechargeable par le
+  // client (pas de massicot), 3 pour le fichier d impression.
+  const bleedMm = Number(input.bleedMm) > 0 ? Number(input.bleedMm) : 0;
+
+  // MISE EN PLANCHES (deux pages par feuille).
+  //
+  // Une photo etalee sur une double page est stockee comme deux moities,
+  // sur deux pages consecutives. Dans un lecteur qui affiche une page a la
+  // fois, on ne voit jamais l image entiere — « lorsqu il y a une photo
+  // sur 2 pages elle est perdue » (2026-09-19).
+  //
+  // On cessait de dependre du mode d affichage du lecteur : la feuille
+  // PORTE les deux pages cote a cote. La couverture et la 4e restent
+  // seules sur leur feuille, comme dans un vrai livre.
+  //
+  // Reserve au PDF de lecture. Le fichier d impression garde une page par
+  // feuille : c'est ce que l imprimeur attend.
+  const enPlanches = input.spreadLayout === true;
   const book = input.book || {};
   const pages = Array.isArray(input.pages) ? input.pages : [];
   const items = Array.isArray(input.items) ? input.items : [];
@@ -971,9 +989,39 @@ function renderBookHtml(input) {
   const layoutsById = Object.fromEntries(layouts.map((layout) => [layout.id, layout]));
   const sortedPages = [...pages].sort((a, b) => a.page_index - b.page_index);
   const context = { book, format };
-  const pagesHtml = sortedPages
-    .map((page, index) => renderPage(page, itemsById, layoutsById, index === sortedPages.length - 1, context))
-    .join('\n');
+  const rendus = sortedPages.map(
+    (page, index) => renderPage(page, itemsById, layoutsById, index === sortedPages.length - 1, context)
+  );
+
+  // En planches, le saut de page appartient a la FEUILLE, plus a la page :
+  // sans quoi chaque page partirait sur sa propre feuille et le
+  // regroupement ne servirait a rien.
+  const sansSaut = (html) => html.replace(' page-break', '');
+
+  let pagesHtml;
+  if (enPlanches && rendus.length > 2) {
+    const feuilles = [];
+    // La couverture, seule.
+    feuilles.push([rendus[0]]);
+    // L interieur, deux par deux — meme appariement que l atelier
+    // (leftPageIndex = spread * 2), donc ce que l utilisateur a compose.
+    const interieur = rendus.slice(1, -1);
+    for (let i = 0; i < interieur.length; i += 2) {
+      feuilles.push(interieur.slice(i, i + 2));
+    }
+    // La 4e de couverture, seule.
+    feuilles.push([rendus[rendus.length - 1]]);
+
+    pagesHtml = feuilles
+      .map((feuille, index) => {
+        const derniere = index === feuilles.length - 1;
+        const classe = derniere ? 'feuille' : 'feuille feuille-break';
+        return `<div class="${classe}">${feuille.map(sansSaut).join('')}</div>`;
+      })
+      .join('\n');
+  } else {
+    pagesHtml = rendus.join('\n');
+  }
 
   const { COVER_BASE_CSS, FRONT_COVER_CSS } = require('./frontCoverRenderer');
   const { BACK_COVER_CSS } = require('./backCoverRenderer');
@@ -985,10 +1033,27 @@ function renderBookHtml(input) {
 <title>${escapeHtml(book.title || 'Aperçu du livre')}</title>
 ${GOOGLE_FONTS_LINK}
 <style>
-  @page { size: ${format.trimWidthMm}mm ${format.trimHeightMm}mm; margin: 0; }
+  @page { size: ${(format.trimWidthMm + bleedMm * 2) * (enPlanches ? 2 : 1)}mm ${format.trimHeightMm + bleedMm * 2}mm; margin: 0; }
+  /* Une feuille porte une ou deux pages, cote a cote, sans espace entre
+     elles : le raccord d une photo sur double page doit etre invisible. */
+  .feuille { display: flex; justify-content: center; align-items: flex-start; }
+  .feuille .page { margin: 0; }
+  .feuille-break { break-after: page; page-break-after: always; }
   :root {
-    --page-width-mm: ${format.trimWidthMm}mm;
-    --page-height-mm: ${format.trimHeightMm}mm;
+    /* FOND PERDU.
+
+       La feuille est plus grande que le livre fini : l imprimeur massicote
+       dedans, et cette marge evite un liseré blanc si la coupe derive d un
+       cheveu.
+
+       Il etait obtenu jusqu ici en etirant les pixels du bord APRES la
+       capture d ecran. Sans capture, on l exprime en CSS : la page grandit
+       de bleedMm sur chaque bord, et son remplissage grandit d autant —
+       la zone de contenu reste donc EXACTEMENT la meme, au millimetre.
+       Rien ne bouge dans la mise en page, seule la feuille deborde. */
+    --bleed-mm: ${bleedMm}mm;
+    --page-width-mm: ${format.trimWidthMm + bleedMm * 2}mm;
+    --page-height-mm: ${format.trimHeightMm + bleedMm * 2}mm;
     --fmt-space-scale: ${format.spaceScale ?? 1};
     --fmt-type-scale: ${format.typeScale ?? 1};
 ${typography.typographyCssVariables(format.formatId)}

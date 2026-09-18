@@ -546,7 +546,7 @@ describe('renderBookHtml — densite par format (--fmt-space-scale/--fmt-type-sc
 
   it('les marges/gaps dependent des variables (jamais une valeur figee)', () => {
     const html = renderBookHtml({ book: {}, pages: [], items: [] });
-    expect(html).toContain('padding: calc(14mm * var(--fmt-space-scale, 1));');
+    expect(html).toContain('padding: calc(14mm * var(--fmt-space-scale, 1) + var(--bleed-mm, 0mm));');
   });
 
   // 2026-09-11 — cahier des charges typographique. Ce bloc remplace une

@@ -79,13 +79,17 @@ jest.mock('../services/composition/pdfService', () => ({
   resolveBrowserPath: jest.fn(() => '/fake/chrome'),
   renderPdfFromHtml: jest.fn(async () => require('path').join(__dirname, 'fixtures', 'fake.pdf')),
   // Rapporte une progression, comme le vrai rendu : c'est ce que la route
-  // de statut doit republier au client.
-  renderPdfFromPages: jest.fn(async ({ onProgress }) => {
+  // de statut doit republier au client. L impression compte des PHOTOS
+  // chargees, la capture comptait des pages — la barre accepte les deux.
+  renderPdfByPrinting: jest.fn(async ({ onProgress }) => {
     if (typeof onProgress === 'function') {
-      onProgress({ done: 3, total: 12 });
+      onProgress({ phase: 'photos', done: 3, total: 12 });
     }
     return require('path').join(__dirname, 'fixtures', 'fake.pdf');
-  })
+  }),
+  // Toujours double, bien que la route ne s en serve plus : le fichier
+  // d impression destine a Gelato passe encore par lui.
+  renderPdfFromPages: jest.fn(async () => require('path').join(__dirname, 'fixtures', 'fake.pdf'))
 }));
 
 // L'email « PDF pret » est la contrepartie du message « vous pouvez fermer
@@ -160,9 +164,9 @@ describe('POST /api/books/:id/export-final-pdf — livre sans-IA (zero chapitre)
     expect(response.body.status).toBe('queued');
   });
 
-  it('le job se termine "ready" en utilisant le pipeline sans-IA (pdfService.renderPdfFromPages)', async () => {
+  it('le job se termine "ready" en utilisant le pipeline sans-IA (pdfService.renderPdfByPrinting)', async () => {
     const pdfService = require('../services/composition/pdfService');
-    pdfService.renderPdfFromPages.mockClear();
+    pdfService.renderPdfByPrinting.mockClear();
 
     const postResponse = await request(app)
       .post(`/api/books/${BOOK_ID}/export-final-pdf`)
@@ -181,12 +185,17 @@ describe('POST /api/books/:id/export-final-pdf — livre sans-IA (zero chapitre)
 
     expect(statusResponse.status).toBe(200);
     expect(statusResponse.body.status).toBe('ready');
-    expect(pdfService.renderPdfFromPages).toHaveBeenCalledTimes(1);
+    expect(pdfService.renderPdfByPrinting).toHaveBeenCalledTimes(1);
 
-    const callArgs = pdfService.renderPdfFromPages.mock.calls[0][0];
+    const callArgs = pdfService.renderPdfByPrinting.mock.calls[0][0];
     // Le format vient de book.print_format (resolveRenderFormat), jamais de
     // PREVIEW_FORMATS (perime, ex. livret 148x210mm au lieu de 170x170mm).
     expect(callArgs.format.formatId).toBe('standard');
+    // EN PLANCHES : deux pages par feuille, pour qu une photo etalee sur une
+    // double page reste entiere quel que soit le lecteur (demande du
+    // 2026-09-19). Sans ce drapeau, la moitie droite repart sur la feuille
+    // suivante et l image est coupee.
+    expect(callArgs.spreadLayout).toBe(true);
   });
 });
 
@@ -233,7 +242,8 @@ describe('Suivi de la fabrication du PDF', () => {
     await flushAsync();
 
     const statut = await lireStatut(jobId);
-    // 3 pages sur 12, exactement ce que le rendu a annonce.
+    // 3 photos sur 12, exactement ce que le rendu a annonce.
+    expect(statut.body.progress.phase).toBe('photos');
     expect(statut.body.progress.done).toBe(3);
     expect(statut.body.progress.total).toBe(12);
   });

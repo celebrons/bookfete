@@ -123,6 +123,19 @@ function AdminHealth() {
               : 'aucun navigateur actif'
           }
         />
+        {/* Les rendus passent un par un depuis le 2026-09-19 : deux Chrome
+            en meme temps rendaient le serveur injoignable. Ce compteur dit
+            combien attendent leur tour — s'il ne redescend jamais, un rendu
+            est bloque. */}
+        <Mesure
+          libelle="File des rendus"
+          valeur={etat.rendusEnFile === null || etat.rendusEnFile === undefined ? '—' : String(etat.rendusEnFile)}
+          detail={
+            etat.rendusEnFile > 1
+              ? `${etat.rendusEnFile - 1} en attente de leur tour`
+              : 'un rendu a la fois, rien en attente'
+          }
+        />
         <Mesure
           libelle="Application démarrée depuis"
           valeur={duree(etat.demarreDepuisSecondes)}

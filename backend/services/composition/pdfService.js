@@ -155,7 +155,40 @@ function execFilePromise(command, args, options) {
 // Rend un document HTML complet (deja autonome : <html>...<style>...</html>)
 // en PDF. Renvoie le chemin du fichier PDF genere. Leve une erreur explicite
 // si aucun navigateur headless n'est disponible.
-async function renderPdfFromHtml(html, { fileBaseName = 'preview' } = {}) {
+// UN SEUL RENDU A LA FOIS.
+//
+// Chaque rendu lance son propre Chrome et monte a plusieurs centaines de
+// Mo. Deux rendus simultanes sur le serveur de 2 Go, et la machine devient
+// injoignable : le 2026-09-19 elle repondait encore au ping (10 ms) mais
+// ni le site, ni SSH ne repondaient. Render, lui, tuait le processus a
+// 512 Mo — une erreur franche valait mieux que ce coma.
+//
+// La file est volontairement de UN. Un rendu dure deux minutes : deux
+// utilisateurs simultanes attendent leur tour, au lieu de faire tomber le
+// serveur pour tout le monde.
+//
+// Elle avance meme quand un rendu echoue, sans quoi un seul plantage
+// bloquerait tous les suivants jusqu au redemarrage.
+let fileDeRendu = Promise.resolve();
+let rendusEnFile = 0;
+
+function unSeulRenduALaFois(travail) {
+  rendusEnFile += 1;
+  const resultat = fileDeRendu.then(travail, travail);
+  fileDeRendu = resultat.then(
+    () => { rendusEnFile -= 1; },
+    () => { rendusEnFile -= 1; }
+  );
+  return resultat;
+}
+
+// Pour la supervision (routes/admin.js) : combien de rendus sont en cours
+// ou en attente d un tour.
+function nombreDeRendusEnFile() {
+  return rendusEnFile;
+}
+
+async function renderPdfFromHtmlDirect(html, { fileBaseName = 'preview' } = {}) {
   const browserPath = await resolveBrowserPath();
   if (!browserPath) {
     throw new Error(
@@ -222,12 +255,22 @@ const SCREENSHOT_SCALE = 3;
 // fois ici.
 const JPEG_QUALITY = 92;
 const MM_TO_PT = 72 / 25.4;
+const MM_PAR_POUCE = 25.4;
+
+// Cadence du compte des photos pendant le chargement. Assez rapide pour
+// que la barre bouge, assez lent pour ne rien couter au rendu.
+const IMAGE_PROGRESS_INTERVAL_MS = 1000;
 const IMAGE_WAIT_TIMEOUT_MS = 8000;
 // Delai de garde du chargement de page. Genereux : une page de couverture
 // telecharge aussi les polices Google. Depasse, on capture quand meme —
 // c'est le comportement d'avant, mais devenu exceptionnel au lieu d'etre
 // la regle.
 const PAGE_LOAD_TIMEOUT_MS = 15000;
+
+// Delai de garde d un appel CDP. Genereux : ecrire le PDF d un livre de
+// trente pages prend deux minutes sur une petite machine. Mais BORNE :
+// sans lui, une connexion rompue laisse le rendu en attente sans fin.
+const CDP_CALL_TIMEOUT_MS = 10 * 60 * 1000;
 const CDP_READY_TIMEOUT_MS = 10000;
 
 function mmToPx(mm) {
@@ -297,11 +340,46 @@ function cdpClient(wsUrl) {
     ws.addEventListener('error', () => reject(new Error('Connexion CDP echouee.')));
   });
 
-  async function call(method, params = {}) {
+  // Une socket qui se ferme en cours de route laissait les appels en
+  // attente POUR TOUJOURS. Le 2026-09-19, un rendu est reste bloque
+  // dix-huit minutes avec un Chrome a 0 % de processeur : le navigateur
+  // avait repondu, plus personne n ecoutait. Un appel sans reponse doit
+  // echouer franchement — c est ce qui permet au job de se declarer en
+  // echec et de rendre la main a l utilisateur.
+  const rompre = (raison) => {
+    const enAttente = [...pending.values()];
+    pending.clear();
+    enAttente.forEach(({ reject }) => reject(new Error(raison)));
+  };
+
+  ws.addEventListener('close', (evenement) => {
+    const code = evenement?.code;
+    // 1009 = message trop volumineux. Un PDF de plusieurs dizaines de Mo
+    // revient en base64 dans UN seul message : c est la limite a
+    // soupconner en premier si elle reapparait.
+    const detail = code === 1009
+      ? ' (reponse trop volumineuse pour la connexion)'
+      : '';
+    rompre(`Le navigateur a ferme la connexion (code ${code ?? '?'})${detail}.`);
+  });
+  ws.addEventListener('error', () => rompre('Connexion au navigateur perdue.'));
+
+  async function call(method, params = {}, timeoutMs = CDP_CALL_TIMEOUT_MS) {
     await ready;
     const id = ++nextId;
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      const garde = setTimeout(() => {
+        if (!pending.has(id)) return;
+        pending.delete(id);
+        reject(new Error(`Le navigateur n a pas repondu a ${method} en ${Math.round(timeoutMs / 1000)} s.`));
+      }, timeoutMs);
+      // Ne pas retenir le processus en vie pour un simple delai de garde.
+      if (typeof garde.unref === 'function') garde.unref();
+
+      pending.set(id, {
+        resolve: (valeur) => { clearTimeout(garde); resolve(valeur); },
+        reject: (erreur) => { clearTimeout(garde); reject(erreur); }
+      });
       ws.send(JSON.stringify({ id, method, params }));
     });
   }
@@ -333,7 +411,12 @@ function cdpClient(wsUrl) {
 // Sans ce second signal, une capture pourrait arriver avant la fin du
 // telechargement de la police et retomber silencieusement sur la police de
 // repli (Georgia) de facon intermittente — un bug difficile a reproduire.
-async function waitForImages(cdp) {
+// `onProgress` est facultatif. Le rendu par impression n a plus de boucle
+// page par page : sans ce compte, la barre d avancement resterait
+// indeterminee pendant toute la fabrication — exactement le reproche fait
+// le 2026-09-15 (« il n y a pas de barre de progression »). Le
+// telechargement des photos est la partie longue et se compte, elle.
+async function waitForImages(cdp, onProgress) {
   // `decode()` et non `complete` : une image peut etre TELECHARGEE (complete
   // === true) sans etre encore DECODEE, donc pas encore peignable. Capturer
   // a cet instant donne une image partielle — c'est exactement la bande
@@ -362,7 +445,33 @@ async function waitForImages(cdp) {
       new Promise((resolve) => setTimeout(resolve, ${IMAGE_WAIT_TIMEOUT_MS}))
     ])
   `;
-  await cdp.call('Runtime.evaluate', { expression, awaitPromise: true });
+  const attente = cdp.call('Runtime.evaluate', { expression, awaitPromise: true });
+
+  if (typeof onProgress !== 'function') {
+    await attente;
+    return;
+  }
+
+  // Le sondage passe par le MEME client CDP que l attente ci-dessus : les
+  // reponses sont appariees par identifiant, deux appels simultanes ne se
+  // marchent pas dessus.
+  const sonde = setInterval(() => {
+    cdp.call('Runtime.evaluate', {
+      expression: 'JSON.stringify({ total: document.images.length, done: Array.from(document.images).filter((i) => i.complete).length })',
+      returnByValue: true
+    })
+      .then((r) => {
+        const compte = JSON.parse(r?.result?.value || '{}');
+        if (compte.total > 0) onProgress({ done: compte.done || 0, total: compte.total });
+      })
+      .catch(() => { /* un sondage rate ne doit jamais casser un rendu */ });
+  }, IMAGE_PROGRESS_INTERVAL_MS);
+
+  try {
+    await attente;
+  } finally {
+    clearInterval(sonde);
+  }
 }
 
 /**
@@ -398,27 +507,20 @@ async function waitForImages(cdp) {
 // bonne taille, une extension en miroir suffit a eviter un liseret blanc
 // au bord si la coupe n'est pas parfaitement precise — c'est exactement
 // le role du bleed, pas une zone destinee a etre visible.
-async function capturePagesAsImages({ book, pages, items, layouts, format, scale = SCREENSHOT_SCALE, bleedMm = 0, onProgress }) {
-  const browserPath = await resolveBrowserPath();
-  if (!browserPath) {
-    throw new Error(
-      "Aucun navigateur headless trouve pour le rendu PDF. Definissez PDF_BROWSER_PATH (Chrome/Edge), ou utilisez l'apercu HTML en attendant."
-    );
-  }
+// BRIDER LE NAVIGATEUR.
+//
+// Le 2026-09-18, sur une machine de 2 Go, le noyau a tue Chrome en plein
+// rendu : « Out of memory: Killed process (chrome) ». Le navigateur avait
+// lance HUIT processus pour 407 Mo, a cote des 624 Mo de Node — plus d'un
+// gigaoctet pour rendre des pages UNE PAR UNE.
+//
+// Chrome repartit normalement son travail entre plusieurs processus pour
+// isoler les onglets les uns des autres. Ici il n'y a qu'un seul onglet,
+// ouvert par nous, sur du HTML que nous avons ecrit : cette isolation ne
+// protege de rien et coute la memoire qui manque.
 
-  const port = cdpPort();
-  // BRIDER LE NAVIGATEUR.
-  //
-  // Le 2026-09-18, sur une machine de 2 Go, le noyau a tue Chrome en plein
-  // rendu : « Out of memory: Killed process (chrome) ». Le navigateur avait
-  // lance HUIT processus pour 407 Mo, a cote des 624 Mo de Node — plus d'un
-  // gigaoctet pour rendre des pages UNE PAR UNE.
-  //
-  // Chrome repartit normalement son travail entre plusieurs processus pour
-  // isoler les onglets les uns des autres. Ici il n'y a qu'un seul onglet,
-  // ouvert par nous, sur du HTML que nous avons ecrit : cette isolation ne
-  // protege de rien et coute la memoire qui manque.
-  const child = spawn(browserPath, [
+function argumentsDuNavigateur(port) {
+  return [
     '--headless=new',
     '--disable-gpu',
     '--no-sandbox',
@@ -442,7 +544,19 @@ async function capturePagesAsImages({ book, pages, items, layouts, format, scale
 
     `--remote-debugging-port=${port}`,
     '--remote-allow-origins=*'
-  ], { stdio: 'ignore' });
+  ];
+}
+
+async function capturePagesAsImagesDirect({ book, pages, items, layouts, format, scale = SCREENSHOT_SCALE, bleedMm = 0, onProgress }) {
+  const browserPath = await resolveBrowserPath();
+  if (!browserPath) {
+    throw new Error(
+      "Aucun navigateur headless trouve pour le rendu PDF. Definissez PDF_BROWSER_PATH (Chrome/Edge), ou utilisez l'apercu HTML en attendant."
+    );
+  }
+
+  const port = cdpPort();
+  const child = spawn(browserPath, argumentsDuNavigateur(port), { stdio: 'ignore' });
 
   await fsp.mkdir(PDF_PREVIEW_DIR, { recursive: true });
   const stamp = Date.now();
@@ -708,16 +822,238 @@ async function renderPdfFromPages(input) {
   return outputPath;
 }
 
+// Photos allegees pour le PDF DE LECTURE.
+//
+// Ce fichier sert a lire et a archiver, pas a imprimer : les photos y
+// arrivaient a leur resolution d origine (3024 px), ce qui donnait 84,6 Mo
+// pour un livre de 32 pages. Trop lourd a telecharger pour un client, et
+// inutile — l imprimeur, lui, recoit un autre fichier avec les originales.
+//
+// Supabase sait redimensionner a la volee : /object/public/ devient
+// /render/image/public/. Une URL qui ne vient pas de ce stockage passe
+// telle quelle plutot que d etre cassee.
+//
+// 2000 px de large donnent ~240 dpi sur une page de 210 mm : plus net que
+// ce qu un ecran affiche, bien assez pour une impression de depannage.
+const LARGEUR_PHOTO_LECTURE = 2000;
+
+function allegerLesPhotos(items, largeurMax) {
+  if (!Array.isArray(items) || !largeurMax) return items;
+  return items.map((item) => {
+    const url = item?.url;
+    if (item?.kind !== 'photo' || typeof url !== 'string') return item;
+    if (!url.includes('/storage/v1/object/public/')) return item;
+    return {
+      ...item,
+      url: url.replace(
+        '/storage/v1/object/public/',
+        '/storage/v1/render/image/public/'
+      // format=origin est INDISPENSABLE.
+      //
+      // Sans lui, Supabase sert du WebP a Chrome (qui l annonce dans son
+      // en-tete Accept). Or un PDF ne sait pas porter de WebP : Chrome
+      // redecode chaque photo et la reecrit SANS compression. Mesure du
+      // 2026-09-19 sur le meme livre : 252 Mo avec WebP, contre 85 Mo en
+      // laissant les photos d origine. Alleger les photos rendait le
+      // fichier trois fois plus lourd.
+      //
+      // format=origin garde le JPEG, que Chrome recopie tel quel.
+      ) + `?width=${largeurMax}&quality=82&format=origin`
+    };
+  });
+}
+
+// Rendu PDF par IMPRESSION plutot que par captures d ecran.
+//
+// Mesure le 2026-09-18 sur un livre reel de 32 pages, face a la methode
+// par captures :
+//
+//   memoire de Node : 608 Mo  ->  131 Mo
+//   duree           : 108 s   ->   74 s
+//   photos          : 288 dpi ->  366 dpi (leur resolution d origine)
+//
+// Le commentaire en tete de ce fichier affirmait que printToPDF plafonnait
+// les photos a 96 dpi. C etait une erreur de METHODE : la conclusion avait
+// ete tiree du POIDS des fichiers produits. Or un PDF qui integre les
+// photos telles quelles est forcement plus leger qu une pile de captures,
+// sans rien perdre. En mesurant les pixels des images integrees plutot que
+// les octets du fichier, le resultat s inverse.
+//
+// Ici, Chrome ecrit le PDF lui-meme : plus aucune capture, plus de base64,
+// plus de tampon d images en memoire. Les textes y sont du vrai texte
+// vectoriel, net a toute echelle, et les photos sont integrees a leur
+// resolution d origine.
+// Recupere un PDF produit par Page.printToPDF EN FLUX.
+//
+// Par defaut, Chrome renvoie le fichier entier en base64 dans UN SEUL
+// message de la connexion de debogage. Pour un livre de photos, ce message
+// depasse la centaine de Mo : la connexion se ferme sans un mot et l appel
+// reste en attente. C est ce qui a bloque un rendu dix-huit minutes le
+// 2026-09-19, avec un navigateur a 0 % de processeur — il avait fini, la
+// reponse ne passait pas.
+//
+// En flux, le navigateur rend une poignee et on lit par tranches. La taille
+// du livre cesse d etre une limite.
+const TAILLE_TRANCHE = 4 * 1024 * 1024;
+
+async function lirePdfEnFlux(cdp, handle, outputPath) {
+  const fichier = await fsp.open(outputPath, 'w');
+  try {
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop
+      const tranche = await cdp.call('IO.read', { handle, size: TAILLE_TRANCHE });
+      if (tranche?.data) {
+        // eslint-disable-next-line no-await-in-loop
+        await fichier.write(Buffer.from(tranche.data, tranche.base64Encoded === false ? 'utf8' : 'base64'));
+      }
+      if (tranche?.eof) break;
+    }
+  } finally {
+    await fichier.close();
+    // Liberer la poignee cote navigateur, meme si la lecture a echoue.
+    await cdp.call('IO.close', { handle }).catch(() => {});
+  }
+}
+
+async function renderPdfByPrintingDirect(input) {
+  const format = input.format || { trimWidthMm: 210, trimHeightMm: 297 };
+  const bleedMm = Number(input.bleedMm) > 0 ? Number(input.bleedMm) : 0;
+  const pages = Array.isArray(input.pages) ? input.pages : [];
+
+  const browserPath = await resolveBrowserPath();
+  if (!browserPath) {
+    throw new Error(
+      "Aucun navigateur headless trouve pour le rendu PDF. Definissez PDF_BROWSER_PATH (Chrome/Edge), ou utilisez l'apercu HTML en attendant."
+    );
+  }
+
+  // Une page blanche apres la couverture, pour que les doubles pages
+  // tombent en vis-a-vis dans un lecteur qui affiche deux pages a la fois.
+  // Elle est INSEREE DANS LE HTML, la ou la methode par captures l ajoutait
+  // au moment de l assemblage.
+  //
+  // Sans spreadIndex : ce n est pas une page du livre, elle ne doit pas
+  // participer au calcul des moities d une photo en double page.
+  const enPlanches = input.spreadLayout === true;
+  const commenceParUneCouverture = pages[0]?.content?.kind === 'front-cover';
+  // En planches, la feuille porte deja les deux pages : la page blanche
+  // qui servait a decaler l appariement dans un lecteur deviendrait une
+  // feuille vide au milieu du livre.
+  const pagesAImprimer = (input.insertInsideCover && commenceParUneCouverture && !enPlanches)
+    ? [pages[0], { page_index: 0.5, layout_id: null, content: {} }, ...pages.slice(1)]
+    : pages;
+
+  // Le fichier d impression garde les photos d origine ; le PDF de lecture
+  // les recoit allegees (voir allegerLesPhotos). On se sert du fond perdu
+  // comme signal : seul le fichier destine au massicot en a un.
+  const items = bleedMm > 0
+    ? input.items
+    : allegerLesPhotos(input.items, input.imageMaxWidth ?? LARGEUR_PHOTO_LECTURE);
+
+  const html = pageRenderer.renderBookHtml({
+    book: input.book,
+    pages: pagesAImprimer,
+    items,
+    layouts: input.layouts,
+    format,
+    bleedMm,
+    spreadLayout: enPlanches
+  });
+
+  await fsp.mkdir(PDF_PREVIEW_DIR, { recursive: true });
+  const stamp = Date.now();
+  const htmlPath = path.join(PDF_PREVIEW_DIR, `${input.fileBaseName || 'book'}-${stamp}.html`);
+  const outputPath = path.join(PDF_PREVIEW_DIR, `${input.fileBaseName || 'book'}-${stamp}.pdf`);
+  await fsp.writeFile(htmlPath, html, 'utf8');
+
+  const port = cdpPort();
+  const child = spawn(browserPath, argumentsDuNavigateur(port), { stdio: 'ignore' });
+
+  try {
+    const wsUrl = await openCdpTarget(port);
+    const cdp = cdpClient(wsUrl);
+    await cdp.call('Page.enable', {});
+
+    // Meme precaution que pour les captures : Page.navigate rend la main
+    // des que la navigation COMMENCE. Sans attendre le chargement puis le
+    // decodage des images, on imprimerait des pages vides.
+    const chargement = cdp.waitForEvent('Page.loadEventFired', PAGE_LOAD_TIMEOUT_MS);
+    await cdp.call('Page.navigate', { url: pathToFileURL(htmlPath).href });
+    await chargement;
+    await waitForImages(cdp, ({ done, total }) => {
+      if (typeof input.onProgress !== 'function') return;
+      try {
+        input.onProgress({ phase: 'photos', done, total });
+      } catch (_error) { /* jamais bloquant */ }
+    });
+
+    if (typeof input.onProgress === 'function') {
+      try {
+        input.onProgress({ phase: 'assembling', done: pagesAImprimer.length, total: pagesAImprimer.length });
+      } catch (_error) { /* jamais bloquant */ }
+    }
+
+    const resultat = await cdp.call('Page.printToPDF', {
+      printBackground: true,
+      // En flux : voir lirePdfEnFlux. Sans ca, un livre de photos ne
+      // revient tout simplement pas.
+      transferMode: 'ReturnAsStream',
+      // Taille de feuille EXPLICITE, en pouces. Le fond perdu est deja dans
+      // la regle @page du document : les deux doivent concorder.
+      paperWidth: ((format.trimWidthMm + bleedMm * 2) * (enPlanches ? 2 : 1)) / MM_PAR_POUCE,
+      paperHeight: (format.trimHeightMm + bleedMm * 2) / MM_PAR_POUCE,
+      marginTop: 0,
+      marginBottom: 0,
+      marginLeft: 0,
+      marginRight: 0,
+      preferCSSPageSize: false
+    });
+
+    if (resultat?.stream) {
+      await lirePdfEnFlux(cdp, resultat.stream, outputPath);
+    } else {
+      // Repli : un navigateur qui ignore transferMode repond encore en
+      // base64. Ca marche tant que le fichier reste petit.
+      await fsp.writeFile(outputPath, Buffer.from(resultat.data, 'base64'));
+    }
+
+    cdp.close();
+    return outputPath;
+  } finally {
+    child.kill();
+    fsp.unlink(htmlPath).catch(() => {});
+  }
+}
+
+// Les enveloppes : c est ce que le reste de l application appelle. Seules
+// ces trois fonctions lancent un navigateur, donc seules elles ont besoin
+// d un tour de file. renderPdfFromPages, lui, passe par
+// capturePagesAsImages : le mettre aussi dans la file le ferait attendre
+// son propre tour, indefiniment.
+const renderPdfFromHtml = (html, options) => unSeulRenduALaFois(
+  () => renderPdfFromHtmlDirect(html, options)
+);
+const capturePagesAsImages = (input) => unSeulRenduALaFois(
+  () => capturePagesAsImagesDirect(input)
+);
+const renderPdfByPrinting = (input) => unSeulRenduALaFois(
+  () => renderPdfByPrintingDirect(input)
+);
+
 module.exports = {
   resolveBrowserPath,
   describeBrowserResolution,
   renderPdfFromHtml,
   renderPdfFromPages,
+  renderPdfByPrinting,
   // capturePagesAsImages/SCREENSHOT_SCALE exportes le 2026-09-09 pour
   // services/printing/gelatoCoverComposer.js (couverture wraparound Gelato,
   // capture front/back cover a la taille exacte des panneaux imprimeur —
   // meme primitive, format juste different de celui d'un livre standard).
   capturePagesAsImages,
+  nombreDeRendusEnFile,
+  // Expose pour les tests : la file se verifie sans lancer de navigateur.
+  __filePourLesTests: { unSeulRenduALaFois },
   SCREENSHOT_SCALE,
   PDF_PREVIEW_DIR
 };

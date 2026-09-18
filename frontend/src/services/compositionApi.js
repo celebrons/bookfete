@@ -1,6 +1,19 @@
 import { supabase } from './supabaseClient';
 import { fetchWithWakeRetry } from './httpClient';
 
+// Adresse de l API.
+//
+// REACT_APP_API_URL accepte une valeur RELATIVE, « /api », et c est la plus
+// sure quand le meme serveur sert le site et l API : le fichier construit
+// n embarque alors aucun nom de machine et fonctionne partout — sur une IP
+// aujourd hui, sur le domaine demain, sans reconstruction.
+//
+// Une adresse absolue reste necessaire la ou site et API sont deux services
+// distincts (Render) ou sur deux ports (developpement local).
+//
+// Le 2026-09-19, un fichier construit sans cette variable a ete deploye sur
+// Scaleway : le site y appelait l API de Render, et l espace d administration
+// repondait « Page introuvable » alors que tout etait correctement configure.
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
   const trimmed = configured.replace(/\/$/, '');

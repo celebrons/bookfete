@@ -30,6 +30,42 @@ KillSignal=SIGTERM
 # ses fichiers temporaires.
 PrivateTmp=false
 
+# --- PLAFOND DE RESSOURCES (2026-09-19) ---
+#
+# La machine est devenue injoignable pendant un rendu : elle repondait
+# encore au ping, mais ni le site ni SSH ne repondaient. Rien ne bornait
+# l'application, donc Chrome pouvait prendre les 2 Go et le reste du
+# systeme n'avait plus de quoi tourner.
+#
+# Render faisait mieux SANS avoir plus de memoire : il tuait le processus
+# a 512 Mo. Une erreur franche vaut mieux qu'une machine dans le coma.
+# C'est ce comportement qu'on reproduit ici, avec un plafond plus haut.
+#
+# Chrome est un enfant de node : il est dans le meme groupe de controle,
+# donc les limites ci-dessous couvrent bien le rendu complet.
+
+# 1,5 Go pour l'application. Le reste (500 Mo) est ce qui garde sshd,
+# Caddy et le systeme joignables — c'est la marge qui permet de reprendre
+# la main sans passer par la console Scaleway.
+MemoryHigh=1200M
+MemoryMax=1500M
+
+# Pas d'echange sur le disque : c'est lui qui transforme un depassement
+# de memoire (quelques secondes) en machine inutilisable (plusieurs
+# minutes). Mieux vaut etre tue net.
+MemorySwapMax=0
+
+# Si le noyau doit tuer quelque chose, qu'il prenne le navigateur et pas
+# tout le service : node survit et signale un rendu echoue.
+OOMPolicy=continue
+
+# Le rendu ne doit jamais prendre TOUT le processeur : il faut qu'il reste
+# de quoi repondre a une requete et accepter une connexion SSH. 160 % sur
+# 2 vCPU laisse 0,4 vCPU au reste.
+CPUQuota=160%
+CPUWeight=50
+IOWeight=50
+
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=celebrons

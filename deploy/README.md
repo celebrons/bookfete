@@ -96,11 +96,37 @@ node scripts/check-serveur.js --rendus 3   # batterie complète, 3 rendus
 
 ---
 
+## Reconstruire le site
+
+Le serveur sert le site ET l'API : le site doit donc appeler **sa propre**
+API, jamais celle de Render.
+
+```bash
+cd frontend
+REACT_APP_API_URL=/api npx craco build
+tar -czf /tmp/b.tgz build
+scp /tmp/b.tgz root@<IP>:/tmp/
+ssh root@<IP> "cd /home/celebrons/bookfete/frontend && rm -rf build && tar -xzf /tmp/b.tgz && chown -R celebrons: build"
+```
+
+`/api` est une adresse **relative** : le fichier construit n'embarque aucun
+nom de machine et vaut pour l'IP d'aujourd'hui comme pour le domaine de
+demain.
+
+Vérifier après coup, systématiquement :
+
+```bash
+curl -s https://<hôte>/static/js/main.<hash>.js | grep -c onrender.com
+```
+
+Doit renvoyer `0`. Le 2026-09-19, un build parti sans cette variable faisait
+appeler l'API de Render depuis Scaleway : l'espace d'administration répondait
+« Page introuvable » alors que tout était correctement configuré.
+
 ## Ce qui n'est PAS fait à ce stade
 
 - Aucune photo déplacée : le stockage reste Supabase.
 - Aucun changement DNS : le domaine ne pointe pas ici.
-- Aucun HTTPS : le serveur écoute en HTTP sur le port 5000, accessible par son
-  IP. Suffisant pour tester, à compléter avant toute mise en production.
 - Render continue de tourner, intact.
-- Aucune sauvegarde automatique de la base.
+- Aucune supervision externe (Sentry, alerte par courriel) : les erreurs sont
+  au journal des événements, encore faut-il aller le regarder.
