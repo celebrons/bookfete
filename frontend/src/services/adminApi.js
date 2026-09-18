@@ -56,3 +56,18 @@ export const fetchBookPreviewHtml = async (bookId) => {
   if (!response.ok) throw new Error("Impossible d'afficher ce livre.");
   return response.text();
 };
+
+// Journal des evenements metier (voir backend/services/events/eventLog.js).
+//
+// Repond a « que s'est-il passe sur cette commande ? » sans ouvrir de
+// terminal, et identiquement quel que soit le serveur qui a agi — chaque
+// evenement porte son environnement d'origine.
+export const listEvents = ({ orderId, bookId, level, limit } = {}) => {
+  const params = new URLSearchParams();
+  if (orderId) params.set('orderId', orderId);
+  if (bookId) params.set('bookId', bookId);
+  if (level) params.set('level', level);
+  if (limit) params.set('limit', String(limit));
+  const suffixe = params.toString();
+  return request(`/events${suffixe ? `?${suffixe}` : ''}`);
+};

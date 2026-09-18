@@ -37,6 +37,7 @@ const TABLES = [
   'orders',
   'profiles',
   'book_snapshots',
+  'app_events',
   'book_participants',
   'contributions',
   'chapters'
@@ -99,6 +100,18 @@ const mo = (o) => (o / 1024 / 1024).toFixed(1);
   console.log('');
   console.log(`  ${lignesTotal} lignes sauvegardees dans ${fichier}`);
   console.log(`  ${mo(taille)} Mo compresses (${mo(brut.length)} Mo bruts)`);
+
+  // Purge du journal d evenements, au meme moment : une table qu on ne
+  // nettoie jamais finit toujours par poser probleme, et toujours au
+  // mauvais moment. La sauvegarde vient d etre faite, donc rien n est
+  // perdu — les lignes effacees restent dans les archives.
+  try {
+    const { purgeEvents } = require("../services/events/eventLog");
+    const { removed } = await purgeEvents({ jours: 90 });
+    if (removed > 0) console.log(`  ${removed} evenement(s) de plus de 90 jours effaces`);
+  } catch (error) {
+    console.log("  purge des evenements impossible :", error.message);
+  }
 
   // Menage des anciennes.
   const limite = Date.now() - JOURS_CONSERVES * 24 * 60 * 60 * 1000;

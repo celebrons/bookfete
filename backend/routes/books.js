@@ -21,6 +21,7 @@ const pdfService = require('../services/composition/pdfService');
 const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../services/composition/coverFormat');
 const { resolveFormatDensity } = require('../services/composition/formatDensity');
 const emailsTransactionnels = require('../services/email/transactionalEmails');
+const { logEvent } = require('../services/events/eventLog');
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 const CHAPTER_DRAFT_EMAIL = '__chapter_draft__@system.local';
@@ -2109,6 +2110,21 @@ async function processPdfExportJob({
     readyJob.error = null;
     readyJob.files = files;
     pdfExportJobs.set(jobId, readyJob);
+
+    logEvent({
+      type: 'pdf.ready',
+      bookId: readyJob.bookId,
+      orderId: readyJob.orderId,
+      ownerId: readyJob.ownerId,
+      message: 'PDF final genere',
+      metadata: {
+        jobId,
+        pages: readyJob.progress?.total || null,
+        secondes: readyJob.startedAt
+          ? Math.round((Date.parse(readyJob.completedAt) - Date.parse(readyJob.startedAt)) / 1000)
+          : null
+      }
+    });
     try {
       await syncOrderWithPdfJobResult({
         job: readyJob,
@@ -2136,6 +2152,16 @@ async function processPdfExportJob({
     failedJob.completedAt = new Date().toISOString();
     failedJob.error = cleanText(error?.message || 'Generation PDF impossible', 260);
     pdfExportJobs.set(jobId, failedJob);
+
+    logEvent({
+      type: 'pdf.failed',
+      level: 'error',
+      bookId: failedJob.bookId,
+      orderId: failedJob.orderId,
+      ownerId: failedJob.ownerId,
+      message: 'Generation du PDF echouee',
+      metadata: { jobId, erreur: failedJob.error }
+    });
     try {
       await syncOrderWithPdfJobResult({
         job: failedJob,

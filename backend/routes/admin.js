@@ -17,6 +17,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
+const { listEvents } = require('../services/events/eventLog');
 const bookContentService = require('../services/composition/bookContentService');
 const templateCatalog = require('../services/composition/templateCatalog');
 const pageRenderer = require('../services/composition/pageRenderer');
@@ -68,6 +69,33 @@ router.get('/me', authenticate, (req, res) => {
 // livre : a quelques centaines de livres la difference est deja franche, et
 // ca evite le classique N+1 qui rend l'ecran inutilisable des que le projet
 // marche.
+// Journal des EVENEMENTS METIER (voir services/events/eventLog.js).
+//
+// Repond a « que s est-il passe sur cette commande ? » sans ouvrir de
+// terminal, et identiquement quel que soit le serveur qui a agi — chaque
+// evenement porte son environnement d origine.
+//
+// Lecture seule, comme tout cet espace. Filtres facultatifs : orderId,
+// bookId, level.
+router.get('/events', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const evenements = await listEvents({
+      orderId: req.query.orderId,
+      bookId: req.query.bookId,
+      level: req.query.level,
+      limit: req.query.limit
+    });
+    return res.json({ events: evenements });
+  } catch (error) {
+    // La table peut ne pas exister si la migration phase21 n a pas ete
+    // passee : on le dit plutot que de renvoyer une erreur opaque.
+    return res.status(500).json({
+      error: error.message,
+      indice: "Avez-vous execute sql/phase21_app_events.sql dans Supabase ?"
+    });
+  }
+});
+
 router.get('/books', authenticate, requireAdmin, async (req, res) => {
   try {
     const search = String(req.query.search || '').trim().toLowerCase();

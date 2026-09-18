@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { checkIsAdmin, fetchBookPreviewHtml, listAllBooks } from '../../services/adminApi';
 import '../../styles/luxe-theme.css';
+import AdminEvents from './AdminEvents';
 import './AdminBooksLuxe.css';
 
 // Espace d'administration : tous les livres, leur statut, qui les a faits, et
@@ -223,6 +224,10 @@ export default function AdminBooksLuxe() {
           </div>
         </div>
       )}
+
+      {/* Le journal des evenements : le deroule de ce qui est arrive aux
+          livres et aux commandes, tous serveurs confondus. */}
+      <AdminEvents />
     </div>
   );
 }

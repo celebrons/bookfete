@@ -6,6 +6,7 @@ const authenticate = require('../middleware/auth');
 const { submitPrintOrderToGelato, isGelatoLiveOrdersEnabled } = require('../services/printing/gelatoOrderService');
 const gelatoClient = require('../services/printing/gelatoClient');
 const { removePrintFilesForOrder } = require('../services/printing/printFileStorage');
+const { logEvent } = require('../services/events/eventLog');
 
 // Envois a l'imprimeur EN COURS, par commande.
 //
@@ -730,6 +731,14 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
     // travail detache : il couvre donc toute la duree du rendu (plusieurs
     // minutes), pas seulement celle de la requete HTTP.
     gelatoSubmissionsEnCours.add(order.id);
+    logEvent({
+      type: 'gelato.submit.started',
+      orderId: order.id,
+      bookId: order.book_id,
+      ownerId: order.owner_id,
+      message: 'Envoi a l\'imprimeur demande',
+      metadata: { format: book.print_format, pages: book.page_count }
+    });
 
     (async () => {
       try {
@@ -738,8 +747,25 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
         });
         if (result.error) {
           console.error('Envoi de test Gelato echoue pour la commande', order.id, ':', result.error);
+          logEvent({
+            type: 'gelato.submit.failed',
+            level: 'error',
+            orderId: order.id,
+            bookId: order.book_id,
+            ownerId: order.owner_id,
+            message: 'Envoi a l\'imprimeur echoue',
+            metadata: { erreur: String(result.error).slice(0, 300) }
+          });
         } else {
           console.log(`Envoi de test Gelato : brouillon ${result.gelatoOrderId} cree pour la commande ${order.id}`);
+          logEvent({
+            type: 'gelato.submitted',
+            orderId: order.id,
+            bookId: order.book_id,
+            ownerId: order.owner_id,
+            message: `Fichier depose chez Gelato (${result.gelatoOrderType})`,
+            metadata: { gelatoOrderId: result.gelatoOrderId, gelatoOrderType: result.gelatoOrderType }
+          });
         }
       } catch (error) {
         console.error('Erreur inattendue lors de l\'envoi de test Gelato', order.id, ':', error.message);
@@ -835,6 +861,17 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
       gelatoCheckedAt: nowIso,
       tracking
     };
+
+    if (shouldAdvance) {
+      logEvent({
+        type: 'status.changed',
+        orderId: order.id,
+        bookId: order.book_id,
+        ownerId: order.owner_id,
+        message: `Statut : ${order.status} -> ${mappedStatus}`,
+        metadata: { avant: order.status, apres: mappedStatus, source: 'gelato', gelatoStatus: rawStatus }
+      });
+    }
 
     const { data: updated } = await supabase
       .from('orders')
@@ -1352,6 +1389,21 @@ router.delete('/:orderId', authenticate, async (req, res) => {
     // (555 Mo mesures le 2026-09-17 pour un seul livre). Best effort, comme
     // la suppression des brouillons Gelato plus haut.
     const menage = await removePrintFilesForOrder(order.id);
+
+    logEvent({
+      type: 'order.deleted',
+      level: 'warn',
+      orderId: order.id,
+      bookId: order.book_id,
+      ownerId: order.owner_id,
+      message: `Commande ${order.order_number} supprimee`,
+      metadata: {
+        statut: order.status,
+        type: order.type,
+        brouillonsGelatoSupprimes: deletedDrafts.length,
+        fichiersImpressionSupprimes: menage.removed
+      }
+    });
 
     return res.json({
       deleted: true,

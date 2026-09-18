@@ -1,0 +1,109 @@
+/* Journal des evenements, dans l'espace d'administration.
+   Dense a dessein : on vient y balayer une liste, pas la lire ligne a ligne. */
+
+.admin-events {
+  margin-top: var(--space-lg, 32px);
+}
+
+.admin-events-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm, 12px);
+  margin-bottom: var(--space-sm, 12px);
+}
+
+.admin-events-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-events-filtres {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-events-filtres select {
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-events-erreur {
+  color: #b3261e;
+  font-size: 14px;
+}
+
+/* Le tableau peut etre plus large que l'ecran : il defile seul, sans
+   entrainer toute la page avec lui. */
+.admin-events-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-events-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-events-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-soft, #7a7266);
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(223, 216, 201, 0.9);
+  white-space: nowrap;
+}
+
+.admin-events-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(223, 216, 201, 0.45);
+  vertical-align: top;
+}
+
+/* Les horodatages s'alignent en colonne : chiffres a chasse fixe. */
+.admin-events-quand {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft, #7a7266);
+}
+
+.admin-events-type {
+  display: block;
+  font-weight: 600;
+}
+
+.admin-events-message {
+  display: block;
+  color: var(--ink-soft, #7a7266);
+}
+
+.admin-events-env {
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-soft, #7a7266);
+}
+
+.admin-events-detail {
+  color: var(--ink-soft, #7a7266);
+  word-break: break-word;
+  max-width: 420px;
+}
+
+/* Le niveau se lit d'un coup d'oeil, par un filet a gauche : assez pour
+   reperer une erreur en balayant, assez sobre pour ne pas crier. */
+.admin-events-table tr.is-warn td:first-child {
+  box-shadow: inset 3px 0 0 #c9a35f;
+}
+
+.admin-events-table tr.is-error td:first-child {
+  box-shadow: inset 3px 0 0 #b3261e;
+}
+
+.admin-events-table tr.is-error .admin-events-type {
+  color: #b3261e;
+}
