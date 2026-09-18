@@ -40,9 +40,27 @@ const compositionRoutes = require('./routes/composition');
 const productRoutes = require('./routes/products');
 const collectiveRoutes = require('./routes/collective');
 
+// ORIGINES AUTORISEES.
+//
+// La liste etait ecrite en dur sur les deux adresses Render : tout autre
+// hebergement etait refuse par le navigateur sans moyen de le configurer
+// (rencontre le 2026-09-18 en montant un second environnement). Elle se
+// regle desormais par ALLOWED_ORIGINS, une liste separee par des virgules.
+//
+// Les deux adresses Render restent le defaut : sans variable, le
+// comportement en production ne change pas d'un iota.
+const ORIGINES_PAR_DEFAUT = [
+  'https://bookfete-front.onrender.com',
+  'https://bookfete.onrender.com'
+];
+const originesAutorisees = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://bookfete-front.onrender.com', 'https://bookfete.onrender.com']
+    ? (originesAutorisees.length > 0 ? originesAutorisees : ORIGINES_PAR_DEFAUT)
     : '*'
 }));
 
