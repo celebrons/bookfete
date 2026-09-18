@@ -24,9 +24,12 @@ describe('mapGelatoStatus', () => {
   });
 
   it('absorbe les variantes d\'ecriture (casse, underscore, tiret, espace)', () => {
-    expect(mapGelatoStatus('IN_PRODUCTION')).toBe('printed');
-    expect(mapGelatoStatus('in-production')).toBe('printed');
-    expect(mapGelatoStatus('In Production')).toBe('printed');
+    // « en production » = EN COURS de fabrication, pas fabrique : corrige
+    // le 2026-09-18 apres qu'une vraie commande sous presse s'est affichee
+    // « Imprime » au client.
+    expect(mapGelatoStatus('IN_PRODUCTION')).toBe('sent_to_printer');
+    expect(mapGelatoStatus('in-production')).toBe('sent_to_printer');
+    expect(mapGelatoStatus('In Production')).toBe('sent_to_printer');
     expect(mapGelatoStatus('Shipped')).toBe('shipped');
   });
 

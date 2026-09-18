@@ -24,9 +24,17 @@ const STATUS_MAP = {
   created: 'sent_to_printer',
   passed: 'sent_to_printer',
   pending: 'sent_to_printer',
-  printing: 'printed',
-  inproduction: 'printed',
-  production: 'printed',
+  // « en production » veut dire EN COURS de fabrication, pas fabrique.
+  // Ces trois etats etaient traduits par `printed`, affiche « Imprime » :
+  // on annoncait au client un livre termine alors qu il etait encore sous
+  // presse (signale le 2026-09-18 sur une vraie commande). Et comme un
+  // statut ne recule jamais, l'erreur ne se corrigeait plus ensuite.
+  //
+  // `printed` reste reserve a l'etat Gelato du meme nom, le seul qui
+  // signifie reellement « imprime, en attente d expedition ».
+  printing: 'sent_to_printer',
+  inproduction: 'sent_to_printer',
+  production: 'sent_to_printer',
   printed: 'printed',
   shipped: 'shipped',
   intransit: 'shipped',
