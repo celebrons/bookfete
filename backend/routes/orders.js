@@ -733,6 +733,7 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
     gelatoSubmissionsEnCours.add(order.id);
     logEvent({
       type: 'gelato.submit.started',
+      actor: req.user.email,
       orderId: order.id,
       bookId: order.book_id,
       ownerId: order.owner_id,
@@ -750,6 +751,7 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
           logEvent({
             type: 'gelato.submit.failed',
             level: 'error',
+            actor: req.user.email,
             orderId: order.id,
             bookId: order.book_id,
             ownerId: order.owner_id,
@@ -760,6 +762,7 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
           console.log(`Envoi de test Gelato : brouillon ${result.gelatoOrderId} cree pour la commande ${order.id}`);
           logEvent({
             type: 'gelato.submitted',
+            actor: req.user.email,
             orderId: order.id,
             bookId: order.book_id,
             ownerId: order.owner_id,
@@ -865,11 +868,19 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
     if (shouldAdvance) {
       logEvent({
         type: 'status.changed',
+        actor: 'gelato',
         orderId: order.id,
         bookId: order.book_id,
         ownerId: order.owner_id,
         message: `Statut : ${order.status} -> ${mappedStatus}`,
-        metadata: { avant: order.status, apres: mappedStatus, source: 'gelato', gelatoStatus: rawStatus }
+        metadata: {
+          avant: order.status,
+          apres: mappedStatus,
+          source: 'gelato',
+          gelatoStatus: rawStatus,
+          // Qui regardait le suivi au moment ou Gelato a repondu.
+          consulteePar: req.user.email || null
+        }
       });
     }
 
@@ -1393,6 +1404,7 @@ router.delete('/:orderId', authenticate, async (req, res) => {
     logEvent({
       type: 'order.deleted',
       level: 'warn',
+      actor: req.user.email,
       orderId: order.id,
       bookId: order.book_id,
       ownerId: order.owner_id,

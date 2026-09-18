@@ -31,6 +31,13 @@ create table if not exists public.app_events (
   order_id uuid,
   owner_id uuid,
 
+  -- QUI a agi, en clair. L identifiant seul ne repond pas a la question :
+  -- il faudrait le resoudre a chaque lecture, et il ne dit rien quand
+  -- l action vient de l imprimeur ou d une tache automatique. On stocke donc
+  -- l adresse email quand une personne est a l origine, et un mot lisible
+  -- sinon (« systeme », « gelato »).
+  actor text,
+
   -- Une phrase lisible, ecrite pour etre comprise sans le code sous les yeux.
   message text,
 

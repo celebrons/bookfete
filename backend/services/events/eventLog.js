@@ -48,9 +48,10 @@ const texte = (valeur, max) => {
  * @param {string} [evenement.bookId]
  * @param {string} [evenement.orderId]
  * @param {string} [evenement.ownerId]
+ * @param {string} [evenement.actor] qui a agi (email, ou 'gelato', 'systeme')
  * @param {object} [evenement.metadata] le detail propre a ce type
  */
-function logEvent({ type, level = 'info', message, bookId, orderId, ownerId, metadata } = {}) {
+function logEvent({ type, level = 'info', message, bookId, orderId, ownerId, actor, metadata } = {}) {
   const typeNettoye = texte(type, 60);
   if (!typeNettoye) return;
 
@@ -61,6 +62,10 @@ function logEvent({ type, level = 'info', message, bookId, orderId, ownerId, met
     book_id: texte(bookId, 60),
     order_id: texte(orderId, 60),
     owner_id: texte(ownerId, 60),
+    // QUI a agi. Une adresse email quand une personne est a l origine, un
+    // mot lisible sinon. Sans valeur : « systeme » — une tache automatique,
+    // pas un vide qui laisserait croire a une information perdue.
+    actor: texte(actor, 200) || 'systeme',
     metadata: {
       ...(metadata && typeof metadata === 'object' ? metadata : {}),
       env: environnement()

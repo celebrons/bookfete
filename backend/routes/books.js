@@ -2113,6 +2113,7 @@ async function processPdfExportJob({
 
     logEvent({
       type: 'pdf.ready',
+      actor: readyJob.ownerEmail,
       bookId: readyJob.bookId,
       orderId: readyJob.orderId,
       ownerId: readyJob.ownerId,
@@ -2156,6 +2157,7 @@ async function processPdfExportJob({
     logEvent({
       type: 'pdf.failed',
       level: 'error',
+      actor: failedJob.ownerEmail,
       bookId: failedJob.bookId,
       orderId: failedJob.orderId,
       ownerId: failedJob.ownerId,

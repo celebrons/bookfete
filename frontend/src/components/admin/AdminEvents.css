@@ -107,3 +107,13 @@
 .admin-events-table tr.is-error .admin-events-type {
   color: #b3261e;
 }
+
+/* Qui a agi. Une adresse email peut etre longue : on la tronque plutot que
+   d'etirer le tableau, le titre au survol donne la version entiere. */
+.admin-events-qui {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  font-size: 12px;
+}

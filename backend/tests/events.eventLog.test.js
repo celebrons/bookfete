@@ -100,6 +100,18 @@ describe('logEvent — un temoin qui ne casse rien', () => {
     expect(mockInserts[0].message.length).toBe(500);
   });
 
+  it('retient QUI a agi', () => {
+    logEvent({ type: 'gelato.submitted', actor: 'marie@exemple.fr' });
+    expect(mockInserts[0].actor).toBe('marie@exemple.fr');
+  });
+
+  it('sans acteur, dit « systeme » plutot que de laisser un vide', () => {
+    // Un vide laisserait croire a une information perdue ; « systeme » dit
+    // qu'aucune personne n'est a l'origine — une tache automatique.
+    logEvent({ type: 'pdf.ready' });
+    expect(mockInserts[0].actor).toBe('systeme');
+  });
+
   it("nomme l'environnement", () => {
     expect(typeof environnement()).toBe('string');
     expect(environnement().length).toBeGreaterThan(0);

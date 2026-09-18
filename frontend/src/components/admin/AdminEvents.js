@@ -99,6 +99,7 @@ function AdminEvents() {
               <tr>
                 <th>Quand</th>
                 <th>Quoi</th>
+                <th>Qui</th>
                 <th>Où</th>
                 <th>Détail</th>
               </tr>
@@ -111,6 +112,9 @@ function AdminEvents() {
                     <span className="admin-events-type">{LIBELLES[e.type] || e.type}</span>
                     {e.message && <span className="admin-events-message">{e.message}</span>}
                   </td>
+                  {/* QUI a agi : une adresse quand c'est une personne,
+                      « gelato » ou « systeme » sinon. */}
+                  <td className="admin-events-qui">{e.actor || '—'}</td>
                   {/* Quel serveur a agi. Indispensable depuis qu'on fait
                       tourner plusieurs environnements sur la meme base. */}
                   <td className="admin-events-env">{e.metadata?.env || '—'}</td>

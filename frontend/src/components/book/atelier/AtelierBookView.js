@@ -138,8 +138,12 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
           encombrerait pour rien et rendrait ambigu ce sur quoi elles
           agissent. */}
       {selectable && isSelected && actions}
+      {/* « Page en cours de modification » se lisait comme un travail du
+          SYSTEME — l utilisateur pouvait croire qu une operation tournait en
+          arriere-plan et qu il fallait attendre. On s adresse donc a lui
+          directement : c est LUI qui modifie cette page (2026-09-18). */}
       {selectable && isSelected && (
-        <span className="atelier-page-pane-editing-badge">✎ Page en cours de modification</span>
+        <span className="atelier-page-pane-editing-badge">✎ Vous modifiez cette page</span>
       )}
       {isInactive && (
         <span className="atelier-page-pane-inactive-hint">Cliquer pour modifier</span>
