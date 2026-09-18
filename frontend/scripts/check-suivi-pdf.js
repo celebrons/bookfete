@@ -92,5 +92,23 @@ html = rendre({
 check(!html.includes('pdf-build-block'), 'une barre figee ne survit pas a un PDF pret');
 check(html.includes('Telecharger le PDF final'), 'le telechargement est propose a la place');
 
+console.log('\nCas 5 — commande IMPRESSION seule : le client n a pas achete de');
+console.log('        PDF, il ne doit en voir aucune trace. Le rendu interne en');
+console.log('        produit pourtant un, donc metadata.pdfReady passe a vrai.\n');
+html = rendre({
+  order: { id: 'o1', order_number: 'CMD-1', type: 'print', status: 'printed', metadata: { pdfReady: true } },
+  pdfJob: { status: 'ready' }
+});
+check(!html.includes('Telecharger le PDF final'), 'aucun telechargement de PDF propose');
+check(!html.includes('Régénérer le PDF'), 'aucune regeneration de PDF proposee');
+check(!html.includes('pdf-build-block'), 'aucune barre de fabrication de PDF');
+
+console.log('\nCas 6 — commande PACK : le PDF fait partie de l achat.\n');
+html = rendre({
+  order: { id: 'o1', order_number: 'CMD-1', type: 'pack', status: 'printed', metadata: { pdfReady: true } },
+  pdfJob: { status: 'ready' }
+});
+check(html.includes('Telecharger le PDF final'), 'le telechargement reste propose pour un pack');
+
 console.log(echecs === 0 ? '\nRESULTAT : OK' : `\nRESULTAT : ${echecs} echec(s)`);
 process.exit(echecs === 0 ? 0 : 1);

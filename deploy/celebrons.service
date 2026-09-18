@@ -1,0 +1,38 @@
+# Service systeme de l'API Celebrons.
+#
+# systemd plutot que pm2 : rien de plus a installer, redemarrage automatique
+# apres un plantage ET apres un reboot de la machine, journaux consultables
+# avec `journalctl -u celebrons -f`.
+#
+# Installe par deploy/install-serveur.sh dans /etc/systemd/system/.
+
+[Unit]
+Description=API Celebrons (bookfete)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=celebrons
+WorkingDirectory=/home/celebrons/bookfete/backend
+EnvironmentFile=/home/celebrons/bookfete/backend/.env
+ExecStart=/usr/bin/node server.js
+
+# Un rendu PDF dure plusieurs minutes et monte a ~600 Mo (node + Chromium).
+# Sur une machine de 2 Go, un redemarrage trop prompt pendant un rendu
+# gaspillerait le travail deja fait : on laisse le temps de finir proprement.
+Restart=always
+RestartSec=5
+TimeoutStopSec=300
+KillSignal=SIGTERM
+
+# Le navigateur headless est lance par l'application : il doit pouvoir ecrire
+# ses fichiers temporaires.
+PrivateTmp=false
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=celebrons
+
+[Install]
+WantedBy=multi-user.target

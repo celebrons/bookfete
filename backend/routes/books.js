@@ -408,7 +408,28 @@ function isOrderLinkedToBook(order, bookId) {
   return false;
 }
 
+// Le PDF fait-il partie de ce qui a ete ACHETE ?
+//
+// Nos trois formules : `pdf` (le fichier seul), `print` (le livre
+// imprime seul), `pack` (les deux). Une commande `print` n'ouvre donc
+// aucun droit sur le PDF — sinon le supplement du pack (+20 EUR) ne
+// correspondrait a rien, et un acheteur qui a paye 108 EUR pour un livre
+// repartirait aussi avec le fichier vendu 39 EUR.
+//
+// Le fichier d'impression envoye a Gelato est un autre objet, produit par
+// services/printing/gelatoPrintFile.js : il ne passe pas par ici et reste
+// evidemment disponible pour toute commande imprimee.
+function orderIncludesPdf(order) {
+  const type = String(order?.type || '').toLowerCase();
+  return type === 'pdf' || type === 'pack';
+}
+
 function hasOrderPdfAccess(order) {
+  // Le paiement ne suffit pas : encore faut-il avoir achete le PDF.
+  if (!orderIncludesPdf(order)) {
+    return false;
+  }
+
   const normalizedStatus = normalizeOrderStatus(order?.status);
   if (ORDER_STATUSES_WITH_PDF_ACCESS.has(normalizedStatus)) {
     return true;
@@ -429,7 +450,7 @@ function hasOrderPdfAccess(order) {
 async function hasPaidPdfAccessForBook({ db = supabase, ownerId, bookId }) {
   const { data, error } = await db
     .from('orders')
-    .select('id, status, paid_at, metadata, book_id, snapshot')
+    .select('id, type, status, paid_at, metadata, book_id, snapshot')
     .eq('owner_id', ownerId || '')
     .order('created_at', { ascending: false })
     .limit(500);
@@ -448,7 +469,7 @@ async function hasPaidPdfAccessForBook({ db = supabase, ownerId, bookId }) {
   // Fallback for legacy/misaligned rows where owner_id can be missing or inconsistent.
   const { data: rawBookOrders, error: rawBookOrdersError } = await db
     .from('orders')
-    .select('id, status, paid_at, metadata, book_id, snapshot')
+    .select('id, type, status, paid_at, metadata, book_id, snapshot')
     .eq('book_id', bookId)
     .order('created_at', { ascending: false })
     .limit(500);

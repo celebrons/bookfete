@@ -1,5 +1,5 @@
 import React from 'react';
-import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPrint } from '../../../utils/orderWorkflow';
+import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPdf, includesPrint } from '../../../utils/orderWorkflow';
 import GenerationProgress from './GenerationProgress';
 import './StepTracking.css';
 
@@ -65,7 +65,14 @@ function StepTracking({
   const statusConfig = getOrderStatusConfig(status);
   const timeline = buildTimeline(order.type, status);
   const isPrint = includesPrint(order.type);
-  const pdfReady = status === 'pdf_ready' || order?.metadata?.pdfReady;
+  // Le PDF n'existe, pour le client, que s'il l'a ACHETE. Une commande
+  // `print` en fabrique bien un en interne (le fichier envoye a
+  // l'imprimeur), et metadata.pdfReady passe donc a vrai — mais ce fichier
+  // ne lui appartient pas : il a paye un livre, pas un fichier. Sans ce
+  // garde-fou, l'ecran proposait « Telecharger le PDF final » a un
+  // acheteur qui ne l'avait pas commande (2026-09-18).
+  const pdfAchete = includesPdf(order.type);
+  const pdfReady = pdfAchete && (status === 'pdf_ready' || order?.metadata?.pdfReady);
 
   // Le PDF est-il en train d'etre fabrique ?
   //
@@ -80,7 +87,7 @@ function StepTracking({
   // pdfJob reste fige sur sa derniere valeur — « 15 / 32 pages » — alors que
   // le serveur, lui, a fini et envoye l email. Sans cette garde, la barre
   // restait affichee indefiniment sur un travail deja termine (2026-09-16).
-  const pdfEnCours = !pdfReady && (
+  const pdfEnCours = pdfAchete && !pdfReady && (
     regeneratingPdf
     || status === 'pdf_generating'
     || pdfJob?.status === 'queued'

@@ -6,39 +6,42 @@ import {
   includesPdf,
   formatPriceCents
 } from '../../utils/orderWorkflow';
-import { createStripeCheckoutSession, deleteOrder, listOrders, updateOrderStatus } from '../../services/ordersApi';
+import { createStripeCheckoutSession, deleteOrder, getOrderTracking, listOrders } from '../../services/ordersApi';
 import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
 
-const nextPrintStatus = (status) => {
-  if (status === 'print_queued') return 'sent_to_printer';
-  if (status === 'sent_to_printer') return 'printed';
-  if (status === 'printed') return 'shipped';
-  if (status === 'shipped') return 'delivered';
-  return null;
-};
+// L'avance MANUELLE du statut d'impression a ete retiree le 2026-09-18.
+//
+// Elle datait d'avant le suivi reel : a l'epoque, rien ne faisait bouger
+// print_queued -> sent_to_printer -> printed -> shipped tout seul, et ces
+// boutons servaient a simuler la progression.
+//
+// Depuis, l'etat vient de l'imprimeur (GET /orders/:id/tracking). Garder une
+// avance manuelle devenait nuisible : le suivi ne fait JAMAIS reculer un
+// statut, donc declarer un livre « expedie » avant Gelato rendait l'erreur
+// irrattrapable — le vrai statut, plus bas dans la sequence, etait ensuite
+// ignore pour toujours.
+//
+// La route serveur POST /:orderId/status existe toujours : elle sert au
+// parcours de paiement et aux tests. Seul ce raccourci d'interface part.
 
-const nextPrintLabel = (status) => {
-  if (status === 'print_queued') return 'Marquer envoye imprimeur';
-  if (status === 'sent_to_printer') return 'Marquer imprime';
-  if (status === 'printed') return 'Marquer expedie';
-  if (status === 'shipped') return 'Marquer livre';
-  return '';
-};
+// Etats ou plus rien ne bougera : inutile de redemander a l'imprimeur.
+const ETATS_TERMINAUX = ['delivered', 'cancelled', 'failed'];
 
 const OrdersLuxe = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
   const [notice, setNotice] = useState(null);
-  const [updatingOrderId, setUpdatingOrderId] = useState('');
   const [startingPaymentOrderId, setStartingPaymentOrderId] = useState('');
   const [deletingOrderId, setDeletingOrderId] = useState('');
 
   const loadOrders = async () => {
     try {
       const data = await listOrders();
-      setOrders(Array.isArray(data) ? data : []);
+      const liste = Array.isArray(data) ? data : [];
+      setOrders(liste);
+      rafraichirDepuisImprimeur(liste);
     } catch (error) {
       setNotice({ type: 'error', message: error.message });
     } finally {
@@ -46,25 +49,38 @@ const OrdersLuxe = () => {
     }
   };
 
+  // Cet ecran lisait UNIQUEMENT notre base : le statut affiche pouvait dater
+  // du dernier passage sur l'ecran de suivi, parfois de plusieurs jours.
+  // On demande donc son etat reel a l'imprimeur, mais seulement pour les
+  // commandes qui peuvent encore bouger : une commande PDF n'a rien a
+  // imprimer, une commande livree ou annulee n'evoluera plus.
+  //
+  // En arriere-plan et sans bloquer l'affichage : la liste apparait tout de
+  // suite avec ce qu'on sait, et se corrige quand l'imprimeur repond. Un
+  // appel par commande concernee — acceptable a ce volume ; le jour ou la
+  // liste s'allongera, il faudra une route qui les traite en une fois.
+  const rafraichirDepuisImprimeur = (liste) => {
+    liste
+      .filter((order) => includesPrint(order.type))
+      .filter((order) => !ETATS_TERMINAUX.includes(String(order.status || '').toLowerCase()))
+      .forEach(async (order) => {
+        try {
+          const suivi = await getOrderTracking(order.id);
+          if (!suivi?.status || suivi.status === order.status) return;
+          setOrders((prev) => prev.map((item) => (
+            item.id === order.id ? { ...item, status: suivi.status } : item
+          )));
+        } catch (_error) {
+          // Jamais bloquant : on garde le dernier etat connu, comme l'ecran
+          // de suivi.
+        }
+      });
+  };
+
   useEffect(() => {
     loadOrders();
   }, []);
 
-  const advancePrintFlow = async (order) => {
-    const nextStatus = nextPrintStatus(order.status);
-    if (!nextStatus) return;
-
-    try {
-      setUpdatingOrderId(order.id);
-      setNotice(null);
-      const updated = await updateOrderStatus(order.id, nextStatus);
-      setOrders((prev) => prev.map((item) => (item.id === order.id ? updated : item)));
-    } catch (error) {
-      setNotice({ type: 'error', message: error.message });
-    } finally {
-      setUpdatingOrderId('');
-    }
-  };
 
   // Suppression d'une commande (essais de formats/types/paiement). Le serveur
   // est seul juge de ce qui est supprimable : on se contente de confirmer
@@ -139,7 +155,6 @@ const OrdersLuxe = () => {
           <div className="orders-list orders-list-full">
             {orders.map((order) => {
               const statusConfig = getOrderStatusConfig(order.status);
-              const canAdvancePrint = includesPrint(order.type) && Boolean(nextPrintStatus(order.status));
               const bookId = order.book_id;
               return (
                 <article key={order.id} className="orders-list-card">
@@ -216,14 +231,16 @@ const OrdersLuxe = () => {
                       </button>
                     )}
 
-                    {canAdvancePrint && (
+                    {/* Le detail du suivi (frise de production, numero de
+                        colis) vit dans l'ecran de suivi du parcours de
+                        commande : on y renvoie plutot que de le dupliquer. */}
+                    {includesPrint(order.type) && bookId && (
                       <button
                         type="button"
                         className="btn btn-primary"
-                        disabled={updatingOrderId === order.id}
-                        onClick={() => advancePrintFlow(order)}
+                        onClick={() => navigate(`/book/${bookId}/checkout`)}
                       >
-                        {updatingOrderId === order.id ? 'Mise a jour...' : nextPrintLabel(order.status)}
+                        Voir le suivi
                       </button>
                     )}
 
