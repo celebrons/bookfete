@@ -979,6 +979,23 @@ function renderBookHtml(input) {
   // Reserve au PDF de lecture. Le fichier d impression garde une page par
   // feuille : c'est ce que l imprimeur attend.
   const enPlanches = input.spreadLayout === true;
+
+  // FEUILLE DE COUVERTURE A PART (fichier d impression Gelato).
+  //
+  // Le fichier attendu par l imprimeur porte DEUX tailles de page : la
+  // couverture enveloppante (428,88 x 286 mm pour du 21x28) puis le cahier
+  // interieur (216 x 286). Un PDF sait le faire, et Chrome aussi — a
+  // condition de nommer les pages et de lui demander de suivre le CSS
+  // (preferCSSPageSize).
+  //
+  // Verifie sur le Chrome du projet le 2026-09-19 : un document produit
+  // bien 429x286 puis 216x286. Sans ca, il faudrait fabriquer deux PDF et
+  // les fusionner, ce qui demanderait une dependance de plus.
+  //
+  // { url, widthMm, heightMm } — l image est deja composee par
+  // gelatoCoverComposer (dos, rabats et fonds perdus compris) : ici elle
+  // ne fait que remplir sa page.
+  const couverture = input.coverSheet || null;
   const book = input.book || {};
   const pages = Array.isArray(input.pages) ? input.pages : [];
   const items = Array.isArray(input.items) ? input.items : [];
@@ -1033,7 +1050,16 @@ function renderBookHtml(input) {
 <title>${escapeHtml(book.title || 'Aperçu du livre')}</title>
 ${GOOGLE_FONTS_LINK}
 <style>
-  @page { size: ${(format.trimWidthMm + bleedMm * 2) * (enPlanches ? 2 : 1)}mm ${format.trimHeightMm + bleedMm * 2}mm; margin: 0; }
+  ${couverture
+    ? `@page couverture { size: ${couverture.widthMm}mm ${couverture.heightMm}mm; margin: 0; }
+  @page interieur { size: ${format.trimWidthMm + bleedMm * 2}mm ${format.trimHeightMm + bleedMm * 2}mm; margin: 0; }
+  .page { page: interieur; }
+  .feuille-couverture { page: couverture; break-after: page; page-break-after: always;
+    width: ${couverture.widthMm}mm; height: ${couverture.heightMm}mm; overflow: hidden; }
+  /* L image porte deja tout : dos, rabats, fonds perdus. Elle remplit sa
+     page exactement, sans recadrage ni marge. */
+  .feuille-couverture img { display: block; width: 100%; height: 100%; object-fit: fill; }`
+    : `@page { size: ${(format.trimWidthMm + bleedMm * 2) * (enPlanches ? 2 : 1)}mm ${format.trimHeightMm + bleedMm * 2}mm; margin: 0; }`}
   /* Une feuille porte une ou deux pages, cote a cote, sans espace entre
      elles : le raccord d une photo sur double page doit etre invisible. */
   .feuille { display: flex; justify-content: center; align-items: flex-start; }
@@ -1066,6 +1092,7 @@ ${typography.typographyCssRules()}
 </style>
 </head>
 <body>
+${couverture ? `<div class="feuille-couverture"><img src="${escapeHtml(couverture.url)}" alt="" /></div>` : ''}
 ${pagesHtml || '<p style="padding:24px;font-family:sans-serif;">Ce livre n\'a pas encore de pages composées — lancez POST /compose.</p>'}
 </body>
 </html>`;

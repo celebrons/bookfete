@@ -36,8 +36,8 @@
 // SEUL fichier combine (construit ici) doit etre passe en interiorFileUrl,
 // coverFileUrl reste vide.
 
-const fs = require('fs');
-const PDFDocument = require('pdfkit');
+const fsp = require('fs/promises');
+const { pathToFileURL } = require('url');
 const pdfService = require('../composition/pdfService');
 const { composeGelatoWraparoundCover } = require('./gelatoCoverComposer');
 const { GELATO_ENDPAPER_PAGES, interiorPagesForGelato } = require('./gelatoCatalog');
@@ -94,70 +94,86 @@ async function buildGelatoPrintReadyPdf({
   const fullSheetSize = dims.wraparoundInsideSize || dims.bleedSize;
 
   const realPages = interiorPages.map((page, index) => ({ ...page, page_index: index }));
-  report('pages', 0, realPages.length);
-  const interiorImages = await pdfService.capturePagesAsImages({
-    book,
-    pages: realPages,
-    items,
-    layouts,
-    format,
-    scale,
-    bleedMm: GELATO_BLEED_MM,
-    // La resolution reellement imprimable, pas celle du telephone qui a
-    // pris la photo. Voir capturePagesAsImages : 2449 px suffisent pour
-    // une page de 216 mm a 288 dpi, on garde une marge.
-    imageMaxWidth: LARGEUR_PHOTO_IMPRESSION,
-    onProgress: ({ done, total }) => report('pages', done, total)
-  });
 
-  // Le cahier interieur fait EXACTEMENT `pageCount` pages, garde blanche en
-  // tete et garde blanche en fin (voir l'en-tete de ce fichier). Une seule
-  // page blanche est rendue puis reutilisee : elles sont identiques.
-  const targetInteriorCount = interiorPagesForGelato(pageCount);
-  const [blankImage] = await pdfService.capturePagesAsImages({
-    book,
-    pages: [{ page_index: 0, layout_id: null, content: {} }],
-    items,
-    layouts,
-    format,
-    scale,
-    bleedMm: GELATO_BLEED_MM
-  });
+  // LE CAHIER INTERIEUR, PAGE PAR PAGE, DANS L ORDRE EXACT ATTENDU.
+  //
+  // Regle validee avec Gelato et jamais remise en cause : le cahier fait
+  // EXACTEMENT pageCount + 2 pages, la PREMIERE et la DERNIERE blanches
+  // (ce sont les gardes, collees aux plats de la couverture). Il reste donc
+  // pageCount - 2 pages composables.
+  //
+  // Une page blanche est un objet de page sans contenu : le moteur de rendu
+  // la produit vide, a la bonne taille et avec le meme fond perdu que les
+  // autres. Aucune image a fabriquer ni a dupliquer.
+  const pageBlanche = () => ({ page_index: 0, layout_id: null, content: {} });
+  const cibleInterieur = interiorPagesForGelato(pageCount);
 
-  // Garde de tete, puis le contenu, puis autant de blanches que necessaire
-  // pour atteindre le total declare (au minimum la garde de fin).
-  interiorImages.unshift(blankImage);
-  const missing = Math.max(1, targetInteriorCount - interiorImages.length);
-  for (let i = 0; i < missing; i += 1) interiorImages.push(blankImage);
+  const pagesInterieures = [pageBlanche(), ...realPages];
+  // Autant de blanches que necessaire pour atteindre le total declare, au
+  // minimum la garde de fin.
+  const blanchesDeFin = Math.max(1, cibleInterieur - pagesInterieures.length);
+  for (let i = 0; i < blanchesDeFin; i += 1) pagesInterieures.push(pageBlanche());
 
-  const interiorWidthPt = (format.trimWidthMm + GELATO_BLEED_MM * 2) * MM_TO_PT;
-  const interiorHeightPt = (format.trimHeightMm + GELATO_BLEED_MM * 2) * MM_TO_PT;
-  const coverWidthPt = fullSheetSize.width * MM_TO_PT;
-  const coverHeightPt = fullSheetSize.height * MM_TO_PT;
+  // Le moteur trie les pages par page_index : il faut donc les renumeroter
+  // APRES avoir insere les gardes, sinon les blanches (toutes a 0)
+  // remonteraient en tete.
+  const pagesNumerotees = pagesInterieures.map((page, index) => ({ ...page, page_index: index }));
 
-  report('assembling', interiorImages.length, interiorImages.length);
-  await new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ autoFirstPage: false });
-    const stream = fs.createWriteStream(outputPath);
-    stream.on('finish', resolve);
-    stream.on('error', reject);
-    doc.on('error', reject);
-    doc.pipe(stream);
+  // La couverture composee devient la premiere page du document, a sa
+  // propre taille. Elle passe par un fichier plutot que par une URL de
+  // donnees : un data:URI de plusieurs Mo alourdit inutilement le HTML.
+  const cheminCouverture = `${outputPath}.couverture.png`;
+  await fsp.writeFile(cheminCouverture, coverBuffer);
 
-    doc.addPage({ size: [coverWidthPt, coverHeightPt], margin: 0 });
-    doc.image(coverBuffer, 0, 0, { width: coverWidthPt, height: coverHeightPt });
+  try {
+    report('pages', 0, pagesNumerotees.length);
 
-    for (const image of interiorImages) {
-      doc.addPage({ size: [interiorWidthPt, interiorHeightPt], margin: 0 });
-      doc.image(image, 0, 0, { width: interiorWidthPt, height: interiorHeightPt });
-    }
+    // RENDU PAR IMPRESSION plutot que par 33 captures d ecran (2026-09-19).
+    //
+    // L ancienne methode photographiait chaque page en 2449x3243, renvoyait
+    // l image en base64 sur la connexion de debogage, puis la reencodait
+    // avec sharp. Trois couts, dont deux inutiles : sur une machine a deux
+    // coeurs, Node passait a 59 % de processeur et le site ne repondait
+    // plus pendant toute la fabrication. Et une capture trop grosse ne
+    // revenait jamais — c est ce qui faisait echouer tous les envois.
+    //
+    // Chrome ecrit ici le PDF lui-meme, en flux, avec les photos integrees
+    // une seule fois. Le format ne change pas : memes tailles de page,
+    // meme fond perdu, meme nombre de pages, memes gardes.
+    const produit = await pdfService.renderPdfByPrinting({
+      book,
+      pages: pagesNumerotees,
+      items,
+      layouts,
+      format,
+      bleedMm: GELATO_BLEED_MM,
+      imageMaxWidth: LARGEUR_PHOTO_IMPRESSION,
+      coverSheet: {
+        url: pathToFileURL(cheminCouverture).href,
+        widthMm: fullSheetSize.width,
+        heightMm: fullSheetSize.height
+      },
+      fileBaseName: `gelato-${Date.now()}`,
+      onProgress: ({ phase, done, total }) => {
+        // Le rendu compte des PHOTOS chargees ; l ecran de commande, lui,
+        // parle de pages. On garde son vocabulaire.
+        report(phase === 'photos' ? 'pages' : phase, done, total);
+      }
+    });
 
-    doc.end();
-  });
+    report('assembling', pagesNumerotees.length, pagesNumerotees.length);
+    await fsp.rename(produit, outputPath).catch(async () => {
+      // rename echoue entre deux volumes : on recopie.
+      await fsp.copyFile(produit, outputPath);
+      await fsp.unlink(produit).catch(() => {});
+    });
+  } finally {
+    await fsp.unlink(cheminCouverture).catch(() => {});
+  }
 
   return {
     outputPath,
-    totalPages: 1 + interiorImages.length,
+    totalPages: 1 + pagesNumerotees.length,
     coverSizeMm: fullSheetSize,
     interiorSizeMm: {
       width: format.trimWidthMm + GELATO_BLEED_MM * 2,
@@ -165,7 +181,7 @@ async function buildGelatoPrintReadyPdf({
     },
     realInteriorPages: realPages.length,
     // Toutes les blanches du cahier : la garde de tete + celles de la fin.
-    paddedInteriorPages: missing + 1
+    paddedInteriorPages: blanchesDeFin + 1
   };
 }
 

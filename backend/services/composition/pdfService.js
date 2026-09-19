@@ -1122,9 +1122,13 @@ async function renderPdfByPrintingDirect(input) {
   // Le fichier d impression garde les photos d origine ; le PDF de lecture
   // les recoit allegees, PROPORTIONS INTACTES (voir allegerLesPhotos). Le
   // fond perdu sert de signal : seul le fichier destine au massicot en a.
-  const items = bleedMm > 0
-    ? input.items
-    : allegerLesPhotos(input.items, input.imageMaxWidth ?? LARGEUR_PHOTO_LECTURE);
+  // La largeur demandee par l appelant prime. A defaut, le PDF de lecture
+  // est allege et le fichier d impression garde ses photos d origine — le
+  // fond perdu sert de signal : seul le fichier destine au massicot en a un.
+  const largeurMax = Number(input.imageMaxWidth) > 0
+    ? Number(input.imageMaxWidth)
+    : (bleedMm > 0 ? 0 : LARGEUR_PHOTO_LECTURE);
+  const items = largeurMax > 0 ? allegerLesPhotos(input.items, largeurMax) : input.items;
 
   const html = pageRenderer.renderBookHtml({
     book: input.book,
@@ -1133,7 +1137,10 @@ async function renderPdfByPrintingDirect(input) {
     layouts: input.layouts,
     format,
     bleedMm,
-    spreadLayout: enPlanches
+    spreadLayout: enPlanches,
+    // Fichier d impression Gelato : la couverture enveloppante occupe une
+    // premiere page a sa propre taille (voir pageRenderer).
+    coverSheet: input.coverSheet || null
   });
 
   await fsp.mkdir(PDF_PREVIEW_DIR, { recursive: true });
@@ -1198,7 +1205,11 @@ async function renderPdfByPrintingDirect(input) {
       marginBottom: 0,
       marginLeft: 0,
       marginRight: 0,
-      preferCSSPageSize: false
+      // Quand le document porte DEUX tailles de page (couverture puis
+      // interieur), c est le CSS qui commande : paperWidth/paperHeight ne
+      // sauraient en exprimer qu une. Sinon on garde la taille explicite,
+      // qui a l avantage de ne dependre d aucune interpretation.
+      preferCSSPageSize: Boolean(input.coverSheet)
     });
 
     if (resultat?.stream) {

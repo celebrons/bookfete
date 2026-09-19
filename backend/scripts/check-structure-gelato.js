@@ -1,118 +1,216 @@
-// Le fichier d'impression a-t-il la structure exigee par Gelato ?
+// LE FICHIER D'IMPRESSION RESPECTE-T-IL LES REGLES DE GELATO ?
 //
-//   node scripts/check-structure-gelato.js chemin/vers/fichier.pdf
+//   node scripts/check-structure-gelato.js <fichier.pdf>
+//   node scripts/check-structure-gelato.js <fichier.pdf> --pages 30
 //
-// Le gabarit officiel (telecharge le 2026-09-16 pour un livre declare a 32
-// pages) donne la regle : 1 couverture enveloppante, puis `pageCount` pages
-// interieures dont la PREMIERE et la DERNIERE sont blanches (les gardes,
-// collees aux plats). Soit `pageCount - 2` pages composables.
+// Les regles, validees avec Gelato et jamais remises en cause :
 //
-// On ne relit pas le code qui a produit le fichier : on lit le FICHIER. Les
-// pages y sont des images ; une garde blanche se reconnait a son entropie
-// quasi nulle, une page composee a la sienne, bien plus riche.
+//   1. UN SEUL fichier PDF.
+//   2. Page 1 = la couverture enveloppante, a SA taille (plus large que
+//      l'interieur : elle couvre plat avant, dos et plat arriere).
+//   3. Pages 2..N = le cahier interieur, toutes a la MEME taille
+//      (trim + 3 mm de fond perdu par cote).
+//   4. Le cahier compte EXACTEMENT pageCount + 2 pages.
+//   5. La PREMIERE et la DERNIERE page interieure sont BLANCHES : ce sont
+//      les gardes, collees aux plats de la couverture.
+//
+// Un fichier a 35 pages au lieu de 33 a deja ete refuse par Gelato avec
+// « Product requires exactly 33 page(s), while file(s) contain 35 page(s) »
+// (2026-09-16). Ce controle existe pour que ca n'arrive plus.
+//
+// REECRIT le 2026-09-19. L'ancienne version deduisait les pages du nombre
+// d'IMAGES : elle supposait une image pleine page par page, ce qui n'est
+// vrai que de l'ancienne methode par captures. Depuis que Chrome ecrit le
+// PDF lui-meme, une page porte autant d'images qu'elle a de photos — et le
+// controleur annoncait 8 pages pour un fichier qui en comptait 33. Il lit
+// maintenant la STRUCTURE du PDF, pas son contenu graphique.
 
 const fs = require('fs');
 const path = require('path');
-const sharp = require('../config/sharp');
+const zlib = require('zlib');
 
-const fichier = process.argv[2];
-if (!fichier || !fs.existsSync(fichier)) {
-  console.log('Usage : node scripts/check-structure-gelato.js <fichier.pdf>');
+const FICHIER = process.argv[2];
+const args = process.argv.slice(2);
+const iPages = args.indexOf('--pages');
+const PAGES_DECLAREES = iPages > -1 ? Number(args[iPages + 1]) : null;
+
+if (!FICHIER) {
+  console.log('usage: node scripts/check-structure-gelato.js <fichier.pdf> [--pages 30]');
   process.exit(1);
 }
 
+const PT_PAR_MM = 72 / 25.4;
 let echecs = 0;
-const check = (cond, msg) => { if (!cond) echecs += 1; console.log((cond ? '  OK  ' : ' ECHEC') + ' ' + msg); };
+const check = (cond, msg, detail = '') => {
+  if (!cond) echecs += 1;
+  console.log((cond ? '  OK  ' : ' ECHEC') + ' ' + msg + (detail ? `   ${detail}` : ''));
+};
+const info = (msg) => console.log(`  info  ${msg}`);
 
-// Les images sont stockees telles quelles (DCTDecode) : un flux JPEG commence
-// par FF D8 FF et se termine par FF D9. On les releve dans l'ordre du fichier,
-// qui est celui des pages.
+const donnees = fs.readFileSync(FICHIER);
+const brut = donnees.toString('latin1');
+
+// Les objets du PDF, par numero. Sert a retrouver le flux de contenu d'une
+// page a partir de sa reference /Contents.
+const objets = new Map();
+for (const m of brut.matchAll(/(\d+)\s+0\s+obj\b/g)) {
+  objets.set(Number(m[1]), m.index);
+}
+
+// Le flux d'un objet, decompresse quand il l'est.
+const fluxDe = (numero) => {
+  const debut = objets.get(numero);
+  if (debut === undefined) return '';
+  const finObjet = brut.indexOf('endobj', debut);
+  const entete = brut.slice(debut, finObjet);
+  const m = /stream\r?\n/.exec(entete);
+  if (!m) return '';
+  const debutFlux = debut + m.index + m[0].length;
+  const finFlux = brut.indexOf('endstream', debutFlux);
+  if (finFlux === -1) return '';
+  const morceau = donnees.subarray(debutFlux, finFlux);
+  if (entete.includes('/FlateDecode')) {
+    try {
+      return zlib.inflateSync(morceau).toString('latin1');
+    } catch (_error) {
+      return '';
+    }
+  }
+  return morceau.toString('latin1');
+};
+
+// LES PAGES. On compte les objets /Type /Page, jamais un /Count : Chrome
+// range ses pages dans un arbre equilibre ou plusieurs noeuds portent un
+// compte PARTIEL. Prendre le premier venu donne un chiffre faux — erreur
+// commise le 2026-09-18 (8 pages annoncees au lieu de 32).
+const pages = [];
+for (const m of brut.matchAll(/(\d+)\s+0\s+obj\s*<<([^]*?)>>\s*(?:stream|endobj)/g)) {
+  const corps = m[2];
+  if (!/\/Type\s*\/Page[^s]/.test(corps)) continue;
+  const boite = /\/MediaBox\s*\[\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s*\]/.exec(corps);
+  const contenu = /\/Contents\s+(\d+)\s+0\s+R/.exec(corps);
+  pages.push({
+    numero: Number(m[1]),
+    largeurMm: boite ? Math.round(((Number(boite[3]) - Number(boite[1])) / PT_PAR_MM) * 10) / 10 : null,
+    hauteurMm: boite ? Math.round(((Number(boite[4]) - Number(boite[2])) / PT_PAR_MM) * 10) / 10 : null,
+    contenu: contenu ? Number(contenu[1]) : null
+  });
+}
+
+console.log(`${path.basename(FICHIER)} — ${(donnees.length / 1048576).toFixed(1)} Mo\n`);
+
+check(pages.length > 0, 'le fichier contient des pages lisibles');
+if (!pages.length) process.exit(1);
+
+info(`${pages.length} pages dans le document`);
+
+// --- Regle 2 : la couverture est la premiere page, et plus large.
+const couverture = pages[0];
+const interieures = pages.slice(1);
+info(`couverture : ${couverture.largeurMm} x ${couverture.hauteurMm} mm`);
+
+check(
+  couverture.largeurMm > (interieures[0]?.largeurMm || 0),
+  'la premiere page est la couverture enveloppante (plus large que l interieur)',
+  `${couverture.largeurMm} contre ${interieures[0]?.largeurMm} mm`
+);
+
+// --- Regle 3 : toutes les pages interieures a la meme taille.
+const taillesInterieures = [...new Set(interieures.map((p) => `${p.largeurMm}x${p.hauteurMm}`))];
+info(`interieur : ${taillesInterieures.join(', ')} mm`);
+check(
+  taillesInterieures.length === 1,
+  'toutes les pages interieures ont la meme taille',
+  taillesInterieures.length > 1 ? taillesInterieures.join(' / ') : ''
+);
+
+// --- Regle 4 : le compte, quand il est connu.
+if (Number.isFinite(PAGES_DECLAREES) && PAGES_DECLAREES > 0) {
+  const attendu = PAGES_DECLAREES + 2;
+  check(
+    interieures.length === attendu,
+    `le cahier compte ${attendu} pages (${PAGES_DECLAREES} declarees + 2 gardes)`,
+    `trouve ${interieures.length}`
+  );
+  check(
+    pages.length === attendu + 1,
+    `le fichier compte ${attendu + 1} pages en tout`,
+    `trouve ${pages.length}`
+  );
+} else {
+  info(`cahier de ${interieures.length} pages — passez --pages <n> pour verifier le compte`);
+}
+
+// --- Regle 5 : les gardes sont BLANCHES.
 //
-// Ce releve naif trouve aussi de faux positifs : la sequence FF D8 FF peut
-// apparaitre par hasard dans des donnees compressees. On les ecarte en ne
-// gardant que les images que sharp sait reellement decoder.
-// Les pages interieures sont en JPEG, mais la couverture enveloppante est
-// deposee en PNG : ne chercher que du JPEG la faisait disparaitre du releve,
-// et le controle concluait a tort « aucune couverture ».
-function extraireImages(donnees) {
+// Une page est BLANCHE de deux facons, selon la methode de fabrication :
+//
+//   - rendu par impression : elle ne dessine rien du tout ;
+//   - rendu par captures : elle dessine UNE image pleine page... qui est la
+//     photographie d'une page vide.
+//
+// Un controle qui ne connaitrait que la premiere declarerait non conforme un
+// fichier de l'ancienne methode qui l'est parfaitement. On regarde donc aussi
+// CE QUE PESE l'image : une page uniforme compresse en quelques kilo-octets,
+// une page de photos en centaines.
+const jpegsDuPdf = (() => {
   const trouves = [];
-  const PNG_ENTETE = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-  const PNG_FIN = Buffer.from('IEND', 'ascii');
-
   let i = 0;
-  while (i < donnees.length - 8) {
+  while (i < donnees.length - 3) {
     if (donnees[i] === 0xFF && donnees[i + 1] === 0xD8 && donnees[i + 2] === 0xFF) {
       let j = i + 3;
-      while (j < donnees.length - 1) {
-        if (donnees[j] === 0xFF && donnees[j + 1] === 0xD9) break;
-        j += 1;
-      }
-      if (j < donnees.length - 1) {
-        trouves.push(donnees.subarray(i, j + 2));
-        i = j + 2;
-        continue;
-      }
-    }
-    if (donnees.subarray(i, i + 8).equals(PNG_ENTETE)) {
-      const fin = donnees.indexOf(PNG_FIN, i);
-      if (fin > -1) {
-        trouves.push(donnees.subarray(i, fin + 8));
-        i = fin + 8;
-        continue;
-      }
+      while (j < donnees.length - 1 && !(donnees[j] === 0xFF && donnees[j + 1] === 0xD9)) j += 1;
+      if (j < donnees.length - 1) { trouves.push(donnees.subarray(i, j + 2)); i = j + 2; continue; }
     }
     i += 1;
   }
   return trouves;
-}
-
-(async () => {
-  const donnees = fs.readFileSync(fichier);
-  const bruts = extraireImages(donnees);
-
-  const images = [];
-  for (const buffer of bruts) {
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      const meta = await sharp(buffer).metadata();
-      // eslint-disable-next-line no-await-in-loop
-      const stats = await sharp(buffer).stats();
-      images.push({ buffer, width: meta.width, height: meta.height, entropie: stats.entropy });
-    } catch (_err) {
-      // faux positif : ce n'etait pas une image
-    }
-  }
-
-  console.log(`${path.basename(fichier)} — ${images.length} images lisibles\n`);
-
-  // Le nombre de pages se lit dans l'arbre des pages du PDF. La couverture,
-  // elle, n'est pas relevable par signature : PDFKit la reencode (le PDF ne
-  // stocke pas le PNG tel quel), contrairement aux pages interieures qui
-  // restent des flux JPEG intacts. On la compte donc par difference.
-  const totalPages = Number((donnees.toString('latin1').match(/\/Type\s*\/Pages[^>]*\/Count\s+(\d+)/) || [])[1] || 0);
-  const interieur = images;
-
-  console.log(`  info  ${totalPages} pages dans le document`);
-  check(
-    totalPages === interieur.length + 1,
-    `1 couverture enveloppante + ${interieur.length} pages interieures = ${interieur.length + 1} pages attendues`
-  );
-
-  // Une garde blanche : entropie quasi nulle.
-  const estBlanche = (im) => im.entropie < 0.5;
-  const premiere = interieur[0];
-  const derniere = interieur[interieur.length - 1];
-
-  console.log(`  info  ${interieur.length} images interieures distinctes`);
-  console.log(`  info  entropie de la 1re : ${premiere?.entropie.toFixed(2)}, de la derniere : ${derniere?.entropie.toFixed(2)}`);
-  console.log('');
-
-  check(premiere && estBlanche(premiere), 'la PREMIERE page interieure est une garde blanche');
-  check(derniere && estBlanche(derniere), 'la DERNIERE page interieure est une garde blanche');
-
-  const composables = interieur.filter((im) => !estBlanche(im));
-  check(composables.length > 0, `des pages composees sont presentes (${composables.length})`);
-
-  console.log(echecs === 0 ? '\nRESULTAT : OK' : `\nRESULTAT : ${echecs} echec(s)`);
-  process.exit(echecs === 0 ? 0 : 1);
 })();
+
+// Mesure du 2026-09-19 sur un vrai fichier : une garde blanche pese 46 Ko
+// en 2449x3243, une page composee entre 941 et 1361 Ko. Le seuil se pose
+// donc largement entre les deux.
+const SEUIL_IMAGE_VIDE_KO = 200;
+
+// Le rapprochement image <-> page n'est legitime QUE si le fichier porte
+// exactement une image par page INTERIEURE : c'est la signature du rendu
+// par captures. La couverture, elle, est un PNG et n'apparait pas dans
+// cette liste — l'image d'indice i est donc la page interieure d'indice i.
+//
+// Le rendu par impression pose autant d'images qu'il y a de photos, et ses
+// pages blanches ne dessinent rien du tout : on n'arrive jamais jusqu'ici.
+const uneImageParPage = jpegsDuPdf.length === interieures.length;
+
+const dessineQuelqueChose = (page, indexDansLeDocument = -1) => {
+  if (!page.contenu) return false;
+  const flux = fluxDe(page.contenu);
+  if (/\b(Tj|TJ)\b/.test(flux)) return true;
+  if (!/\bDo\b/.test(flux)) return false;
+
+  // La page dessine une image : est-elle vide ?
+  if (uneImageParPage && indexDansLeDocument >= 0) {
+    const image = jpegsDuPdf[indexDansLeDocument];
+    if (image) return image.length > SEUIL_IMAGE_VIDE_KO * 1024;
+  }
+  return true;
+};
+
+const premiere = interieures[0];
+const derniere = interieures[interieures.length - 1];
+
+check(
+  premiere && !dessineQuelqueChose(premiere, 0),
+  'la PREMIERE page interieure est une garde blanche'
+);
+check(
+  derniere && !dessineQuelqueChose(derniere, interieures.length - 1),
+  'la DERNIERE page interieure est une garde blanche'
+);
+
+// --- Et le reste n'est pas vide, sinon le livre le serait.
+const composees = interieures.filter(dessineQuelqueChose).length;
+info(`${composees} pages interieures portent du contenu`);
+check(composees > 0, 'des pages composees sont presentes');
+
+console.log(echecs === 0 ? '\nRESULTAT : OK' : `\nRESULTAT : ${echecs} echec(s)`);
+process.exit(echecs === 0 ? 0 : 1);
