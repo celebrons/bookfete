@@ -88,7 +88,8 @@ const extraireJpegs = (donnees) => {
   const t0 = Date.now();
   const chemin = await pdfService.renderPdfByPrinting({
     book: livre, pages, items, layouts, format,
-    spreadLayout: true,
+    spreadLayout: false,
+    insertInsideCover: true,
     fileBaseName: 'check-fidelite',
     onProgress: ({ phase, done, total }) => {
       process.stdout.write(`\r   ${phase} ${done}/${total}          `);
@@ -103,6 +104,7 @@ const extraireJpegs = (donnees) => {
   let lisibles = 0;
   let tronquees = 0;
   const largeurs = [];
+  const tailles = [];
   for (const image of jpegs) {
     try {
       // eslint-disable-next-line no-await-in-loop
@@ -112,6 +114,7 @@ const extraireJpegs = (donnees) => {
       await sharp(image).raw().toBuffer();
       lisibles += 1;
       largeurs.push(meta.width);
+      tailles.push(meta.width / meta.height);
     } catch (_error) {
       tronquees += 1;
     }
@@ -124,6 +127,44 @@ const extraireJpegs = (donnees) => {
   console.log('');
 
   check(tronquees === 0, 'aucune image tronquee dans le PDF', tronquees ? `${tronquees} tronquee(s)` : '');
+
+  // LES PROPORTIONS. Le controle qui manquait le 2026-09-19 : les images
+  // etaient intactes, en bon nombre, et pourtant fausses — ecrasees a moins
+  // de la moitie de leur largeur par un redimensionnement qui ne conservait
+  // pas le ratio. Une image parfaitement lisible peut etre parfaitement
+  // deformee.
+  const ratiosOriginaux = new Map();
+  for (const item of (items || []).filter((i) => i?.kind === 'photo')) {
+    // On lit les proportions sur la version ALLEGEE : elle les conserve, et
+    // pese cent fois moins. Un echantillon de six originaux faisait crier
+    // au loup des le premier livre melangeant portraits et 16:9.
+    const url = item.url;
+    if (!url) continue;
+    const leger = url.includes('/storage/v1/object/public/')
+      ? url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
+        + '?width=400&height=400&resize=contain&format=origin'
+      : url;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const rep = await fetch(leger);
+      // eslint-disable-next-line no-await-in-loop
+      const meta = await sharp(Buffer.from(await rep.arrayBuffer())).metadata();
+      ratiosOriginaux.set(item.id, meta.width / meta.height);
+    } catch (_error) { /* photo illisible : on passe */ }
+  }
+
+  const ratiosPdf = [...new Set(tailles.map((t) => Math.round(t * 1000) / 1000))];
+  const ratiosAttendus = [...new Set([...ratiosOriginaux.values()].map((r) => Math.round(r * 1000) / 1000))];
+  const inconnus = ratiosPdf.filter(
+    (r) => !ratiosAttendus.some((attendu) => Math.abs(attendu - r) < 0.02)
+  );
+  console.log(`  proportions attendues : ${ratiosAttendus.join(", ")}`);
+  console.log(`  proportions dans le PDF: ${ratiosPdf.slice(0, 8).join(", ")}`);
+  check(
+    inconnus.length === 0,
+    'les photos gardent leurs proportions',
+    inconnus.length ? `inattendues : ${inconnus.slice(0, 4).join(", ")}` : ''
+  );
   check(
     lisibles >= photosDuLivre,
     `toutes les photos placees sont presentes (${photosDuLivre} attendues)`,

@@ -932,7 +932,21 @@ function allegerLesPhotos(items, largeurMax) {
       // fichier trois fois plus lourd.
       //
       // format=origin garde le JPEG, que Chrome recopie tel quel.
-      ) + `?width=${largeurMax}&quality=82&format=origin`
+      // TROIS PARAMETRES, ET AUCUN N EST FACULTATIF.
+      //
+      // height + resize=contain : sans eux, Supabase NE CONSERVE PAS LES
+      // PROPORTIONS. Mesure du 2026-09-19 : une photo 4284x5712 (ratio
+      // 0,750) revenait en 2000x5712 (ratio 0,350) avec width seul — tout
+      // le livre etait ecrase a moins de la moitie de sa largeur, visages
+      // etires et cadrages faux. Avec les trois : 1500x2000, ratio 0,750.
+      //
+      // format=origin : sans lui, Supabase sert du WebP a Chrome, qu un PDF
+      // ne sait pas porter — chaque photo est alors reecrite SANS
+      // compression. Mesure : 252 Mo au lieu de 85.
+      //
+      // contain et non cover : cover RECADRERAIT la photo avant meme
+      // qu elle arrive dans sa case, en plus du cadrage de la mise en page.
+      ) + `?width=${largeurMax}&height=${largeurMax}&resize=contain&quality=82&format=origin`
     };
   });
 }
@@ -1020,6 +1034,20 @@ async function renderPdfByPrintingDirect(input) {
   // Le fichier d impression garde les photos d origine ; le PDF de lecture
   // les recoit allegees (voir allegerLesPhotos). On se sert du fond perdu
   // comme signal : seul le fichier destine au massicot en a un.
+  // PHOTOS D ORIGINE, TOUJOURS.
+  //
+  // Un allegement passait ici par le redimensionnement Supabase, pour faire
+  // tomber le PDF de 84 a 31 Mo. Il NE CONSERVE PAS LES PROPORTIONS :
+  // mesure du 2026-09-19 sur ce livre, une photo 4284x5712 (ratio 0,750)
+  // revenait en 2000x5712 (ratio 0,350). Toutes les photos du livre étaient
+  // donc ecrasees a moins de la moitie de leur largeur — les visages
+  // etires, les cadrages faux. « Photos non fideles au livre. »
+  //
+  // Le poids se retravaillera autrement (largeur ET hauteur donnees, ou
+  // redimensionnement chez nous). Pas au prix de la fidelite du livre.
+  // Le fichier d impression garde les photos d origine ; le PDF de lecture
+  // les recoit allegees, PROPORTIONS INTACTES (voir allegerLesPhotos). Le
+  // fond perdu sert de signal : seul le fichier destine au massicot en a.
   const items = bleedMm > 0
     ? input.items
     : allegerLesPhotos(input.items, input.imageMaxWidth ?? LARGEUR_PHOTO_LECTURE);
