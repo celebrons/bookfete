@@ -43,9 +43,12 @@ echo "==> Services systeme"
 # protegee alors qu'elle ne l'est pas. C'est ce qui l'a rendue injoignable
 # le 2026-09-19.
 RECHARGER=0
-for UNITE in celebrons.service celebrons-sauvegarde.service celebrons-sauvegarde.timer celebrons-veille.service celebrons-veille.timer; do
-  SOURCE="${DOSSIER}/deploy/${UNITE}"
+# Toutes les unites du depot, sans liste a tenir a jour : une unite ajoutee
+# et oubliee dans une liste en dur ne serait jamais deployee, et on la
+# croirait active. C'est deja arrive avec le plafond de memoire.
+for SOURCE in "${DOSSIER}"/deploy/celebrons*.service "${DOSSIER}"/deploy/celebrons*.timer; do
   [ -f "${SOURCE}" ] || continue
+  UNITE=$(basename "${SOURCE}")
   if ! cmp -s "${SOURCE}" "/etc/systemd/system/${UNITE}"; then
     cp "${SOURCE}" "/etc/systemd/system/${UNITE}"
     echo "    ${UNITE} mis a jour"
@@ -54,8 +57,11 @@ for UNITE in celebrons.service celebrons-sauvegarde.service celebrons-sauvegarde
 done
 if [ "${RECHARGER}" = "1" ]; then
   systemctl daemon-reload
-  # La veille est nouvelle : l'activer si elle ne l'est pas encore.
-  systemctl enable --now celebrons-veille.timer >/dev/null 2>&1 || true
+  # Activer les minuteries, y compris celles qui viennent d'apparaitre.
+  for T in "${DOSSIER}"/deploy/celebrons*.timer; do
+    [ -f "${T}" ] || continue
+    systemctl enable --now "$(basename "${T}")" >/dev/null 2>&1 || true
+  done
   echo "    systemd rechargé"
 else
   echo "    inchangés"

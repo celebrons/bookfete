@@ -1,0 +1,22 @@
+# Menage des fichiers de travail (voir backend/scripts/nettoyer-fichiers-locaux.js).
+#
+# Chaque fabrication depose un PDF de ~43 Mo sur le disque. Sans ce menage,
+# la machine se remplit — et un disque plein ne dit pas son nom : le site se
+# met a echouer un peu partout, sans raison apparente.
+
+[Unit]
+Description=Menage des fichiers de travail Celebrons
+
+[Service]
+Type=oneshot
+User=celebrons
+WorkingDirectory=/home/celebrons/bookfete/backend
+ExecStart=/usr/bin/node scripts/nettoyer-fichiers-locaux.js --jours 30 --appliquer
+
+# Aucune urgence : ce travail ne doit jamais gener un rendu en cours.
+Nice=10
+IOWeight=20
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=celebrons-menage

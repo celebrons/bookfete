@@ -1,0 +1,16 @@
+# Une fois par jour, a une heure creuse.
+#
+# Persistent=true : si la machine etait eteinte a l'heure dite, le menage se
+# fait au demarrage suivant plutot que d'etre saute.
+
+[Unit]
+Description=Menage quotidien des fichiers de travail
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+Persistent=true
+RandomizedDelaySec=15min
+Unit=celebrons-menage.service
+
+[Install]
+WantedBy=timers.target
