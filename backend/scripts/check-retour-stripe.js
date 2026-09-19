@@ -259,6 +259,17 @@ async function copierLeContenu(bookId) {
     const chemin = await navigateur.evaluer('location.pathname');
     check(chemin !== '/login', 'la connexion aboutit', `arrive sur ${chemin}`);
 
+    // QUI est connecte doit se lire sans y penser. Le 2026-09-19,
+    // l utilisateur a paye et cherche son espace d administration en
+    // croyant etre sur un compte... alors que la session appartenait a un
+    // autre. L en-tete doit lever ce doute d un coup d oeil.
+    const entete = await navigateur.evaluer("document.querySelector('.site-nav-user') ? document.querySelector('.site-nav-user').innerText.trim() : ''");
+    check(
+      String(entete || '').includes(email),
+      'l en-tete affiche le compte connecte',
+      entete ? `« ${entete} »` : '(aucun indicateur)'
+    );
+
     // 3. LE moment qui a echoue : le retour de Stripe.
     navigateur.problemes.length = 0;
     navigateur.httpEnErreur.length = 0;
