@@ -109,6 +109,17 @@ scp /tmp/b.tgz root@<IP>:/tmp/
 ssh root@<IP> "cd /home/celebrons/bookfete/frontend && rm -rf build && tar -xzf /tmp/b.tgz && chown -R celebrons: build"
 ```
 
+Le site construit **n'est pas dans git** (`frontend/build/` est ignoré depuis
+le 2026-09-19). Il ne peut pas y être : ce serveur a besoin d’un build qui
+appelle une API **relative**, Render en reconstruit un autre depuis les
+sources. Tant que le dossier était versionné, `git pull` refusait d’écraser
+le build local et **le déploiement s’arrêtait après avoir annoncé qu’il
+commençait**.
+
+Conséquence pratique : après chaque `deploy.sh`, le site reste celui de la
+dernière archive envoyée. Pour changer le site, il faut refaire les cinq
+lignes ci-dessus — `deploy.sh` seul ne le touche pas.
+
 `/api` est une adresse **relative** : le fichier construit n'embarque aucun
 nom de machine et vaut pour l'IP d'aujourd'hui comme pour le domaine de
 demain.
