@@ -75,14 +75,23 @@ OOMPolicy=continue
 # Le rendu ne doit jamais prendre TOUT le processeur : il faut qu'il reste
 # de quoi repondre a une requete et accepter une connexion SSH. 160 % sur
 # 2 vCPU laisse 0,4 vCPU au reste.
-# 180 % : le rendu peut prendre presque toute la machine, PARCE QU'IL
-# tourne en priorite basse (voir pdfService.js, nice). Il rend la main des
-# que l'API a quelque chose a repondre.
+# PAS DE CPUQuota. C est contre-intuitif, et c est mesure.
 #
-# Le bridage a 120 % essaye plus tot reglait la reactivite mais rendait la
-# fabrication interminable : plus de vingt minutes pour un livre de 33
-# pages. La priorite est le bon levier, pas le plafond.
-CPUQuota=180%
+# Un plafond de processeur s applique au GROUPE entier. Quand le quota est
+# epuise, systemd suspend TOUT le groupe jusqu a la periode suivante — node
+# compris, et quelle que soit sa priorite. La priorite basse du navigateur
+# ne pouvait donc rien : les deux etaient suspendus ensemble.
+#
+# Mesure du 2026-09-19 pendant une fabrication, avec CPUQuota=180 % ET le
+# navigateur en nice : charge 10,7 sur deux coeurs, /api/health en echec
+# deux fois sur trois. Le quota ETAIT le probleme, pas la solution.
+#
+# Sans plafond, node n est jamais suspendu et sa priorite normale prime sur
+# celle du navigateur. sshd et Caddy, dans d autres groupes, passent aussi
+# devant un navigateur en priorite basse : on garde la main sur la machine.
+#
+# La memoire, elle, reste plafonnee : elle ne se rattrape pas par la
+# priorite.
 CPUWeight=50
 IOWeight=50
 
