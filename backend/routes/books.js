@@ -503,6 +503,18 @@ function getPdfCompletionTargetStatus(orderType) {
   return 'pdf_ready';
 }
 
+// Le poids du fichier remis au client, en Mo. Jamais bloquant : un fichier
+// introuvable vaut null, pas une exception dans le journal.
+function poidsDuPdf(files) {
+  try {
+    const chemin = files?.final?.path;
+    if (!chemin) return null;
+    return Number((fs.statSync(chemin).size / 1024 / 1024).toFixed(1));
+  } catch (_error) {
+    return null;
+  }
+}
+
 // Prevenir que le PDF est pret. La commande liee (si elle existe) porte
 // parfois une adresse de livraison differente du compte : c'est elle qui
 // prime, comme pour tous les autres emails de commande.
@@ -2120,10 +2132,18 @@ async function processPdfExportJob({
       message: 'PDF final genere',
       metadata: {
         jobId,
-        pages: readyJob.progress?.total || null,
+        // progress.total compte desormais des PHOTOS chargees : l impression
+        // n a plus de boucle page par page. Le champ s appelait « pages » et
+        // disait donc autre chose que son nom.
+        photos: readyJob.progress?.total || null,
         secondes: readyJob.startedAt
           ? Math.round((Date.parse(readyJob.completedAt) - Date.parse(readyJob.startedAt)) / 1000)
-          : null
+          : null,
+        // Duree et poids de CHAQUE rendu reel, sur CHAQUE environnement.
+        // C est la seule mesure comparable entre local, Render et Scaleway :
+        // on ne peut pas ouvrir un terminal sur l offre gratuite de Render,
+        // mais le journal, lui, s y remplit comme ailleurs.
+        poidsMo: poidsDuPdf(files)
       }
     });
     try {
