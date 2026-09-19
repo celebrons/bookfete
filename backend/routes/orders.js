@@ -631,16 +631,21 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
       });
     }
 
+    // LE MENAGE NE BLOQUE PLUS LA REPONSE.
+    //
+    // Supprimer le brouillon precedent est un appel RESEAU a Gelato. Il
+    // etait attendu avant de repondre au client : quand Gelato tardait,
+    // le navigateur abandonnait au bout de quinze secondes avec « le
+    // serveur met trop de temps a repondre » et l envoi paraissait
+    // echoue, alors qu'il n'avait meme pas commence (2026-09-19).
+    //
+    // C'est du best effort : le pire cas est un brouillon orphelin dans
+    // le tableau de bord Gelato, sans consequence. Ca n'a rien a faire
+    // sur le chemin critique.
     if (previousGelatoOrderId) {
-      // Menage chez Gelato : le brouillon precedent n'a plus de raison
-      // d'exister et encombrerait le tableau de bord a chaque essai. Best
-      // effort — un echec de suppression ne doit jamais empecher le nouvel
-      // envoi (le pire cas est un brouillon orphelin, sans consequence).
-      try {
-        await gelatoClient.deleteOrder(previousGelatoOrderId);
-      } catch (error) {
+      gelatoClient.deleteOrder(previousGelatoOrderId).catch((error) => {
         console.warn('Suppression du brouillon Gelato precedent impossible', previousGelatoOrderId, ':', error.message);
-      }
+      });
     }
 
     // ASYNCHRONE, volontairement (mesure 2026-09-11 : ~15 s par page pour

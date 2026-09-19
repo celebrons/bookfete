@@ -31,9 +31,21 @@ function getApiKey() {
   return key;
 }
 
+// DELAI DE GARDE SUR LES APPELS A GELATO.
+//
+// Aucun n'en avait. Un appel qui traine bloquait la requete du client
+// jusqu a ce que SON navigateur abandonne au bout de quinze secondes,
+// avec « le serveur met trop de temps a repondre » — alors que le serveur
+// allait tres bien et attendait simplement un tiers.
+//
+// Televerser un fichier de 48 Mo prend du temps : le delai est genereux.
+// Mais BORNE, pour que la panne soit lisible du cote ou elle se produit.
+const DELAI_GELATO_MS = 120 * 1000;
+
 async function gelatoOrderFetch(pathSuffix, options = {}) {
   const response = await fetch(`${BASE_URL}${pathSuffix}`, {
     ...options,
+    signal: options.signal || AbortSignal.timeout(DELAI_GELATO_MS),
     headers: {
       'X-API-KEY': getApiKey(),
       'Content-Type': 'application/json',
