@@ -313,6 +313,68 @@ const server = app.listen(PORT, () => {
   console.log(`API started on http://localhost:${PORT}`);
 });
 
+// ARRET PROPRE : NE PAS TUER UN TRAVAIL EN COURS.
+//
+// Un deploiement fait `systemctl restart`, donc un SIGTERM. Sans rien
+// pour le rattraper, Node sort immediatement — et un rendu PDF ou un envoi
+// a l'imprimeur en cours depuis deux minutes meurt sur place, sans trace.
+//
+// Le 2026-09-19, trois envois a Gelato ont demarre et aucun resultat n est
+// jamais apparu au journal. Ils n'avaient pas echoue : ils avaient ete
+// interrompus par MES deploiements. Vu de l'utilisateur, « le serveur
+// casse au bout de 5 ou 6 pages ».
+//
+// L'unite systemd accorde TimeoutStopSec=300. On s'en sert : on cesse
+// d'accepter de nouvelles connexions, on laisse finir ce qui tourne, puis
+// on sort. Au-dela du delai, systemd tranchera de toute facon — mais on
+// aura laisse sa chance au travail en cours.
+const DELAI_ARRET_MS = 240 * 1000;
+const PAS_DE_VERIFICATION_MS = 2000;
+
+const travauxEnCours = () => {
+  let total = 0;
+  try {
+    // eslint-disable-next-line global-require
+    total += require('./routes/books').countActivePdfJobs();
+  } catch (_error) { /* module non charge : rien en cours */ }
+  try {
+    // eslint-disable-next-line global-require
+    total += require('./routes/orders').listGelatoSubmissions().length;
+  } catch (_error) { /* idem */ }
+  return total;
+};
+
+let arretEnCours = false;
+
+const arreterProprement = async (signal) => {
+  if (arretEnCours) return;
+  arretEnCours = true;
+
+  const restants = travauxEnCours();
+  console.log(`${signal} recu. Travaux en cours : ${restants}.`);
+
+  // Plus de nouvelles connexions, mais celles en cours vont au bout.
+  server.close(() => {});
+
+  const echeance = Date.now() + DELAI_ARRET_MS;
+  while (Date.now() < echeance && travauxEnCours() > 0) {
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => setTimeout(resolve, PAS_DE_VERIFICATION_MS));
+  }
+
+  const oublies = travauxEnCours();
+  if (oublies > 0) {
+    console.warn(`Arret force : ${oublies} travail(aux) encore en cours apres ${DELAI_ARRET_MS / 1000} s.`);
+  } else {
+    console.log('Tous les travaux sont termines. Arret.');
+  }
+  process.exit(0);
+};
+
+['SIGTERM', 'SIGINT'].forEach((signal) => {
+  process.on(signal, () => { arreterProprement(signal); });
+});
+
 server.on('error', (error) => {
   if (error?.code === 'EADDRINUSE') {
     console.error(`Startup failed: port ${PORT} is already in use.`);

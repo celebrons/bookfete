@@ -783,6 +783,23 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
         }
       } catch (error) {
         console.error('Erreur inattendue lors de l\'envoi de test Gelato', order.id, ':', error.message);
+
+        // AU JOURNAL AUSSI. Seul un echec RENVOYE par submitPrintOrder
+        // etait consigne ; une exception ne laissait rien. Le 2026-09-19,
+        // trois envois ont demarre sans qu aucun resultat n apparaisse :
+        // impossible de savoir, depuis l application, ce qui les avait
+        // interrompus.
+        logEvent({
+          type: 'gelato.submit.failed',
+          level: 'error',
+          actor: req.user.email,
+          orderId: order.id,
+          bookId: order.book_id,
+          ownerId: order.owner_id,
+          message: 'Envoi a l\'imprimeur interrompu',
+          metadata: { erreur: String(error.message).slice(0, 300) }
+        });
+
         await supabase
           .from('orders')
           .update({ metadata: { ...(order.metadata || {}), gelatoError: error.message }, updated_at: getNowIso() })
