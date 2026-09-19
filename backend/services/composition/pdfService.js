@@ -1209,7 +1209,9 @@ async function renderPdfByPrintingDirect(input) {
       // interieur), c est le CSS qui commande : paperWidth/paperHeight ne
       // sauraient en exprimer qu une. Sinon on garde la taille explicite,
       // qui a l avantage de ne dependre d aucune interpretation.
-      preferCSSPageSize: Boolean(input.coverSheet)
+      // Deux tailles de page dans un meme document — couverture Gelato, ou
+      // planches ou la couverture reste seule : c est le CSS qui commande.
+      preferCSSPageSize: Boolean(input.coverSheet) || enPlanches
     });
 
     if (resultat?.stream) {

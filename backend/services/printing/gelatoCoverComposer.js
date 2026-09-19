@@ -87,7 +87,25 @@ async function composeGelatoWraparoundCover({ book, items, template, format, gel
   // place (memes champs width/height/left/top, juste un nom different — pas
   // de zone de jointure separee, la tranche touche directement les panneaux
   // recto/verso puisqu'il n'y a pas de carton rigide a plier autour).
+  // AUCUN REPLI SILENCIEUX SUR LA TAILLE DE COUVERTURE.
+  //
+  // C'est Gelato qui fait foi : la taille depend du nombre de pages (epaisseur
+  // du dos) et du cartonnage. La deviner reviendrait a imprimer une couverture
+  // qui ne couvre pas.
+  //
+  // Le 2026-09-19, deux fichiers produits a deux heures d'intervalle par le
+  // MEME code portaient 428,88 x 286 puis 478 x 326 mm : la reponse de l'API
+  // avait manque une fois, et le code s'etait rabattu en silence. Un fichier
+  // est donc parti avec une couverture trop petite sans que rien ne le
+  // signale. Mieux vaut echouer et relancer.
   const fullSheetSize = dims.wraparoundInsideSize || dims.bleedSize;
+  if (!fullSheetSize || !fullSheetSize.width || !fullSheetSize.height) {
+    throw new Error(
+      "Gelato n'a pas renvoye la taille de la couverture (ni wraparoundInsideSize "
+      + 'ni bleedSize). Fabrication interrompue : une couverture a une taille '
+      + 'devinee serait imprimee de travers. Relancez.'
+    );
+  }
   const canvasWidthPx = mmToPx(fullSheetSize.width);
   const canvasHeightPx = mmToPx(fullSheetSize.height);
 

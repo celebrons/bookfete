@@ -2348,25 +2348,20 @@ async function generateFinalBookPdfFiles({ book, jobId, onProgress }) {
     items,
     layouts,
     format,
-    // MISE EN PLANCHES DESACTIVEE (2026-09-19, le jour meme de sa mise en
-    // service).
+    // MISE EN PLANCHES : deux pages par feuille.
     //
-    // Elle devait empecher une photo en double page d etre coupee en deux.
-    // Elle a casse plus qu elle n a repare : la couverture et la 4e se
-    // retrouvaient seules au milieu d une feuille deux fois trop large, et
-    // les pages interieures ne ressemblaient plus au livre compose. Signale
-    // le jour meme : « le rendu PDF n est pas bon, beaucoup de photos non
-    // fideles au livre ».
+    // Une photo etalee sur une double page est stockee comme deux moities.
+    // Une page par feuille, et le lecteur n en voit jamais qu une a la fois :
+    // l image est perdue. La feuille porte donc les deux pages.
     //
-    // Une page par feuille, comme avant : c est l etat connu bon. La page
-    // blanche apres la couverture (insertInsideCover) fait retomber les
-    // doubles pages en vis-a-vis dans un lecteur qui affiche deux pages.
-    //
-    // Le mode planches reste dans pageRenderer et se rallume par ce seul
-    // drapeau, quand il aura ete verifie A L OEIL et pas seulement au
-    // compteur — c est precisement ce qui a manque.
-    spreadLayout: false,
-    insertInsideCover: true,
+    // Premiere tentative le matin du 2026-09-19, retiree le jour meme : une
+    // seule taille de page pour tout le document, deux pages de large, et la
+    // couverture flottait au milieu d un vide grand comme une page. Reprise
+    // avec des @page NOMMEES — la couverture et la 4e gardent leur taille,
+    // les planches ont la leur — et des pages qui ne se laissent plus
+    // comprimer (flex: 0 0 auto). Verifie a l oeil cette fois, page par
+    // page, avant d etre rallumee.
+    spreadLayout: true,
     // Sous ce nom, l'espace d'administration peut arreter ce rendu : tuer
     // le navigateur fait echouer le rendu proprement, au lieu de le
     // laisser tourner jusqu au bout sur une machine deja a genoux.

@@ -634,7 +634,16 @@ function renderPage(page, itemsById, layoutsById, isLast, context = {}) {
   // mettre du doré partout", un cadre sur CHAQUE page etait trop present).
   const luxeClass = context?.format?.formatId === 'luxe' ? ' is-luxe' : '';
   const pageClass = isLast ? `page${luxeClass}` : `page page-break${luxeClass}`;
-  const pageNumberHtml = context?.format?.formatId === 'luxe'
+  // PAS DE NUMERO SUR UNE PAGE VIDE.
+  //
+  // Une page sans aucun bloc n'est pas une page du livre : c'est une garde,
+  // collee au plat de la couverture, ou une page de remplissage. Y imprimer
+  // un numero est une faute d'imprimeur — et ca partait bel et bien dans le
+  // fichier remis a Gelato, un « 1 » en bas de la garde de tete et un « 32 »
+  // sur celle de fin (constate le 2026-09-19, apres le passage du livre au
+  // format luxe, le seul qui numerote ses pages).
+  const pageEstVide = blocksHtml.trim() === '';
+  const pageNumberHtml = context?.format?.formatId === 'luxe' && !pageEstVide
     ? `<span class="page-number-luxe">${page.page_index + 1}</span>`
     : '';
   return `<section class="${pageClass}" data-page-index="${page.page_index}"><div class="page-blocks">${blocksHtml}</div>${pageNumberHtml}</section>`;
@@ -1032,8 +1041,16 @@ function renderBookHtml(input) {
     pagesHtml = feuilles
       .map((feuille, index) => {
         const derniere = index === feuilles.length - 1;
-        const classe = derniere ? 'feuille' : 'feuille feuille-break';
-        return `<div class="${classe}">${feuille.map(sansSaut).join('')}</div>`;
+        // UNE FEUILLE A LA TAILLE DE CE QU ELLE PORTE.
+        //
+        // Premiere tentative du 2026-09-19 : une seule taille pour tout le
+        // document, deux pages de large. La couverture et la 4e, seules sur
+        // leur feuille, flottaient alors au milieu d un vide grand comme
+        // une page — « le rendu PDF n est pas bon ». Elles ont maintenant
+        // leur propre taille.
+        const format = feuille.length > 1 ? 'feuille-planche' : 'feuille-simple';
+        const saut = derniere ? '' : ' feuille-break';
+        return `<div class="feuille ${format}${saut}">${feuille.map(sansSaut).join('')}</div>`;
       })
       .join('\n');
   } else {
@@ -1059,11 +1076,23 @@ ${GOOGLE_FONTS_LINK}
   /* L image porte deja tout : dos, rabats, fonds perdus. Elle remplit sa
      page exactement, sans recadrage ni marge. */
   .feuille-couverture img { display: block; width: 100%; height: 100%; object-fit: fill; }`
-    : `@page { size: ${(format.trimWidthMm + bleedMm * 2) * (enPlanches ? 2 : 1)}mm ${format.trimHeightMm + bleedMm * 2}mm; margin: 0; }`}
+    : enPlanches
+      ? `@page simple  { size: ${format.trimWidthMm + bleedMm * 2}mm ${format.trimHeightMm + bleedMm * 2}mm; margin: 0; }
+  @page planche { size: ${(format.trimWidthMm + bleedMm * 2) * 2}mm ${format.trimHeightMm + bleedMm * 2}mm; margin: 0; }
+  .feuille-simple  { page: simple; }
+  .feuille-planche { page: planche; }`
+      : `@page { size: ${format.trimWidthMm + bleedMm * 2}mm ${format.trimHeightMm + bleedMm * 2}mm; margin: 0; }`}
   /* Une feuille porte une ou deux pages, cote a cote, sans espace entre
      elles : le raccord d une photo sur double page doit etre invisible. */
   .feuille { display: flex; justify-content: center; align-items: flex-start; }
-  .feuille .page { margin: 0; }
+  /* flex: 0 0 auto — SANS CA, LES PAGES RETRECISSENT.
+
+     Un element de flex accepte par defaut de se laisser comprimer quand
+     le conteneur est plus etroit que son contenu. Les pages ont pourtant
+     une largeur en millimetres : elles se retrouvaient reduites a une
+     bande, photos comprises. C est l autre moitie du rendu casse du
+     2026-09-19. */
+  .feuille .page { margin: 0; flex: 0 0 auto; }
   .feuille-break { break-after: page; page-break-after: always; }
   :root {
     /* FOND PERDU.
