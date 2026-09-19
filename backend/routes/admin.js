@@ -17,7 +17,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
-const { listEvents } = require('../services/events/eventLog');
+const { listEvents, logEvent } = require('../services/events/eventLog');
 const { etatServeur } = require('../services/events/serverHealth');
 const bookContentService = require('../services/composition/bookContentService');
 const templateCatalog = require('../services/composition/templateCatalog');
@@ -107,6 +107,124 @@ router.get('/health', authenticate, requireAdmin, (req, res) => {
     } catch (_error) { /* idem */ }
 
     return res.json(etatServeur({ rendusEnCours, rendusEnFile }));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// LES TRAVAUX EN COURS : fabrications de PDF et envois a l imprimeur.
+//
+// Demande du 2026-09-19 : « voir toutes les demandes de generation de PDF
+// ou a Gelato, leur statut (en cours, bloquee, echouee, reussie), et
+// pouvoir les arreter / nettoyer ».
+//
+// Ces deux travaux n'ont rien en commun techniquement — l'un lance un
+// navigateur, l'autre televerse un fichier chez un imprimeur — mais ils
+// posent la MEME question : qu est-ce qui tourne, depuis quand, et est-ce
+// que c est normal ? Ils sont donc presentes ensemble, avec le meme
+// vocabulaire.
+//
+// C'est le premier endroit de cet espace qui AGIT au lieu de seulement
+// lire. Chaque action est donc consignee au journal avec son auteur.
+router.get('/jobs', authenticate, requireAdmin, async (req, res) => {
+  try {
+    // eslint-disable-next-line global-require
+    const fabrications = require('./books').listPdfExportJobs();
+    // eslint-disable-next-line global-require
+    const envois = require('./orders').listGelatoSubmissions();
+    const travaux = [...fabrications, ...envois];
+
+    // Le titre du livre en une seule requete : sans lui, la liste n'affiche
+    // que des identifiants et ne sert a rien.
+    const identifiants = [...new Set(travaux.map((t) => t.bookId).filter(Boolean))];
+    let titres = {};
+    if (identifiants.length) {
+      const { data } = await supabase
+        .from('books')
+        .select('id, title')
+        .in('id', identifiants);
+      titres = Object.fromEntries((data || []).map((b) => [b.id, b.title]));
+    }
+
+    return res.json({
+      travaux: travaux.map((t) => ({ ...t, livre: titres[t.bookId] || null })),
+      // De quoi afficher un resume sans recompter cote navigateur.
+      resume: {
+        enCours: travaux.filter((t) => t.etat === 'en cours' || t.etat === 'en attente').length,
+        bloquees: travaux.filter((t) => t.bloquee).length,
+        echouees: travaux.filter((t) => t.etat === 'echouee').length,
+        reussies: travaux.filter((t) => t.etat === 'reussie').length
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Arreter une fabrication de PDF. Tue le navigateur : le rendu s'arrete
+// vraiment, au lieu de continuer a manger la machine jusqu au bout.
+router.post('/jobs/pdf/:jobId/stop', authenticate, requireAdmin, (req, res) => {
+  try {
+    // eslint-disable-next-line global-require
+    const resultat = require('./books').cancelPdfExportJob(req.params.jobId);
+
+    logEvent({
+      type: 'admin.job.stopped',
+      level: 'warn',
+      actor: req.user?.email,
+      message: `Fabrication PDF arretee depuis l'administration`,
+      metadata: { jobId: req.params.jobId, ...resultat }
+    });
+
+    if (!resultat.arrete) return res.status(409).json(resultat);
+    return res.json(resultat);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Relacher le verrou d'un envoi a l'imprimeur.
+//
+// A LIRE AVANT DE CLIQUER : ca ne rappelle RIEN. Un fichier deja parti chez
+// Gelato y reste. Ce que ca rend, c'est la possibilite de relancer une
+// commande que le verrou bloquait.
+router.post('/jobs/gelato/:orderId/stop', authenticate, requireAdmin, (req, res) => {
+  try {
+    // eslint-disable-next-line global-require
+    const resultat = require('./orders').releaseGelatoSubmission(req.params.orderId);
+
+    logEvent({
+      type: 'admin.job.stopped',
+      level: 'warn',
+      actor: req.user?.email,
+      orderId: req.params.orderId,
+      message: `Verrou d'envoi a l'imprimeur relache depuis l'administration`,
+      metadata: resultat
+    });
+
+    if (!resultat.relache) return res.status(409).json(resultat);
+    return res.json(resultat);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Oublier les demandes TERMINEES. Celles qui tournent ne sont pas touchees :
+// les effacer de la liste ne les arreterait pas, ca les rendrait seulement
+// invisibles — ce qui est pire que de ne rien faire.
+router.post('/jobs/cleanup', authenticate, requireAdmin, (req, res) => {
+  try {
+    // eslint-disable-next-line global-require
+    const resultat = require('./books').purgePdfExportJobs();
+
+    logEvent({
+      type: 'admin.jobs.cleaned',
+      actor: req.user?.email,
+      message: `Liste des fabrications nettoyee (${resultat.oubliees})`,
+      metadata: resultat
+    });
+
+    return res.json(resultat);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

@@ -22,7 +22,14 @@ const { logEvent } = require('../services/events/eventLog');
 // une seule instance, qui est le notre. Un verrou reparti demanderait une
 // colonne dediee en base ; a faire le jour ou plusieurs instances servent
 // la meme commande.
-const gelatoSubmissionsEnCours = new Set();
+// Les envois a l imprimeur en cours, et depuis quand.
+//
+// C'etait un Set : il ne disait que « oui/non ». Un verrou qui fuit
+// bloquait alors tout nouvel envoi sur la commande, sans que rien ne
+// permette de le voir ni de le relacher autrement qu'en redemarrant le
+// serveur. Une Map retient DEPUIS QUAND, ce qui suffit a distinguer un
+// envoi qui travaille d un verrou oublie (2026-09-19).
+const gelatoSubmissionsEnCours = new Map();
 const gelatoTracking = require('../services/printing/gelatoTracking');
 const emails = require('../services/email/transactionalEmails');
 const { emailValide } = require('../services/email/resendClient');
@@ -730,7 +737,11 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
     // Le verrou est pris AVANT de repondre et relache dans le `finally` du
     // travail detache : il couvre donc toute la duree du rendu (plusieurs
     // minutes), pas seulement celle de la requete HTTP.
-    gelatoSubmissionsEnCours.add(order.id);
+    gelatoSubmissionsEnCours.set(order.id, {
+      debutLe: startedAt,
+      demandeur: req.user.email || null,
+      bookId: order.book_id || null
+    });
     logEvent({
       type: 'gelato.submit.started',
       actor: req.user.email,
@@ -1871,5 +1882,58 @@ router.post('/:orderId/status', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+// LES ENVOIS A L IMPRIMEUR, VUS DE L ESPACE D ADMINISTRATION.
+//
+// Demande du 2026-09-19 : voir les demandes en cours, leur statut, et
+// pouvoir les arreter / nettoyer.
+//
+// Un envoi depose un fichier de ~46 Mo chez Gelato : c'est long. Au-dela
+// d'une demi-heure, ce n'est plus un envoi qui travaille, c'est un verrou
+// oublie — et tant qu il tient, la commande refuse tout nouvel envoi.
+const VERROU_GELATO_SUSPECT_MS = 30 * 60 * 1000;
+
+module.exports.listGelatoSubmissions = () => {
+  const travaux = [];
+  gelatoSubmissionsEnCours.forEach((info, orderId) => {
+    const debut = Date.parse(info?.debutLe || '');
+    const depuisMs = Number.isNaN(debut) ? null : Date.now() - debut;
+    const bloquee = depuisMs !== null && depuisMs > VERROU_GELATO_SUSPECT_MS;
+
+    travaux.push({
+      genre: 'gelato',
+      id: orderId,
+      orderId,
+      bookId: info?.bookId || null,
+      demandeur: info?.demandeur || null,
+      etat: bloquee ? 'bloquee' : 'en cours',
+      bloquee,
+      arretable: true,
+      creeLe: info?.debutLe || null,
+      demarreLe: info?.debutLe || null,
+      fini: null,
+      avancement: null,
+      erreur: null,
+      fichier: null
+    });
+  });
+  return travaux.sort((a, b) => Date.parse(b.creeLe || 0) - Date.parse(a.creeLe || 0));
+};
+
+// Relacher le verrou d'un envoi.
+//
+// ATTENTION A CE QUE CA FAIT, ET A CE QUE CA NE FAIT PAS : le travail
+// detache continue son chemin cote serveur, et surtout un fichier deja
+// parti chez Gelato y reste — on ne rappelle pas un envoi. Ce que ca rend,
+// c'est la possibilite de RELANCER la commande, qui etait bloquee.
+//
+// Le brouillon eventuellement cree chez Gelato se supprime par la route de
+// suppression de commande, qui consulte Gelato avant de trancher.
+module.exports.releaseGelatoSubmission = (orderId) => {
+  const cle = String(orderId || '');
+  if (!gelatoSubmissionsEnCours.has(cle)) return { relache: false, raison: 'aucun envoi en cours' };
+  gelatoSubmissionsEnCours.delete(cle);
+  return { relache: true };
+};
+
 module.exports.handleStripeWebhook = handleStripeWebhook;
 module.exports.computeOrderPricing = computeOrderPricing;

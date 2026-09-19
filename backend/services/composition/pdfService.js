@@ -169,6 +169,35 @@ function execFilePromise(command, args, options) {
 //
 // Elle avance meme quand un rendu echoue, sans quoi un seul plantage
 // bloquerait tous les suivants jusqu au redemarrage.
+// LES NAVIGATEURS EN COURS, pour pouvoir les arreter.
+//
+// Un rendu qui part en vrille tenait la machine sans qu on puisse rien
+// faire depuis l'application : il fallait ouvrir un terminal et tuer
+// Chrome a la main. Demande du 2026-09-19 : voir les rendus en cours
+// depuis l espace d administration, et pouvoir les arreter.
+//
+// On garde le PROCESSUS, pas une promesse : tuer le navigateur fait
+// echouer l appel CDP en attente, donc le rendu se termine en erreur au
+// lieu de rester suspendu. C est exactement le comportement voulu.
+const navigateursEnCours = new Map();
+
+// Retourne le nombre de navigateurs reellement arretes (0 si le rendu
+// etait deja fini, ou attendait encore son tour dans la file).
+function arreterLeRendu(renderId) {
+  const enfant = navigateursEnCours.get(String(renderId || ""));
+  if (!enfant) return 0;
+  try {
+    enfant.kill();
+    return 1;
+  } catch (_error) {
+    return 0;
+  }
+}
+
+function rendusEnCours() {
+  return [...navigateursEnCours.keys()];
+}
+
 let fileDeRendu = Promise.resolve();
 let rendusEnFile = 0;
 
@@ -968,6 +997,9 @@ async function renderPdfByPrintingDirect(input) {
 
   const port = cdpPort();
   const child = spawn(browserPath, argumentsDuNavigateur(port), { stdio: 'ignore' });
+  // Sous ce nom, l espace d administration peut arreter ce rendu.
+  const renderId = String(input.renderId || '');
+  if (renderId) navigateursEnCours.set(renderId, child);
 
   try {
     const wsUrl = await openCdpTarget(port);
@@ -1020,6 +1052,7 @@ async function renderPdfByPrintingDirect(input) {
     cdp.close();
     return outputPath;
   } finally {
+    if (renderId) navigateursEnCours.delete(renderId);
     child.kill();
     fsp.unlink(htmlPath).catch(() => {});
   }
@@ -1052,6 +1085,8 @@ module.exports = {
   // meme primitive, format juste different de celui d'un livre standard).
   capturePagesAsImages,
   nombreDeRendusEnFile,
+  arreterLeRendu,
+  rendusEnCours,
   // Expose pour les tests : la file se verifie sans lancer de navigateur.
   __filePourLesTests: { unSeulRenduALaFois },
   SCREENSHOT_SCALE,

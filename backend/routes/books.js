@@ -2349,6 +2349,10 @@ async function generateFinalBookPdfFiles({ book, jobId, onProgress }) {
     layouts,
     format,
     spreadLayout: true,
+    // Sous ce nom, l'espace d'administration peut arreter ce rendu : tuer
+    // le navigateur fait echouer le rendu proprement, au lieu de le
+    // laisser tourner jusqu au bout sur une machine deja a genoux.
+    renderId: jobId,
     // L impression n a plus de boucle page par page : ce qui se compte
     // desormais, c est le chargement des photos (phase « photos »), de
     // loin la partie la plus longue.
@@ -4575,6 +4579,105 @@ module.exports.__pdfExportJobsForTests = pdfExportJobs;
 // (services/events/serverHealth.js) : un rendu prend plusieurs minutes et
 // ~600 Mo, savoir combien sont en vol explique a lui seul une machine qui
 // rame.
+// LES DEMANDES DE FABRICATION, VUES DE L ESPACE D ADMINISTRATION.
+//
+// Demande du 2026-09-19 : « voir toutes les demandes de generation de PDF,
+// leur statut, et pouvoir les arreter / nettoyer ».
+//
+// Le statut brut d'un job ne suffit pas : un job « rendering » qui
+// n'avance plus depuis huit minutes est BLOQUE, pas en cours, et c'est
+// precisement celui qu on veut reperer d un coup d oeil.
+const ETAT_LISIBLE = {
+  queued: 'en attente',
+  rendering: 'en cours',
+  ready: 'reussie',
+  failed: 'echouee',
+  cancelled: 'arretee'
+};
+
+module.exports.listPdfExportJobs = () => {
+  const travaux = [];
+  pdfExportJobs.forEach((job) => {
+    const brut = String(job?.status || '').toLowerCase();
+    const bloquee = isPdfExportJobStalled(job);
+
+    let fichier = null;
+    const chemin = job?.files?.final?.path;
+    if (chemin) {
+      try {
+        const stat = fs.statSync(chemin);
+        fichier = { nom: job.files.final.fileName, mo: Number((stat.size / 1048576).toFixed(1)) };
+      } catch (_error) {
+        // Le fichier a ete nettoye : on le dit plutot que de le taire.
+        fichier = { nom: job.files.final.fileName, mo: null, absent: true };
+      }
+    }
+
+    travaux.push({
+      genre: 'pdf',
+      id: job.jobId,
+      bookId: job.bookId,
+      orderId: job.orderId || null,
+      demandeur: job.ownerEmail || null,
+      etat: bloquee ? 'bloquee' : (ETAT_LISIBLE[brut] || brut || 'inconnu'),
+      bloquee,
+      // Un travail est ARRETABLE tant qu il n est pas fini : c est ce qui
+      // decide de l affichage du bouton.
+      arretable: brut === 'queued' || brut === 'rendering',
+      creeLe: job.createdAt || null,
+      demarreLe: job.startedAt || null,
+      fini: job.completedAt || null,
+      avancement: job.progress || null,
+      erreur: job.error || null,
+      fichier,
+      retrouveSurDisque: Boolean(job.retrouveSurDisque)
+    });
+  });
+
+  // Le plus recent en premier : c'est celui qu'on vient de lancer et qu'on
+  // cherche a comprendre.
+  return travaux.sort(
+    (a, b) => Date.parse(b.creeLe || 0) - Date.parse(a.creeLe || 0)
+  );
+};
+
+// Arreter une fabrication. Deux cas, tous deux utiles :
+//   - elle attend son tour dans la file : elle ne partira jamais ;
+//   - elle tourne : on tue le navigateur, l appel en attente echoue, et le
+//     rendu se termine en erreur au lieu de continuer a manger la machine.
+module.exports.cancelPdfExportJob = (jobId) => {
+  const job = pdfExportJobs.get(String(jobId || ''));
+  if (!job) return { arrete: false, raison: 'introuvable' };
+
+  const brut = String(job.status || '').toLowerCase();
+  if (brut !== 'queued' && brut !== 'rendering') {
+    return { arrete: false, raison: 'deja terminee', etat: brut };
+  }
+
+  const navigateursTues = pdfService.arreterLeRendu(jobId);
+
+  job.status = 'cancelled';
+  job.completedAt = new Date().toISOString();
+  job.error = 'Arretee depuis l espace d administration';
+  pdfExportJobs.set(job.jobId, job);
+
+  return { arrete: true, navigateursTues };
+};
+
+// Nettoyer : oublier les demandes TERMINEES. Celles qui tournent encore
+// ne sont jamais touchees — les effacer de la liste ne les arreterait pas,
+// ca les rendrait seulement invisibles, ce qui est pire.
+module.exports.purgePdfExportJobs = () => {
+  let oubliees = 0;
+  pdfExportJobs.forEach((job, cle) => {
+    const brut = String(job?.status || '').toLowerCase();
+    if (brut === 'queued' || brut === 'rendering') return;
+    pdfExportJobs.delete(cle);
+    oubliees += 1;
+  });
+  return { oubliees };
+};
+
 module.exports.countActivePdfJobs = () => {
   let actifs = 0;
   pdfExportJobs.forEach((job) => {

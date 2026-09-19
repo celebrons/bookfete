@@ -1,0 +1,157 @@
+/* Les travaux longs (fabrications PDF, envois imprimeur).
+   Meme grammaire visuelle que les autres panneaux d'administration :
+   sobre, dense, lisible en diagonale. Ce tableau se lit pendant qu'une
+   machine rame — ce n'est pas le moment de chercher l'information. */
+
+.admin-jobs {
+  margin: 28px 0;
+}
+
+.admin-jobs-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.admin-jobs-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.admin-jobs-head-droite {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-jobs-resume {
+  font-size: 0.86rem;
+  opacity: 0.75;
+}
+
+.admin-jobs-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-jobs-ligne {
+  display: grid;
+  grid-template-columns: 92px minmax(160px, 1fr) 160px 150px 90px 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-left: 4px solid rgba(0, 0, 0, 0.18);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+/* L'etat se lit a la couleur du liseré avant meme d'etre lu au texte. */
+.admin-jobs-ligne.is-encours { border-left-color: #2f6fd0; }
+.admin-jobs-ligne.is-attente { border-left-color: #8a8a8a; }
+.admin-jobs-ligne.is-reussie { border-left-color: #2e7d46; }
+.admin-jobs-ligne.is-echouee { border-left-color: #b3261e; }
+.admin-jobs-ligne.is-arretee { border-left-color: #8a8a8a; }
+
+/* Une seule chose doit sauter aux yeux : ce qui est bloque. */
+.admin-jobs-ligne.is-bloquee {
+  border-left-color: #d1852a;
+  background: #fdf6e8;
+}
+
+.admin-jobs-genre {
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.admin-jobs-livre {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-jobs-livre strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-jobs-demandeur {
+  font-size: 0.78rem;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-jobs-etat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-jobs-phase {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.admin-jobs-temps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-jobs-depuis {
+  font-size: 0.78rem;
+  opacity: 0.65;
+}
+
+.admin-jobs-fichier {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.admin-jobs-action {
+  text-align: right;
+}
+
+.btn-petit {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+/* L'erreur prend toute la largeur sous la ligne : elle est souvent longue,
+   et la tronquer ferait perdre exactement ce qu'on cherche. */
+.admin-jobs-erreur {
+  grid-column: 1 / -1;
+  padding-top: 6px;
+  color: #b3261e;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.admin-jobs-note {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  opacity: 0.65;
+}
+
+@media (max-width: 900px) {
+  .admin-jobs-ligne {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-jobs-action {
+    text-align: left;
+  }
+}

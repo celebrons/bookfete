@@ -4,6 +4,7 @@ import { checkIsAdmin, fetchBookPreviewHtml, listAllBooks, poserCodeAdmin } from
 import '../../styles/luxe-theme.css';
 import AdminHealth from './AdminHealth';
 import AdminEvents from './AdminEvents';
+import AdminJobs from './AdminJobs';
 import './AdminBooksLuxe.css';
 
 // Espace d'administration : tous les livres, leur statut, qui les a faits, et
@@ -284,6 +285,7 @@ export default function AdminBooksLuxe() {
 
       {/* Ce que fait la machine en ce moment. */}
       <AdminHealth />
+      <AdminJobs />
 
       {/* Le journal des evenements : le deroule de ce qui est arrive aux
           livres et aux commandes, tous serveurs confondus. */}

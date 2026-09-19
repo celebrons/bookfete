@@ -76,6 +76,29 @@ export const checkIsAdmin = async () => {
   }
 };
 
+// Les travaux longs : fabrications de PDF et envois a l imprimeur.
+// Premieres routes de cet espace qui AGISSENT au lieu de lire — d'ou le
+// POST, et la confirmation cote ecran.
+export const listJobs = () => request('/jobs');
+
+const action = async (chemin) => {
+  const response = await fetch(`${getApiBaseUrl()}/admin${chemin}`, {
+    method: 'POST',
+    headers: await authHeaders()
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.error || payload?.raison || 'Action refusée.');
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+};
+
+export const stopPdfJob = (jobId) => action(`/jobs/pdf/${encodeURIComponent(jobId)}/stop`);
+export const stopGelatoJob = (orderId) => action(`/jobs/gelato/${encodeURIComponent(orderId)}/stop`);
+export const cleanupJobs = () => action('/jobs/cleanup');
+
 export const listAllBooks = (search = '') => request(
   `/books${search ? `?search=${encodeURIComponent(search)}` : ''}`
 );
