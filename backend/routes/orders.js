@@ -1774,7 +1774,12 @@ router.post('/:orderId/stripe/confirm', authenticate, async (req, res) => {
 
     return res.json(getApiSafeOrder(updatedOrder));
   } catch (error) {
-    const status = error.status || 500;
+    // Une session que Stripe ne connait pas n est pas une panne de notre
+    // serveur. Depuis que la page de commande tente ce rattrapage a chaque
+    // ouverture, une vieille session laisserait sinon une erreur serveur au
+    // journal a chaque visite — et noierait les vraies.
+    const stripeRefuse = String(error?.type || '').startsWith('Stripe');
+    const status = error.status || (stripeRefuse ? (error.statusCode || 400) : 500);
     return res.status(status).json({ error: error.message });
   }
 });
