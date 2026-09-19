@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import AtelierPhotoLightbox from './AtelierPhotoLightbox';
 
 // Colonne gauche de l'atelier : "Mes souvenirs" — photos et souvenirs
@@ -105,7 +105,31 @@ function AtelierSidebar({
 
   const [activeTab, setActiveTab] = useState(initialTab === 'souvenirs' ? 'souvenirs' : 'photos');
   const [newText, setNewText] = useState('');
-  const items = activeTab === 'photos' ? photos : souvenirs;
+
+  // CE QUI RESTE A PLACER D'ABORD, CE QUI EST DEJA PLACE EN BAS (2026-09-19).
+  //
+  // La bibliotheque d'un livre de 60 photos melange celles qu'on a deja
+  // posees et celles qu'on cherche encore : le badge « utilisee » le disait
+  // deja, mais il fallait balayer toute la grille pour trouver les
+  // restantes. Le travail en cours est en haut, l'archive en bas.
+  //
+  // Tri STABLE (deux filtres, pas un sort) : a l'interieur de chaque groupe
+  // l'ordre d'origine — celui du livre — est conserve tel quel, et poser une
+  // photo ne fait donc que la deplacer en fin de liste, sans rebattre le
+  // reste. Vaut aussi pour les souvenirs : meme badge, meme besoin.
+  const items = useMemo(() => {
+    const base = activeTab === 'photos' ? photos : souvenirs;
+    if (!usedItemIds || usedItemIds.size === 0) return base;
+    return [
+      ...base.filter((item) => !usedItemIds.has(item.id)),
+      ...base.filter((item) => usedItemIds.has(item.id))
+    ];
+  }, [activeTab, photos, souvenirs, usedItemIds]);
+
+  const nombreUtilises = useMemo(
+    () => (usedItemIds ? items.filter((item) => usedItemIds.has(item.id)).length : 0),
+    [items, usedItemIds]
+  );
 
   const handleDragStart = (event, item) => {
     event.dataTransfer.effectAllowed = 'copy';
@@ -235,6 +259,12 @@ function AtelierSidebar({
           {activeTab === 'photos' ? 'Aucune photo pour le moment.' : 'Aucun souvenir pour le moment.'}
         </p>
       ) : (
+        <>
+        {nombreUtilises > 0 && nombreUtilises < items.length && (
+          <p className="atelier-sidebar-sorthint">
+            {activeTab === 'photos' ? 'Photos' : 'Souvenirs'} deja place{activeTab === 'photos' ? 'es' : 's'} regroupe{activeTab === 'photos' ? 'es' : 's'} en bas ({nombreUtilises}).
+          </p>
+        )}
         <div className="atelier-sidebar-grid">
           {items.map((item) => {
             const isUsed = usedItemIds?.has(item.id);
@@ -289,6 +319,7 @@ function AtelierSidebar({
             );
           })}
         </div>
+        </>
       )}
 
       {/* Rendus en DERNIER et en position fixe : la bibliotheque defile et

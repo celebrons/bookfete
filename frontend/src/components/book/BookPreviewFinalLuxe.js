@@ -389,6 +389,15 @@ export default function BookPreviewFinalLuxe() {
     try {
       const { book: updatedBook } = await chooseFormat(bookId, formatId);
       setBook((previous) => ({ ...previous, ...updatedBook }));
+      // RETOUR A LA COUVERTURE.
+      //
+      // Changer de format recompose le livre : la pagination change, donc
+      // la planche n°7 d'avant n'est plus la planche n°7 d'apres. Rester
+      // sur le meme numero montrait un contenu different sans prevenir, et
+      // pouvait meme designer une planche qui n existe plus dans le format
+      // choisi. On revient a la couverture : le debut du livre est le seul
+      // repere qui a le meme sens dans les trois formats.
+      setViewIndex(0);
       loadFormatOptions();
     } catch (err) {
       // Remonte le vrai message serveur (ex. "Il faut ajouter du contenu

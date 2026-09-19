@@ -355,6 +355,26 @@ router.post(
       if (uploadResult.thumbnailUrl) metadata.thumbnailUrl = uploadResult.thumbnailUrl;
       if (uploadResult.previewUrl) metadata.previewUrl = uploadResult.previewUrl;
 
+      // NOM ET POIDS DU FICHIER D'ORIGINE (2026-09-19).
+      //
+      // Le seul moyen de reconnaitre une photo deja envoyee : une fois dans
+      // Supabase Storage, elle porte un nom genere et plus rien ne rattache
+      // le fichier a celui choisi sur le disque. Sans ces deux champs,
+      // l'atelier ne peut pas dire « celle-ci est deja dans votre livre » —
+      // demande du 2026-09-19 (« detecter les doublons... nom ? taille ? »).
+      //
+      // Ce n'est pas une empreinte du contenu : deux fichiers de meme nom et
+      // de meme poids sont, en pratique, le meme fichier envoye deux fois,
+      // mais l'atelier s'en sert pour PREVENIR, jamais pour refuser.
+      // Les photos envoyees avant cette date n'ont pas ces champs : elles ne
+      // seront simplement jamais reconnues comme doublons.
+      if (req.file.originalname) {
+        metadata.originalName = String(req.file.originalname).slice(0, 200);
+      }
+      if (Number.isFinite(req.file.size)) {
+        metadata.size = req.file.size;
+      }
+
       const data = await bookContentService.createContentItem(req.params.bookId, {
         source: 'upload',
         kind: 'photo',

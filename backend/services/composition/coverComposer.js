@@ -329,7 +329,18 @@ function composeBackCover({ book, items, template, format, frontCoverItemIds = [
     ? 0
     : new Set((items || []).filter((item) => item.contribution_id).map((item) => item.contribution_id)).size;
 
-  const statsLine = formatStatsLine({ contributeurs, souvenirs, photos });
+  // DEUX lignes de chiffres, et ce n'est pas un doublon :
+  //  - `statsLineComplete` sert a DECIDER (un livre a-t-il de quoi remplir
+  //    une 4e "avec chiffres" ?) ;
+  //  - `statsLine` est ce qui sera AFFICHE, une fois retires les chiffres
+  //    que l'utilisateur a decoches (cover_overrides.backStatsHidden).
+  // Les confondre ferait disparaitre la photo de 4e des qu'on decoche le
+  // dernier chiffre — une case a cocher ne doit pas changer la mise en page.
+  const statsLineComplete = formatStatsLine({ contributeurs, souvenirs, photos });
+  const statsLine = formatStatsLine(
+    { contributeurs, souvenirs, photos },
+    Array.isArray(overrides.backStatsHidden) ? overrides.backStatsHidden : []
+  );
   const phrase = resolveClosingPhrase(book, overrides);
   const forcedVariant = resolveForcedBackVariant(overrides);
 
@@ -367,8 +378,8 @@ function composeBackCover({ book, items, template, format, frontCoverItemIds = [
   let photoItem;
 
   if (forcedVariant) {
-    ({ variant, photoItem } = resolveForcedBackComposition(forcedVariant, { statsLine, ranked, overridden }));
-  } else if (overridden && statsLine) {
+    ({ variant, photoItem } = resolveForcedBackComposition(forcedVariant, { statsLine: statsLineComplete, ranked, overridden }));
+  } else if (overridden && statsLineComplete) {
     // Une photo choisie a la main exprime deja l'intention d'afficher une
     // photo, meme sans variante forcee explicitement — meme principe que le
     // recto (voir composeFrontCover : `else if (overridden)`).
@@ -378,7 +389,7 @@ function composeBackCover({ book, items, template, format, frontCoverItemIds = [
     variant = 'BACK_MINIMAL';
     photoItem = null;
 
-    if (statsLine) {
+    if (statsLineComplete) {
       const acceptable = ranked.filter((entry) => entry.score >= COVER_PHOTO_THRESHOLDS.good);
 
       if (acceptable.length > 0) {

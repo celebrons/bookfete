@@ -401,6 +401,48 @@ describe('coverComposer.composeBackCover — statistiques et repli', () => {
     });
     expect(back.content.variant).not.toBe('BACK_PHOTO_STATS');
   });
+
+  // Chiffres retires a la demande (cover_overrides.backStatsHidden,
+  // 2026-09-19). Le point delicat : masquer un chiffre ne doit changer que
+  // le TEXTE affiche, jamais la mise en page — sinon decocher "nombre de
+  // photos" ferait disparaitre la photo de 4e par effet de bord.
+  it('masquer le nombre de photos retire le chiffre sans changer la variante ni la photo', () => {
+    const items = [greatPhoto('p1'), mediumPhoto('p2'), textItem('t1')];
+    const base = {
+      items,
+      template: TEMPLATE,
+      format: FORMAT,
+      frontCoverItemIds: ['p1']
+    };
+    const avant = composeBackCover({ ...base, book: { id: 'b1', collection_mode: 'solo' } });
+    const apres = composeBackCover({
+      ...base,
+      book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backStatsHidden: ['photos'] } }
+    });
+
+    expect(avant.content.statsLine).toContain('photo');
+    expect(apres.content.statsLine).not.toContain('photo');
+    expect(apres.content.variant).toBe(avant.content.variant);
+    expect(apres.content.itemIds).toEqual(avant.content.itemIds);
+  });
+
+  it('masquer TOUS les chiffres laisse la 4e intacte (photo comprise), seule la ligne disparait', () => {
+    const items = [greatPhoto('p1'), mediumPhoto('p2'), textItem('t1')];
+    const base = { items, template: TEMPLATE, format: FORMAT, frontCoverItemIds: ['p1'] };
+    const avant = composeBackCover({ ...base, book: { id: 'b1', collection_mode: 'solo' } });
+    const apres = composeBackCover({
+      ...base,
+      book: {
+        id: 'b1',
+        collection_mode: 'solo',
+        cover_overrides: { backStatsHidden: ['contributeurs', 'souvenirs', 'photos'] }
+      }
+    });
+
+    expect(apres.content.statsLine).toBe('');
+    expect(apres.content.variant).toBe(avant.content.variant);
+    expect(apres.content.itemIds).toEqual(avant.content.itemIds);
+  });
 });
 
 describe('coverComposer.composeBackCover — surcharge de la phrase de cloture', () => {

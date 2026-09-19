@@ -17,6 +17,12 @@
 //
 // formatStatsLine() : jamais de statistique a 0 affichee (ordre fixe
 // contributeurs -> souvenirs -> photos, valeurs a 0 simplement retirees).
+// Le second argument `hidden` retire en plus les chiffres que l'utilisateur
+// a explicitement decoches (cover_overrides.backStatsHidden — demande du
+// 2026-09-19 : "donner la possibilite d'enlever le nombre de photos"). Un
+// chiffre masque n'est qu'un chiffre NON AFFICHE : il continue d'exister et
+// de compter pour decider de la variante de 4e (voir coverComposer.js),
+// sinon decocher un chiffre ferait disparaitre la photo de 4e avec lui.
 //
 // Fonctions pures, aucun acces reseau/disque.
 
@@ -51,15 +57,18 @@ function pickClosingPhrase(book) {
 
 /**
  * @param {object} counts - { contributeurs, souvenirs, photos }
+ * @param {string[]} [hidden] - cles a ne pas afficher (ex. ['photos'])
  * @returns {string} ex. "32 contributeurs · 47 souvenirs" — jamais "· 0 photos".
  *   Chaine vide si les trois compteurs sont a 0 (a l'appelant de repartir
  *   sur une variante sans statistiques dans ce cas).
  */
-function formatStatsLine({ contributeurs = 0, souvenirs = 0, photos = 0 } = {}) {
+function formatStatsLine({ contributeurs = 0, souvenirs = 0, photos = 0 } = {}, hidden = []) {
+  const masques = Array.isArray(hidden) ? hidden : [];
+  const affiche = (cle, valeur) => valeur > 0 && !masques.includes(cle);
   const parts = [];
-  if (contributeurs > 0) parts.push(`${contributeurs} contributeur${contributeurs > 1 ? 's' : ''}`);
-  if (souvenirs > 0) parts.push(`${souvenirs} souvenir${souvenirs > 1 ? 's' : ''}`);
-  if (photos > 0) parts.push(`${photos} photo${photos > 1 ? 's' : ''}`);
+  if (affiche('contributeurs', contributeurs)) parts.push(`${contributeurs} contributeur${contributeurs > 1 ? 's' : ''}`);
+  if (affiche('souvenirs', souvenirs)) parts.push(`${souvenirs} souvenir${souvenirs > 1 ? 's' : ''}`);
+  if (affiche('photos', photos)) parts.push(`${photos} photo${photos > 1 ? 's' : ''}`);
   return parts.join(' · ');
 }
 

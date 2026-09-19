@@ -15,6 +15,7 @@ import {
   updateOrderStatus
 } from '../../services/ordersApi';
 import { estimatePrice } from '../../services/compositionApi';
+import { isCurrentlyAnonymous } from '../../services/anonymousSession';
 // formatPriceCents/getOrderStatusConfig ne sont plus utilises ICI : ils ont
 // suivi les blocs d'affichage dans checkout/ (StepProduct, StepPayment,
 // StepTracking), qui sont desormais seuls responsables du rendu.
@@ -23,11 +24,6 @@ import {
   getBookLifecycleStatusFromBook,
   isBookLifecycleAtLeast
 } from '../../utils/bookLifecycle';
-import {
-  getJourneyPrimaryAction,
-  getJourneyStatusConfig,
-  resolveBookJourneyStatus
-} from '../../utils/clientJourney';
 import OrderSteps from './checkout/OrderSteps';
 import StepProduct from './checkout/StepProduct';
 import StepAddress from './checkout/StepAddress';
@@ -165,23 +161,69 @@ const BookCheckoutLuxe = () => {
     return () => { cancelled = true; };
   }, [book?.id, book?.print_format, book?.page_count, orderType, quantity]);
 
+  // LES TROIS PRIX, POUR LES AFFICHER DEVANT LES TROIS PRODUITS.
+  // Meme source que le prix facture (estimatePrice -> computeOrderPricing) :
+  // on demande simplement les trois, a l'unite. Le total dependant de la
+  // quantite reste calcule par le serveur dans `estimate` ci-dessus — on ne
+  // multiplie rien ici, pour ne pas reimplementer un second calcul de prix.
+  const [pricesByType, setPricesByType] = useState({});
+  useEffect(() => {
+    if (!book?.id) return undefined;
+    let cancelled = false;
+    Promise.all(['pdf', 'print', 'pack'].map((type) => (
+      estimatePrice(book.id, {
+        printFormat: book.print_format,
+        pageCount: book.page_count,
+        type,
+        quantity: 1
+      })
+        .then((result) => [type, Number(result.unitCents)])
+        .catch(() => [type, null])
+    ))).then((entries) => {
+      if (cancelled) return;
+      setPricesByType(Object.fromEntries(entries.filter(([, cents]) => Number.isFinite(cents))));
+    });
+    return () => { cancelled = true; };
+  }, [book?.id, book?.print_format, book?.page_count]);
+
+  // COMMANDER EXIGE UN COMPTE — ET LE DIRE DOIT MENER QUELQUE PART.
+  //
+  // POST /api/orders refuse une session anonyme (403 requiresAccount, voir
+  // backend/routes/orders.js) : c'est le bon point d'etranglement, sans email
+  // l'acheteur ne pourrait ni retrouver sa commande ni la suivre. Mais le
+  // message arrivait APRES le clic sur Payer et ne renvoyait nulle part.
+  //
+  // Deux corrections : on l'annonce sur l'ecran de paiement AVANT le clic, et
+  // le bouton emmene vraiment a l'inscription en memorisant ou revenir. La
+  // conversion d'une session anonyme garde le MEME identifiant de compte
+  // (services/anonymousSession.js) : le livre, les photos et la commande en
+  // cours sont donc retrouves tels quels au retour.
+  const [anonymousSession, setAnonymousSession] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    isCurrentlyAnonymous()
+      .then((value) => { if (!cancelled) setAnonymousSession(Boolean(value)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const allerVersInscription = useCallback(() => {
+    // Meme cle que CreateBookSansIA/LoginLuxe/RegisterLuxe : l'inscription
+    // repart d'ici, sur CE livre, a l'etape ou on en etait.
+    try {
+      localStorage.setItem('returnTo', `${location.pathname}${location.search || ''}`);
+    } catch (_error) {
+      // Navigation privee ou stockage refuse : on va quand meme s'inscrire,
+      // le retour se fera simplement par le tableau de bord.
+    }
+    navigate('/register');
+  }, [location.pathname, location.search, navigate]);
+
   const canOrder = useMemo(
     () => isBookLifecycleAtLeast(getBookLifecycleStatusFromBook(book), 'finalized'),
     [book]
   );
   const stripeTestEnabled = process.env.REACT_APP_STRIPE_ENABLED === '1';
-  const checkoutJourneyStatus = useMemo(
-    () => resolveBookJourneyStatus({ book, latestOrder }),
-    [book, latestOrder]
-  );
-  const checkoutJourneyConfig = useMemo(
-    () => getJourneyStatusConfig(checkoutJourneyStatus),
-    [checkoutJourneyStatus]
-  );
-  const checkoutJourneyAction = useMemo(
-    () => getJourneyPrimaryAction(checkoutJourneyStatus, latestOrder),
-    [checkoutJourneyStatus, latestOrder]
-  );
   const hasPendingPaymentOrder = (
     String(latestOrder?.status || '').toLowerCase() === 'awaiting_payment'
   );
@@ -834,6 +876,12 @@ const BookCheckoutLuxe = () => {
       return;
     } catch (error) {
       setNotice({ type: 'error', message: error.message });
+      // Refus « compte requis » : on emmene a l'inscription au lieu de
+      // laisser la personne devant un message sans issue.
+      if (error?.requiresAccount) {
+        setAnonymousSession(true);
+        allerVersInscription();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1205,14 +1253,10 @@ const BookCheckoutLuxe = () => {
           <p>
             Livre: <strong>{book?.title || 'Sans titre'}</strong>
           </p>
-          <div className="orders-journey">
-            <span className={`orders-status-chip ${checkoutJourneyConfig.tone}`}>
-              {checkoutJourneyConfig.label}
-            </span>
-            <span className="orders-journey-next">
-              Prochaine action: {checkoutJourneyAction.label}
-            </span>
-          </div>
+          {/* Ni pastille de statut, ni « Prochaine action ». La frise
+              d etapes juste en dessous dit deja ou on en est, et mieux :
+              « Valide definitivement / Prochaine action: Commander »
+              inquietait sans informer (retour utilisateur 2026-09-19). */}
           <div className="orders-hero-links">
             <Link to={`/book/${bookId}`} className="btn btn-outline">Retour au livre</Link>
             <Link to="/orders" className="btn btn-outline">Mes commandes</Link>
@@ -1257,6 +1301,7 @@ const BookCheckoutLuxe = () => {
               locked={checkoutFormLocked}
               unitCents={effectiveUnit}
               totalCents={effectiveTotal}
+              pricesByType={pricesByType}
             />
           )}
 
@@ -1282,6 +1327,8 @@ const BookCheckoutLuxe = () => {
               canPay={canOrder}
               stripeEnabled={stripeTestEnabled}
               hasPendingPaymentOrder={hasPendingPaymentOrder}
+              isAnonymous={anonymousSession}
+              onCreateAccount={allerVersInscription}
             />
           )}
 

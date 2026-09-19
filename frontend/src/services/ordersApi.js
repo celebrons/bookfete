@@ -41,7 +41,16 @@ const request = async (path, options = {}) => {
 
   const payload = await parseJsonSafe(response);
   if (!response.ok) {
-    throw new Error(payload?.error || 'Erreur API commandes.');
+    // Le corps d'un refus porte parfois un drapeau qui dit a l'interface quoi
+    // FAIRE, pas seulement quoi afficher : `requiresAccount` (POST /orders
+    // refuse une session anonyme) doit conduire a l'inscription. En ne
+    // gardant que le message, on affichait "Creez votre compte pour
+    // commander" sans envoyer nulle part (signale le 2026-09-19).
+    const erreur = new Error(payload?.error || 'Erreur API commandes.');
+    erreur.status = response.status;
+    erreur.requiresAccount = payload?.requiresAccount === true;
+    erreur.payload = payload;
+    throw erreur;
   }
   return payload;
 };

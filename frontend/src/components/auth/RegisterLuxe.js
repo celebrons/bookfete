@@ -37,8 +37,17 @@ const RegisterLuxe = () => {
   const navigate = useNavigate();
 
   // Meme cible que LoginLuxe.js : returnTo si present (pose par
-  // CreateBookSansIA.js), sinon le tableau de bord.
-  const returnTarget = () => localStorage.getItem('returnTo') || '/dashboard';
+  // CreateBookSansIA.js ou par la page de commande quand elle demande un
+  // compte), sinon le tableau de bord.
+  //
+  // On l'EFFACE en le lisant, comme LoginLuxe : une cible laissee derriere
+  // detournerait la connexion suivante, des semaines plus tard, vers une
+  // page qui n'a plus rien a voir.
+  const returnTarget = () => {
+    const cible = localStorage.getItem('returnTo');
+    localStorage.removeItem('returnTo');
+    return cible || '/dashboard';
+  };
 
   const handleOAuth = async (provider) => {
     setError(null);

@@ -27,37 +27,39 @@ function PrintQualityRecapModal({ isOpen, warnings = [], onContinueAnyway, onRev
           <button type="button" className="pq-recap-close" onClick={onClose} aria-label="Fermer">×</button>
         </div>
 
-        <p className="pq-recap-intro">
-          {insuffisants > 0
-            ? 'Certaines photos ont une résolution trop faible pour la taille à laquelle elles seront imprimées : elles risquent d\'apparaître floues sur le livre papier.'
-            : 'Certaines photos sont un peu justes en résolution pour la taille à laquelle elles seront imprimées.'}
-        </p>
+        <div className="pq-recap-body">
+          <p className="pq-recap-intro">
+            {insuffisants > 0
+              ? 'Certaines photos ont une résolution trop faible pour la taille à laquelle elles seront imprimées : elles risquent d\'apparaître floues sur le livre papier.'
+              : 'Certaines photos sont un peu justes en résolution pour la taille à laquelle elles seront imprimées.'}
+          </p>
 
-        <ul className="pq-recap-list">
-          {warnings.map((entry) => (
-            <li key={`${entry.pageIndex}-${entry.itemId}`} className="pq-recap-item">
-              {entry.thumbnailUrl ? (
-                <img src={entry.thumbnailUrl} alt="" className="pq-recap-thumb" />
-              ) : (
-                <span className="pq-recap-thumb pq-recap-thumb-empty" aria-hidden="true" />
-              )}
-              <span className="pq-recap-item-text">
-                <span className="pq-recap-item-page">Page {entry.pageIndex + 1}</span>
-                <span className="pq-recap-item-label">{entry.label}</span>
-              </span>
-              <PhotoFitBadge fit={entry} size="md" className="pq-recap-item-badge" />
-              {onReviewPage && (
-                <button
-                  type="button"
-                  className="pq-recap-item-link"
-                  onClick={() => onReviewPage(entry.pageIndex)}
-                >
-                  Revoir
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+          <ul className="pq-recap-list">
+            {warnings.map((entry) => (
+              <li key={`${entry.pageIndex}-${entry.itemId}`} className="pq-recap-item">
+                {entry.thumbnailUrl ? (
+                  <img src={entry.thumbnailUrl} alt="" className="pq-recap-thumb" />
+                ) : (
+                  <span className="pq-recap-thumb pq-recap-thumb-empty" aria-hidden="true" />
+                )}
+                <span className="pq-recap-item-text">
+                  <span className="pq-recap-item-page">Page {entry.pageIndex + 1}</span>
+                  <span className="pq-recap-item-label">{entry.label}</span>
+                </span>
+                <PhotoFitBadge fit={entry} size="md" className="pq-recap-item-badge" />
+                {onReviewPage && (
+                  <button
+                    type="button"
+                    className="pq-recap-item-link"
+                    onClick={() => onReviewPage(entry.pageIndex)}
+                  >
+                    Revoir
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <div className="pq-recap-actions">
           {onReviewPage && count > 0 && (

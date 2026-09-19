@@ -2342,6 +2342,30 @@
   color: var(--text-light);
 }
 
+/* Chiffres affichables en 4e de couverture (2026-09-19) : trois cases a
+   cocher, memes tokens que le reste du panneau. */
+.coverlite-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.coverlite-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.coverlite-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
 /* --- Avancement de l'envoi de photos (2026-09-12) -----------------------
    Un lot de 40 photos prend plusieurs minutes : sans avancement visible,
    rien ne distingue un traitement en cours d'un blocage. */
@@ -2392,3 +2416,13 @@
 }
 .atelier-sidebar-delete-all:hover:not(:disabled) { color: #8c3225; }
 .atelier-sidebar-delete-all:disabled { opacity: 0.5; cursor: default; }
+
+/* Regroupement des elements deja places en bas de la bibliotheque
+   (AtelierSidebar.js, 2026-09-19) : sans cette ligne, le regroupement
+   passerait pour un ordre aleatoire. */
+.atelier-sidebar-sorthint {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--text-light);
+}

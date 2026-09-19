@@ -13,7 +13,7 @@ import { PageZoomStage, ZoomControls } from '../../common/PageZoomStage';
 // voit exactement ce qu'il obtiendra. Le plateau de travail, lui, affiche
 // les pages retassees pour tenir dans l'espace disponible (partage avec les
 // colonnes gauche/droite) — pas a l'echelle reelle d'impression. Le bouton
-// "Voir à l'échelle" (barre de navigation, toujours visible) ouvre le meme
+// "Prévisualiser" (barre de navigation, toujours visible) ouvre le meme
 // contenu (meme srcDoc, aucun nouvel appel reseau) dans un calque plein
 // ecran base sur PageZoomStage (voir common/PageZoomStage.js) : le livre
 // garde TOUJOURS ses vraies proportions, mis a l'echelle automatiquement
@@ -125,8 +125,8 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
           type="button"
           className="atelier-book-stage-eye"
           onClick={(event) => { event.stopPropagation(); onExpand(); }}
-          title="Voir à l'échelle — proportions et dimensions d'impression respectées"
-          aria-label="Voir à l'échelle"
+          title="Prévisualiser — proportions et dimensions d'impression respectées"
+          aria-label="Prévisualiser"
         >
           <EyeIcon />
         </button>
@@ -282,7 +282,7 @@ function AtelierBookView({
   return (
     <div className="atelier-book-view">
       <div className="atelier-book-stage">
-        {/* Le raccourci "Voir à l'échelle" (retour utilisateur : "un petit
+        {/* Le raccourci "Prévisualiser" (retour utilisateur : "un petit
             oeil sur le coin haut droit du livre") est desormais rendu DANS
             chaque page (voir PagePane) plutot qu'ici, au coin du plateau —
             voir le commentaire de PagePane pour la raison. Le bouton
@@ -409,10 +409,10 @@ function AtelierBookView({
             className="atelier-realsize-toggle-btn"
             onClick={() => setIsFullscreenOpen(true)}
             disabled={!hasContentToExpand}
-            title="Voir à l'échelle — proportions et dimensions d'impression respectées"
+            title="Prévisualiser — proportions et dimensions d'impression respectées"
           >
             <ExpandIcon />
-            <span>Voir à l'échelle</span>
+            <span>Prévisualiser</span>
           </button>
         </div>
       </div>
@@ -440,7 +440,7 @@ function AtelierBookView({
           <div className="atelier-realsize-panel">
             <div className="atelier-realsize-head">
               <span>
-                {navLabel} — Voir à l'échelle
+                {navLabel} — Prévisualiser
                 {/* Cahier des charges §3 : "taille reelle" est trompeur sur
                     ecran (22cm CSS != 22cm physiques selon le DPI) — cette
                     formule remplace l'ancien affichage brut des mm. */}

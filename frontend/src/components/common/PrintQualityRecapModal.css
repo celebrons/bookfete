@@ -12,15 +12,32 @@
   padding: var(--space-md);
 }
 
+/* LA FENETRE NE DOIT PAS ETRE TRONQUEE.
+   Avant : toute la fenetre defilait d'un bloc (max-height + overflow).
+   Des qu'il y avait plusieurs photos a signaler, le pied — donc
+   "Continuer quand meme", le SEUL chemin vers le paiement — sortait de
+   l'ecran, et rien ne disait qu'il fallait faire defiler : la fenetre
+   avait l'air incomplete (signale le 2026-09-19).
+   Maintenant : colonne flex, seule la liste defile, le titre et les deux
+   boutons restent toujours visibles. */
 .pq-recap-modal {
   width: 100%;
   max-width: 560px;
-  max-height: 88vh;
-  overflow-y: auto;
+  max-height: min(88vh, 88dvh);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--white);
   border-radius: 16px;
   padding: var(--space-lg);
   box-shadow: 0 30px 70px -25px rgba(36, 31, 24, 0.45);
+}
+
+.pq-recap-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .pq-recap-head {
@@ -56,7 +73,7 @@
 
 .pq-recap-list {
   list-style: none;
-  margin: 0 0 var(--space-md);
+  margin: 0 0 var(--space-sm);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -115,7 +132,19 @@
 .pq-recap-item-link:hover { color: var(--ink); }
 
 .pq-recap-actions {
+  flex: none;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(36, 31, 24, 0.08);
+}
+
+/* Telephone : la fenetre prend la hauteur utile et les boutons passent
+   pleine largeur plutot que de se tasser sur une ligne trop etroite. */
+@media (max-width: 520px) {
+  .pq-recap-backdrop { padding: var(--space-sm); align-items: flex-end; }
+  .pq-recap-modal { max-height: min(92vh, 92dvh); padding: var(--space-md); }
+  .pq-recap-actions .btn { flex: 1 1 100%; }
 }

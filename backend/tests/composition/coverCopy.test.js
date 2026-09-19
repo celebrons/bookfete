@@ -47,4 +47,26 @@ describe('coverCopy.formatStatsLine', () => {
     expect(formatStatsLine({ contributeurs: 0, souvenirs: 0, photos: 0 })).toBe('');
     expect(formatStatsLine()).toBe('');
   });
+
+  // Chiffres retires a la demande (cover_overrides.backStatsHidden, 2026-09-19).
+  it('retire un chiffre explicitement masque', () => {
+    expect(formatStatsLine({ contributeurs: 32, souvenirs: 47, photos: 18 }, ['photos']))
+      .toBe('32 contributeurs · 47 souvenirs');
+  });
+
+  it('peut masquer plusieurs chiffres, et tous', () => {
+    expect(formatStatsLine({ contributeurs: 32, souvenirs: 47, photos: 18 }, ['contributeurs', 'souvenirs']))
+      .toBe('18 photos');
+    expect(formatStatsLine({ contributeurs: 32, souvenirs: 47, photos: 18 }, ['contributeurs', 'souvenirs', 'photos']))
+      .toBe('');
+  });
+
+  it('ignore une liste absente, vide ou invalide plutot que de tout masquer', () => {
+    const compteurs = { contributeurs: 2, souvenirs: 3, photos: 4 };
+    const attendu = '2 contributeurs · 3 souvenirs · 4 photos';
+    expect(formatStatsLine(compteurs, [])).toBe(attendu);
+    expect(formatStatsLine(compteurs, null)).toBe(attendu);
+    expect(formatStatsLine(compteurs, 'photos')).toBe(attendu);
+    expect(formatStatsLine(compteurs, ['inconnu'])).toBe(attendu);
+  });
 });

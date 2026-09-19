@@ -279,16 +279,25 @@ describe('routes/composition', () => {
 
   describe('POST /api/books/:bookId/content-items/photo', () => {
     it('uploade une photo et cree le content-item', async () => {
+      const octets = Buffer.from('fake-image-bytes');
       const response = await request(app)
         .post(`/api/books/${BOOK_ID}/content-items/photo`)
         .set('Authorization', 'Bearer valid-token')
-        .attach('photo', Buffer.from('fake-image-bytes'), 'souvenir.jpg');
+        .attach('photo', octets, 'souvenir.jpg');
 
       expect(response.status).toBe(201);
       expect(response.body).toMatchObject({
         book_id: BOOK_ID,
         kind: 'photo',
         url: 'https://cdn.test/uploaded.jpg'
+      });
+
+      // Nom et poids du fichier d'origine (2026-09-19) : sans eux, l'atelier
+      // n'a aucun moyen de reconnaitre une photo deja envoyee — une fois
+      // dans le stockage, elle porte un nom genere.
+      expect(response.body.metadata).toMatchObject({
+        originalName: 'souvenir.jpg',
+        size: octets.length
       });
 
       const storageService = require('../services/storageService');

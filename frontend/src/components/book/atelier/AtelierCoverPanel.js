@@ -206,6 +206,22 @@ function CoverPhotoPicker({ photos, loading, selectedId, onSelect }) {
   );
 }
 
+// Les trois chiffres de la 4e de couverture (voir backend coverCopy.js :
+// formatStatsLine). Chacun peut etre retire — demande utilisateur du
+// 2026-09-19 : "donner la possibilite d'enlever le nombre de photos".
+// On memorise ce qui est MASQUE, pas ce qui est affiche : un chiffre
+// ajoute plus tard apparaitra donc par defaut, sans qu'il faille corriger
+// les livres existants.
+const BACK_STATS = [
+  { id: 'contributeurs', label: 'Nombre de contributeurs' },
+  { id: 'souvenirs', label: 'Nombre de souvenirs' },
+  { id: 'photos', label: 'Nombre de photos' }
+];
+
+const normalizeHiddenStats = (value) => (
+  Array.isArray(value) ? value.filter((id) => BACK_STATS.some((stat) => stat.id === id)) : []
+);
+
 const buildInitialState = (book) => {
   const overrides = (book?.cover_overrides && typeof book.cover_overrides === 'object') ? book.cover_overrides : {};
   const closingPhraseMode = ['custom', 'none'].includes(overrides.closingPhraseMode) ? overrides.closingPhraseMode : 'auto';
@@ -236,7 +252,8 @@ const buildInitialState = (book) => {
     closingPhraseMode,
     closingPhraseText: normalizeText(overrides.closingPhraseText),
     kickerMode,
-    kickerText: normalizeText(overrides.kickerText)
+    kickerText: normalizeText(overrides.kickerText),
+    backStatsHidden: normalizeHiddenStats(overrides.backStatsHidden)
   };
 };
 
@@ -299,6 +316,12 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
           // besoin de le reappliquer ici.
           title: formState.title,
           cover_overrides: {
+            // Les surcharges que CE panneau ne gere pas (recadrages
+            // frontPhotoAdjust/backPhotoAdjust, poses ailleurs dans
+            // l'atelier) doivent survivre : sans ce report, modifier un
+            // titre ici effacait silencieusement un cadrage regle a la
+            // main. Meme precaution qu'ailleurs dans BookAtelierLuxe.js.
+            ...(book?.cover_overrides && typeof book.cover_overrides === 'object' ? book.cover_overrides : {}),
             frontVariant: formState.frontVariant,
             backVariant: formState.backVariant,
             coverColor: formState.coverColor || null,
@@ -309,7 +332,8 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
             closingPhraseMode: formState.closingPhraseMode,
             closingPhraseText: formState.closingPhraseText,
             kickerMode: formState.kickerMode,
-            kickerText: formState.kickerText
+            kickerText: formState.kickerText,
+            backStatsHidden: formState.backStatsHidden
           }
         });
         setSavedSignature(stateSignature);
@@ -507,22 +531,6 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
             />
           </div>
 
-          {/* Photo de 4e de couverture (retour utilisateur, 2026-09-10 :
-              "pareil pour la 4e de couverture") — jusqu'ici seul le recto
-              avait ce controle, meme composant/meme principe ici
-              (cover_overrides.backPhotoId, voir coverComposer.js). */}
-          {showBackPhotoPicker && (
-            <div className="coverlite-group">
-              <span className="coverlite-group-label">Photo de 4e de couverture</span>
-              <CoverPhotoPicker
-                photos={photos}
-                loading={loadingPhotos}
-                selectedId={formState.backPhotoId}
-                onSelect={(id) => updateField('backPhotoId', id)}
-              />
-            </div>
-          )}
-
           <div className="coverlite-group">
             <span className="coverlite-group-label">Phrase de 4e de couverture</span>
             {/* <select> plutot que 3 boutons — meme simplification et meme
@@ -548,6 +556,56 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               />
             )}
           </div>
+
+          {/* Photo de 4e de couverture (retour utilisateur, 2026-09-10 :
+              "pareil pour la 4e de couverture") — jusqu'ici seul le recto
+              avait ce controle, meme composant/meme principe ici
+              (cover_overrides.backPhotoId, voir coverComposer.js). */}
+          {showBackPhotoPicker && (
+            <div className="coverlite-group">
+              <span className="coverlite-group-label">Photo de 4e de couverture</span>
+              <CoverPhotoPicker
+                photos={photos}
+                loading={loadingPhotos}
+                selectedId={formState.backPhotoId}
+                onSelect={(id) => updateField('backPhotoId', id)}
+              />
+            </div>
+          )}
+
+          {/* CHIFFRES DE LA 4e — chacun peut etre retire (2026-09-19).
+              Masque sur le format "Sobre", qui n'affiche aucun chiffre :
+              proposer d'en retirer un qui n'apparait pas n'aurait aucun
+              sens. */}
+          {formState.backVariant !== 'BACK_MINIMAL' && (
+          <div className="coverlite-group">
+            <span className="coverlite-group-label">Chiffres affiches en 4e</span>
+            <div className="coverlite-checks">
+              {BACK_STATS.map((stat) => {
+                const masque = formState.backStatsHidden.includes(stat.id);
+                return (
+                  <label key={stat.id} className="coverlite-check">
+                    <input
+                      type="checkbox"
+                      checked={!masque}
+                      onChange={() => updateField(
+                        'backStatsHidden',
+                        masque
+                          ? formState.backStatsHidden.filter((id) => id !== stat.id)
+                          : [...formState.backStatsHidden, stat.id]
+                      )}
+                    />
+                    <span>{stat.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="coverlite-hint">
+              Un chiffre decoche n'apparait pas sur la 4e de couverture. Un chiffre a zero
+              n'est de toute facon jamais affiche.
+            </p>
+          </div>
+          )}
         </>
       )}
     </aside>
