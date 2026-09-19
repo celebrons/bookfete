@@ -1247,6 +1247,62 @@ router.get('/book/:bookId/price-estimate', authenticate, async (req, res) => {
   }
 });
 
+// RATTRAPAGE D'UN PAIEMENT QUE LE NAVIGATEUR N'A PAS PU ANNONCER.
+//
+// Jusqu'ici, un paiement n'etait enregistre que si le client revenait sur
+// la page de commande apres Stripe. Autrement dit, la trace d'un paiement
+// dependait d'un onglet de navigateur.
+//
+// Le 2026-09-19, ca a casse pour de bon : un client a paye 94,50 EUR, est
+// tombe sur une page blanche, et la commande est restee « en attente de
+// paiement ». Stripe avait l'argent, nous n'avions rien. Un onglet ferme
+// trop tot, un reseau qui lache ou un telephone qui se verrouille
+// produisaient la meme chose.
+//
+// Desormais, il suffit d'ouvrir la commande : le serveur demande a Stripe
+// ou en est la session et enregistre le paiement s'il a eu lieu. La page
+// de retour reste le chemin normal, elle n'est plus le seul.
+//
+// Jamais bloquant : si Stripe ne repond pas, on rend la commande telle
+// qu'elle est plutot que de refuser de l'afficher.
+const rattraperLePaiementStripe = async ({ db, order, ownerEmail }) => {
+  const statut = String(order?.status || '').toLowerCase();
+  if (statut !== 'awaiting_payment') return order;
+
+  const sessionId = cleanString(String(order?.metadata?.stripeCheckoutSessionId || ''), 240);
+  if (!sessionId) return order;
+
+  try {
+    const session = await ensureStripeClient().checkout.sessions.retrieve(sessionId);
+    if (String(session?.payment_status || '').toLowerCase() !== 'paid') return order;
+
+    // La session doit bien designer CETTE commande : une session collee
+    // dans la mauvaise fiche ne doit rien payer.
+    const sessionOrderId = String(session.metadata?.orderId || '');
+    if (sessionOrderId && sessionOrderId !== String(order.id)) return order;
+
+    const rattrapee = await persistStripePaymentForOrder({
+      db, order, session, source: 'rattrapage'
+    });
+
+    logEvent({
+      type: 'order.payment.recovered',
+      level: 'warn',
+      actor: ownerEmail,
+      orderId: order.id,
+      bookId: order.book_id,
+      message: 'Paiement Stripe retrouve et enregistre apres coup',
+      metadata: { sessionId, montantCents: session.amount_total || null }
+    });
+
+    triggerGelatoSubmissionIfNeeded({ db, order: rattrapee, ownerEmail });
+    return rattrapee;
+  } catch (error) {
+    console.error('Rattrapage du paiement Stripe impossible:', error.message);
+    return order;
+  }
+};
+
 router.get('/:orderId', authenticate, async (req, res) => {
   try {
     const db = createUserScopedClient(req);
@@ -1261,7 +1317,13 @@ router.get('/:orderId', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Commande introuvable' });
     }
 
-    return res.json(getApiSafeOrder(data));
+    // Ouvrir la commande suffit a rattraper un paiement que le navigateur
+    // n'a pas pu annoncer (voir rattraperLePaiementStripe).
+    const commande = await rattraperLePaiementStripe({
+      db, order: data, ownerEmail: req.user.email
+    });
+
+    return res.json(getApiSafeOrder(commande));
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

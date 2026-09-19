@@ -212,8 +212,31 @@ if (SERVIR_LE_SITE && fs.existsSync(path.join(DOSSIER_SITE, 'index.html'))) {
   // dans le navigateur. Toute URL qui n'est ni un fichier ni une route /api
   // doit donc renvoyer index.html, a charge du routeur React de s'y
   // retrouver. Les routes /api gardent leur 404 en JSON.
-  app.get(/^(?!\/api\/).*/, (_req, res) => {
-    res.sendFile(path.join(DOSSIER_SITE, 'index.html'));
+  //
+  // MAIS PAS POUR UN FICHIER. Le repli renvoyait index.html — avec un code
+  // 200 et le type text/html — pour un script ou une feuille de style
+  // introuvable. Le navigateur recevait donc du HTML la ou il attendait du
+  // JavaScript, echouait a l'analyser, et n'affichait RIEN : page blanche,
+  // aucune erreur reseau, aucune trace nulle part.
+  //
+  // Ca arrive a chaque reconstruction du site : le nom du fichier contient
+  // une empreinte qui change, et tout navigateur qui a garde l'ancienne
+  // page demande un fichier qui n'existe plus. Un 404 franc, lui, se voit
+  // dans la console et permet au navigateur de recharger.
+  //
+  // Constate le 2026-09-19 : un client a paye 94,50 EUR et est retombe sur
+  // une page blanche. Comme c'est cette page qui confirme le paiement au
+  // serveur, la commande est restee « en attente de paiement ».
+  const RESSOURCE = /\.[a-z0-9]{2,8}$/i;
+
+  app.get(/^(?!\/api\/).*/, (req, res) => {
+    // Une URL de page ne porte pas d'extension ; un fichier, si. On ne se
+    // fie pas au dossier (/static/) : une police ou une image peut vivre
+    // ailleurs.
+    if (RESSOURCE.test(req.path)) {
+      return res.status(404).type('text/plain').send('Fichier introuvable');
+    }
+    return res.sendFile(path.join(DOSSIER_SITE, 'index.html'));
   });
 } else if (SERVIR_LE_SITE) {
   console.warn('SERVE_FRONTEND=1 mais frontend/build est introuvable : seule l API est servie.');
