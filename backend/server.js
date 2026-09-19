@@ -141,19 +141,47 @@ const limiteRendu = rateLimit({
 
 // Applique AVANT les routes, sinon il ne protegerait rien.
 // Depuis le 2026-09-19, un code partage peut ouvrir cet espace (voir
-// middleware/requireAdmin.js). Un code se devine par essais successifs :
-// 30 tentatives par minute rendent la chose sans espoir, sans jamais gener
-// une consultation normale (une page d'admin fait quelques requetes).
+// middleware/requireAdmin.js). Il faut donc borner les essais.
+//
+// MAIS PAS EN BRIDANT TOUT /api/admin. Premiere version : 30 requetes par
+// minute — et tout le site a commence a recevoir des 429, parce que
+// /api/admin/me est appele a CHAQUE page pour decider d'afficher le lien
+// « Administration ». Une limite censee proteger d'une attaque genait
+// d'abord l'usage normal.
+//
+// La bonne cible est etroite : les requetes qui PRESENTENT un code. Dix
+// essais par minute rendent la recherche sans espoir sur un code de douze
+// caracteres, et ne touchent personne d autre.
 const limiteAdmin = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: 240,
   standardHeaders: true,
   legacyHeaders: false,
+  message: { error: 'Trop de requetes. Reessayez dans une minute.' }
+});
+
+// Cent essais par minute. Le chiffre parait large : il ne l est pas.
+// La page d administration se rafraichit toute seule (travaux toutes les
+// 5 s, etat du serveur toutes les 15 s) et chacune de ces requetes porte
+// le code — une limite a dix aurait coupe la page au bout d une minute.
+//
+// Ce qui protege vraiment ce code, c est sa LONGUEUR : douze caracteres au
+// minimum, imposes par middleware/requireAdmin.js. Cent essais par minute
+// font 144 000 par jour, ce qui reste sans commune mesure avec le nombre
+// de codes possibles.
+const limiteCodeAdmin = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Seules les requetes qui tentent un code sont comptees.
+  skip: (req) => !req.headers['x-admin-code'],
   message: { error: 'Trop de tentatives. Reessayez dans une minute.' }
 });
 
 app.use('/api', limiteGenerale);
 app.use('/api/admin', limiteAdmin);
+app.use('/api/admin', limiteCodeAdmin);
 app.use('/api/books/:id/export-final-pdf', limiteRendu);
 app.use('/api/orders/:orderId/gelato-test', limiteRendu);
 
