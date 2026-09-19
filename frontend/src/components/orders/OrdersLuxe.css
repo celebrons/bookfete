@@ -78,11 +78,19 @@
   color: #2a4f71;
 }
 
+/* UNE SEULE COLONNE (2026-09-19).
+   Deux colonnes etaient un reste de l'ancienne page unique, qui empilait
+   tous les blocs a la fois. Le parcours n'affiche plus qu'UN ecran a la
+   fois : la deuxieme colonne restait vide, le panneau occupait la moitie
+   gauche et le bouton « Continuer » se retrouvait a l'autre bout de
+   l'ecran, sans rapport visible avec ce qu'il valide. La barre de
+   navigation partage desormais le bord droit du panneau. */
 .orders-grid {
   margin-top: 18px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
+  max-width: 780px;
 }
 
 .orders-panel {
@@ -429,10 +437,6 @@
 }
 
 @media (max-width: 980px) {
-  .orders-grid {
-    grid-template-columns: 1fr;
-  }
-
   .orders-meta-grid {
     grid-template-columns: 1fr;
   }
@@ -442,11 +446,13 @@
 /* Navigation entre les ecrans de SAISIE (produit/livraison) — disparait des
    qu'une commande existe : l'etape est alors imposee par son etat reel. */
 /* "CONTINUER" EN BAS A DROITE, EN EVIDENCE (2026-09-19).
-   .orders-grid est une grille a DEUX colonnes : sans grid-column, cette
+   .orders-grid etait une grille a DEUX colonnes : sans grid-column, cette
    barre devenait une simple cellule posee A COTE du panneau, en haut a
    droite — on cherchait le bouton pour avancer. Elle occupe maintenant
    toute la largeur, sous le panneau, separee par un filet, et le bouton
-   d'action y est nettement plus gros que le retour. */
+   d'action y est nettement plus gros que le retour. Le grid-column reste
+   utile meme sur une seule colonne : il protege la barre d'un retour a
+   deux colonnes. */
 .orders-step-nav {
   grid-column: 1 / -1;
   display: flex;
