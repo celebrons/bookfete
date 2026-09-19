@@ -60,7 +60,23 @@ PrivateTmp=false
 # 1,5 Go pour l'application. Le reste (500 Mo) est ce qui garde sshd,
 # Caddy et le systeme joignables — c'est la marge qui permet de reprendre
 # la main sans passer par la console Scaleway.
-MemoryHigh=1200M
+# PAS DE MemoryHigh. Troisieme fois que je pose une "protection" qui etrangle.
+#
+# MemoryHigh n est pas une limite qui arrete : c est une limite qui FREINE.
+# Des qu elle est franchie, le noyau ralentit deliberement le groupe pour le
+# forcer a rendre de la memoire. Mesure du 2026-09-19 pendant un envoi a
+# l imprimeur, avec MemoryHigh=1200M :
+#
+#   memory.events high = 116 680 franchissements
+#   memory.current     = 1199 Mo, colle au plafond
+#   pression memoire   = 53 %, pression I/O = 100 %
+#   charge             = 27 sur deux coeurs, en ATTENTE et non en calcul
+#
+# Le rendu a besoin de plus de 1,2 Go : il passait son temps a etre freine.
+# Huit minutes sans aboutir, et le site inutilisable pendant ce temps.
+#
+# MemoryMax suffit : c est un arret FRANC. Depasser 1,5 Go tue le navigateur,
+# le rendu echoue proprement et se relance — au lieu de ramper.
 MemoryMax=1500M
 
 # Pas d'echange sur le disque : c'est lui qui transforme un depassement

@@ -15,7 +15,13 @@ const PROGRESS_LABELS = {
   starting: 'Preparation...',
   cover: 'Rendu de la couverture...',
   pages: 'Rendu des pages',
-  photos: 'Preparation des photos',
+  photos: 'Préparation des photos',
+  // Phases du fichier d'impression. Aucune n'a de decompte : la barre se
+  // met en mouvement indetermine, ce qui est honnete — un chiffre fige a
+  // 0/32 pendant des minutes est pire que pas de chiffre du tout.
+  preparation: 'Préparation du livre…',
+  ecriture: 'Écriture du fichier d’impression…',
+  televersement: 'Envoi du fichier à l’imprimeur…',
   assembling: 'Assemblage du PDF...',
   uploading: 'Envoi du fichier a l\'imprimeur...',
   submitting: 'Creation de la commande chez Gelato...'

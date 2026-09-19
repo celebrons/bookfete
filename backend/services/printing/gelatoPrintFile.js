@@ -126,7 +126,17 @@ async function buildGelatoPrintReadyPdf({
   await fsp.writeFile(cheminCouverture, coverBuffer);
 
   try {
-    report('pages', 0, pagesNumerotees.length);
+    // PAS DE COMPTEUR EPINGLE A ZERO.
+    //
+    // On annoncait « pages 0/32 » avant meme de commencer, et plus rien ne
+    // le faisait bouger : le rendu par impression n a plus de boucle page
+    // par page. L ecran affichait donc une barre bloquee a 0 % pendant des
+    // minutes — pire que pas de barre du tout (signale le 2026-09-19).
+    //
+    // Ce qui se compte vraiment, c est le chargement des photos. Le reste
+    // est annonce par son nom, sans chiffre invente : la barre se met alors
+    // en mouvement indetermine plutot que de mentir.
+    report('preparation');
 
     // RENDU PAR IMPRESSION plutot que par 33 captures d ecran (2026-09-19).
     //
@@ -154,14 +164,12 @@ async function buildGelatoPrintReadyPdf({
         heightMm: fullSheetSize.height
       },
       fileBaseName: `gelato-${Date.now()}`,
-      onProgress: ({ phase, done, total }) => {
-        // Le rendu compte des PHOTOS chargees ; l ecran de commande, lui,
-        // parle de pages. On garde son vocabulaire.
-        report(phase === 'photos' ? 'pages' : phase, done, total);
-      }
+      // On transmet la phase TELLE QUELLE. La deguiser en « pages » donnait
+      // un compte de photos sous un libelle de pages : deux fois faux.
+      onProgress: ({ phase, done, total }) => report(phase, done, total)
     });
 
-    report('assembling', pagesNumerotees.length, pagesNumerotees.length);
+    report('ecriture');
     await fsp.rename(produit, outputPath).catch(async () => {
       // rename echoue entre deux volumes : on recopie.
       await fsp.copyFile(produit, outputPath);
