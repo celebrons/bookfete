@@ -45,6 +45,17 @@ const { GELATO_ENDPAPER_PAGES, interiorPagesForGelato } = require('./gelatoCatal
 const MM_TO_PT = 72 / 25.4;
 // Confirme empiriquement le 2026-09-10 via un vrai rejet du validateur
 // Gelato pour du 21x28cm (216x286mm attendu contre 210x280mm fourni).
+// Largeur maximale des photos embarquees dans le fichier d impression.
+//
+// Une page de 216 mm (fond perdu compris) capturee a 288 dpi tient dans
+// 2449 pixels. Au-dela, les pixels ne sont jamais imprimes : ils ne font
+// qu'alourdir le fichier. Mesure du 2026-09-19 : les photos du livre en
+// portaient 4284, et le fichier atteignait 50,4 Mo pour un bucket qui en
+// accepte 50.
+//
+// 2600 laisse une marge confortable au-dessus des 2449 utiles.
+const LARGEUR_PHOTO_IMPRESSION = 2600;
+
 const GELATO_BLEED_MM = 3;
 
 /**
@@ -92,6 +103,10 @@ async function buildGelatoPrintReadyPdf({
     format,
     scale,
     bleedMm: GELATO_BLEED_MM,
+    // La resolution reellement imprimable, pas celle du telephone qui a
+    // pris la photo. Voir capturePagesAsImages : 2449 px suffisent pour
+    // une page de 216 mm a 288 dpi, on garde une marge.
+    imageMaxWidth: LARGEUR_PHOTO_IMPRESSION,
     onProgress: ({ done, total }) => report('pages', done, total)
   });
 

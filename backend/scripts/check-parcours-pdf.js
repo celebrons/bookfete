@@ -106,21 +106,75 @@ const extraireJpegs = (donnees) => {
     if (erreurLivre) throw new Error(`livre : ${erreurLivre.message}`);
     bookId = livre.id;
 
-    let copiees = 0;
-    for (const table of ['book_content_items', 'book_pages']) {
-      // eslint-disable-next-line no-await-in-loop
-      const { data: lignes } = await supabase.from(table).select('*').eq('book_id', modele.id);
-      if (!lignes?.length) continue;
-      const copies = lignes.map((l) => {
-        const c = { ...l, book_id: bookId };
-        delete c.id; delete c.created_at; delete c.updated_at;
-        return c;
+    // COPIER UN LIVRE DEMANDE DE RENUMEROTER SES PHOTOS.
+    //
+    // Les pages ne contiennent pas les photos : elles les DESIGNENT par
+    // identifiant. Recopier les photos leur donne de nouveaux identifiants,
+    // et les pages continuent de pointer vers les anciens — le livre copie
+    // se retrouve vide. Premiere version de ce script : 4 photos au lieu
+    // de 56, et un PDF de 1,1 Mo qui semblait « reussi ».
+    //
+    // On garde donc la correspondance ancien -> nouveau et on la applique
+    // partout ou un identifiant de photo apparait.
+    const { data: itemsModele } = await supabase
+      .from('book_content_items').select('*').eq('book_id', modele.id);
+
+    const correspondance = new Map();
+    const copiesItems = (itemsModele || []).map((l) => {
+      const c = { ...l, book_id: bookId };
+      delete c.id; delete c.created_at; delete c.updated_at;
+      return { ancien: l.id, ligne: c };
+    });
+
+    if (copiesItems.length) {
+      const { data: inseres, error } = await supabase
+        .from('book_content_items')
+        .insert(copiesItems.map((c) => c.ligne))
+        .select('id');
+      if (error) throw new Error(`copie des photos : ${error.message}`);
+      // L ordre des lignes rendues suit celui des lignes envoyees.
+      (inseres || []).forEach((ligne, i) => {
+        correspondance.set(copiesItems[i].ancien, ligne.id);
       });
-      // eslint-disable-next-line no-await-in-loop
-      const { error } = await supabase.from(table).insert(copies);
-      if (error) throw new Error(`copie ${table} : ${error.message}`);
-      copiees += copies.length;
     }
+
+    // Remplacer les identifiants PARTOUT : listes, blocs, ajustements de
+    // cadrage, diagnostics de qualite. Un seul oubli et une photo disparait
+    // ou perd son cadrage.
+    const renumeroter = (valeur) => {
+      if (typeof valeur === 'string') return correspondance.get(valeur) || valeur;
+      if (Array.isArray(valeur)) return valeur.map(renumeroter);
+      if (valeur && typeof valeur === 'object') {
+        const sortie = {};
+        Object.entries(valeur).forEach(([cle, v]) => {
+          sortie[correspondance.get(cle) || cle] = renumeroter(v);
+        });
+        return sortie;
+      }
+      return valeur;
+    };
+
+    const { data: pagesModele } = await supabase
+      .from('book_pages').select('*').eq('book_id', modele.id);
+    const copiesPages = (pagesModele || []).map((l) => {
+      const c = { ...l, book_id: bookId, content: renumeroter(l.content) };
+      delete c.id; delete c.created_at; delete c.updated_at;
+      return c;
+    });
+    if (copiesPages.length) {
+      const { error } = await supabase.from('book_pages').insert(copiesPages);
+      if (error) throw new Error(`copie des pages : ${error.message}`);
+    }
+
+    // La couverture designe elle aussi des photos.
+    if (modele.cover_overrides || modele.cover_config) {
+      await supabase.from('books').update({
+        cover_overrides: renumeroter(modele.cover_overrides),
+        cover_config: renumeroter(modele.cover_config)
+      }).eq('id', bookId);
+    }
+
+    const copiees = copiesItems.length + copiesPages.length;
 
     // Une commande PDF DEJA PAYEE : on teste la fabrication et la remise du
     // fichier, pas Stripe.
@@ -139,7 +193,42 @@ const extraireJpegs = (donnees) => {
     if (erreurCommande) throw new Error(`commande : ${erreurCommande.message}`);
     orderId = commande.id;
 
-    console.log(`   livre « ${modele.title} » recopie (${copiees} lignes), commande PDF payee\n`);
+    console.log(`   livre « ${modele.title} » recopie (${copiees} lignes), commande PDF payee`);
+
+    // Le livre copie contient-il autant de photos POSEES que l'original ?
+    // Sans ce controle, un harnais casse produit un PDF vide qui passe tous
+    // les autres tests.
+    const pageRenderer = require('../services/composition/pageRenderer');
+    const bookContentService = require('../services/composition/bookContentService');
+    const templateCatalog = require('../services/composition/templateCatalog');
+    const coverComposer = require('../services/composition/coverComposer');
+    const { resolveCoverFormat } = require('../services/composition/coverFormat');
+    const { resolveFormatDensity } = require('../services/composition/formatDensity');
+    const compterPhotosPosees = async (id, livreRow) => {
+      const fmt = {
+        formatId: livreRow.print_format,
+        ...resolveCoverFormat(livreRow.print_format),
+        ...resolveFormatDensity(livreRow.print_format)
+      };
+      const [ip, its, lay] = await Promise.all([
+        bookContentService.listPagesForRender(id, livreRow.page_count),
+        bookContentService.listContentItems(id),
+        templateCatalog.listActiveLayouts()
+      ]);
+      const tpl = livreRow.template_id ? await templateCatalog.getTemplateById(livreRow.template_id) : null;
+      const pg = coverComposer.composeCoversIntoPages({ book: livreRow, items: its, template: tpl, interiorPages: ip, format: fmt });
+      const h = pageRenderer.renderBookHtml({ book: livreRow, pages: pg, items: its, layouts: lay, format: fmt });
+      return (h.match(/<img/g) || []).length;
+    };
+    const { data: livreCopie } = await supabase.from('books').select('*').eq('id', bookId).single();
+    const posesOriginal = await compterPhotosPosees(modele.id, modele);
+    const posesCopie = await compterPhotosPosees(bookId, livreCopie);
+    check(
+      posesCopie === posesOriginal,
+      'le livre copie contient autant de photos que l original',
+      `${posesCopie} contre ${posesOriginal}`
+    );
+    console.log('');
 
     // ---------------------------------------------------------------- 2
     console.log('2. Connexion, comme le client');
@@ -225,6 +314,7 @@ const extraireJpegs = (donnees) => {
     let intactes = 0;
     let abimees = 0;
     const ratios = [];
+    let artefacts = 0;
     for (const image of jpegs) {
       try {
         // eslint-disable-next-line no-await-in-loop
@@ -233,19 +323,32 @@ const extraireJpegs = (donnees) => {
         // eslint-disable-next-line no-await-in-loop
         await sharp(image).raw().toBuffer();
         intactes += 1;
-        ratios.push(meta.width / meta.height);
+        // DISTINGUER UNE PHOTO D UN ELEMENT DE GABARIT.
+        //
+        // Le PDF contient aussi des filets et des motifs de couverture, qui
+        // n ont evidemment pas les proportions des photos du livre. Mesure
+        // du 2026-09-19 : un filet de 984x52 pesant 3 Ko, un motif de 4e de
+        // couverture de 1255x911 pesant 12 Ko — tandis qu une photo du
+        // livre, a 2000 px de large, pese entre 300 Ko et 1 Mo.
+        //
+        // Sans cette distinction, le controle criait a la deformation sur
+        // des elements de decor et masquait ce qu il devait surveiller.
+        const ratio = meta.width / meta.height;
+        const estUnePhoto = image.length > 60 * 1024 && ratio > 0.2 && ratio < 5;
+        if (estUnePhoto) ratios.push(ratio);
+        else artefacts += 1;
       } catch (_error) {
         abimees += 1;
       }
     }
-    console.log(`   ${intactes} photos intactes, ${abimees} abimees`);
+    console.log(`   ${intactes} photos intactes, ${abimees} abimees` + (artefacts ? ` (${artefacts} element(s) de gabarit ignore(s))` : ''));
     check(intactes > 0, 'le PDF contient des photos');
     check(abimees === 0, 'aucune photo abimee', abimees ? `${abimees} abimee(s)` : '');
 
     // Les proportions, le controle qui manquait toute la journee.
     const attendus = new Set();
     const { data: photos } = await supabase
-      .from('book_content_items').select('url').eq('book_id', bookId).eq('kind', 'photo').limit(40);
+      .from('book_content_items').select('url').eq('book_id', bookId).eq('kind', 'photo').limit(500);
     for (const photo of (photos || [])) {
       const url = photo.url;
       if (!url) continue;

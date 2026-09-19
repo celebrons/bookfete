@@ -621,7 +621,7 @@ function argumentsDuNavigateur(port) {
   ];
 }
 
-async function capturePagesAsImagesDirect({ book, pages, items, layouts, format, scale = SCREENSHOT_SCALE, bleedMm = 0, onProgress }) {
+async function capturePagesAsImagesDirect({ book, pages, items, layouts, format, scale = SCREENSHOT_SCALE, bleedMm = 0, onProgress, imageMaxWidth = 0 }) {
   const browserPath = await resolveBrowserPath();
   if (!browserPath) {
     throw new Error(
@@ -671,9 +671,25 @@ async function capturePagesAsImagesDirect({ book, pages, items, layouts, format,
     // Mesure du 2026-09-11 sur un livre reel : navigation+capture ~6 s/page
     // et encodage ~5 s/page s'additionnaient ; en les recouvrant, le cout de
     // l'encodage disparait presque entierement du temps total.
+    // NE PAS EMBARQUER PLUS DE PIXELS QUE LA PAGE NE PEUT EN IMPRIMER.
+    //
+    // Mesure du 2026-09-19 : une page de 216 mm capturee a 288 dpi tient
+    // dans 2449 pixels de large. Les photos du livre en font 4284 — soit
+    // 1,75 fois plus que ce qui sera imprime. Ces pixels en trop ne se
+    // voient nulle part et alourdissent le fichier : 50,4 Mo pour un
+    // bucket qui en accepte 50.
+    //
+    // La reduction passe par Supabase avec width ET height ET
+    // resize=contain : avec la seule largeur, il ecrase les proportions
+    // (4284x5712 devenait 2000x5712). C'est ce qui a deforme tout un
+    // livre le meme jour.
+    const photos = imageMaxWidth > 0
+      ? allegerLesPhotos(items, imageMaxWidth)
+      : items;
+
     const encodeTasks = [];
     for (const page of pages) {
-      const html = pageRenderer.renderSinglePageHtml({ book, page, items, layouts, format });
+      const html = pageRenderer.renderSinglePageHtml({ book, page, items: photos, layouts, format });
       const htmlPath = path.join(PDF_PREVIEW_DIR, `${stamp}-page-${page.page_index}.html`);
       tempHtmlPaths.push(htmlPath);
       await fsp.writeFile(htmlPath, html, 'utf8');
