@@ -356,8 +356,39 @@ async function openCdpTarget(port) {
   return data.webSocketDebuggerUrl;
 }
 
+// LA CONNEXION AU NAVIGATEUR DOIT ACCEPTER DE GROS MESSAGES.
+//
+// Le protocole de debogage de Chrome repond en UN SEUL message : une
+// capture de page en 2449x3243 revient en base64, plusieurs dizaines de
+// Mo. Le WebSocket integre a Node fixe une limite et laisse tomber le
+// message au-dela, SANS rien dire : l'appel n'est jamais resolu.
+//
+// Ca marchait sur ma machine (Node 24) et pas sur le serveur (Node 22) —
+// la limite a change entre les deux. Le 2026-09-19, chaque envoi a
+// l'imprimeur mourait sur « le navigateur n a pas repondu a
+// Page.captureScreenshot en 600 s », apres dix minutes a ne rien faire.
+//
+// La bibliotheque `ws` (deja installee avec puppeteer) laisse fixer cette
+// limite. 512 Mo : bien au-dela de toute capture concevable, et la
+// connexion vient de notre propre navigateur en local — il n'y a personne
+// a se mefier au bout du fil.
+const TAILLE_MAX_MESSAGE = 512 * 1024 * 1024;
+
+function ouvrirLaConnexion(wsUrl) {
+  try {
+    // eslint-disable-next-line global-require
+    const WsLib = require('ws');
+    return new WsLib(wsUrl, { maxPayload: TAILLE_MAX_MESSAGE });
+  } catch (_error) {
+    // Repli : sans `ws`, on garde le comportement d avant. Les petits
+    // rendus passent ; les gros retomberont sur le delai de garde, avec un
+    // message clair.
+    return new WebSocket(wsUrl);
+  }
+}
+
 function cdpClient(wsUrl) {
-  const ws = new WebSocket(wsUrl);
+  const ws = ouvrirLaConnexion(wsUrl);
   let nextId = 0;
   const pending = new Map();
 
@@ -370,7 +401,11 @@ function cdpClient(wsUrl) {
   const listeners = new Map();
 
   ws.addEventListener('message', (event) => {
-    const message = JSON.parse(event.data);
+    // `ws` peut rendre un Buffer la ou le WebSocket integre rend une
+    // chaine : on normalise avant d analyser.
+    const message = JSON.parse(
+      typeof event.data === 'string' ? event.data : String(event.data)
+    );
     if (message.id !== undefined && pending.has(message.id)) {
       const { resolve, reject } = pending.get(message.id);
       pending.delete(message.id);
