@@ -208,6 +208,49 @@ curl -s -X POST -H 'Content-Type: application/json' -d '{}' \
 L’URL contient l’adresse IP : elle devra être changée dans Stripe le jour du
 passage au vrai domaine.
 
+## Le disque
+
+Le 2026-09-19 il s’est rempli en une journée, et une fabrication a échoué
+sur `no space left on device`. Trois causes, toutes traitées :
+
+| ce qui grossissait | taille | traitement |
+|---|---|---|
+| cache et profil de Chrome | 1,9 Go | profil **jetable** par rendu (`pdfService`) |
+| historique git | 884 Mo | dépôt **raccourci** (voir ci-dessous) |
+| PDF de travail | ~40 Mo par livre | ménage quotidien, 7 jours **et** 1,2 Go |
+
+### Le dépôt du serveur est raccourci
+
+Le serveur n’a pas besoin de l’historique : il a besoin du code d’aujourd’hui.
+Le dossier `.git` pesait 884 Mo — surtout des `frontend/build` commités
+pendant des mois — et en pèse 73 depuis :
+
+```bash
+cd /home/celebrons/bookfete
+sudo -u celebrons git fetch --depth=1 origin main
+sudo -u celebrons git reflog expire --expire=now --all
+sudo -u celebrons git gc --prune=now
+```
+
+`deploy.sh` continue de fonctionner (`git pull --ff-only` s’accommode d’un
+dépôt raccourci) — vérifié après l’opération. En revanche `git log` n’y
+montre plus qu’un commit : pour enquêter sur l’historique, il faut le dépôt
+local, pas celui du serveur.
+
+### Ménage à la main, en cas d’urgence
+
+```bash
+cd /home/celebrons/bookfete/backend
+node scripts/nettoyer-fichiers-locaux.js                        # liste seulement
+node scripts/nettoyer-fichiers-locaux.js --jours 1 --appliquer  # supprime
+node scripts/nettoyer-fichiers-locaux.js --budget 500 --appliquer
+```
+
+`--budget` est un plafond en Mo : les plus anciens partent tant que le
+dossier le dépasse, quel que soit leur âge. Une rétention par âge seule ne
+protège pas d’un disque qui se remplit en une journée — c’est précisément ce
+qui s’est produit.
+
 ## Ce qui n'est PAS fait à ce stade
 
 - Aucune photo déplacée : le stockage reste Supabase.
