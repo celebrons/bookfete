@@ -60,7 +60,12 @@ echo "veille : l'API ne repond pas (${echecs}/${ECHECS_AVANT_ACTION})" >&2
 # Assez attendu. On note d'abord POURQUOI, tant que la machine repond encore.
 memoire=$(free -m | awk '/^Mem:/ {print $3"/"$2" Mo"}')
 charge=$(cut -d' ' -f1-3 /proc/loadavg)
-navigateurs=$(pgrep -fc -- --headless 2>/dev/null | head -1 || echo 0)
+# pgrep -fc sort le compte ET rend un code d erreur quand il ne trouve
+# rien : le repli « || echo 0 » ajoutait alors un SECOND zero, et le JSON
+# ecrit plus bas devenait invalide. L application ne pouvait plus le lire,
+# donc le bandeau d incident n apparaissait jamais — un garde-fou muet.
+# wc -l, lui, ecrit toujours exactement un nombre.
+navigateurs=$(pgrep -f -- --headless 2>/dev/null | wc -l | tr -d " ")
 
 dernier=0
 if [ -f "${JOURNAL}" ]; then
@@ -85,6 +90,11 @@ cat > "${JOURNAL}" <<JSON
   "action": "${action}"
 }
 JSON
+# Se relire avant de partir : si le JSON est invalide, l application
+# l ignorera en silence et le blocage passera inapercu malgre la veille.
+if command -v python3 >/dev/null 2>&1; then
+  python3 -c "import json,sys; json.load(open(sys.argv[1]))" "${JOURNAL}" 2>/dev/null || echo "veille : ATTENTION, journal illisible" >&2
+fi
 chmod 644 "${JOURNAL}"
 
 echo "veille : ${action} (memoire ${memoire}, charge ${charge}, ${navigateurs} navigateur(s))" >&2
