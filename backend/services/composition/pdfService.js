@@ -289,7 +289,29 @@ const MM_PAR_POUCE = 25.4;
 // Cadence du compte des photos pendant le chargement. Assez rapide pour
 // que la barre bouge, assez lent pour ne rien couter au rendu.
 const IMAGE_PROGRESS_INTERVAL_MS = 1000;
-const IMAGE_WAIT_TIMEOUT_MS = 8000;
+// COMBIEN DE TEMPS ATTENDRE LES PHOTOS AVANT D'IMPRIMER.
+//
+// Huit secondes, fixes, quel que soit le livre. Mesure du 2026-09-19 sur
+// « Portugal 2025 » : au bout de 8 s, 9 photos sur 56 etaient pretes.
+// Chrome imprimait donc avec 47 photos a moitie chargees — ce sont les
+// images « tronquees, coupees » signalees par l utilisateur.
+//
+// Le rendu par impression charge TOUT le livre dans un seul document, la
+// ou l'ancien rendu par captures en chargeait quelques-unes par page. Le
+// delai devait suivre, il ne l a pas fait.
+//
+// Le budget depend donc du nombre de photos. Mesure de reference : 56
+// photos pretes en 29 s, soit ~0,5 s par photo ; on prend trois fois
+// cette cadence, plus un socle, pour tenir sur une machine chargee ou un
+// reseau lent.
+const IMAGE_WAIT_SOCLE_MS = 30000;
+const IMAGE_WAIT_PAR_PHOTO_MS = 1500;
+const IMAGE_WAIT_PLAFOND_MS = 5 * 60 * 1000;
+
+const budgetDesPhotos = (nombre) => Math.min(
+  IMAGE_WAIT_PLAFOND_MS,
+  IMAGE_WAIT_SOCLE_MS + Math.max(0, Number(nombre) || 0) * IMAGE_WAIT_PAR_PHOTO_MS
+);
 // Delai de garde du chargement de page. Genereux : une page de couverture
 // telecharge aussi les polices Google. Depasse, on capture quand meme —
 // c'est le comportement d'avant, mais devenu exceptionnel au lieu d'etre
@@ -434,7 +456,7 @@ function cdpClient(wsUrl) {
 
 // Attend que toutes les <img> de la page courante soient chargees ET que les
 // polices web (document.fonts.ready) aient fini de se charger, ou abandonne
-// apres IMAGE_WAIT_TIMEOUT_MS : les photos viennent du Storage Supabase, un
+// apres le budget calcule plus haut : les photos viennent du Storage Supabase, un
 // vrai fetch reseau, pas un asset local instantane — et depuis l'ajout du
 // lien Google Fonts (couverture, voir pageRenderer.js), les polices aussi.
 // Sans ce second signal, une capture pourrait arriver avant la fin du
@@ -446,61 +468,70 @@ function cdpClient(wsUrl) {
 // le 2026-09-15 (« il n y a pas de barre de progression »). Le
 // telechargement des photos est la partie longue et se compte, elle.
 async function waitForImages(cdp, onProgress) {
-  // `decode()` et non `complete` : une image peut etre TELECHARGEE (complete
-  // === true) sans etre encore DECODEE, donc pas encore peignable. Capturer
-  // a cet instant donne une image partielle — c'est exactement la bande
-  // bleue tronquee observee en haut d'une page du PDF le 2026-09-15.
-  // `decode()` ne resout que lorsque l'image est reellement prete a etre
-  // dessinee.
-  //
-  // Le repli sur l'ancienne methode couvre les navigateurs ou `decode()`
-  // rejette sur une image deja en erreur : on ne veut pas bloquer une page
-  // entiere pour une seule photo introuvable.
-  const expression = `
+  // Une image est REGLEE quand elle a fini, chargee ou en erreur. Compter
+  // les seules images valides bloquerait pour toujours sur une photo
+  // introuvable : mieux vaut imprimer un trou visible qu attendre en vain.
+  const compter = async () => {
+    const r = await cdp.call('Runtime.evaluate', {
+      expression: `JSON.stringify({
+        total: document.images.length,
+        reglees: Array.from(document.images).filter((i) => i.complete).length,
+        valides: Array.from(document.images).filter((i) => i.complete && i.naturalWidth > 0).length
+      })`,
+      returnByValue: true
+    });
+    try {
+      return JSON.parse((r && r.result && r.result.value) || '{}');
+    } catch (_error) {
+      return {};
+    }
+  };
+
+  const premier = await compter();
+  const total = premier.total || 0;
+  const budget = budgetDesPhotos(total);
+  const echeance = Date.now() + budget;
+
+  let dernier = premier;
+  while (Date.now() < echeance) {
+    if (total > 0 && (dernier.reglees || 0) >= total) break;
+    if (typeof onProgress === 'function' && total > 0) {
+      try {
+        onProgress({ done: dernier.reglees || 0, total });
+      } catch (_error) { /* un rapport d avancement ne casse pas un rendu */ }
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => setTimeout(resolve, IMAGE_PROGRESS_INTERVAL_MS));
+    // eslint-disable-next-line no-await-in-loop
+    dernier = await compter();
+  }
+
+  // Chargee ne veut pas dire PEIGNABLE : `decode()` ne resout que lorsque
+  // l'image est reellement prete a etre dessinee. Capturer avant, c'est la
+  // bande tronquee observee le 2026-09-15. Les polices comptent aussi.
+  const finition = `
     Promise.race([
       Promise.all([
-        Promise.all(Array.from(document.images).map((img) => {
-          const attendreEvenement = () => new Promise((resolve) => {
-            if (img.complete) { resolve(); return; }
-            img.addEventListener('load', resolve, { once: true });
-            img.addEventListener('error', resolve, { once: true });
-          });
-          return attendreEvenement().then(() => (
-            typeof img.decode === 'function' ? img.decode().catch(() => {}) : undefined
-          ));
-        })),
+        Promise.all(Array.from(document.images).map((img) => (
+          typeof img.decode === 'function' ? img.decode().catch(() => {}) : undefined
+        ))),
         (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve()
       ]),
-      new Promise((resolve) => setTimeout(resolve, ${IMAGE_WAIT_TIMEOUT_MS}))
+      new Promise((resolve) => setTimeout(resolve, 30000))
     ])
   `;
-  const attente = cdp.call('Runtime.evaluate', { expression, awaitPromise: true });
+  await cdp.call('Runtime.evaluate', { expression: finition, awaitPromise: true });
 
-  if (typeof onProgress !== 'function') {
-    await attente;
-    return;
-  }
-
-  // Le sondage passe par le MEME client CDP que l attente ci-dessus : les
-  // reponses sont appariees par identifiant, deux appels simultanes ne se
-  // marchent pas dessus.
-  const sonde = setInterval(() => {
-    cdp.call('Runtime.evaluate', {
-      expression: 'JSON.stringify({ total: document.images.length, done: Array.from(document.images).filter((i) => i.complete).length })',
-      returnByValue: true
-    })
-      .then((r) => {
-        const compte = JSON.parse(r?.result?.value || '{}');
-        if (compte.total > 0) onProgress({ done: compte.done || 0, total: compte.total });
-      })
-      .catch(() => { /* un sondage rate ne doit jamais casser un rendu */ });
-  }, IMAGE_PROGRESS_INTERVAL_MS);
-
-  try {
-    await attente;
-  } finally {
-    clearInterval(sonde);
-  }
+  const bilan = await compter();
+  return {
+    total,
+    reglees: bilan.reglees || 0,
+    valides: bilan.valides || 0,
+    // Vrai quand le budget a expire avant que tout soit arrive. C est LE
+    // signal qui manquait : sans lui, un livre partait tronque sans que
+    // personne ne le sache.
+    incomplet: total > 0 && (bilan.reglees || 0) < total
+  };
 }
 
 /**
@@ -1012,12 +1043,25 @@ async function renderPdfByPrintingDirect(input) {
     const chargement = cdp.waitForEvent('Page.loadEventFired', PAGE_LOAD_TIMEOUT_MS);
     await cdp.call('Page.navigate', { url: pathToFileURL(htmlPath).href });
     await chargement;
-    await waitForImages(cdp, ({ done, total }) => {
+    const photos = await waitForImages(cdp, ({ done, total }) => {
       if (typeof input.onProgress !== 'function') return;
       try {
         input.onProgress({ phase: 'photos', done, total });
       } catch (_error) { /* jamais bloquant */ }
     });
+
+    // MIEUX VAUT UNE ERREUR QU UN LIVRE TRONQUE.
+    //
+    // Un PDF ou les photos sont coupees ressemble a un PDF : rien ne le
+    // signale, et c'est l'utilisateur qui le decouvre en le feuilletant
+    // (2026-09-19). Une generation qui echoue, elle, se voit et se relance.
+    if (photos.incomplet) {
+      throw new Error(
+        `Rendu interrompu : ${photos.total - photos.reglees} photo(s) sur `
+        + `${photos.total} ne sont pas arrivees a temps. Le livre aurait ete `
+        + 'incomplet. Relancez la generation.'
+      );
+    }
 
     if (typeof input.onProgress === 'function') {
       try {
@@ -1089,6 +1133,9 @@ module.exports = {
   rendusEnCours,
   // Expose pour les tests : la file se verifie sans lancer de navigateur.
   __filePourLesTests: { unSeulRenduALaFois },
+  // Expose pour les scripts de mesure : reproduire EXACTEMENT le document
+  // envoye a l impression, photos allegees comprises.
+  __allegerPourLesTests: allegerLesPhotos,
   SCREENSHOT_SCALE,
   PDF_PREVIEW_DIR
 };
