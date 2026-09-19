@@ -489,13 +489,27 @@ async function waitForImages(cdp, onProgress) {
 
   const premier = await compter();
   const total = premier.total || 0;
+
+  // AUCUNE IMAGE : il n'y a rien a attendre.
+  //
+  // Sans ce retour, la boucle ci-dessous ne trouve jamais sa condition de
+  // sortie (« toutes reglees » n'a pas de sens quand il n'y en a aucune) et
+  // brule son budget entier — trente secondes. Sur le fichier d'impression,
+  // qui rend les pages UNE PAR UNE, chaque garde blanche et chaque page de
+  // texte coutait donc trente secondes de plus. Introduit le 2026-09-19 en
+  // corrigeant l'attente des photos, et signale le jour meme : « l'envoi
+  // Gelato toujours bloque ».
+  if (total === 0) {
+    return { total: 0, reglees: 0, valides: 0, incomplet: false };
+  }
+
   const budget = budgetDesPhotos(total);
   const echeance = Date.now() + budget;
 
   let dernier = premier;
   while (Date.now() < echeance) {
-    if (total > 0 && (dernier.reglees || 0) >= total) break;
-    if (typeof onProgress === 'function' && total > 0) {
+    if ((dernier.reglees || 0) >= total) break;
+    if (typeof onProgress === 'function') {
       try {
         onProgress({ done: dernier.reglees || 0, total });
       } catch (_error) { /* un rapport d avancement ne casse pas un rendu */ }

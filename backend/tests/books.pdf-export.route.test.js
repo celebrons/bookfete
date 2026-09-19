@@ -191,11 +191,13 @@ describe('POST /api/books/:id/export-final-pdf — livre sans-IA (zero chapitre)
     // Le format vient de book.print_format (resolveRenderFormat), jamais de
     // PREVIEW_FORMATS (perime, ex. livret 148x210mm au lieu de 170x170mm).
     expect(callArgs.format.formatId).toBe('standard');
-    // EN PLANCHES : deux pages par feuille, pour qu une photo etalee sur une
-    // double page reste entiere quel que soit le lecteur (demande du
-    // 2026-09-19). Sans ce drapeau, la moitie droite repart sur la feuille
-    // suivante et l image est coupee.
-    expect(callArgs.spreadLayout).toBe(true);
+    // UNE PAGE PAR FEUILLE. La mise en planches a ete essayee le 2026-09-19
+    // puis retiree le jour meme : la couverture se retrouvait seule au milieu
+    // d une feuille deux fois trop large et le livre ne ressemblait plus a ce
+    // que l utilisateur avait compose. La page blanche apres la couverture
+    // fait retomber les doubles pages en vis-a-vis dans un lecteur.
+    expect(callArgs.spreadLayout).toBe(false);
+    expect(callArgs.insertInsideCover).toBe(true);
   });
 });
 

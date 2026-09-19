@@ -2348,7 +2348,25 @@ async function generateFinalBookPdfFiles({ book, jobId, onProgress }) {
     items,
     layouts,
     format,
-    spreadLayout: true,
+    // MISE EN PLANCHES DESACTIVEE (2026-09-19, le jour meme de sa mise en
+    // service).
+    //
+    // Elle devait empecher une photo en double page d etre coupee en deux.
+    // Elle a casse plus qu elle n a repare : la couverture et la 4e se
+    // retrouvaient seules au milieu d une feuille deux fois trop large, et
+    // les pages interieures ne ressemblaient plus au livre compose. Signale
+    // le jour meme : « le rendu PDF n est pas bon, beaucoup de photos non
+    // fideles au livre ».
+    //
+    // Une page par feuille, comme avant : c est l etat connu bon. La page
+    // blanche apres la couverture (insertInsideCover) fait retomber les
+    // doubles pages en vis-a-vis dans un lecteur qui affiche deux pages.
+    //
+    // Le mode planches reste dans pageRenderer et se rallume par ce seul
+    // drapeau, quand il aura ete verifie A L OEIL et pas seulement au
+    // compteur — c est precisement ce qui a manque.
+    spreadLayout: false,
+    insertInsideCover: true,
     // Sous ce nom, l'espace d'administration peut arreter ce rendu : tuer
     // le navigateur fait echouer le rendu proprement, au lieu de le
     // laisser tourner jusqu au bout sur une machine deja a genoux.
