@@ -29,11 +29,22 @@
 set -uo pipefail
 
 URL="http://127.0.0.1:5000/api/health"
+
+# Trente secondes, pas dix : sous une charge de 5 sur deux coeurs, une
+# reponse peut tarder sans que rien ne soit casse. Un delai trop court
+# transforme la veille en fabrique de fausses alertes.
+DELAI_SONDE=30
 ETAT="/var/lib/celebrons"
 COMPTEUR="${ETAT}/veille-echecs"
 JOURNAL="${ETAT}/veille.json"
 
 ECHECS_AVANT_ACTION=3
+
+# TRES LONG quand un rendu tourne. Voir plus bas : une fabrication en
+# cours monopolise le processeur, et une API qui ne repond pas pendant ce
+# temps-la n'est pas une panne — c'est un serveur qui travaille.
+ECHECS_AVANT_ACTION_SI_RENDU=30
+
 # Ne jamais enchainer les redemarrages : si l'application retombe aussitot,
 # le probleme n'est pas qu'elle a besoin d'un coup de pouce.
 DELAI_ENTRE_REDEMARRAGES=600
@@ -44,7 +55,7 @@ chmod 755 "${ETAT}"
 maintenant=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echecs=$(cat "${COMPTEUR}" 2>/dev/null || echo 0)
 
-if curl -fsS --max-time 10 "${URL}" >/dev/null 2>&1; then
+if curl -fsS --max-time "${DELAI_SONDE}" "${URL}" >/dev/null 2>&1; then
   # Tout va bien. On efface l'ardoise, sans toucher au journal des
   # incidents : l'historique est justement ce qu'on veut garder.
   echo 0 > "${COMPTEUR}"
@@ -53,9 +64,30 @@ fi
 
 echecs=$((echecs + 1))
 echo "${echecs}" > "${COMPTEUR}"
-echo "veille : l'API ne repond pas (${echecs}/${ECHECS_AVANT_ACTION})" >&2
 
-[ "${echecs}" -lt "${ECHECS_AVANT_ACTION}" ] && exit 0
+# UN RENDU EN COURS N EST PAS UNE PANNE.
+#
+# Le 2026-09-19, cette veille a tue tous les envois a l imprimeur. Une
+# fabrication monopolise le processeur (charge mesuree : 5,26 sur deux
+# coeurs) et l'API cesse de repondre a temps. La veille comptait trois
+# echecs, redemarrait le service, et systemd tuait le navigateur avec :
+# « ca casse au bout de 5 ou 6 pages ».
+#
+# La presence d'un navigateur de rendu est le signe qu'on travaille. On
+# laisse alors trente minutes au lieu de trois : de quoi rattraper un
+# rendu VRAIMENT bloque, sans interrompre ceux qui avancent.
+navigateurs=$(pgrep -f -- --headless 2>/dev/null | wc -l | tr -d " ")
+if [ "${navigateurs:-0}" -gt 0 ]; then
+  seuil="${ECHECS_AVANT_ACTION_SI_RENDU}"
+  contexte=" (rendu en cours, ${navigateurs} navigateur(s))"
+else
+  seuil="${ECHECS_AVANT_ACTION}"
+  contexte=""
+fi
+
+echo "veille : l'API ne repond pas (${echecs}/${seuil})${contexte}" >&2
+
+[ "${echecs}" -lt "${seuil}" ] && exit 0
 
 # Assez attendu. On note d'abord POURQUOI, tant que la machine repond encore.
 memoire=$(free -m | awk '/^Mem:/ {print $3"/"$2" Mo"}')

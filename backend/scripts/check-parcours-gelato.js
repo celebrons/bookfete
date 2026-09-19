@@ -148,13 +148,19 @@ const check = (cond, msg, detail = '') => {
         type: 'print',
         status: 'paid',
         paid_at: new Date().toISOString(),
+        // L adresse vit dans la COLONNE shipping_address, pas dans les
+        // metadonnees : isAddressValid() lit order.shipping_address et exige
+        // fullName, line1, postalCode, city et country.
+        shipping_address: {
+          fullName: 'Test Jetable',
+          line1: '1 rue de la Verification',
+          postalCode: '75001',
+          city: 'Paris',
+          country: 'FR',
+          email
+        },
         metadata: {
-          pricing: { pages: modele.page_count, printFormat: modele.print_format, printUnitCents: 7450 },
-          shippingAddress: {
-            firstName: 'Test', lastName: 'Jetable',
-            line1: '1 rue de la Verification', postalCode: '75001',
-            city: 'Paris', country: 'FR', email
-          }
+          pricing: { pages: modele.page_count, printFormat: modele.print_format, printUnitCents: 7450 }
         }
       })
       .select('id')

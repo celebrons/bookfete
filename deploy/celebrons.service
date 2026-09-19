@@ -26,6 +26,19 @@ RestartSec=5
 TimeoutStopSec=300
 KillSignal=SIGTERM
 
+# KillMode=mixed : le SIGTERM ne va qu au processus principal (node).
+#
+# Par defaut, systemd l'envoie a TOUT le groupe — donc aussi au navigateur
+# de rendu, qui meurt sur-le-champ. L arret propre cote node (voir
+# server.js) etait alors sans effet : il attendait la fin de travaux dont
+# le navigateur venait d etre tue, et le rendu echouait avec « le
+# navigateur a ferme la connexion (code 1006) ».
+#
+# En mode mixed, node recoit le signal, laisse finir ce qui tourne, puis
+# sort. Le reste du groupe ne recoit SIGKILL qu au bout de
+# TimeoutStopSec, en dernier recours.
+KillMode=mixed
+
 # Le navigateur headless est lance par l'application : il doit pouvoir ecrire
 # ses fichiers temporaires.
 PrivateTmp=false
