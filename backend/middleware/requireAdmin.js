@@ -20,12 +20,62 @@
 // L'email vient du JETON verifie par `authenticate` (Supabase), jamais du
 // corps de la requete : il n'est donc pas falsifiable cote client.
 
+const crypto = require('crypto');
+
 const parseAdminEmails = () => String(process.env.ADMIN_EMAILS || '')
   .split(',')
   .map((entry) => entry.trim().toLowerCase())
   .filter(Boolean);
 
-const isAdminUser = (user) => {
+// CODE D ACCES PARTAGE (ADMIN_ACCESS_CODE), ajoute le 2026-09-19.
+//
+// Demande explicite : « ouvrir la page admin a tous les utilisateurs, ca me
+// permettra de voir la page quel que soit le compte de test utilise,
+// protege-la par un mot de passe si tu veux ».
+//
+// Le besoin est reel — tester avec plusieurs comptes sans avoir a inscrire
+// chacun dans ADMIN_EMAILS. Mais cet espace montre les livres, les contenus
+// et les EMAILS de tout le monde : l ouvrir sans rien serait une fuite de
+// donnees personnelles. Le code est donc le minimum, pas une precaution
+// excessive.
+//
+// Deux garde-fous :
+//   - un code court est REFUSE (et signale), parce qu un code de quatre
+//     chiffres se devine en quelques minutes a 300 requetes/minute ;
+//   - la comparaison est a temps constant, pour ne pas laisser deviner le
+//     code caractere par caractere.
+//
+// Il reste reserve a la phase de test : en production, ADMIN_EMAILS seul.
+const LONGUEUR_MINIMALE = 12;
+
+const adminAccessCode = () => {
+  const code = String(process.env.ADMIN_ACCESS_CODE || '').trim();
+  if (!code) return '';
+  if (code.length < LONGUEUR_MINIMALE) {
+    console.warn(
+      `[admin] ADMIN_ACCESS_CODE ignore : ${code.length} caracteres, `
+      + `${LONGUEUR_MINIMALE} au minimum. L espace reste ferme.`
+    );
+    return '';
+  }
+  return code;
+};
+
+// Comparaison a temps constant. timingSafeEqual exige deux tampons de meme
+// longueur : on hache les deux cotes, ce qui les egalise sans rien reveler.
+const memeCode = (fourni, attendu) => {
+  if (!fourni || !attendu) return false;
+  const h = (v) => crypto.createHash('sha256').update(String(v)).digest();
+  return crypto.timingSafeEqual(h(fourni), h(attendu));
+};
+
+// Le code voyage dans un en-tete, jamais dans l URL : une URL finit dans
+// les journaux du serveur et dans l historique du navigateur.
+const codeFourniPar = (req) => String(
+  req?.headers?.['x-admin-code'] || ''
+).trim();
+
+const isAdminUser = (user, req = null) => {
   // Un compte anonyme n'a pas d'email : il ne peut structurellement pas
   // figurer dans la liste, mais on le refuse explicitement plutot que de
   // compter sur cette coincidence.
@@ -35,15 +85,21 @@ const isAdminUser = (user) => {
   if (!email) return false;
 
   const admins = parseAdminEmails();
-  // Liste vide = espace d'administration ferme. Jamais "ouvert a tous par
-  // defaut" : une variable oubliee doit fermer la porte, pas l'ouvrir.
-  if (admins.length === 0) return false;
+  if (admins.includes(email)) return true;
 
-  return admins.includes(email);
+  // A defaut, le code partage. Il exige quand meme un compte connecte avec
+  // un email : on veut toujours savoir QUI a consulte quoi (le journal des
+  // evenements enregistre cet email).
+  const code = adminAccessCode();
+  if (code && memeCode(codeFourniPar(req), code)) return true;
+
+  // Ni liste, ni code : espace d'administration ferme. Jamais "ouvert a tous
+  // par defaut" — une variable oubliee doit fermer la porte, pas l'ouvrir.
+  return false;
 };
 
 const requireAdmin = (req, res, next) => {
-  if (!isAdminUser(req.user)) {
+  if (!isAdminUser(req.user, req)) {
     // 404 et non 403 : ne pas confirmer l'existence d'un espace
     // d'administration a quelqu'un qui n'y a pas droit.
     return res.status(404).json({ error: 'Route not found' });
@@ -54,3 +110,6 @@ const requireAdmin = (req, res, next) => {
 module.exports = requireAdmin;
 module.exports.isAdminUser = isAdminUser;
 module.exports.parseAdminEmails = parseAdminEmails;
+// L interface a besoin de savoir s il faut proposer un champ « code ».
+// Elle ne recoit jamais le code lui-meme, seulement son existence.
+module.exports.codeDemande = () => Boolean(adminAccessCode());

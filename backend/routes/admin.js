@@ -59,7 +59,14 @@ const resolveRenderFormat = (formatId) => {
 // gardee independamment par requireAdmin ; ici on repond simplement oui/non
 // a un utilisateur authentifie, sans jamais reveler QUI est administrateur.
 router.get('/me', authenticate, (req, res) => {
-  res.json({ isAdmin: requireAdmin.isAdminUser(req.user) });
+  // `req` est indispensable : le code d acces partage voyage dans un
+  // en-tete de la requete, pas dans le jeton.
+  const isAdmin = requireAdmin.isAdminUser(req.user, req);
+
+  // `codeAttendu` dit seulement qu un code EXISTE, jamais lequel. C est ce
+  // qui permet a l interface de proposer un champ plutot que de repondre
+  // « Page introuvable » a quelqu un qui a le droit d entrer.
+  res.json({ isAdmin, codeAttendu: !isAdmin && requireAdmin.codeDemande() });
 });
 
 // GET /api/admin/books

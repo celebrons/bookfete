@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { checkIsAdmin, fetchBookPreviewHtml, listAllBooks } from '../../services/adminApi';
+import { checkIsAdmin, fetchBookPreviewHtml, listAllBooks, poserCodeAdmin } from '../../services/adminApi';
 import '../../styles/luxe-theme.css';
 import AdminHealth from './AdminHealth';
 import AdminEvents from './AdminEvents';
@@ -54,6 +54,12 @@ function OwnerCell({ owner }) {
 
 export default function AdminBooksLuxe() {
   const [allowed, setAllowed] = useState(null); // null = verification en cours
+  // Un code partage est-il configure sur ce serveur ? Si oui, on propose
+  // un champ plutot que de repondre « Page introuvable » a quelqu un qui a
+  // le droit d entrer avec un autre compte (demande du 2026-09-19).
+  const [codeAttendu, setCodeAttendu] = useState(false);
+  const [code, setCode] = useState('');
+  const [codeRefuse, setCodeRefuse] = useState(false);
   const [books, setBooks] = useState([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
@@ -63,9 +69,29 @@ export default function AdminBooksLuxe() {
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  useEffect(() => {
-    checkIsAdmin().then(setAllowed);
+  const verifierLAcces = useCallback(async () => {
+    const { isAdmin, codeAttendu: attendu } = await checkIsAdmin();
+    setAllowed(isAdmin);
+    setCodeAttendu(attendu);
+    return isAdmin;
   }, []);
+
+  useEffect(() => {
+    verifierLAcces();
+  }, [verifierLAcces]);
+
+  const soumettreLeCode = async (evenement) => {
+    evenement.preventDefault();
+    setCodeRefuse(false);
+    poserCodeAdmin(code.trim());
+    const ouvert = await verifierLAcces();
+    if (!ouvert) {
+      // Code faux : on l efface, sinon toutes les requetes suivantes
+      // partiraient avec lui et compteraient dans la limite de debit.
+      poserCodeAdmin('');
+      setCodeRefuse(true);
+    }
+  };
 
   const load = useCallback(async (term) => {
     setLoading(true);
@@ -109,10 +135,40 @@ export default function AdminBooksLuxe() {
   // Meme reponse que le serveur : on ne confirme pas l'existence de cet
   // espace a quelqu'un qui n'y a pas droit.
   if (allowed === false) {
+    // Sans code configure, la reponse reste la meme qu avant : on ne
+    // confirme pas l existence de cet espace a quelqu un qui n y a pas
+    // droit.
+    if (!codeAttendu) {
+      return (
+        <div className="admin-shell">
+          <p className="admin-state">Page introuvable.</p>
+          <Link className="btn btn-outline" to="/dashboard">Retour au tableau de bord</Link>
+        </div>
+      );
+    }
+
     return (
       <div className="admin-shell">
-        <p className="admin-state">Page introuvable.</p>
-        <Link className="btn btn-outline" to="/dashboard">Retour au tableau de bord</Link>
+        <form className="admin-code" onSubmit={soumettreLeCode}>
+          <h1 className="admin-title">Administration</h1>
+          <p className="admin-code-note">
+            Cet espace montre les livres, les contenus et les adresses de tous
+            les comptes. Entrez le code de consultation pour continuer.
+          </p>
+          <input
+            className="admin-code-champ"
+            type="password"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="Code de consultation"
+            autoFocus
+          />
+          {codeRefuse && <p className="admin-code-erreur">Code refusé.</p>}
+          <button className="btn btn-primary" type="submit" disabled={!code.trim()}>
+            Ouvrir
+          </button>
+          <Link className="btn btn-outline" to="/dashboard">Retour au tableau de bord</Link>
+        </form>
       </div>
     );
   }

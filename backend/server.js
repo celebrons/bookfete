@@ -140,7 +140,20 @@ const limiteRendu = rateLimit({
 });
 
 // Applique AVANT les routes, sinon il ne protegerait rien.
+// Depuis le 2026-09-19, un code partage peut ouvrir cet espace (voir
+// middleware/requireAdmin.js). Un code se devine par essais successifs :
+// 30 tentatives par minute rendent la chose sans espoir, sans jamais gener
+// une consultation normale (une page d'admin fait quelques requetes).
+const limiteAdmin = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de tentatives. Reessayez dans une minute.' }
+});
+
 app.use('/api', limiteGenerale);
+app.use('/api/admin', limiteAdmin);
 app.use('/api/books/:id/export-final-pdf', limiteRendu);
 app.use('/api/orders/:orderId/gelato-test', limiteRendu);
 

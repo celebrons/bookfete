@@ -85,7 +85,7 @@ const HeaderLuxe = () => {
   React.useEffect(() => {
     if (!user) { setIsAdmin(false); return; }
     let cancelled = false;
-    checkIsAdmin().then((value) => { if (!cancelled) setIsAdmin(value); });
+    checkIsAdmin().then(({ isAdmin }) => { if (!cancelled) setIsAdmin(isAdmin); });
     return () => { cancelled = true; };
   }, [user]);
 

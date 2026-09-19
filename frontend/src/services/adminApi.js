@@ -8,12 +8,43 @@
 import { supabase } from './supabaseClient';
 import { getApiBaseUrl } from './compositionApi';
 
+// CODE D ACCES PARTAGE (2026-09-19).
+//
+// Demande : pouvoir ouvrir l'espace d'administration depuis n'importe quel
+// compte de test, sans inscrire chaque adresse dans ADMIN_EMAILS.
+//
+// Il est garde dans sessionStorage, PAS dans localStorage : il disparait a
+// la fermeture de l'onglet. Un code de consultation qui survivrait des
+// semaines sur une machine partagee n'aurait plus grand sens.
+//
+// Il voyage dans un en-tete, jamais dans une URL — une URL finit dans les
+// journaux du serveur et dans l'historique du navigateur.
+const CLE_CODE = 'celebrons.admin.code';
+
+export const lireCodeAdmin = () => {
+  try {
+    return sessionStorage.getItem(CLE_CODE) || '';
+  } catch (_error) {
+    // Navigation privee ou stockage bloque : on continue sans code.
+    return '';
+  }
+};
+
+export const poserCodeAdmin = (code) => {
+  try {
+    if (code) sessionStorage.setItem(CLE_CODE, code);
+    else sessionStorage.removeItem(CLE_CODE);
+  } catch (_error) { /* sans stockage, le code vaut pour cette page */ }
+};
+
 const authHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error('Session invalide. Merci de vous reconnecter.');
+  const code = lireCodeAdmin();
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${session.access_token}`
+    Authorization: `Bearer ${session.access_token}`,
+    ...(code ? { 'x-admin-code': code } : {})
   };
 };
 
@@ -31,12 +62,17 @@ const request = async (path) => {
 // Sert uniquement a decider si le lien "Administration" s'affiche. Ne jamais
 // s'en servir comme d'une protection : c'est le serveur qui tranche, route
 // par route.
+// Renvoie desormais { isAdmin, codeAttendu } : « codeAttendu » dit qu un
+// code partage est configure sur ce serveur, donc que l interface doit
+// proposer un champ plutot que de repondre « Page introuvable » a
+// quelqu un qui a le droit d entrer. Le code lui-meme ne circule jamais
+// dans ce sens.
 export const checkIsAdmin = async () => {
   try {
-    const { isAdmin } = await request('/me');
-    return Boolean(isAdmin);
+    const { isAdmin, codeAttendu } = await request('/me');
+    return { isAdmin: Boolean(isAdmin), codeAttendu: Boolean(codeAttendu) };
   } catch (_error) {
-    return false;
+    return { isAdmin: false, codeAttendu: false };
   }
 };
 
