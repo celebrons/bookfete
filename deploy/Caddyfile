@@ -13,6 +13,32 @@
 #   celebrons.fr, www.celebrons.fr
 # et recharger : systemctl reload caddy
 
+# PAS DE HTTP/3.
+#
+# Caddy l'active par defaut. Il transporte alors les reponses en QUIC, sur
+# UDP — et un gros telechargement n'y survivait pas ici.
+#
+# Mesure du 2026-09-19, en pilotant le vrai bouton dans un vrai navigateur :
+#
+#   reponse HTTP : 200 .../download/final
+#   echec reseau : net::ERR_QUIC_PROTOCOL_ERROR
+#   message vu par le client : « Failed to fetch »
+#
+# Le serveur repondait donc correctement, et le transfert du PDF de 23 Mo
+# cassait en route. Au second clic, Chrome avait marque le chemin QUIC
+# comme defaillant et retombait sur HTTP/2 : ca passait. D ou « je suis
+# toujours oblige de cliquer deux fois sur telecharger », signale deux
+# fois, et introuvable tant qu on cherchait du cote du serveur.
+#
+# Ce produit transfere des fichiers de dizaines de megaoctets : ce sont
+# exactement les transferts que QUIC met ici en echec. HTTP/2 les porte
+# sans probleme.
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
 78.232.5.181.sslip.io {
 	# Le site ET l'API sont servis par le meme processus node (SERVE_FRONTEND=1),
 	# donc une seule redirection suffit : Caddy ne fait que le HTTPS et passe
