@@ -526,9 +526,51 @@ const persistStripePaymentForOrder = async ({
 // order.metadata.gelatoOrderId), donc sans risque a appeler plusieurs fois
 // pour la meme commande (webhook + route de confirmation peuvent toutes
 // deux declencher ce chemin). N'agit que sur 'print'/'pack' — jamais 'pdf'.
+// LE MEME VERROU QUE L ENVOI MANUEL.
+//
+// Il y avait DEUX chemins vers l imprimeur : le bouton « envoi de test »,
+// verrouille et consigne au journal, et celui-ci, declenche par la
+// confirmation de paiement — sans verrou et sans trace.
+//
+// Le 2026-09-19, les deux ont tourne en parallele sur la meme commande :
+// Gelato a recu DEUX brouillons (bd63c9ef a 20:54:43, b4ac19b5 a 20:55:26)
+// pour CMD-260919-MU8V6KLU-528, et notre journal n'en connaissait qu un.
+// Le second etait invisible. En mode facturable, ce serait deux livres
+// imprimes et deux factures.
+//
+// Un seul verrou pour les deux chemins, et une trace dans les deux cas.
 const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
   const type = String(order?.type || '').toLowerCase();
   if (type !== 'print' && type !== 'pack') return;
+
+  if (gelatoSubmissionsEnCours.has(order.id)) {
+    console.log(`Soumission Gelato deja en cours pour la commande ${order.id} : on ne relance pas.`);
+    logEvent({
+      type: 'gelato.submit.skipped',
+      level: 'warn',
+      actor: ownerEmail,
+      orderId: order.id,
+      bookId: order.book_id,
+      message: 'Envoi a l\'imprimeur ignore : un envoi est deja en cours',
+      metadata: { raison: 'verrou' }
+    });
+    return;
+  }
+
+  gelatoSubmissionsEnCours.set(order.id, {
+    debutLe: getNowIso(),
+    demandeur: ownerEmail || null,
+    bookId: order.book_id || null
+  });
+
+  logEvent({
+    type: 'gelato.submit.started',
+    actor: ownerEmail,
+    orderId: order.id,
+    bookId: order.book_id,
+    message: 'Envoi a l\'imprimeur declenche par le paiement',
+    metadata: { origine: 'paiement' }
+  });
 
   (async () => {
     try {
@@ -545,11 +587,42 @@ const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
       const result = await submitPrintOrderToGelato({ db: supabase, book, order, ownerEmail });
       if (result.error) {
         console.error('Soumission Gelato echouee pour la commande', order.id, ':', result.error);
+        logEvent({
+          type: 'gelato.submit.failed',
+          level: 'error',
+          actor: ownerEmail,
+          orderId: order.id,
+          bookId: order.book_id,
+          message: 'Envoi a l\'imprimeur echoue (declenche par le paiement)',
+          metadata: { origine: 'paiement', erreur: String(result.error).slice(0, 300) }
+        });
       } else if (!result.skipped) {
         console.log(`Commande Gelato ${result.gelatoOrderType} creee (${result.gelatoOrderId}) pour la commande Celebrons ${order.id}`);
+        logEvent({
+          type: 'gelato.submitted',
+          actor: ownerEmail,
+          orderId: order.id,
+          bookId: order.book_id,
+          message: `Fichier depose chez Gelato (${result.gelatoOrderType})`,
+          metadata: { origine: 'paiement', gelatoOrderId: result.gelatoOrderId, gelatoOrderType: result.gelatoOrderType }
+        });
       }
     } catch (error) {
       console.error('Erreur inattendue lors de la soumission Gelato pour la commande', order.id, ':', error.message);
+      logEvent({
+        type: 'gelato.submit.failed',
+        level: 'error',
+        actor: ownerEmail,
+        orderId: order.id,
+        bookId: order.book_id,
+        message: 'Envoi a l\'imprimeur interrompu (declenche par le paiement)',
+        metadata: { origine: 'paiement', erreur: String(error.message).slice(0, 300) }
+      });
+    } finally {
+      // TOUJOURS relacher, quelle que soit l'issue. Un verrou pris et jamais
+      // rendu bloquerait tout envoi ulterieur sur cette commande jusqu'au
+      // redemarrage du serveur — un remede pire que le mal qu'il soigne.
+      gelatoSubmissionsEnCours.delete(order.id);
     }
   })();
 };
@@ -1957,5 +2030,8 @@ module.exports.releaseGelatoSubmission = (orderId) => {
   return { relache: true };
 };
 
+// Expose pour les tests : verifier qu un doublon d envoi est impossible
+// demande de declencher les deux chemins en meme temps.
+module.exports.__triggerGelatoPourLesTests = triggerGelatoSubmissionIfNeeded;
 module.exports.handleStripeWebhook = handleStripeWebhook;
 module.exports.computeOrderPricing = computeOrderPricing;

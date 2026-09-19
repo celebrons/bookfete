@@ -591,66 +591,42 @@ const BookCheckoutLuxe = () => {
     return { blob, fileName };
   };
 
-  const recoverPdfJobForDownload = async () => {
-    const currentOrder = latestOrder;
-    if (!currentOrder?.id || !includesPdf(currentOrder.type)) {
-      throw new Error('Commande PDF introuvable');
-    }
 
-    setNotice({
-      type: 'info',
-      message: 'Le job PDF a expire. Regeneration en cours...'
-    });
-
-    let workingOrder = currentOrder;
-    if (String(workingOrder.status || '').toLowerCase() === 'paid') {
-      workingOrder = await updateOrderStatus(workingOrder.id, 'pdf_generating');
-      setLatestOrder(workingOrder);
-    }
-
-    const restartedJob = await startPdfExportWithRetry(workingOrder.id, 2);
-    setPdfJob(restartedJob);
-
-    workingOrder = await updateOrderStatus(workingOrder.id, 'pdf_generating', {
-      pdfJobId: restartedJob.jobId,
-      pdfRequestedAt: restartedJob.createdAt || new Date().toISOString(),
-      pdfReady: false
-    });
-    setLatestOrder(workingOrder);
-
-    const readyJob = await pollPdfJobUntilReady(restartedJob.jobId);
-    const nextStatus = includesPrint(workingOrder.type) ? 'print_queued' : 'pdf_ready';
-    const completedOrder = await updateOrderStatus(workingOrder.id, nextStatus, {
-      pdfReady: true,
-      pdfJobId: readyJob.jobId,
-      pdfCompletedAt: readyJob.completedAt || new Date().toISOString()
-    });
-
-    setLatestOrder(completedOrder);
-    setPdfJob(readyJob);
-    setNotice({
-      type: 'success',
-      message: 'PDF regenere. Le telechargement demarre.'
-    });
-
-    return readyJob.jobId;
-  };
-
+  // TELECHARGER NE DOIT PAS REFABRIQUER LE LIVRE EN CACHETTE.
+  //
+  // Au premier clic, si le serveur ne retrouvait pas le job, ce bouton
+  // relancait une generation ENTIERE et l attendait : plusieurs minutes,
+  // bouton fige sur « Telechargement... », sans un mot d explication. Le
+  // second clic aboutissait parce que l etat avait ete rafraichi entre
+  // temps — d'ou « j'etais oblige de cliquer deux fois » (2026-09-19).
+  //
+  // Desormais : on relit la commande AVANT (c'est instantane, et c'est ce
+  // qui manquait au premier clic), puis on telecharge. Si le fichier a
+  // vraiment disparu, on le DIT et on laisse la personne decider de
+  // relancer — une attente de plusieurs minutes se demande, elle ne
+  // s impose pas.
   const downloadPdfFile = async (kind) => {
-    const initialJobId = latestOrder?.metadata?.pdfJobId || pdfJob?.jobId;
-    if (!initialJobId) {
-      setNotice({
-        type: 'warning',
-        message: 'Aucun job PDF disponible. Regeneration automatique en cours...'
-      });
-    }
-
     try {
       setDownloadingKind(kind);
       const headers = await getAuthHeaders();
-      let jobIdToUse = initialJobId;
+
+      // La commande en base sait quel fichier est pret ; l onglet, lui,
+      // peut porter un identifiant vieux de plusieurs generations.
+      let jobIdToUse = latestOrder?.metadata?.pdfJobId || pdfJob?.jobId;
+      if (latestOrder?.id) {
+        const fraiche = await getOrderById(latestOrder.id).catch(() => null);
+        if (fraiche) {
+          setLatestOrder(fraiche);
+          jobIdToUse = fraiche?.metadata?.pdfJobId || jobIdToUse;
+        }
+      }
+
       if (!jobIdToUse) {
-        jobIdToUse = await recoverPdfJobForDownload();
+        setNotice({
+          type: 'warning',
+          message: 'Aucun PDF n\'a encore ete fabrique pour cette commande. Lancez la generation, puis revenez telecharger.'
+        });
+        return;
       }
 
       let blobResult;
@@ -660,8 +636,11 @@ const BookCheckoutLuxe = () => {
         if (!isMissingPdfJobError(error)) {
           throw error;
         }
-        const recoveredJobId = await recoverPdfJobForDownload();
-        blobResult = await fetchPdfDownloadBlob({ jobId: recoveredJobId, kind, headers });
+        setNotice({
+          type: 'warning',
+          message: 'Ce PDF n\'est plus disponible sur le serveur. Relancez la generation depuis cette page : elle prend une minute environ.'
+        });
+        return;
       }
 
       const { blob, fileName } = blobResult;
