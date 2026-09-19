@@ -97,3 +97,27 @@
   font-size: 12px;
   color: var(--ink-soft, #7a7266);
 }
+
+/* Bandeau de blocage releve par la veille (deploy/veille.sh). Volontairement
+   en tete et distinct des cartes de mesure : ce n est pas une valeur a
+   surveiller, c est un evenement qui s est deja produit. */
+.admin-health-incident {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e0a94a;
+  border-left: 4px solid #d1852a;
+  background: #fdf6e8;
+  color: #5a4114;
+  font-size: 0.92rem;
+}
+
+.admin-health-incident strong { font-size: 0.98rem; }
+
+.admin-health-incident-note {
+  color: #7a6234;
+  font-size: 0.84rem;
+}

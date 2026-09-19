@@ -22,6 +22,14 @@ const duree = (secondes) => {
   return `${m} min`;
 };
 
+const horodatage = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+};
+
 // Un seuil visuel, pas une alerte : de quoi reperer en balayant ce qui
 // approche de ses limites.
 const ton = (pourcent) => {
@@ -86,6 +94,24 @@ function AdminHealth() {
           {etat.environnement} · {etat.version || 'version inconnue'} · node {etat.node}
         </span>
       </div>
+
+      {etat.dernierIncident && (
+        <div className="admin-health-incident">
+          <strong>Blocage détecté le {horodatage(etat.dernierIncident.quand)}</strong>
+          <span>
+            {etat.dernierIncident.action}
+            {etat.dernierIncident.memoire ? ` · mémoire ${etat.dernierIncident.memoire}` : ''}
+            {etat.dernierIncident.charge ? ` · charge ${etat.dernierIncident.charge}` : ''}
+            {etat.dernierIncident.navigateursDeRendu
+              ? ` · ${etat.dernierIncident.navigateursDeRendu} navigateur(s) de rendu`
+              : ''}
+          </span>
+          <span className="admin-health-incident-note">
+            Relevé par la veille, qui tourne hors du plafond de l’application :
+            c’est elle qui voit ce que le serveur ne peut plus raconter lui-même.
+          </span>
+        </div>
+      )}
 
       <div className="admin-health-grille">
         <Mesure

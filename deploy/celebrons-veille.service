@@ -1,0 +1,27 @@
+# Veille : verifie chaque minute que l'application repond (voir veille.sh).
+#
+# Declenche par celebrons-veille.timer.
+
+[Unit]
+Description=Veille Celebrons (l'API repond-elle ?)
+After=celebrons.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /home/celebrons/bookfete/deploy/veille.sh
+
+# LE POINT ESSENTIEL : cette unite doit obtenir du processeur AU MOMENT ou
+# l'application n'en a plus. Elle a son propre groupe de controle, hors du
+# plafond de celebrons.service, et une priorite plus haute que lui.
+#
+# Sans ca, la veille serait asphyxiee par ce qu'elle est censee surveiller.
+Nice=-5
+CPUWeight=200
+IOWeight=200
+
+# Elle doit pouvoir redemarrer le service et ecrire dans /var/lib.
+User=root
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=celebrons-veille

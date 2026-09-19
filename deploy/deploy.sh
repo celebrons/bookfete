@@ -21,6 +21,31 @@ echo "==> Dependances"
 cd "${DOSSIER}/backend"
 sudo -u "${UTILISATEUR}" npm ci --omit=dev
 
+echo "==> Services systeme"
+# Les fichiers d'unite font partie du depot, mais systemd lit ceux de
+# /etc/systemd/system. Sans cette recopie, un plafond de memoire ajoute
+# dans deploy/celebrons.service ne s'applique JAMAIS : on croit la machine
+# protegee alors qu'elle ne l'est pas. C'est ce qui l'a rendue injoignable
+# le 2026-09-19.
+RECHARGER=0
+for UNITE in celebrons.service celebrons-sauvegarde.service celebrons-sauvegarde.timer celebrons-veille.service celebrons-veille.timer; do
+  SOURCE="${DOSSIER}/deploy/${UNITE}"
+  [ -f "${SOURCE}" ] || continue
+  if ! cmp -s "${SOURCE}" "/etc/systemd/system/${UNITE}"; then
+    cp "${SOURCE}" "/etc/systemd/system/${UNITE}"
+    echo "    ${UNITE} mis a jour"
+    RECHARGER=1
+  fi
+done
+if [ "${RECHARGER}" = "1" ]; then
+  systemctl daemon-reload
+  # La veille est nouvelle : l'activer si elle ne l'est pas encore.
+  systemctl enable --now celebrons-veille.timer >/dev/null 2>&1 || true
+  echo "    systemd rechargé"
+else
+  echo "    inchangés"
+fi
+
 echo "==> Redemarrage"
 # LE POINT CRITIQUE. Node garde les modules charges en memoire : sans ce
 # redemarrage, le serveur continue de servir l'ANCIEN code, corrections

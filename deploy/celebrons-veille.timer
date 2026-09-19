@@ -1,0 +1,17 @@
+# Declenche la veille chaque minute.
+#
+# Une minute est le bon pas : assez court pour qu'un blocage soit vu vite
+# (trois echecs consecutifs, donc environ trois minutes avant toute action),
+# assez long pour ne rien couter. Le script lui-meme ne fait qu'un curl.
+
+[Unit]
+Description=Veille Celebrons, chaque minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Unit=celebrons-veille.service
+
+[Install]
+WantedBy=timers.target

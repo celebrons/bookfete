@@ -91,6 +91,33 @@ function derniereSauvegarde() {
   return null;
 }
 
+// Le dernier blocage vu par la veille (deploy/veille.sh).
+//
+// L'application ne peut pas temoigner de sa propre asphyxie : quand elle
+// ne repond plus, elle ne peut rien raconter. La veille, elle, tourne hors
+// de son plafond de ressources et laisse une trace ici. On la relit au
+// retour a la normale — c est ainsi qu un blocage cesse de passer
+// inapercu, comme celui du 2026-09-19 decouvert par un client.
+//
+// Absent partout ailleurs que sur le serveur Scaleway : null, et
+// l'ecran n'affiche rien.
+function dernierIncident() {
+  try {
+    const brut = fs.readFileSync('/var/lib/celebrons/veille.json', 'utf8');
+    const incident = JSON.parse(brut);
+    return {
+      quand: incident.quand || null,
+      action: incident.action || null,
+      memoire: incident.memoire || null,
+      charge: incident.charge || null,
+      navigateursDeRendu: incident.navigateursDeRendu ?? null,
+      echecsConsecutifs: incident.echecsConsecutifs ?? null
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
 /**
  * Photographie de l'etat du serveur a l'instant present.
  *
@@ -139,6 +166,7 @@ function etatServeur({ rendusEnCours = null, rendusEnFile = null } = {}) {
     // signe d un rendu bloque.
     rendusEnFile,
     derniereSauvegarde: derniereSauvegarde(),
+    dernierIncident: dernierIncident(),
     mesureLe: new Date().toISOString()
   };
 }
