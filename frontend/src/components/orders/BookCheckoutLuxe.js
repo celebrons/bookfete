@@ -260,7 +260,42 @@ const BookCheckoutLuxe = () => {
 
         setBook(bookData);
         const bookOrders = await listOrdersByBook(bookId).catch(() => []);
-        const latestBookOrder = Array.isArray(bookOrders) ? bookOrders[0] : null;
+        let latestBookOrder = Array.isArray(bookOrders) ? bookOrders[0] : null;
+
+        // RATTRAPER UN PAIEMENT QUE CETTE PAGE N A PAS PU ANNONCER.
+        //
+        // Le 2026-09-19, un client a paye 94,50 EUR et est retombe sur une
+        // page blanche : la commande est restee « en attente de paiement »
+        // alors que Stripe avait encaisse. Tant que seule la page de retour
+        // annonce le paiement, un onglet ferme trop tot, un reseau qui
+        // lache ou un telephone qui se verrouille suffisent a le perdre.
+        //
+        // Rouvrir la commande suffit maintenant a le retrouver. Le serveur
+        // redemande la session a Stripe et n enregistre rien si elle n est
+        // pas payee (il repond 409) — donc aucun risque a essayer.
+        //
+        // Le vrai filet reste le webhook Stripe : lui n a besoin d aucun
+        // navigateur. Ceci le complete, ca ne le remplace pas.
+        // Pas sur le retour de Stripe lui-meme : cet ecran a deja son
+        // propre enchainement (resumeAfterStripe), qui lance en plus la
+        // generation du PDF. Deux confirmations en parallele se
+        // marcheraient sur les pieds pour rien.
+        const retourDeStripe = new URLSearchParams(location.search || '').get('payment') === 'success';
+        const sessionEnAttente = !retourDeStripe && String(latestBookOrder?.status || '').toLowerCase() === 'awaiting_payment'
+          ? String(latestBookOrder?.metadata?.stripeCheckoutSessionId || '').trim()
+          : '';
+        if (sessionEnAttente) {
+          const rattrapee = await confirmStripePayment(latestBookOrder.id, sessionEnAttente)
+            .catch(() => null);
+          if (rattrapee) {
+            latestBookOrder = rattrapee;
+            setNotice({
+              type: 'success',
+              message: 'Votre paiement a bien ete enregistre. Votre commande est en cours de traitement.'
+            });
+          }
+        }
+
         if (latestBookOrder) {
           setLatestOrder(latestBookOrder);
           const recoveredJobId = String(latestBookOrder?.metadata?.pdfJobId || '').trim();
