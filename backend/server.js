@@ -133,9 +133,28 @@ const limiteGenerale = rateLimit({
 // livre.
 const limiteRendu = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+
+  // SEULEMENT CE QUI LANCE UN RENDU.
+  //
+  // Ce compteur est pose sur /api/books/:id/export-final-pdf, et `app.use`
+  // attrape TOUS les sous-chemins : le sondage d avancement
+  // (.../:jobId/status, interroge toutes les deux secondes pendant la
+  // fabrication) et le telechargement (.../:jobId/download/final) etaient
+  // comptes comme des generations.
+  //
+  // Une seule fabrication epuisait donc le quota en une minute, et le
+  // client se voyait refuser SON PROPRE telechargement avec « trop de
+  // generations demandees » alors que plus rien ne tournait. Signale le
+  // 2026-09-19 : « j ai commande un PDF uniquement mais au moment de
+  // telecharger... pourtant y a rien qui tourne ».
+  //
+  // Lancer un rendu est un POST ; lire un statut ou recuperer un fichier
+  // est un GET. On ne compte que les POST.
+  skip: (req) => req.method !== 'POST',
+
   message: { error: 'Trop de generations demandees. Attendez quelques minutes.' }
 });
 
