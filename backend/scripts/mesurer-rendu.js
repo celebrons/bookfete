@@ -3,6 +3,7 @@
 //
 //   node scripts/mesurer-rendu.js                 -> le livre dont le titre contient "montr"
 //   node scripts/mesurer-rendu.js --livre "60 ans"
+//   node scripts/mesurer-rendu.js --captures     -> l ancienne methode, pour comparer
 //
 // Ecrit le 2026-09-18 apres que le noyau a tue Chrome pour manque de memoire
 // sur une machine de 2 Go, en plein rendu :
@@ -30,6 +31,7 @@ const { resolveFormatDensity } = require('../services/composition/formatDensity'
 const args = process.argv.slice(2);
 const iLivre = args.indexOf('--livre');
 const RECHERCHE = (iLivre > -1 ? args[iLivre + 1] : 'montr').toLowerCase();
+const PAR_CAPTURES = args.includes('--captures');
 
 const mo = (octets) => Math.round(octets / 1024 / 1024);
 
@@ -93,8 +95,16 @@ function navigateur() {
   let chemin = null;
   let echec = null;
   try {
-    chemin = await pdfService.renderPdfFromPages({
+    // Exactement l appel de routes/books.js : c est le PDF que le client
+    // telecharge. Mesurer autre chose donnerait un chiffre rassurant et
+    // faux. --captures rejoue l ancienne methode, pour comparer.
+    const rendre = PAR_CAPTURES
+      ? pdfService.renderPdfFromPages
+      : pdfService.renderPdfByPrinting;
+
+    chemin = await rendre({
       book: livre, pages, items, layouts, format,
+      spreadLayout: !PAR_CAPTURES,
       fileBaseName: 'mesure-rendu',
       onProgress: ({ phase, done, total }) => {
         const nav = navigateur();
@@ -112,6 +122,7 @@ function navigateur() {
 
   const secondes = (Date.now() - depart) / 1000;
 
+  console.log(`  methode            : ${PAR_CAPTURES ? 'captures (ancienne)' : 'impression, en planches'}`);
   console.log(`  duree              : ${(secondes / 60).toFixed(1)} min`);
   console.log(`  pic node           : ${mo(picNode)} Mo`);
   console.log(`  pic navigateur     : ${mo(picNavigateur)} Mo   (${picProcessus} processus au plus)`);
