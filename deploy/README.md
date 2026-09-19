@@ -103,10 +103,27 @@ API, jamais celle de Render.
 
 ```bash
 cd frontend
-REACT_APP_API_URL=/api npx craco build
+MSYS_NO_PATHCONV=1 REACT_APP_API_URL=/api npx craco build
 tar -czf /tmp/b.tgz build
 scp /tmp/b.tgz root@<IP>:/tmp/
 ssh root@<IP> "cd /home/celebrons/bookfete/frontend && rm -rf build && tar -xzf /tmp/b.tgz && chown -R celebrons: build"
+```
+
+### `MSYS_NO_PATHCONV=1` n’est pas décoratif
+
+Sous Git Bash, toute valeur commençant par une barre est convertie en chemin
+Windows. `REACT_APP_API_URL=/api` devient `C:/Program Files/Git/api`, et le
+site construit appelle `file:///C:/Program%20Files/Git/api/health`.
+
+Le résultat est un site **entièrement mort mais qui s’affiche** : les pages
+s’ouvrent, les boutons ne répondent pas, la console montre « Failed to
+fetch », `/admin` répond « Page introuvable ». Vécu le 2026-09-19, sur quatre
+déploiements de suite.
+
+Le raccourci sûr, depuis PowerShell :
+
+```powershell
+$env:REACT_APP_API_URL = '/api'; npx craco build
 ```
 
 Le site construit **n'est pas dans git** (`frontend/build/` est ignoré depuis
@@ -127,12 +144,69 @@ demain.
 Vérifier après coup, systématiquement :
 
 ```bash
-curl -s https://<hôte>/static/js/main.<hash>.js | grep -c onrender.com
+F=$(curl -s https://<hôte>/ | grep -o "main\.[a-f0-9]*\.js")
+curl -s "https://<hôte>/static/js/$F" > /tmp/bundle.js
+grep -c onrender.com /tmp/bundle.js     # doit valoir 0
+grep -c "Program Files" /tmp/bundle.js  # doit valoir 0
+grep -o '"/api"' /tmp/bundle.js | head -1   # doit AFFICHER "/api"
 ```
 
-Doit renvoyer `0`. Le 2026-09-19, un build parti sans cette variable faisait
-appeler l'API de Render depuis Scaleway : l'espace d'administration répondait
-« Page introuvable » alors que tout était correctement configuré.
+**Les trois lignes, pas seulement la première.** Chercher l’absence de
+`onrender.com` ne prouve rien : un site construit avec une variable abîmée
+passe ce test sans broncher, tout en étant incapable d’appeler quoi que ce
+soit. Il faut vérifier ce que le fichier contient, pas ce qu’il ne contient
+pas.
+
+Le contrôle complet, depuis un vrai navigateur neuf :
+
+```bash
+cd backend && node scripts/check-parcours.js
+```
+
+Il ouvre les pages principales sans cache ni session et compte les erreurs
+JavaScript et réseau. Zéro partout, ou ce n’est pas bon.
+
+## Webhook Stripe
+
+Sans lui, un paiement n'est enregistré que si le client revient sur la page
+de commande. Le 2026-09-19, un client a payé 94,50 € et est tombé sur une
+page blanche : Stripe avait l'argent, la commande est restée « en attente de
+paiement ». Le webhook, lui, ne dépend d’aucun navigateur.
+
+Dans le tableau de bord Stripe (**mode test**), Développeurs → Webhooks →
+Ajouter un point de terminaison :
+
+| champ | valeur |
+|---|---|
+| URL | `https://78.232.5.181.sslip.io/api/orders/webhook/stripe` |
+| événements | `checkout.session.completed` et `checkout.session.async_payment_succeeded` |
+
+Stripe affiche ensuite un **secret de signature** (`whsec_...`). Il se pose
+sur le serveur :
+
+```bash
+ssh root@<IP>
+printf 'STRIPE_WEBHOOK_SECRET=whsec_xxx\n' >> /home/celebrons/bookfete/backend/.env
+systemctl restart celebrons
+```
+
+Le `printf` avec `\n` n’est pas un détail : un `.env` sans saut de ligne
+final colle la nouvelle variable à la précédente, et les deux sont perdues.
+Déjà vu ici le 2026-09-18 avec `TRUST_PROXY`.
+
+Vérifier :
+
+```bash
+curl -s -X POST -H 'Content-Type: application/json' -d '{}' \
+  https://<hôte>/api/orders/webhook/stripe
+```
+
+- `Configuration webhook Stripe incomplète` → le secret n’est pas posé.
+- `Signature Stripe manquante` → **c’est la bonne réponse** : la route est
+  active et exige une signature.
+
+L’URL contient l’adresse IP : elle devra être changée dans Stripe le jour du
+passage au vrai domaine.
 
 ## Ce qui n'est PAS fait à ce stade
 

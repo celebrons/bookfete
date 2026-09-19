@@ -14,8 +14,36 @@ import { fetchWithWakeRetry } from './httpClient';
 // Le 2026-09-19, un fichier construit sans cette variable a ete deploye sur
 // Scaleway : le site y appelait l API de Render, et l espace d administration
 // repondait « Page introuvable » alors que tout etait correctement configure.
+// Une adresse d API valable commence par http(s):// ou par une barre. Tout
+// le reste est une valeur abimee en chemin, et le site est alors MORT sans
+// rien dire : chaque appel echoue en « Failed to fetch », les boutons ne
+// repondent plus, les pages se vident.
+//
+// Ca n a rien de theorique. Le 2026-09-19, une construction lancee depuis
+// Git Bash avec REACT_APP_API_URL=/api a livre un site qui appelait
+// file:///C:/Program Files/Git/api/health : MSYS convertit toute valeur
+// commencant par une barre en chemin Windows. Le fichier construit etait
+// pourtant conforme a tous les controles qu'on lui faisait passer.
+//
+// On retombe donc sur une adresse relative, et on le CRIE dans la console :
+// un site qui marche vaut mieux qu un site mort, mais la construction est a
+// refaire.
+const ADRESSE_VALABLE = /^(https?:\/\/|\/)/;
+
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+
+  if (!ADRESSE_VALABLE.test(configured)) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[Celebrons] REACT_APP_API_URL vaut « ${configured} », ce qui n'est pas une adresse. `
+      + 'Le site a ete construit avec une variable abimee (souvent MSYS/Git Bash qui '
+      + 'transforme /api en chemin Windows : utiliser MSYS_NO_PATHCONV=1). '
+      + 'On se rabat sur /api ; la construction est a refaire.'
+    );
+    return '/api';
+  }
+
   const trimmed = configured.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };

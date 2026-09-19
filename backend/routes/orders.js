@@ -997,7 +997,18 @@ const buildStripeWebhookEvent = (req) => {
       error.status = 400;
       throw error;
     }
-    return stripe.webhooks.constructEvent(req.body, signature, STRIPE_WEBHOOK_SECRET);
+    try {
+      return stripe.webhooks.constructEvent(req.body, signature, STRIPE_WEBHOOK_SECRET);
+    } catch (erreurDeSignature) {
+      // 400 et non 500. Stripe REESSAIE un evenement pendant trois jours
+      // tant qu il recoit une erreur serveur, et affiche « votre serveur a
+      // echoue » — alors que la seule chose qui ne va pas est le secret de
+      // signature. Un 400 arrete les tentatives et dit la verite : cet
+      // evenement-la ne sera jamais accepte tel quel.
+      const error = new Error(`Signature Stripe invalide : ${erreurDeSignature.message}`);
+      error.status = 400;
+      throw error;
+    }
   }
 
   if (!STRIPE_WEBHOOK_ALLOW_UNSIGNED) {
