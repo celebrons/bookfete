@@ -1915,6 +1915,74 @@ function buildPdfExportPrerequisiteError(message) {
   return error;
 }
 
+// UN PDF DEJA FABRIQUE, RETROUVE SUR LE DISQUE.
+//
+// Les jobs d'export vivent en MEMOIRE. Un redemarrage du serveur les
+// efface tous, y compris ceux qui ont abouti. Le fichier, lui, est
+// toujours la — mais plus personne ne savait qu il existait, et cliquer
+// sur « telecharger » relancait une fabrication de deux minutes sans rien
+// dire de visible.
+//
+// Constate le 2026-09-19 : PDF pret a 12:06:02, service redemarre a
+// 12:09:01 pour un deploiement, telechargement impossible dans la foulee.
+// Un deploiement, un plantage ou la veille suffisent a reproduire ca.
+//
+// Le nom du fichier porte l'identifiant du job — c est ce qui permet de
+// le rattacher a coup sur, sans registre ni table supplementaire.
+//
+// L'appelant a DEJA verifie que le livre appartient au demandeur : cette
+// fonction ne controle aucun droit et ne doit jamais etre appelee avant.
+function retrouverLePdfFabrique({ jobId, bookId, ownerId, ownerEmail = null, orderId = null }) {
+  const identifiant = cleanText(jobId, 120);
+  if (!identifiant) return null;
+
+  try {
+    const dossier = pdfService.PDF_PREVIEW_DIR;
+    if (!dossier || !fs.existsSync(dossier)) return null;
+
+    const marque = `-${identifiant}-livre-final-`;
+    const candidats = fs.readdirSync(dossier)
+      .filter((nom) => nom.endsWith('.pdf') && nom.includes(marque))
+      .map((nom) => ({ nom, chemin: path.join(dossier, nom) }))
+      .map((f) => ({ ...f, stat: fs.statSync(f.chemin) }))
+      .sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+
+    if (!candidats.length) return null;
+    const trouve = candidats[0];
+
+    // Le nom d'origine est « <livre>-<job>-livre-final-<horodatage>.pdf » :
+    // on rend au client un nom lisible, sans identifiant technique.
+    const nomDuLivre = trouve.nom.split(marque)[0] || 'livre';
+    const quand = new Date(trouve.stat.mtimeMs).toISOString();
+
+    const job = {
+      jobId: identifiant,
+      bookId,
+      ownerId,
+      ownerEmail,
+      orderId,
+      status: 'ready',
+      createdAt: quand,
+      startedAt: quand,
+      completedAt: quand,
+      error: null,
+      progress: null,
+      files: {
+        final: { path: trouve.chemin, fileName: `${nomDuLivre}-livre-final.pdf` }
+      },
+      // Trace explicite : ce job n a pas ete fabrique pendant cette vie du
+      // processus, il a ete retrouve.
+      retrouveSurDisque: true
+    };
+
+    pdfExportJobs.set(identifiant, job);
+    return job;
+  } catch (error) {
+    console.error('Recherche du PDF sur disque impossible:', error.message);
+    return null;
+  }
+}
+
 async function recoverMissingPdfExportJob({
   db = supabase,
   bookId,
@@ -1952,6 +2020,12 @@ async function recoverMissingPdfExportJob({
   if (!ownedBook) {
     return null;
   }
+
+  // Le livre est bien a ce demandeur : on peut chercher son fichier.
+  const dejaFabrique = retrouverLePdfFabrique({
+    jobId: normalizedRequestedJobId, bookId, ownerId, ownerEmail
+  });
+  if (dejaFabrique) return dejaFabrique;
 
   const { data: candidateOrders, error: candidateOrdersError } = await db
     .from('orders')
@@ -1992,6 +2066,13 @@ async function recoverMissingPdfExportJob({
     if (metadataLinkedJob) {
       return metadataLinkedJob;
     }
+
+    // La commande se souvient d'un autre identifiant que celui demande :
+    // son fichier est peut-etre encore la.
+    const retrouve = retrouverLePdfFabrique({
+      jobId: metadataJobId, bookId, ownerId, ownerEmail, orderId: targetOrder.id
+    });
+    if (retrouve) return retrouve;
   }
 
   const { data: book, error: bookLoadError } = await db
