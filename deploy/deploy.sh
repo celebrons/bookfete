@@ -14,6 +14,21 @@ set -euo pipefail
 UTILISATEUR="celebrons"
 DOSSIER="/home/${UTILISATEUR}/bookfete"
 
+# TOUT LE DEPLOIEMENT TIENT DANS UNE FONCTION. Ce n'est pas une coquetterie :
+# bash lit un script au fil de l'eau, en retenant sa POSITION dans le
+# fichier. Or la premiere chose que fait ce script est de recuperer une
+# nouvelle version du depot... y compris de lui-meme. Le fichier change de
+# longueur sous les pieds de bash, qui reprend sa lecture au mauvais
+# endroit : des commandes sont sautees en silence.
+#
+# C'est arrive le 2026-09-19 : le bloc qui installe les unites systemd a ete
+# purement et simplement ignore, et le plafond de memoire cense proteger la
+# machine n'a jamais ete pose. Le deploiement s'annoncait pourtant reussi.
+#
+# Une fonction est analysee en entier avant d'etre executee : la mise a jour
+# du fichier ne peut plus l'amputer.
+deployer() {
+
 echo "==> Code"
 sudo -u "${UTILISATEUR}" git -C "${DOSSIER}" pull --ff-only
 
@@ -70,3 +85,6 @@ curl -fsS --max-time 15 http://127.0.0.1:5000/api/health && echo "" || {
 
 echo ""
 echo "Deploiement termine. Version : $(sudo -u "${UTILISATEUR}" git -C "${DOSSIER}" rev-parse --short HEAD)"
+}
+
+deployer "$@"
