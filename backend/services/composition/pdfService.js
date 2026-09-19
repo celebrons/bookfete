@@ -28,6 +28,7 @@
 
 const fs = require('fs');
 const fsp = require('fs/promises');
+const os = require('os');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
 const { pathToFileURL } = require('url');
@@ -644,11 +645,39 @@ async function waitForImages(cdp, onProgress) {
 // directement, sans changer le comportement.
 const PRIORITE_RENDU = 10;
 
+// UN PROFIL JETABLE PAR RENDU.
+//
+// Chrome garde un cache et un profil entre deux lancements. Sur un serveur
+// qui ne fait que rendre des livres, ils ne servent a RIEN et grossissent
+// sans fin : mesure du 2026-09-19 sur la machine Scaleway — 1,5 Go de
+// cache et 375 Mo de profil, soit le quart du disque. Il s'est rempli, et
+// la fabrication suivante a echoue sur « no space left on device ».
+//
+// Un dossier neuf par rendu, supprime ensuite : rien ne s accumule.
+function dossierJetable() {
+  return path.join(os.tmpdir(), `celebrons-chrome-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+}
+
 function lancerLeNavigateur(browserPath, args) {
-  if (process.platform === 'win32') {
-    return spawn(browserPath, args, { stdio: 'ignore' });
-  }
-  return spawn('nice', ['-n', String(PRIORITE_RENDU), browserPath, ...args], { stdio: 'ignore' });
+  const profil = dossierJetable();
+  const complets = [
+    ...args,
+    `--user-data-dir=${profil}`,
+    // Rien a garder d un rendu a l autre : chaque page est vue une fois.
+    '--disk-cache-size=1',
+    '--media-cache-size=1'
+  ];
+
+  const enfant = process.platform === 'win32'
+    ? spawn(browserPath, complets, { stdio: 'ignore' })
+    : spawn('nice', ['-n', String(PRIORITE_RENDU), browserPath, ...complets], { stdio: 'ignore' });
+
+  // Le menage suit la mort du navigateur, quelle qu en soit la cause.
+  enfant.once('exit', () => {
+    fsp.rm(profil, { recursive: true, force: true }).catch(() => {});
+  });
+
+  return enfant;
 }
 
 function argumentsDuNavigateur(port) {

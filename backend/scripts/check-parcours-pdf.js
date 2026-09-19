@@ -307,8 +307,20 @@ const extraireJpegs = (donnees) => {
 
     const texte = donnees.toString('latin1');
     const nbPages = (texte.match(/\/Type\s*\/Page[^s]/g) || []).length;
-    console.log(`   ${nbPages} pages`);
-    check(nbPages >= modele.page_count, `au moins ${modele.page_count} pages`, `trouve ${nbPages}`);
+
+    // EN PLANCHES, UNE FEUILLE PORTE DEUX PAGES.
+    //
+    // Le PDF client groupe les pages interieures par deux pour qu'une photo
+    // en double page reste entiere ; la couverture et la 4e restent seules
+    // sur la leur. Compter des pages ici donnerait un chiffre deux fois trop
+    // petit et ferait crier a la perte de contenu.
+    const feuillesAttendues = 2 + Math.ceil(modele.page_count / 2);
+    console.log(`   ${nbPages} feuilles (${modele.page_count} pages interieures, plus couverture et 4e)`);
+    check(
+      nbPages === feuillesAttendues,
+      `le PDF compte ${feuillesAttendues} feuilles`,
+      `trouve ${nbPages}`
+    );
 
     const jpegs = extraireJpegs(donnees);
     let intactes = 0;
@@ -320,8 +332,25 @@ const extraireJpegs = (donnees) => {
         // eslint-disable-next-line no-await-in-loop
         const meta = await sharp(image).metadata();
         if (!meta.width || meta.width < 300) continue;
-        // eslint-disable-next-line no-await-in-loop
-        await sharp(image).raw().toBuffer();
+
+        // UNE PHOTO ABIMEE N'EST PAS UN FRAGMENT.
+        //
+        // Mon extracteur cherche des marqueurs JPEG dans les octets bruts du
+        // PDF : il ramasse forcement quelques suites d'octets qui commencent
+        // comme une image sans en etre une. Celles-la n'ont pas de
+        // metadonnees lisibles et sont ecartees plus bas.
+        //
+        // Une photo TRONQUEE, elle, s'annonce correctement et casse au
+        // decodage complet. C'est ce cas-ci, et c'est le seul qui compte :
+        // c'est lui qui a revele les photos coupees du 2026-09-19.
+        let lisible = true;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await sharp(image).raw().toBuffer();
+        } catch (_erreurDeDecodage) {
+          lisible = false;
+        }
+        if (!lisible) { abimees += 1; continue; }
         intactes += 1;
         // DISTINGUER UNE PHOTO D UN ELEMENT DE GABARIT.
         //
@@ -338,10 +367,16 @@ const extraireJpegs = (donnees) => {
         if (estUnePhoto) ratios.push(ratio);
         else artefacts += 1;
       } catch (_error) {
-        abimees += 1;
+        // Metadonnees illisibles : ce n est pas une image, juste une suite
+        // d octets qui commence comme un JPEG.
+        artefacts += 1;
       }
     }
-    console.log(`   ${intactes} photos intactes, ${abimees} abimees` + (artefacts ? ` (${artefacts} element(s) de gabarit ignore(s))` : ''));
+    // Le PDF declare lui-meme ses images JPEG : reference plus sure que mon
+    // extracteur d octets.
+    const jpegDeclares = (texte.match(/DCTDecode/g) || []).length;
+    console.log(`   ${jpegDeclares} photos declarees par le PDF, ${intactes} verifiees intactes, ${abimees} abimees`);
+    check(jpegDeclares > 0, 'le PDF declare des photos', String(jpegDeclares));
     check(intactes > 0, 'le PDF contient des photos');
     check(abimees === 0, 'aucune photo abimee', abimees ? `${abimees} abimee(s)` : '');
 
