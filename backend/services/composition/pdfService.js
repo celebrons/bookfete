@@ -593,6 +593,29 @@ async function waitForImages(cdp, onProgress) {
 // ouvert par nous, sur du HTML que nous avons ecrit : cette isolation ne
 // protege de rien et coute la memoire qui manque.
 
+// LANCER LE NAVIGATEUR EN PRIORITE BASSE.
+//
+// Le rendu et l'API partagent le meme processeur. Pendant une
+// fabrication, le navigateur prenait tout : charge mesuree a 7 sur deux
+// coeurs, et l'API ne repondait plus du tout — au point que la veille
+// prenait le serveur pour mort et le redemarrait (2026-09-19).
+//
+// Brider le rendu (CPUQuota bas) reglait la reactivite mais rendait la
+// fabrication interminable : plus de vingt minutes pour un livre. La
+// priorite basse fait mieux que les deux : le rendu utilise tout ce qui
+// est libre, et s'efface des que l'API a quelque chose a repondre.
+//
+// `nice` n existe que sur les systemes POSIX ; ailleurs on lance
+// directement, sans changer le comportement.
+const PRIORITE_RENDU = 10;
+
+function lancerLeNavigateur(browserPath, args) {
+  if (process.platform === 'win32') {
+    return spawn(browserPath, args, { stdio: 'ignore' });
+  }
+  return spawn('nice', ['-n', String(PRIORITE_RENDU), browserPath, ...args], { stdio: 'ignore' });
+}
+
 function argumentsDuNavigateur(port) {
   return [
     '--headless=new',
@@ -630,7 +653,7 @@ async function capturePagesAsImagesDirect({ book, pages, items, layouts, format,
   }
 
   const port = cdpPort();
-  const child = spawn(browserPath, argumentsDuNavigateur(port), { stdio: 'ignore' });
+  const child = lancerLeNavigateur(browserPath, argumentsDuNavigateur(port));
 
   await fsp.mkdir(PDF_PREVIEW_DIR, { recursive: true });
   const stamp = Date.now();
@@ -1085,7 +1108,7 @@ async function renderPdfByPrintingDirect(input) {
   await fsp.writeFile(htmlPath, html, 'utf8');
 
   const port = cdpPort();
-  const child = spawn(browserPath, argumentsDuNavigateur(port), { stdio: 'ignore' });
+  const child = lancerLeNavigateur(browserPath, argumentsDuNavigateur(port));
   // Sous ce nom, l espace d administration peut arreter ce rendu.
   const renderId = String(input.renderId || '');
   if (renderId) navigateursEnCours.set(renderId, child);

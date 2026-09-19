@@ -75,11 +75,14 @@ OOMPolicy=continue
 # Le rendu ne doit jamais prendre TOUT le processeur : il faut qu'il reste
 # de quoi repondre a une requete et accepter une connexion SSH. 160 % sur
 # 2 vCPU laisse 0,4 vCPU au reste.
-# 120 % et non 160 : sur deux vCPU, il faut qu il reste de quoi REPONDRE
-# pendant un rendu. A 160 %, le site devenait poussif au point de paraitre
-# casse pendant toute la fabrication — un rendu un peu plus lent vaut mieux
-# qu un site qui ne repond plus (2026-09-19).
-CPUQuota=120%
+# 180 % : le rendu peut prendre presque toute la machine, PARCE QU'IL
+# tourne en priorite basse (voir pdfService.js, nice). Il rend la main des
+# que l'API a quelque chose a repondre.
+#
+# Le bridage a 120 % essaye plus tot reglait la reactivite mais rendait la
+# fabrication interminable : plus de vingt minutes pour un livre de 33
+# pages. La priorite est le bon levier, pas le plafond.
+CPUQuota=180%
 CPUWeight=50
 IOWeight=50
 
