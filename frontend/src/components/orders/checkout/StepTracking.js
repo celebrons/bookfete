@@ -1,5 +1,5 @@
 import React from 'react';
-import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPdf, includesPrint } from '../../../utils/orderWorkflow';
+import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPdf, includesPrint, isPdfReady, pdfJobIdOf } from '../../../utils/orderWorkflow';
 import GenerationProgress from './GenerationProgress';
 import './StepTracking.css';
 
@@ -149,7 +149,9 @@ function StepTracking({
   // garde-fou, l'ecran proposait « Telecharger le PDF final » a un
   // acheteur qui ne l'avait pas commande (2026-09-18).
   const pdfAchete = includesPdf(order.type);
-  const pdfReady = pdfAchete && (status === 'pdf_ready' || order?.metadata?.pdfReady);
+  // Source unique : voir orderWorkflow.isPdfReady — le statut de la commande
+  // decrit l'impression sur un « Pack », pas l'etat du fichier.
+  const pdfReady = isPdfReady(order);
 
   // Le PDF est-il en train d'etre fabrique ?
   //
@@ -164,9 +166,14 @@ function StepTracking({
   // pdfJob reste fige sur sa derniere valeur — « 15 / 32 pages » — alors que
   // le serveur, lui, a fini et envoye l email. Sans cette garde, la barre
   // restait affichee indefiniment sur un travail deja termine (2026-09-16).
+  // Un job enregistre sur la commande compte aussi : apres un rechargement
+  // de page, `pdfJob` est vide tant que le sondage n'a pas repondu, et
+  // l'ecran affichait alors « la fabrication demarre » sur un PDF deja en
+  // cours de fabrication.
   const pdfEnCours = pdfAchete && !pdfReady && (
     regeneratingPdf
     || status === 'pdf_generating'
+    || Boolean(pdfJobIdOf(order))
     || pdfJob?.status === 'queued'
     || pdfJob?.status === 'rendering'
   );

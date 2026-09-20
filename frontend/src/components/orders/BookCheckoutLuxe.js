@@ -19,7 +19,7 @@ import { isCurrentlyAnonymous } from '../../services/anonymousSession';
 // formatPriceCents/getOrderStatusConfig ne sont plus utilises ICI : ils ont
 // suivi les blocs d'affichage dans checkout/ (StepProduct, StepPayment,
 // StepTracking), qui sont desormais seuls responsables du rendu.
-import { includesPdf, includesPrint } from '../../utils/orderWorkflow';
+import { includesPdf, includesPrint, isOrderPaid, isPdfReady, pdfJobIdOf } from '../../utils/orderWorkflow';
 import {
   getBookLifecycleStatusFromBook,
   isBookLifecycleAtLeast
@@ -1083,9 +1083,11 @@ const BookCheckoutLuxe = () => {
       return undefined;
     }
 
-    const status = String(latestOrder.status || '').toLowerCase();
-    const existingJobId = String(latestOrder?.metadata?.pdfJobId || '').trim();
-    if (status !== 'pdf_generating' || !existingJobId) {
+    // Conditionne au PDF lui-meme, pas au statut de la commande : sur un
+    // « Pack », ce statut decrit l'impression et a deja pu passer a
+    // `sent_to_printer` (voir orderWorkflow.isPdfReady).
+    const existingJobId = pdfJobIdOf(latestOrder);
+    if (!isOrderPaid(latestOrder.status) || !existingJobId || isPdfReady(latestOrder)) {
       return undefined;
     }
 
@@ -1168,19 +1170,23 @@ const BookCheckoutLuxe = () => {
     return () => {
       active = false;
     };
-  }, [latestOrder?.id, latestOrder?.status, latestOrder?.metadata?.pdfJobId, latestOrder?.type]);
+  }, [latestOrder?.id, latestOrder?.status, latestOrder?.metadata?.pdfJobId, latestOrder?.metadata?.pdfReady, latestOrder?.type]);
 
   useEffect(() => {
     if (!latestOrder?.id || !includesPdf(latestOrder.type)) {
       return undefined;
     }
 
+    // Meme raison que ci-dessus : c'est l'absence de job ET de PDF pret qui
+    // declenche une relance, jamais la valeur d'un statut partage avec
+    // l'impression. Payee est la seule condition qui reste sur le statut :
+    // on ne fabrique rien avant paiement.
     const status = String(latestOrder.status || '').toLowerCase();
-    if (!['paid', 'pdf_generating'].includes(status)) {
+    if (!isOrderPaid(status) || isPdfReady(latestOrder)) {
       return undefined;
     }
 
-    const existingJobId = String(latestOrder?.metadata?.pdfJobId || '').trim();
+    const existingJobId = pdfJobIdOf(latestOrder);
     if (existingJobId) {
       return undefined;
     }
@@ -1249,7 +1255,7 @@ const BookCheckoutLuxe = () => {
         clearTimeout(retryTimer);
       }
     };
-  }, [latestOrder?.id, latestOrder?.status, latestOrder?.metadata?.pdfJobId, latestOrder?.type]);
+  }, [latestOrder?.id, latestOrder?.status, latestOrder?.metadata?.pdfJobId, latestOrder?.metadata?.pdfReady, latestOrder?.type]);
 
   if (loading) {
     return (

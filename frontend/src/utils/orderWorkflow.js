@@ -29,6 +29,28 @@ export const getOrderStatusConfig = (status) => (
   ORDER_STATUS_CONFIG[status] || { label: status || 'Inconnu', tone: 'is-muted' }
 );
 
+// La commande est-elle payee (ou plus avancee) ?
+export const isOrderPaid = (status) => {
+  const rang = ORDER_STATUS_SEQUENCE.indexOf(String(status || '').toLowerCase());
+  return rang > -1 && rang >= ORDER_STATUS_SEQUENCE.indexOf('paid');
+};
+
+// LE PDF NE SE LIT PAS DANS `status` (2026-09-20).
+//
+// `orders.status` est une colonne UNIQUE pour deux produits qui n'avancent
+// pas au meme rythme. Sur un « Pack », l'envoi a l'imprimeur y ecrit
+// `sent_to_printer` quelques secondes apres le paiement : chercher
+// `pdf_ready` dans ce champ revient a demander au suivi d'impression ou en
+// est le fichier. L'etat du PDF vit donc dans SES marqueurs a lui.
+export const isPdfReady = (order) => {
+  if (!order || !includesPdf(order.type)) return false;
+  if (order?.metadata?.pdfReady === true) return true;
+  // Commandes PDF seules d'avant cette date : leur statut fait foi.
+  return String(order.status || '').toLowerCase() === 'pdf_ready';
+};
+
+export const pdfJobIdOf = (order) => String(order?.metadata?.pdfJobId || '').trim();
+
 export const includesPdf = (orderType) => orderType === 'pdf' || orderType === 'pack';
 
 export const includesPrint = (orderType) => orderType === 'print' || orderType === 'pack';

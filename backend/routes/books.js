@@ -495,10 +495,22 @@ function mergeOrderMetadata(existingMetadata, patchMetadata) {
   };
 }
 
+// Quel statut de COMMANDE un PDF termine doit-il poser — s'il doit en poser un ?
+//
+// Pour une commande PDF seule, `pdf_ready` decrit exactement la commande
+// entiere : elle est prete.
+//
+// Pour une commande imprimee ou « Pack », NON : la colonne `status` decrit
+// desormais le parcours d'IMPRESSION (l'envoi a l'imprimeur y ecrit
+// `sent_to_printer`, voir gelatoOrderService). Y ecrire un statut lie au PDF
+// ferait se marcher dessus deux produits qui n'avancent pas au meme rythme —
+// c'est exactement ce qui a casse la fabrication du PDF sur un Pack le
+// 2026-09-20. L'etat du PDF vit dans `metadata.pdfReady`, lu par le frontend
+// via orderWorkflow.isPdfReady.
 function getPdfCompletionTargetStatus(orderType) {
   const normalizedType = String(orderType || '').toLowerCase();
   if (normalizedType === 'print' || normalizedType === 'pack') {
-    return 'print_queued';
+    return null;
   }
   return 'pdf_ready';
 }
@@ -577,7 +589,7 @@ async function syncOrderWithPdfJobResult({ job, outcome, errorMessage = '' }) {
   if (outcome === 'ready') {
     const targetStatus = getPdfCompletionTargetStatus(order.type);
     const currentRank = getOrderStatusRank(order.status);
-    const targetRank = getOrderStatusRank(targetStatus);
+    const targetRank = targetStatus ? getOrderStatusRank(targetStatus) : -1;
     const completedAt = job.completedAt || nowIso;
 
     nextMetadata.pdfReady = true;
@@ -585,7 +597,9 @@ async function syncOrderWithPdfJobResult({ job, outcome, errorMessage = '' }) {
     nextMetadata.pdfError = null;
     nextMetadata.pdfRenderer = job?.files?.renderer || null;
 
-    if (targetRank > currentRank) {
+    // `targetStatus` vaut null pour une commande imprimee/Pack : on ne
+    // touche alors pas au statut, qui appartient au parcours d'impression.
+    if (targetStatus && targetRank > currentRank) {
       updatePayload.status = targetStatus;
     }
 
@@ -4699,3 +4713,10 @@ module.exports.countActivePdfJobs = () => {
   });
   return actifs;
 };
+
+// Expose la seule regle vraiment delicate de la synchronisation PDF/commande,
+// pour qu'elle soit testable sans monter tout un parcours de paiement : sur
+// une commande imprimee ou « Pack », un PDF termine ne doit JAMAIS ecrire
+// dans `orders.status`, qui appartient au parcours d'impression (voir le
+// commentaire de la fonction).
+module.exports.__getPdfCompletionTargetStatusForTests = getPdfCompletionTargetStatus;
