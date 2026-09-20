@@ -2488,6 +2488,23 @@
   color: var(--text-light);
 }
 
+/* Trois actions dans une fenetre de 560 px : sans reduire le remplissage
+   des boutons, la troisieme passait seule a la ligne. Et si l ecran est
+   vraiment etroit, elles s empilent proprement plutot que de deborder. */
+.atelier-doublons .atelier-modal-actions {
+  flex-wrap: wrap;
+}
+
+.atelier-doublons .atelier-modal-actions .btn {
+  padding: 12px 18px;
+}
+
+@media (max-width: 520px) {
+  .atelier-doublons .atelier-modal-actions { flex-direction: column-reverse; }
+  .atelier-doublons .atelier-modal-actions .btn { width: 100%; }
+  .atelier-doublons-note { text-align: center; }
+}
+
 .atelier-doublons-note {
   margin: 8px 0 0;
   text-align: right;

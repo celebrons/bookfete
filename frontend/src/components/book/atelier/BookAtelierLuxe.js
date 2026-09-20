@@ -1335,6 +1335,7 @@ export default function BookAtelierLuxe() {
 
     const vues = new Set();
     const doublons = [];
+    const nouvelles = [];
     selection.forEach((fichier) => {
       const cle = signatureFichier(fichier?.name, fichier?.size);
       // Deux fois le meme fichier DANS la selection compte aussi : c'est le
@@ -1344,11 +1345,12 @@ export default function BookAtelierLuxe() {
         return;
       }
       if (cle) vues.add(cle);
+      nouvelles.push(fichier);
     });
 
     if (doublons.length > 0) {
       setSidebarAddError('');
-      setDoublonsEnAttente({ doublons, selection });
+      setDoublonsEnAttente({ doublons, nouvelles, selection });
       return;
     }
 
@@ -2028,8 +2030,13 @@ export default function BookAtelierLuxe() {
       <AtelierDuplicatePhotosModal
         isOpen={Boolean(doublonsEnAttente)}
         doublons={doublonsEnAttente?.doublons || []}
-        totalChoisi={doublonsEnAttente?.selection?.length || 0}
+        nombreNouvelles={doublonsEnAttente?.nouvelles?.length || 0}
         onCancel={() => setDoublonsEnAttente(null)}
+        onAddNewOnly={() => {
+          const nouvelles = doublonsEnAttente?.nouvelles || [];
+          setDoublonsEnAttente(null);
+          envoyerLesPhotos(nouvelles);
+        }}
         onAddAnyway={() => {
           const selection = doublonsEnAttente?.selection || [];
           setDoublonsEnAttente(null);

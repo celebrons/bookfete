@@ -44,9 +44,10 @@ const DOUBLONS = `
     </div>
     <div class="atelier-modal-actions">
       <button class="btn btn-outline">Annuler</button>
-      <button class="btn btn-primary">Ajouter quand même</button>
+      <button class="btn btn-outline">Ajouter quand même</button>
+      <button class="btn btn-primary">N’ajouter que les 6 nouvelles</button>
     </div>
-    <p class="atelier-doublons-note">« Annuler » n’ajoute aucune photo, pas même les nouvelles.</p>
+    <p class="atelier-doublons-note">« Ajouter quand même » remet aussi les photos déjà présentes. « Annuler » n’ajoute rien du tout.</p>
   </div>
 </div>`;
 
