@@ -2,18 +2,31 @@ import React from 'react';
 import './PhotoFitBadge.css';
 
 // Badge d'avertissement de qualite d'impression (cahier des charges v2,
-// §2/§4) — 3 etats visuels : AUCUN (statut 'ok' ou inconnu : rien n'est
-// rendu, critere d'acceptation n°1 "une photo bien cadree et haute
-// resolution ne declenche aucun avertissement visible"), AMBRE ('limite')
-// et ROUGE/CORAIL ('insuffisant'). Le texte d'explication (une phrase,
-// jamais le mot "DPI") vient du moteur (photoQuality.js/FIT_DISPLAY),
-// jamais reecrit ici — une seule formulation dans toute l'application.
+// §2/§4) — DEUX etats depuis le 2026-09-20 : AUCUN (statut 'ok', 'limite',
+// ou inconnu) et ROUGE/CORAIL ('insuffisant'). L'ambre existait pour
+// 'limite' ; voir la fonction ci-dessous pour la raison de son retrait.
+//
+// Le texte d'explication (une phrase, jamais le mot "DPI") vient du moteur
+// (photoQuality.js/FIT_DISPLAY), jamais reecrit ici — une seule
+// formulation dans toute l'application.
 //
 // `size` : 'sm' pour une incrustation sur la page, 'md' pour une liste
 // (ecran recapitulatif). `as` : 'span' par defaut ; passer 'div' quand le
 // badge ne doit pas etre imbrique dans du texte.
 function PhotoFitBadge({ fit, size = 'sm', className = '' }) {
-  if (!fit || !fit.severity) return null;
+  // ALLEGEMENT DU 2026-09-20 : plus de badge ambre.
+  //
+  // 'limite' (150-250 dpi) signalait une photo qui s'imprime tres bien.
+  // Sur un livre fait de photos de telephone, presque chaque page portait
+  // un triangle d'avertissement : le livre avait l'air rate avant meme
+  // d'exister. Retour utilisateur : « j'ai peur que ca dissuade
+  // l'utilisateur de continuer ».
+  //
+  // Seul 'insuffisant' (< 150 dpi, severite 'danger') alerte encore. Le
+  // statut 'limite' reste calcule et stocke (content.photoFit) : pour le
+  // remettre a l'ecran, il suffit de reaccepter 'warning' ici et dans
+  // backend/routes/composition.js (print-quality-check).
+  if (!fit || fit.severity !== 'danger') return null;
 
   return (
     <span

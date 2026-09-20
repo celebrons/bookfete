@@ -88,3 +88,33 @@ describe('readGelatoFulfillmentStatus', () => {
     expect(() => readGelatoFulfillmentStatus(null)).not.toThrow();
   });
 });
+
+// Delais de livraison (2026-09-20) : on n'affiche que ce que Gelato annonce.
+// Aucun delai ecrit en dur nulle part — une absence vaut mieux qu'une
+// promesse inventee.
+describe('extractDelivery', () => {
+  const { extractDelivery } = require('../../services/printing/gelatoTracking');
+
+  it('lit la fenetre annoncee au niveau de l\'expedition', () => {
+    expect(extractDelivery({
+      shipment: { minDeliveryDate: '2026-09-24', maxDeliveryDate: '2026-09-29' }
+    })).toEqual({ minDate: '2026-09-24', maxDate: '2026-09-29' });
+  });
+
+  it('retombe sur le premier fulfillment quand l\'expedition ne porte rien', () => {
+    expect(extractDelivery({
+      items: [{ fulfillments: [{ minDeliveryDate: '2026-10-01', maxDeliveryDate: '2026-10-05' }] }]
+    })).toEqual({ minDate: '2026-10-01', maxDate: '2026-10-05' });
+  });
+
+  it('accepte une fenetre partielle sans inventer l\'autre borne', () => {
+    expect(extractDelivery({ shipment: { maxDeliveryDate: '2026-10-05' } }))
+      .toEqual({ minDate: null, maxDate: '2026-10-05' });
+  });
+
+  it('reponse vide/inattendue -> deux nulls, jamais une exception', () => {
+    expect(extractDelivery({})).toEqual({ minDate: null, maxDate: null });
+    expect(() => extractDelivery(null)).not.toThrow();
+    expect(() => extractDelivery({ items: 'pas un tableau' })).not.toThrow();
+  });
+});

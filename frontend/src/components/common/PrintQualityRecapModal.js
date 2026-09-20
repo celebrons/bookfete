@@ -15,7 +15,6 @@ function PrintQualityRecapModal({ isOpen, warnings = [], onContinueAnyway, onRev
   if (!isOpen) return null;
 
   const count = warnings.length;
-  const insuffisants = warnings.filter((entry) => entry.statut === 'insuffisant').length;
 
   return (
     <div className="pq-recap-backdrop" onClick={onClose}>
@@ -28,10 +27,14 @@ function PrintQualityRecapModal({ isOpen, warnings = [], onContinueAnyway, onRev
         </div>
 
         <div className="pq-recap-body">
+          {/* Un seul message depuis l'allegement du 2026-09-20 : cet ecran ne
+              montre plus que des photos vraiment trop petites pour la taille
+              imprimee. Les photos « un peu justes » (150-250 dpi) n'y
+              figurent plus du tout — voir backend print-quality-check. */}
           <p className="pq-recap-intro">
-            {insuffisants > 0
-              ? 'Certaines photos ont une résolution trop faible pour la taille à laquelle elles seront imprimées : elles risquent d\'apparaître floues sur le livre papier.'
-              : 'Certaines photos sont un peu justes en résolution pour la taille à laquelle elles seront imprimées.'}
+            Ces photos ont une résolution trop faible pour la taille à laquelle elles seront
+            imprimées : elles risquent d'apparaître floues sur le livre papier. Vous pouvez les
+            remplacer, les afficher plus petites, ou commander ainsi.
           </p>
 
           <ul className="pq-recap-list">

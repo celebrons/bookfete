@@ -158,3 +158,137 @@
   font-size: 13px;
   padding: 6px 12px;
 }
+
+/* --- Deux suivis cote a cote (2026-09-20) --------------------------------
+   Une commande « Pack » achete deux choses qui n'avancent pas au meme
+   rythme : un fichier pret en minutes, un livre imprime puis expedie en
+   jours. Une frise unique melangeait les deux. */
+.tracking-panes {
+  margin-top: var(--space-md);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.tracking-panes.is-double {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .tracking-panes.is-double { grid-template-columns: minmax(0, 1fr); }
+}
+
+.tracking-pane {
+  padding: 14px 16px;
+  border: 1px solid rgba(184, 146, 74, 0.24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.tracking-pane-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.tracking-pane .tracking-timeline {
+  margin: 10px 0 0;
+}
+
+.tracking-pane-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Bouton porteur d'une icone : l'icone precede le libelle, jamais a la
+   place — une icone seule ne se lit pas de la meme facon par tout le monde. */
+.btn-icone {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  vertical-align: -3px;
+  flex: none;
+}
+
+/* « C'est pret » / « c'est parti » : une pastille verte, la meme dans les
+   deux volets, pour que l'etat se lise avant le texte. */
+.tracking-ready,
+.tracking-sent {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tracking-sent {
+  font-weight: 400;
+  color: var(--text-light);
+}
+
+.tracking-ready-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #1f7a3d;
+  flex: none;
+}
+
+.tracking-sent-ref {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(36, 31, 24, 0.07);
+  color: var(--ink);
+}
+
+.tracking-sent.is-failed {
+  color: #7a202c;
+}
+
+/* Attente de la transmission : un point qui respire, pas un pourcentage
+   invente — on ne sait pas combien de temps l'imprimeur mettra a repondre. */
+.tracking-spinner {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--gold);
+  flex: none;
+  animation: tracking-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes tracking-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tracking-spinner { animation: none; opacity: 0.7; }
+}
+
+/* Fraicheur de l'information + verification a la demande. Volontairement
+   discret : la page se met a jour toute seule, ce lien sert seulement a ne
+   pas attendre le prochain cycle. */
+.tracking-freshness {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  color: var(--text-light);
+}
+
+.tracking-refresh {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--gold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.tracking-refresh:hover:not(:disabled) { color: var(--ink); }
+.tracking-refresh:disabled { cursor: default; opacity: 0.6; text-decoration: none; }

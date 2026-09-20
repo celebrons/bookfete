@@ -34,6 +34,7 @@ import AtelierGenerateModal from './AtelierGenerateModal';
 import AtelierConfirmSwitchDialog from './AtelierConfirmSwitchDialog';
 import AtelierOnboarding from './AtelierOnboarding';
 import AtelierFinishModal from './AtelierFinishModal';
+import AtelierDuplicatePhotosModal from './AtelierDuplicatePhotosModal';
 import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
 import AtelierPageActions from './AtelierPageActions';
@@ -203,6 +204,10 @@ export default function BookAtelierLuxe() {
   }, []);
 
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  // Selection en attente de decision quand elle contient des doublons :
+  // { doublons: File[], selection: File[] }. Rien nest envoye tant que
+  // lutilisateur na pas tranche (voir AtelierDuplicatePhotosModal).
+  const [doublonsEnAttente, setDoublonsEnAttente] = useState(null);
   // { done, total, failed } pendant un envoi de lot, null sinon.
   const [uploadProgress, setUploadProgress] = useState(null);
   const [deletingAll, setDeletingAll] = useState(false);
@@ -1264,76 +1269,8 @@ export default function BookAtelierLuxe() {
   //     Avant, la premiere erreur faisait perdre TOUTES les photos suivantes
   //     — sur 40 photos et une coupure a la 9e, 31 etaient abandonnees sans
   //     que rien ne le dise.
-  const handleUploadPhotos = async (files) => {
-    const selection = Array.from(files || []);
-    if (!book?.id || selection.length === 0) return;
-
-    // DOUBLONS : PREVENIR AVANT D'ENVOYER (2026-09-19).
-    //
-    // Reenvoyer le meme dossier, ou ajouter « les dernieres » en reprenant
-    // une selection deja faite, remplissait la bibliotheque de photos en
-    // double — qu'il fallait ensuite retrouver et supprimer une par une.
-    //
-    // Reconnaissance sur NOM + POIDS exact (metadata.originalName/size, pose
-    // a l'upload par routes/composition.js) : deux fichiers qui partagent les
-    // deux sont, en pratique, le meme fichier. On ne compare pas le contenu —
-    // ce serait lire des dizaines de megaoctets dans le navigateur pour
-    // gagner un cas rare — et surtout ON NE REFUSE RIEN : la meme photo peut
-    // legitimement etre ajoutee deux fois. C'est un avertissement, la
-    // decision reste a l'utilisateur.
-    //
-    // Les photos envoyees avant cette date n'ont ni nom ni poids memorises :
-    // elles ne peuvent pas etre reconnues, et une signature incomplete est
-    // donc ignoree plutot que de produire de faux doublons.
-    const signature = (nom, poids) => {
-      const nomPropre = String(nom || '').trim().toLowerCase();
-      if (!nomPropre || !Number.isFinite(poids)) return null;
-      return `${nomPropre}|${poids}`;
-    };
-
-    const dejaPresentes = new Set(
-      photos
-        .map((photo) => signature(photo.metadata?.originalName, Number(photo.metadata?.size)))
-        .filter(Boolean)
-    );
-
-    const vues = new Set();
-    const doublons = [];
-    const aEnvoyer = [];
-    selection.forEach((fichier) => {
-      const cle = signature(fichier?.name, fichier?.size);
-      // Deux fois le meme fichier DANS la selection compte aussi : c'est le
-      // cas le plus frequent quand on ajoute un dossier par-dessus un autre.
-      if (cle && (dejaPresentes.has(cle) || vues.has(cle))) {
-        doublons.push(fichier);
-        return;
-      }
-      if (cle) vues.add(cle);
-      aEnvoyer.push(fichier);
-    });
-
-    let list = selection;
-    if (doublons.length > 0) {
-      const noms = doublons.slice(0, 5).map((f) => f.name).join('\n  • ');
-      const pluriel = doublons.length > 1;
-      const suite = doublons.length > 5 ? '\n  • …' : '';
-      const reste = aEnvoyer.length > 0 ? ` (j'ajoute les ${aEnvoyer.length} autres)` : '';
-      // eslint-disable-next-line no-restricted-globals
-      const ignorer = window.confirm(
-        `${doublons.length} photo${pluriel ? 's' : ''} semble${pluriel ? 'nt' : ''} deja dans votre livre `
-        + `(meme nom et meme taille) :\n  • ${noms}${suite}\n\n`
-        + `OK : ne pas les ajouter${reste}\n`
-        + 'Annuler : les ajouter quand meme'
-      );
-      list = ignorer ? aEnvoyer : selection;
-
-      if (list.length === 0) {
-        setSidebarAddError(
-          `Aucune photo ajoutee : ${pluriel ? 'elles etaient toutes deja' : 'elle etait deja'} dans votre livre.`
-        );
-        return;
-      }
-    }
+  const envoyerLesPhotos = async (list) => {
+    if (!book?.id || !Array.isArray(list) || list.length === 0) return;
 
     setUploadingPhotos(true);
     setSidebarAddError('');
@@ -1361,6 +1298,61 @@ export default function BookAtelierLuxe() {
 
     setUploadingPhotos(false);
     setUploadProgress(null);
+  };
+
+  // DOUBLONS : PREVENIR AVANT D'ENVOYER (2026-09-19).
+  //
+  // Reenvoyer le meme dossier, ou ajouter « les dernieres » en reprenant une
+  // selection deja faite, remplissait la bibliotheque de photos en double —
+  // qu'il fallait ensuite retrouver et supprimer une par une.
+  //
+  // Reconnaissance sur NOM + POIDS exact (metadata.originalName/size, pose a
+  // l'upload par routes/composition.js) : deux fichiers qui partagent les
+  // deux sont, en pratique, le meme fichier. On ne compare pas le contenu —
+  // ce serait lire des dizaines de megaoctets dans le navigateur pour gagner
+  // un cas rare — et surtout ON NE REFUSE RIEN : la meme photo peut
+  // legitimement etre ajoutee deux fois. C'est un avertissement, la decision
+  // reste a l'utilisateur (voir AtelierDuplicatePhotosModal).
+  //
+  // Les photos envoyees avant le 2026-09-19 n'ont ni nom ni poids memorises :
+  // elles ne peuvent pas etre reconnues, et une signature incomplete est donc
+  // ignoree plutot que de produire de faux doublons.
+  const signatureFichier = (nom, poids) => {
+    const nomPropre = String(nom || '').trim().toLowerCase();
+    if (!nomPropre || !Number.isFinite(poids)) return null;
+    return `${nomPropre}|${poids}`;
+  };
+
+  const handleUploadPhotos = async (files) => {
+    const selection = Array.from(files || []);
+    if (!book?.id || selection.length === 0) return;
+
+    const dejaPresentes = new Set(
+      photos
+        .map((photo) => signatureFichier(photo.metadata?.originalName, Number(photo.metadata?.size)))
+        .filter(Boolean)
+    );
+
+    const vues = new Set();
+    const doublons = [];
+    selection.forEach((fichier) => {
+      const cle = signatureFichier(fichier?.name, fichier?.size);
+      // Deux fois le meme fichier DANS la selection compte aussi : c'est le
+      // cas le plus frequent quand on ajoute un dossier par-dessus un autre.
+      if (cle && (dejaPresentes.has(cle) || vues.has(cle))) {
+        doublons.push(fichier);
+        return;
+      }
+      if (cle) vues.add(cle);
+    });
+
+    if (doublons.length > 0) {
+      setSidebarAddError('');
+      setDoublonsEnAttente({ doublons, selection });
+      return;
+    }
+
+    await envoyerLesPhotos(selection);
   };
 
   const handleAddText = async (text) => {
@@ -2032,6 +2024,18 @@ export default function BookAtelierLuxe() {
           </button>
         </div>
       ) : null}
+
+      <AtelierDuplicatePhotosModal
+        isOpen={Boolean(doublonsEnAttente)}
+        doublons={doublonsEnAttente?.doublons || []}
+        totalChoisi={doublonsEnAttente?.selection?.length || 0}
+        onCancel={() => setDoublonsEnAttente(null)}
+        onAddAnyway={() => {
+          const selection = doublonsEnAttente?.selection || [];
+          setDoublonsEnAttente(null);
+          envoyerLesPhotos(selection);
+        }}
+      />
 
       <AtelierFinishModal
         isOpen={isFinishModalOpen}

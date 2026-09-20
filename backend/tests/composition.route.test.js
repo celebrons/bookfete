@@ -121,7 +121,11 @@ jest.mock('../config/supabase', () => {
         // ambiguite une fois placees en FULL_PHOTO (lay-1) sur un format
         // standard (~182x252mm de zone utile).
         { id: 'item-5-photo-lowres', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-lowres.jpg', display_order: 2, metadata: { width: 100, height: 100 } },
-        { id: 'item-5-photo-hires', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-hires.jpg', display_order: 3, metadata: { width: 4000, height: 3000 } }
+        { id: 'item-5-photo-hires', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-hires.jpg', display_order: 3, metadata: { width: 4000, height: 3000 } },
+        // Volontairement dans la bande "limite" : 192 dpi effectifs en
+        // FULL_PHOTO sur un standard — imprimable, pas parfait, et plus
+        // signale depuis le 2026-09-20.
+        { id: 'item-5-photo-limite', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-limite.jpg', display_order: 4, metadata: { width: 1400, height: 1900 } }
       ]
         // 32 photos supplementaires sur book-test-1 : template tpl-1
         // n'autorise que FULL_PHOTO (1 photo/page, voir allowed_layouts
@@ -1075,7 +1079,7 @@ describe('routes/composition', () => {
         (entry) => entry.pageIndex === 5 && entry.itemId === 'item-5-photo-lowres'
       );
       expect(flagged).toBeDefined();
-      expect(['limite', 'insuffisant']).toContain(flagged.statut);
+      expect(flagged.statut).toBe('insuffisant');
       expect(flagged.label.toLowerCase()).not.toContain('dpi'); // jamais le mot DPI affiche (§2)
       expect(response.body.hasWarnings).toBe(true);
       // Vignette necessaire a l'ecran recapitulatif (§2) — repli sur l'original.
@@ -1097,6 +1101,27 @@ describe('routes/composition', () => {
         (entry) => entry.pageIndex === 6 && entry.itemId === 'item-5-photo-hires'
       );
       expect(flagged).toBeUndefined();
+    });
+
+    // Allegement du controle (2026-09-20) : une photo "limite" (150-250 dpi)
+    // est imprimable. La signaler juste avant le paiement allongeait la liste
+    // d'avertissements sans rien apporter — et decourageait l'achat.
+    it('ne signale plus une photo "limite", mais la compte (allegement 2026-09-20)', async () => {
+      await request(app)
+        .put('/api/books/book-test-5/pages/7/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-1', itemIds: ['item-5-photo-limite'] });
+
+      const response = await request(app)
+        .get('/api/books/book-test-5/print-quality-check')
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      const signalee = response.body.warnings.find((entry) => entry.itemId === 'item-5-photo-limite');
+      expect(signalee).toBeUndefined();
+      // Comptee quand meme : la decision reste verifiable, et le statut
+      // continue d'etre calcule et persiste.
+      expect(response.body.photosLimitesCount).toBeGreaterThan(0);
     });
 
     // Cahier des charges v2, §4 : le statut est PERSISTE a l'ecriture, pas

@@ -2426,3 +2426,71 @@
   line-height: 1.35;
   color: var(--text-light);
 }
+
+/* --- Photos deja presentes (AtelierDuplicatePhotosModal, 2026-09-20) -----
+   Remplace un window.confirm. On montre les photos, pas leurs noms de
+   fichier : c'est en les voyant qu'on reconnait le dossier qu'on vient de
+   redeposer. Memes tokens que le reste de l'atelier. */
+.atelier-doublons {
+  max-width: 560px;
+}
+
+.atelier-doublons-intro {
+  margin: 4px 0 var(--space-md);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-light);
+}
+
+.atelier-doublons-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.atelier-doublons-item {
+  margin: 0;
+  width: 88px;
+}
+
+.atelier-doublons-item img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+  background: rgba(36, 31, 24, 0.06);
+}
+
+.atelier-doublons-item figcaption {
+  margin-top: 4px;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--text-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atelier-doublons-reste {
+  align-self: center;
+  min-width: 44px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(36, 31, 24, 0.06);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-light);
+}
+
+.atelier-doublons-note {
+  margin: 8px 0 0;
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--text-light);
+}

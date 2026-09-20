@@ -767,10 +767,27 @@ const BookCheckoutLuxe = () => {
     const terminal = ['delivered', 'cancelled', 'failed'];
     if (terminal.includes(String(latestOrder.status || '').toLowerCase())) return undefined;
 
-    const timer = setInterval(() => refreshTracking(latestOrder.id), 60000);
+    // PLUS SOUVENT TANT QU'ON ATTEND L'IMPRIMEUR (2026-09-20).
+    //
+    // L'envoi a Gelato part tout seul apres le paiement, en tache de fond.
+    // Pendant ce temps l'ecran affiche « Transmission en cours… », et une
+    // minute de latence pour voir apparaitre le numero de commande donne
+    // l'impression que rien ne se passe — c'est exactement ce qui a ete
+    // signale (« on ne sait pas que ca a ete envoye »). Une fois le numero
+    // connu, l'etat evolue en heures ou en jours : une minute suffit
+    // largement, et interroger l'imprimeur plus souvent ne servirait a rien.
+    const enAttenteDeLImprimeur = includesPrint(latestOrder.type)
+      && !(latestOrder?.metadata?.gelatoOrderId || tracking?.gelatoOrderId);
+    const delai = enAttenteDeLImprimeur ? 15000 : 60000;
+
+    const timer = setInterval(() => refreshTracking(latestOrder.id), delai);
     return () => clearInterval(timer);
+    // `tracking?.gelatoOrderId` EST une dependance necessaire : sans elle,
+    // l'intervalle rapide pose au montage resterait a 15 s pour toujours.
+    // Il ne change qu'une fois (absent -> connu), donc pas de re-creation
+    // en boucle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTrackingStep, latestOrder?.id]);
+  }, [isTrackingStep, latestOrder?.id, latestOrder?.type, tracking?.gelatoOrderId]);
 
   const sendToGelatoTest = async () => {
     // gelatoSending garde le BOUTON, mais setGelatoSending est asynchrone :

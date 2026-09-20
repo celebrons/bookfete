@@ -488,9 +488,9 @@ export default function BookPreviewFinalLuxe() {
             className="preview-final-fullscreen-btn"
             onClick={() => setIsFullscreen(true)}
             disabled={!hasCurrentContent}
-            title="Feuilleter en plein écran"
+            title="Prévisualiser : le livre en grand, proportions réelles"
           >
-            ⛶ <span>Plein écran</span>
+            ⛶ <span>Prévisualiser</span>
           </button>
           {viewKind === 'spread' ? (
             <div className="preview-final-spread">

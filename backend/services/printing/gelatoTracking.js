@@ -101,6 +101,37 @@ function extractTracking(gelatoOrder) {
 }
 
 /**
+ * Fenetre de livraison annoncee par Gelato, quand elle existe.
+ *
+ * Demande du 2026-09-20 : « peut-etre afficher les delais ». On n'invente
+ * AUCUN delai — pas de « comptez 3 a 5 jours » ecrit en dur, qui serait faux
+ * le jour ou l'imprimeur change de transporteur ou de pays de production.
+ * On n'affiche que ce que Gelato annonce lui-meme, et rien si Gelato ne dit
+ * rien : une absence vaut mieux qu'une promesse inventee.
+ *
+ * @returns {{minDate: string|null, maxDate: string|null}}
+ */
+function extractDelivery(gelatoOrder) {
+  const shipment = gelatoOrder?.shipment || {};
+  const items = Array.isArray(gelatoOrder?.items) ? gelatoOrder.items : [];
+  const itemFulfillments = items.flatMap((item) => (Array.isArray(item?.fulfillments) ? item.fulfillments : []));
+  const first = itemFulfillments[0] || {};
+
+  return {
+    minDate: firstNonEmpty(
+      shipment.minDeliveryDate,
+      shipment.estimatedDeliveryMinDate,
+      first.minDeliveryDate
+    ),
+    maxDate: firstNonEmpty(
+      shipment.maxDeliveryDate,
+      shipment.estimatedDeliveryMaxDate,
+      first.maxDeliveryDate
+    )
+  };
+}
+
+/**
  * Statut de production tel que Gelato le voit, tous champs confondus :
  * l'etat global de la commande prime, mais certaines reponses ne le portent
  * qu'au niveau des articles — on retombe donc dessus si besoin.
@@ -137,6 +168,7 @@ function readGelatoOrderType(gelatoOrder) {
 module.exports = {
   mapGelatoStatus,
   extractTracking,
+  extractDelivery,
   readGelatoFulfillmentStatus,
   readGelatoOrderType,
   STATUS_MAP

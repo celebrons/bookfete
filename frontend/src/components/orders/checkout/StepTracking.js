@@ -9,22 +9,25 @@ import './StepTracking.css';
 // lui-meme (voir backend GET /api/orders/:orderId/tracking, qui interroge
 // Gelato et ne fait jamais RECULER un statut).
 //
+// DEUX SUIVIS COTE A COTE (2026-09-20). Une commande « Pack » achete deux
+// choses qui n'avancent pas au meme rythme : un fichier pret en quelques
+// minutes, et un livre imprime puis expedie en plusieurs jours. Une frise
+// unique melangeait les deux — on y lisait « Imprime » alors qu'on attendait
+// son PDF, et inversement. Chaque produit achete a donc son volet, et un
+// seul volet s'affiche quand un seul produit a ete achete.
+//
 // Purement presentatif : le chargement/rafraichissement est pilote par
 // BookCheckoutLuxe.js.
 
-// Etapes affichees selon le type de commande : une commande PDF n'a rien a
-// imprimer ni a expedier, une commande imprimee ne passe pas par la
-// generation du PDF client.
-const PDF_STEPS = ['paid', 'pdf_generating', 'pdf_ready'];
+// Etapes affichees dans le volet impression. Le PDF, lui, n'a pas de frise :
+// il est en fabrication ou il est pret, et la barre de progression dit deja
+// ou il en est.
 const PRINT_STEPS = ['paid', 'print_queued', 'sent_to_printer', 'printed', 'shipped', 'delivered'];
 
-function buildTimeline(orderType, currentStatus) {
-  const keys = includesPrint(orderType)
-    ? PRINT_STEPS
-    : PDF_STEPS;
+function buildPrintTimeline(currentStatus) {
   const currentRank = ORDER_STATUS_SEQUENCE.indexOf(currentStatus);
 
-  return keys.map((key) => {
+  return PRINT_STEPS.map((key) => {
     const rank = ORDER_STATUS_SEQUENCE.indexOf(key);
     return {
       key,
@@ -33,6 +36,47 @@ function buildTimeline(orderType, currentStatus) {
       current: key === currentStatus
     };
   });
+}
+
+// Icones : demandees explicitement (2026-09-20) pour que l'action se
+// reconnaisse avant d'etre lue — une fleche qui descend pour telecharger,
+// deux fleches qui tournent pour refabriquer.
+function IconeTelecharger() {
+  return (
+    <svg className="btn-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v12" />
+      <path d="m7 11 5 5 5-5" />
+      <path d="M4 19h16" />
+    </svg>
+  );
+}
+
+function IconeRegenerer() {
+  return (
+    <svg className="btn-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 11a8 8 0 0 0-13.8-5.5L3 8.5" />
+      <path d="M4 13a8 8 0 0 0 13.8 5.5L21 15.5" />
+      <path d="M3 4v4.5h4.5" />
+      <path d="M21 20v-4.5h-4.5" />
+    </svg>
+  );
+}
+
+// Date lisible, sans bibliotheque : « 20 septembre à 14:32 ».
+function formaterDate(valeur) {
+  if (!valeur) return null;
+  const date = new Date(valeur);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('fr-FR', {
+    day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
+  });
+}
+
+function formaterJour(valeur) {
+  if (!valeur) return null;
+  const date = new Date(valeur);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 }
 
 function StepTracking({
@@ -63,7 +107,6 @@ function StepTracking({
 
   const status = tracking?.status || order.status;
   const statusConfig = getOrderStatusConfig(status);
-  const timeline = buildTimeline(order.type, status);
   const isPrint = includesPrint(order.type);
   // Le PDF n'existe, pour le client, que s'il l'a ACHETE. Une commande
   // `print` en fabrique bien un en interne (le fichier envoye a
@@ -94,9 +137,17 @@ function StepTracking({
     || pdfJob?.status === 'rendering'
   );
 
+  const gelatoOrderId = tracking?.gelatoOrderId || order?.metadata?.gelatoOrderId || null;
+  const envoyeLe = formaterDate(tracking?.gelatoSubmittedAt || order?.metadata?.gelatoSubmittedAt);
+  const echecEnvoi = tracking?.gelatoError || order?.metadata?.gelatoError || null;
+  const livraisonMin = formaterJour(tracking?.delivery?.minDate);
+  const livraisonMax = formaterJour(tracking?.delivery?.maxDate);
+  const verifieLe = formaterDate(tracking?.updatedAt);
+  const deuxVolets = pdfAchete && isPrint;
+
   return (
     <article className="orders-panel">
-      <h2>Suivi de production</h2>
+      <h2>Votre commande</h2>
 
       <div className="orders-result-grid">
         <div>
@@ -109,101 +160,171 @@ function StepTracking({
         </div>
       </div>
 
-      <ol className="tracking-timeline">
-        {timeline.map((step) => (
-          <li
-            key={step.key}
-            className={`tracking-step ${step.done ? 'is-done' : ''} ${step.current ? 'is-current' : ''}`}
-          >
-            <span className="tracking-dot" aria-hidden="true" />
-            <span className="tracking-label">{step.label}</span>
-          </li>
-        ))}
-      </ol>
+      <div className={`tracking-panes ${deuxVolets ? 'is-double' : ''}`}>
+        {/* ----------------------------- VOLET PDF ----------------------- */}
+        {pdfAchete && (
+          <section className="tracking-pane">
+            <h3 className="tracking-pane-title">Votre PDF</h3>
 
-      {/* Numero de suivi : n'apparait que quand le transporteur en a fourni un. */}
-      {tracking?.tracking?.code && (
-        <p className="tracking-carrier">
-          Colis {tracking.tracking.carrier ? `(${tracking.tracking.carrier})` : ''} :{' '}
-          {tracking.tracking.url ? (
-            <a href={tracking.tracking.url} target="_blank" rel="noreferrer">{tracking.tracking.code}</a>
-          ) : (
-            <strong>{tracking.tracking.code}</strong>
-          )}
-        </p>
-      )}
+            {pdfEnCours && (
+              <>
+                {/* Entre le clic et la premiere reponse du serveur, le job
+                    n'existe pas encore : on affiche la meme valeur de depart
+                    que le serveur, plutot qu'un blanc. */}
+                <GenerationProgress
+                  progress={pdfJob?.progress || { phase: 'starting', done: 0, total: 0 }}
+                  label="Fabrication du PDF..."
+                />
+                <p className="orders-disclaimer">
+                  Il sera disponible dans quelques minutes. <strong>Vous serez informé par email</strong> dès
+                  qu’il sera prêt : vous pouvez fermer cette page, la fabrication continue de notre côté.
+                </p>
+                {onRegeneratePdf && (
+                  <button
+                    type="button"
+                    className="btn btn-outline pdf-build-relaunch"
+                    onClick={onRegeneratePdf}
+                    disabled={regeneratingPdf}
+                    title="Repart de zero si la fabrication semble arretee"
+                  >
+                    <IconeRegenerer />
+                    {regeneratingPdf ? 'Relance…' : 'Relancer la fabrication'}
+                  </button>
+                )}
+              </>
+            )}
 
-      {/* Transparence quand l'information n'est pas fraiche ou pas comprise :
-          mieux vaut le dire que d'afficher un etat faussement rassurant. */}
-      {tracking?.stale && (
-        <p className="orders-disclaimer">
-          L'imprimeur est momentanement injoignable : voici le dernier etat connu.
-        </p>
-      )}
-      {tracking?.gelatoStatusUnknown && (
-        <p className="orders-disclaimer">
-          Etat renvoye par l'imprimeur : <strong>{tracking.gelatoStatus}</strong> (non traduit).
-        </p>
-      )}
+            {pdfReady && (
+              <>
+                <p className="tracking-ready">
+                  <span className="tracking-ready-dot" aria-hidden="true" />
+                  PDF disponible
+                </p>
+                <div className="tracking-pane-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => onDownloadPdf('final')}
+                    disabled={downloadingKind === 'final'}
+                  >
+                    <IconeTelecharger />
+                    {downloadingKind === 'final' ? 'Téléchargement…' : 'Télécharger'}
+                  </button>
+                  {onRegeneratePdf && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={onRegeneratePdf}
+                      disabled={regeneratingPdf}
+                      title="Refabrique le PDF a partir de votre livre actuel"
+                    >
+                      <IconeRegenerer />
+                      {regeneratingPdf ? 'Régénération…' : 'Régénérer'}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
 
-      {/* Fabrication du PDF : plusieurs minutes de rendu haute resolution.
-          Le travail se poursuit cote serveur meme si l'onglet est ferme —
-          c'est ce qui autorise a le dire ici, et un email vient le
-          confirmer (backend : notifierPdfPret). */}
-      {pdfEnCours && (
-        <div className="pdf-build-block">
-          <h3>Votre PDF est en cours de fabrication</h3>
-          {/* Entre le clic et la premiere reponse du serveur, le job
-              n'existe pas encore : on affiche la meme valeur de depart que
-              le serveur, plutot qu'un blanc. */}
-          <GenerationProgress
-            progress={pdfJob?.progress || { phase: 'starting', done: 0, total: 0 }}
-            label="Fabrication du PDF..."
-          />
-          <p className="orders-disclaimer">
-            Il sera disponible dans quelques minutes. <strong>Vous serez informé par email</strong> dès
-            qu’il sera prêt : vous pouvez fermer cette page, la fabrication continue de notre côté.
-          </p>
-          {onRegeneratePdf && (
-            <button
-              type="button"
-              className="btn btn-outline pdf-build-relaunch"
-              onClick={onRegeneratePdf}
-              disabled={regeneratingPdf}
-              title="Repart de zero si la fabrication semble arretee"
-            >
-              {regeneratingPdf ? 'Relance…' : 'Relancer la fabrication'}
-            </button>
-          )}
-        </div>
-      )}
+            {!pdfEnCours && !pdfReady && (
+              <p className="orders-disclaimer">
+                La fabrication démarre dès le paiement validé.
+              </p>
+            )}
+          </section>
+        )}
 
-      <div className="orders-download-actions">
+        {/* ------------------------- VOLET IMPRESSION -------------------- */}
         {isPrint && (
-          <button type="button" className="btn btn-outline" onClick={onRefreshTracking} disabled={loadingTracking}>
-            {loadingTracking ? 'Actualisation...' : 'Actualiser le suivi'}
-          </button>
-        )}
-        {pdfReady && (
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => onDownloadPdf('final')}
-            disabled={downloadingKind === 'final'}
-          >
-            {downloadingKind === 'final' ? 'Telechargement...' : 'Telecharger le PDF final'}
-          </button>
-        )}
-        {pdfReady && onRegeneratePdf && (
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={onRegeneratePdf}
-            disabled={regeneratingPdf}
-            title="Refabrique le PDF a partir de votre livre actuel"
-          >
-            {regeneratingPdf ? 'Regeneration…' : 'Régénérer le PDF'}
-          </button>
+          <section className="tracking-pane">
+            <h3 className="tracking-pane-title">Votre livre imprimé</h3>
+
+            {/* DIRE QUE C'EST PARTI, ET SOUS QUEL NUMERO (2026-09-20).
+                L'envoi a l'imprimeur se declenche tout seul apres le
+                paiement, en tache de fond : rien ne le disait, et on ne
+                savait pas si le livre avait ete transmis. */}
+            {echecEnvoi ? (
+              <p className="tracking-sent is-failed">
+                L’envoi à l’imprimeur a échoué : {echecEnvoi}. Notre équipe le relance,
+                votre commande n’est pas perdue.
+              </p>
+            ) : gelatoOrderId ? (
+              <p className="tracking-sent">
+                <span className="tracking-ready-dot" aria-hidden="true" />
+                Reçu par l’imprimeur{envoyeLe ? ` le ${envoyeLe}` : ''}
+                <span className="tracking-sent-ref">n° {gelatoOrderId}</span>
+              </p>
+            ) : (
+              <p className="tracking-sent is-pending">
+                <span className="tracking-spinner" aria-hidden="true" />
+                Transmission à l’imprimeur en cours… cette page se met à jour toute seule.
+              </p>
+            )}
+
+            <ol className="tracking-timeline">
+              {buildPrintTimeline(status).map((step) => (
+                <li
+                  key={step.key}
+                  className={`tracking-step ${step.done ? 'is-done' : ''} ${step.current ? 'is-current' : ''}`}
+                >
+                  <span className="tracking-dot" aria-hidden="true" />
+                  <span className="tracking-label">{step.label}</span>
+                </li>
+              ))}
+            </ol>
+
+            {/* Delais : uniquement ceux annonces par l'imprimeur. Aucun
+                « comptez 3 a 5 jours » ecrit en dur, qui deviendrait faux
+                sans prevenir (voir backend gelatoTracking.extractDelivery). */}
+            {(livraisonMin || livraisonMax) && (
+              <p className="tracking-carrier">
+                Livraison annoncée : {livraisonMin && livraisonMax
+                  ? `entre le ${livraisonMin} et le ${livraisonMax}`
+                  : `à partir du ${livraisonMin || livraisonMax}`}
+              </p>
+            )}
+
+            {/* Numero de suivi : n'apparait que quand le transporteur en a fourni un. */}
+            {tracking?.tracking?.code && (
+              <p className="tracking-carrier">
+                Colis {tracking.tracking.carrier ? `(${tracking.tracking.carrier})` : ''} :{' '}
+                {tracking.tracking.url ? (
+                  <a href={tracking.tracking.url} target="_blank" rel="noreferrer">{tracking.tracking.code}</a>
+                ) : (
+                  <strong>{tracking.tracking.code}</strong>
+                )}
+              </p>
+            )}
+
+            {/* Transparence quand l'information n'est pas fraiche ou pas
+                comprise : mieux vaut le dire que d'afficher un etat
+                faussement rassurant. */}
+            {tracking?.stale && (
+              <p className="orders-disclaimer">
+                L'imprimeur est momentanement injoignable : voici le dernier etat connu.
+              </p>
+            )}
+            {tracking?.gelatoStatusUnknown && (
+              <p className="orders-disclaimer">
+                Etat renvoye par l'imprimeur : <strong>{tracking.gelatoStatus}</strong> (non traduit).
+              </p>
+            )}
+
+            {/* Le suivi se rafraichit tout seul (BookCheckoutLuxe) : ce lien
+                n'existe que pour ne pas attendre le prochain cycle, et la
+                date dit si ca vaut la peine de cliquer. Un gros bouton
+                « Actualiser le suivi » laissait croire qu'il fallait le
+                faire soi-meme. */}
+            <p className="tracking-freshness">
+              {loadingTracking
+                ? 'Vérification auprès de l’imprimeur…'
+                : verifieLe ? `Vérifié le ${verifieLe}` : 'Mise à jour automatique'}
+              {' · '}
+              <button type="button" className="tracking-refresh" onClick={onRefreshTracking} disabled={loadingTracking}>
+                Vérifier maintenant
+              </button>
+            </p>
+          </section>
         )}
       </div>
 

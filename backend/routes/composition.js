@@ -1369,8 +1369,11 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
 // GET /api/books/:bookId/print-quality-check
 // Controle qualite obligatoire avant commande (cahier des charges v2, §2 —
 // "ecran recapitulatif") : parcourt TOUTES les pages et renvoie chaque
-// photo dont le statut n'est pas 'ok', avec sa vignette et son numero de
-// page (necessaires a l'ecran recapitulatif).
+// photo REELLEMENT problematique ('insuffisant', < 150 dpi), avec sa
+// vignette et son numero de page (necessaires a l'ecran recapitulatif).
+//
+// Les photos 'limite' (150-250 dpi) sont comptees mais PLUS signalees
+// depuis le 2026-09-20 — voir le commentaire au niveau du filtre.
 //
 // RECALCULE toujours, jamais lu depuis content.photoFit : le statut stocke
 // depend du format d'impression (les cadres changent de taille en mm), il
@@ -1392,6 +1395,10 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
 
     let photosCount = 0;
     let evaluatedCount = 0;
+    // Photos "limite" : evaluees, comptees, mais PLUS SIGNALEES (voir le
+    // filtre plus bas). Le chiffre reste dans la reponse pour que la
+    // decision soit verifiable, pas pour etre affiche.
+    let photosLimitesCount = 0;
     let textsCount = 0;
     let textsEvaluatedCount = 0;
     const warnings = [];
@@ -1458,6 +1465,27 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
           evaluatedCount += 1;
           if (fit.statut === 'ok') return;
 
+          // ON N'ALERTE QUE SUR CE QUI SERA VRAIMENT VISIBLE (2026-09-20).
+          //
+          // Le controle remontait les photos 'limite' (150-250 dpi) au meme
+          // titre que les 'insuffisant' (< 150 dpi). Sur un livre de 60
+          // photos de telephone, ca produisait une liste d'avertissements
+          // longue comme le bras juste avant de payer — et le retour
+          // utilisateur est sans ambiguite : « j'ai peur que ca dissuade
+          // l'utilisateur de continuer ».
+          //
+          // Entre 150 et 250 dpi, une photo est imprimable : elle n'est pas
+          // parfaite, elle n'est pas ratee. La signaler coute plus (un
+          // acheteur qui renonce) qu'elle ne rapporte.
+          //
+          // Le statut 'limite' continue d'etre CALCULE et stocke
+          // (content.photoFit) : rien n'est perdu, seule l'alerte disparait.
+          // Remettre le signalement = remettre 'limite' dans ce filtre.
+          if (fit.statut === 'limite') {
+            photosLimitesCount += 1;
+            return;
+          }
+
           warnings.push({
             pageIndex: page.page_index,
             itemId,
@@ -1479,6 +1507,7 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
       pagesCount: pages.length,
       photosCount,
       evaluatedCount,
+      photosLimitesCount,
       textsCount,
       textsEvaluatedCount,
       warnings,

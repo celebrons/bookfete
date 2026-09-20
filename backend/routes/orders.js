@@ -921,11 +921,21 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
     }
 
     const gelatoOrderId = order.metadata?.gelatoOrderId || null;
+    // DIRE QUE C'EST PARTI CHEZ L'IMPRIMEUR (2026-09-20).
+    //
+    // L'ecran de suivi ne montrait qu'un statut : rien ne disait que le
+    // livre avait ete transmis, ni quand, ni sous quel numero — « aujourd'hui
+    // on ne sait pas que ca a ete envoye ». Ces trois informations existaient
+    // deja en base (posees par gelatoOrderService) mais ne sortaient jamais
+    // de la reponse.
     const localState = {
       status: order.status,
       gelatoOrderId,
       gelatoStatus: order.metadata?.gelatoFulfillmentStatus || null,
+      gelatoSubmittedAt: order.metadata?.gelatoSubmittedAt || null,
+      gelatoError: order.metadata?.gelatoError || null,
       tracking: order.metadata?.tracking || { carrier: null, code: null, url: null },
+      delivery: order.metadata?.delivery || { minDate: null, maxDate: null },
       updatedAt: order.updated_at || null
     };
 
@@ -946,6 +956,7 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
     const rawStatus = gelatoTracking.readGelatoFulfillmentStatus(gelatoOrder);
     const mappedStatus = gelatoTracking.mapGelatoStatus(rawStatus);
     const tracking = gelatoTracking.extractTracking(gelatoOrder);
+    const delivery = gelatoTracking.extractDelivery(gelatoOrder);
 
     // Avancee seulement : un statut inconnu (mappedStatus null) ou anterieur
     // laisse la commande exactement ou elle est.
@@ -968,7 +979,8 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
       gelatoFulfillmentStatus: rawStatus || null,
       gelatoOrderType: typeRetenu,
       gelatoCheckedAt: nowIso,
-      tracking
+      tracking,
+      delivery
     };
 
     if (shouldAdvance) {
@@ -1008,7 +1020,10 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
       // Signale explicitement un statut que nous ne savons pas traduire :
       // l'ecran affiche alors la chaine brute plutot que d'inventer.
       gelatoStatusUnknown: Boolean(rawStatus && !mappedStatus),
+      gelatoSubmittedAt: order.metadata?.gelatoSubmittedAt || null,
+      gelatoError: null,
       tracking,
+      delivery,
       updatedAt: nowIso,
       source: 'gelato',
       stale: false
