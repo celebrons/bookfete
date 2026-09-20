@@ -63,7 +63,8 @@ const SUIVI = `
   <h2>Votre commande</h2>
   <div class="orders-result-grid">
     <div><span>Numero</span><strong>CMD-260920-XK4P2M-118</strong></div>
-    <div><span>Statut</span><strong class="is-info">En production</strong></div>
+    <div><span>Statut PDF</span><strong class="is-ready">Disponible</strong></div>
+    <div><span>Statut impression</span><strong class="is-progress">Chez l&rsquo;imprimeur</strong></div>
   </div>
   <div class="tracking-panes is-double">
     <section class="tracking-pane">
@@ -78,12 +79,13 @@ const SUIVI = `
       <h3 class="tracking-pane-title">Votre livre imprimé</h3>
       <p class="tracking-sent"><span class="tracking-ready-dot"></span>Reçu par l’imprimeur le 20 septembre à 14:32<span class="tracking-sent-ref">n° 17e804f9-4361-468c</span></p>
       <ol class="tracking-timeline">
-        ${etape('Payée', 'is-done')}${etape('En file d’impression', 'is-done')}${etape('Chez l’imprimeur', 'is-current')}${etape('Imprimée', '')}${etape('Expédiée', '')}${etape('Livrée', '')}
+        ${etape('Payée', 'is-done')}${etape('Envoyé imprimeur', 'is-current')}${etape('Imprimée', '')}${etape('Expédiée', '')}${etape('Livrée', '')}
       </ol>
       <p class="tracking-carrier">Livraison annoncée : entre le 24 septembre et le 29 septembre</p>
       <p class="tracking-freshness">Vérifié le 20 septembre à 14:41 · <button class="tracking-refresh">Vérifier maintenant</button></p>
     </section>
   </div>
+  <p class="tracking-delais"><strong>Livraison annoncée par l&rsquo;imprimeur : </strong>entre le 24 septembre et le 29 septembre — Colissimo</p>
 </article>
 </div>`;
 

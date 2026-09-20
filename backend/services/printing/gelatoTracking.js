@@ -20,7 +20,13 @@
 // tiret/underscore) pour absorber les variantes d'ecriture d'une version
 // d'API a l'autre ("in_production", "inProduction", "in production"...).
 const STATUS_MAP = {
-  draft: 'print_queued',
+  // « draft » chez Gelato = le fichier est chez l'imprimeur, en attente de
+  // lancement. Longtemps traduit par `print_queued` (« Mise en
+  // production »), une etape intermediaire qui ne voulait rien dire pour
+  // l'acheteur : il venait de payer, son livre etait parti, et l'ecran lui
+  // parlait de mise en production. On dit maintenant ce qui s'est
+  // reellement passe — envoye a l'imprimeur (2026-09-20).
+  draft: 'sent_to_printer',
   created: 'sent_to_printer',
   passed: 'sent_to_printer',
   pending: 'sent_to_printer',

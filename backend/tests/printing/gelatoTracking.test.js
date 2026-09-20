@@ -11,7 +11,8 @@ const {
 
 describe('mapGelatoStatus', () => {
   it.each([
-    ['draft', 'print_queued'],
+    // Un brouillon depose chez Gelato EST un envoi a l'imprimeur (2026-09-20).
+    ['draft', 'sent_to_printer'],
     ['created', 'sent_to_printer'],
     ['passed', 'sent_to_printer'],
     ['printed', 'printed'],

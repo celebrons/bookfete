@@ -111,6 +111,37 @@ describe('gelatoOrderService', () => {
     expect(savedMetadata.gelatoOrderType).toBe('draft');
   });
 
+  // L'ENVOI REUSSI FAIT AVANCER LA COMMANDE (2026-09-20).
+  // Avant, seules les metadonnees changeaient : la commande restait
+  // affichee « Payee » alors que le livre etait deja chez l'imprimeur.
+  it('passe la commande a « Envoye imprimeur » quand l\'envoi reussit', async () => {
+    delete process.env.GELATO_LIVE_ORDERS;
+    const updateSpy = jest.fn();
+
+    await submitPrintOrderToGelato({
+      db: makeDb(updateSpy),
+      book,
+      order: { ...baseOrder, status: 'paid' }
+    });
+
+    expect(updateSpy.mock.calls[0][0].status).toBe('sent_to_printer');
+  });
+
+  it('ne fait jamais RECULER une commande deja plus avancee', async () => {
+    delete process.env.GELATO_LIVE_ORDERS;
+    const updateSpy = jest.fn();
+
+    await submitPrintOrderToGelato({
+      db: makeDb(updateSpy),
+      book,
+      order: { ...baseOrder, status: 'shipped' }
+    });
+
+    // Les metadonnees sont bien ecrites, mais le statut n'est pas touche.
+    expect(updateSpy.mock.calls[0][0].status).toBeUndefined();
+    expect(updateSpy.mock.calls[0][0].metadata.gelatoOrderId).toBe('gelato-order-fake-1');
+  });
+
   it('soumet en orderType "order" reel uniquement si GELATO_LIVE_ORDERS=1', async () => {
     process.env.GELATO_LIVE_ORDERS = '1';
     const updateSpy = jest.fn();

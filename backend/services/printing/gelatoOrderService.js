@@ -33,6 +33,22 @@ const { uploadPrintFile } = require('./printFileStorage');
 const { resolveCountryIso2 } = require('./countryCodes');
 const gelatoClient = require('./gelatoClient');
 
+// Meme ordre que ORDER_STATUSES/ORDER_STATUS_SEQUENCE (routes/orders.js et
+// frontend/utils/orderWorkflow.js) : sert uniquement a ne jamais faire
+// RECULER une commande. Redeclare ici plutot qu'importe depuis le routeur,
+// qui monterait tout un Express pour lire un tableau.
+const ORDER_STATUS_SEQUENCE = [
+  'awaiting_payment',
+  'paid',
+  'pdf_generating',
+  'pdf_ready',
+  'print_queued',
+  'sent_to_printer',
+  'printed',
+  'shipped',
+  'delivered'
+];
+
 function resolveRenderFormat(formatId) {
   const normalized = Object.prototype.hasOwnProperty.call(COVER_FORMATS, formatId) ? formatId : DEFAULT_COVER_FORMAT_ID;
   return { formatId: normalized, ...resolveCoverFormat(formatId), ...resolveFormatDensity(formatId) };
@@ -138,7 +154,25 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
       gelatoError: null
     };
 
-    await db.from('orders').update({ metadata: nextMetadata, updated_at: nowIso }).eq('id', order.id);
+    // L'ENVOI REUSSI CHANGE LE STATUT, PAS SEULEMENT LES METADONNEES.
+    //
+    // Jusqu'ici cette fonction n'ecrivait que `metadata` : la commande
+    // restait affichee « Payee » alors que le livre etait deja chez
+    // l'imprimeur, et il fallait attendre qu'un affichage du suivi
+    // interroge Gelato pour que le statut bouge enfin. D'ou « on ne sait
+    // pas que ca a ete envoye » (2026-09-20).
+    //
+    // Jamais de recul : si la commande est deja plus avancee (imprimee,
+    // expediee), on ne la ramene pas en arriere.
+    const rangCourant = ORDER_STATUS_SEQUENCE.indexOf(order.status);
+    const rangEnvoye = ORDER_STATUS_SEQUENCE.indexOf('sent_to_printer');
+    const avance = rangCourant === -1 || rangCourant < rangEnvoye;
+
+    await db.from('orders').update({
+      ...(avance ? { status: 'sent_to_printer' } : {}),
+      metadata: nextMetadata,
+      updated_at: nowIso
+    }).eq('id', order.id);
 
     return {
       skipped: false,

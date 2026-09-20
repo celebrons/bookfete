@@ -22,10 +22,22 @@ import './StepTracking.css';
 // Etapes affichees dans le volet impression. Le PDF, lui, n'a pas de frise :
 // il est en fabrication ou il est pret, et la barre de progression dit deja
 // ou il en est.
-const PRINT_STEPS = ['paid', 'print_queued', 'sent_to_printer', 'printed', 'shipped', 'delivered'];
+//
+// « Mise en production » (`print_queued`) A ETE RETIREE (2026-09-20). Elle
+// s'intercalait entre le paiement et l'envoi, et ne decrivait rien que
+// l'acheteur puisse constater : quand l'envoi a l'imprimeur reussit, on
+// passe directement a « Envoye imprimeur ». Le statut existe toujours en
+// base pour les commandes d'avant, il est simplement affiche sur cette
+// etape-la (voir etapeAffichee).
+const PRINT_STEPS = ['paid', 'sent_to_printer', 'printed', 'shipped', 'delivered'];
+
+// Les commandes anterieures peuvent encore porter `print_queued` : elles
+// s'affichent sur l'etape « Envoye imprimeur », qui la remplace.
+const etapeAffichee = (statut) => (statut === 'print_queued' ? 'sent_to_printer' : statut);
 
 function buildPrintTimeline(currentStatus) {
-  const currentRank = ORDER_STATUS_SEQUENCE.indexOf(currentStatus);
+  const statutAffiche = etapeAffichee(currentStatus);
+  const currentRank = ORDER_STATUS_SEQUENCE.indexOf(statutAffiche);
 
   return PRINT_STEPS.map((key) => {
     const rank = ORDER_STATUS_SEQUENCE.indexOf(key);
@@ -33,10 +45,33 @@ function buildPrintTimeline(currentStatus) {
       key,
       label: getOrderStatusConfig(key).label,
       done: currentRank > -1 && rank > -1 && rank < currentRank,
-      current: key === currentStatus
+      current: key === statutAffiche
     };
   });
 }
+
+// DEUX STATUTS QUAND ON A ACHETE DEUX CHOSES (2026-09-20).
+//
+// Un « Pack » n'a pas un etat, il en a deux : le fichier peut etre pret
+// pendant que le livre est encore sous presse. Un statut unique en haut de
+// page devait donc choisir lequel mentir.
+const statutDuPdf = ({ pret, enCours }) => {
+  if (pret) return { label: 'Disponible', tone: 'is-ready' };
+  if (enCours) return { label: 'En fabrication', tone: 'is-progress' };
+  return { label: 'En attente', tone: 'is-muted' };
+};
+
+const statutDeLImpression = ({ statut, gelatoOrderId, echec }) => {
+  if (echec) return { label: 'Envoi a reprendre', tone: 'is-error' };
+  const affiche = etapeAffichee(statut);
+  if (['printed', 'shipped', 'delivered', 'cancelled', 'failed'].includes(affiche)) {
+    return getOrderStatusConfig(affiche);
+  }
+  if (affiche === 'sent_to_printer' || gelatoOrderId) {
+    return { label: "Chez l'imprimeur", tone: 'is-progress' };
+  }
+  return { label: 'Envoi en cours', tone: 'is-progress' };
+};
 
 // Icones : demandees explicitement (2026-09-20) pour que l'action se
 // reconnaisse avant d'etre lue — une fleche qui descend pour telecharger,
@@ -106,7 +141,6 @@ function StepTracking({
   if (!order) return null;
 
   const status = tracking?.status || order.status;
-  const statusConfig = getOrderStatusConfig(status);
   const isPrint = includesPrint(order.type);
   // Le PDF n'existe, pour le client, que s'il l'a ACHETE. Une commande
   // `print` en fabrique bien un en interne (le fichier envoye a
@@ -145,6 +179,9 @@ function StepTracking({
   const verifieLe = formaterDate(tracking?.updatedAt);
   const deuxVolets = pdfAchete && isPrint;
 
+  const infoPdf = statutDuPdf({ pret: pdfReady, enCours: pdfEnCours });
+  const infoImpression = statutDeLImpression({ statut: status, gelatoOrderId, echec: echecEnvoi });
+
   return (
     <article className="orders-panel">
       <h2>Votre commande</h2>
@@ -154,10 +191,18 @@ function StepTracking({
           <span>Numero</span>
           <strong>{order.order_number}</strong>
         </div>
-        <div>
-          <span>Statut</span>
-          <strong className={statusConfig.tone}>{statusConfig.label}</strong>
-        </div>
+        {pdfAchete && (
+          <div>
+            <span>{isPrint ? 'Statut PDF' : 'Statut'}</span>
+            <strong className={infoPdf.tone}>{infoPdf.label}</strong>
+          </div>
+        )}
+        {isPrint && (
+          <div>
+            <span>{pdfAchete ? 'Statut impression' : 'Statut'}</span>
+            <strong className={infoImpression.tone}>{infoImpression.label}</strong>
+          </div>
+        )}
       </div>
 
       <div className={`tracking-panes ${deuxVolets ? 'is-double' : ''}`}>
@@ -273,17 +318,6 @@ function StepTracking({
               ))}
             </ol>
 
-            {/* Delais : uniquement ceux annonces par l'imprimeur. Aucun
-                « comptez 3 a 5 jours » ecrit en dur, qui deviendrait faux
-                sans prevenir (voir backend gelatoTracking.extractDelivery). */}
-            {(livraisonMin || livraisonMax) && (
-              <p className="tracking-carrier">
-                Livraison annoncée : {livraisonMin && livraisonMax
-                  ? `entre le ${livraisonMin} et le ${livraisonMax}`
-                  : `à partir du ${livraisonMin || livraisonMax}`}
-              </p>
-            )}
-
             {/* Numero de suivi : n'apparait que quand le transporteur en a fourni un. */}
             {tracking?.tracking?.code && (
               <p className="tracking-carrier">
@@ -327,6 +361,29 @@ function StepTracking({
           </section>
         )}
       </div>
+
+      {/* LES DELAIS, EN BAS (2026-09-20).
+          Uniquement ceux annonces par l'imprimeur lui-meme : aucun
+          « comptez 3 a 5 jours » ecrit en dur, qui deviendrait faux le jour
+          ou l'imprimeur change de pays de production (voir backend
+          gelatoTracking.extractDelivery). Tant qu'il n'a rien annonce, on le
+          DIT plutot que de laisser un vide qui ressemble a un oubli. */}
+      {isPrint && (
+        <p className="tracking-delais">
+          {livraisonMin || livraisonMax ? (
+            <>
+              <strong>Livraison annoncée par l’imprimeur : </strong>
+              {livraisonMin && livraisonMax
+                ? `entre le ${livraisonMin} et le ${livraisonMax}`
+                : `à partir du ${livraisonMin || livraisonMax}`}
+              {tracking?.tracking?.carrier ? ` — ${tracking.tracking.carrier}` : ''}
+            </>
+          ) : (
+            <>L’imprimeur n’a pas encore communiqué de date de livraison. Elle apparaîtra ici
+            dès qu’il l’aura fixée, avec le numéro de colis.</>
+          )}
+        </p>
+      )}
 
       {/* Envoi de test a l'imprimeur : sa place logique est ici, c'est ce qui
           cree la commande de production sans passer par un paiement. */}

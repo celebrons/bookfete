@@ -299,3 +299,16 @@
 }
 .tracking-refresh:hover:not(:disabled) { color: var(--ink); }
 .tracking-refresh:disabled { cursor: default; opacity: 0.6; text-decoration: none; }
+
+/* Delais de livraison, en bas du recapitulatif (2026-09-20). Sous les deux
+   volets et non dans l'un d'eux : c'est la derniere chose qu'on lit, et
+   elle concerne la commande entiere. */
+.tracking-delais {
+  margin: var(--space-md) 0 0;
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(184, 146, 74, 0.2);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-light);
+}
+.tracking-delais strong { color: var(--ink); }

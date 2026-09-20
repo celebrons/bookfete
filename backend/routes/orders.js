@@ -359,7 +359,11 @@ const mergeMetadata = (existingMetadata, nextMetadata) => ({
 const ORDER_ALLOWED_TRANSITIONS = {
   draft: new Set(['awaiting_payment', 'cancelled', 'failed']),
   awaiting_payment: new Set(['paid', 'cancelled', 'failed']),
-  paid: new Set(['pdf_generating', 'pdf_ready', 'print_queued', 'cancelled', 'failed']),
+  // 'sent_to_printer' directement depuis 'paid' : l'envoi a l'imprimeur part
+  // tout seul apres le paiement et fait desormais avancer la commande
+  // lui-meme (voir gelatoOrderService). 'print_queued' reste accepte pour
+  // les commandes anterieures.
+  paid: new Set(['pdf_generating', 'pdf_ready', 'print_queued', 'sent_to_printer', 'cancelled', 'failed']),
   pdf_generating: new Set(['pdf_ready', 'failed', 'cancelled']),
   pdf_ready: new Set(['print_queued', 'sent_to_printer', 'printed', 'shipped', 'delivered']),
   print_queued: new Set(['sent_to_printer', 'failed']),
