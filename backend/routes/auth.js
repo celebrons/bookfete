@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const anonymousController = require('../controllers/anonymousController');
+const accountController = require('../controllers/accountController');
 const authenticate = require('../middleware/auth');
 
 router.get('/test', (_req, res) => {
@@ -19,5 +20,11 @@ router.put('/profile', authenticate, authController.updateProfile);
 // et rattacher les livres a un compte deja existant.
 router.post('/anonymous/complete', authenticate, anonymousController.completeAnonymousSignup);
 router.post('/anonymous/link', authenticate, anonymousController.linkAnonymousBooks);
+
+// Suppression du compte a la demande de son proprietaire. Irreversible :
+// voir controllers/accountController.js pour les garde-fous (refus si un
+// livre est en fabrication, photos effacees du stockage, compte supprime
+// en dernier).
+router.delete('/account', authenticate, accountController.supprimerMonCompte);
 
 module.exports = router;

@@ -1,0 +1,95 @@
+/* Supprimer son compte (voir SupprimerMonCompte.js).
+
+   DISCRET AU REPOS. Un lien gris en bas de page, de la taille d'une note.
+   Personne ne vient dans ses parametres pour supprimer son compte : celui
+   qui le cherche le trouvera, les autres ne doivent pas tomber dessus.
+
+   FRANC UNE FOIS OUVERT. La couleur d'alerte n'apparait qu'a ce moment-la,
+   quand elle informe au lieu d'effrayer. */
+
+.suppr-compte-ligne {
+  margin: var(--space-lg) 0 0;
+  text-align: center;
+}
+
+.suppr-compte-lien {
+  border: none;
+  background: none;
+  padding: 4px;
+  font: inherit;
+  font-size: 12px;
+  color: rgba(31, 31, 31, 0.45);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.suppr-compte-lien:hover { color: #7a202c; }
+
+.suppr-compte-panneau {
+  margin-top: var(--space-lg);
+  padding: 18px 20px;
+  border: 1px solid rgba(177, 54, 66, 0.3);
+  border-radius: 12px;
+  background: rgba(177, 54, 66, 0.04);
+}
+
+.suppr-compte-panneau h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: #7a202c;
+}
+
+.suppr-compte-texte {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.suppr-compte-liste {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.suppr-compte-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.suppr-compte-erreur {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(177, 54, 66, 0.28);
+  background: rgba(177, 54, 66, 0.09);
+  color: #7a202c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.suppr-compte-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* Le bouton destructeur n'emprunte PAS le doré du reste du site : cette
+   action ne ressemble a aucune autre, et ne doit pas se confondre avec un
+   bouton de validation ordinaire. */
+.suppr-compte-valider {
+  background-color: #7a202c;
+  color: #fff;
+}
+.suppr-compte-valider:hover:not(:disabled) { background-color: #61181f; }
+.suppr-compte-valider:disabled { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 520px) {
+  .suppr-compte-actions { flex-direction: column-reverse; }
+  .suppr-compte-actions .btn { width: 100%; }
+}

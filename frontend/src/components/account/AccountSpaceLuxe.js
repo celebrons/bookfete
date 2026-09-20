@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import SupprimerMonCompte from './SupprimerMonCompte';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { listOrders, getEmailStatus, sendTestEmail } from '../../services/ordersApi';
@@ -520,6 +521,11 @@ const AccountSpaceLuxe = () => {
             </form>
           </article>
         </section>
+
+        {/* Tout en bas, et discret : personne ne vient dans ses parametres
+            pour supprimer son compte. Celui qui le cherche le trouve, les
+            autres ne tombent pas dessus. */}
+        <SupprimerMonCompte nombreLivres={books.length} nombreCommandes={orders.length} />
       </div>
     </div>
   );
