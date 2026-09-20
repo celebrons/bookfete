@@ -81,7 +81,6 @@ const SUIVI = `
       <ol class="tracking-timeline">
         ${etape('Payée', 'is-done')}${etape('Envoyé imprimeur', 'is-current')}${etape('Imprimée', '')}${etape('Expédiée', '')}${etape('Livrée', '')}
       </ol>
-      <p class="tracking-carrier">Livraison annoncée : entre le 24 septembre et le 29 septembre</p>
       <p class="tracking-freshness">Vérifié le 20 septembre à 14:41 · <button class="tracking-refresh">Vérifier maintenant</button></p>
     </section>
   </div>
@@ -148,7 +147,7 @@ async function main() {
     await poserLaMaquette(onglet, DOUBLONS, '#efe9dd');
     await onglet.screenshot({ path: path.join(SORTIE, 'ecran-doublons.png') });
 
-    await onglet.setViewport({ width: 860, height: 520 });
+    await onglet.setViewport({ width: 860, height: 620 });
     await poserLaMaquette(onglet, SUIVI, '#f6f3ee');
     await onglet.screenshot({ path: path.join(SORTIE, 'ecran-suivi.png') });
   } finally {
