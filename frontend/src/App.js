@@ -18,6 +18,7 @@ import HomePageLuxe from './components/home/HomePageLuxe';
 import HowItWorksLuxe from './components/home/HowItWorksLuxe';
 import LoginLuxe from './components/auth/LoginLuxe';
 import RegisterLuxe from './components/auth/RegisterLuxe';
+import MesLivresLuxe from './components/auth/MesLivresLuxe';
 import CreateBookSansIA from './components/create-book/CreateBookSansIA';
 import DashboardGeneralLuxe from './components/dashboard/DashboardGeneralLuxe';
 import BookPageLuxe  from './components/book/BookPageLuxe';
@@ -107,6 +108,9 @@ function App() {
           <Route path="/how-it-works" element={<HowItWorksLuxe />} />
           <Route path="/login" element={<LoginLuxe />} />
           <Route path="/register" element={<RegisterLuxe />} />
+          {/* Retrouver ses livres depuis un autre appareil : adresse + code,
+              aucun mot de passe (voir services/emailOtp.js). */}
+          <Route path="/mes-livres" element={<MesLivresLuxe />} />
           <Route path="/create-book" element={<CreateBookSansIA />} />
           {/* Espace d administration : la page se protege elle-meme (elle
               demande au serveur si l utilisateur y a droit) et le backend

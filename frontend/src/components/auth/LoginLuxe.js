@@ -192,6 +192,17 @@ const LoginLuxe = () => {
           <span>OU</span>
         </div>
 
+        {/* Le chemin le plus court pour quelqu'un qui a commande sans jamais
+            creer de mot de passe : adresse + code, rien a se rappeler
+            (2026-09-20). Mis AVANT « creer un compte » parce que c'est le
+            cas le plus frequent de retour sur le site. */}
+        <div className="auth-footer">
+          Vous avez commandé sans mot de passe ?
+          <Link to="/mes-livres">
+            Retrouver mes livres
+          </Link>
+        </div>
+
         <div className="auth-footer">
           Pas encore de compte ?
           <Link to="/register">

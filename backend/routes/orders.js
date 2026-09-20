@@ -1636,9 +1636,25 @@ router.post('/', authenticate, async (req, res) => {
     // ne pourrait ni retrouver sa commande, ni recevoir son suivi, ni
     // reclamer quoi que ce soit. C'est aussi le moment naturel pour le
     // demander — la valeur a deja ete vue.
-    if (req.user?.is_anonymous === true) {
+    // CE QU'ON EXIGE VRAIMENT, C'EST UNE ADRESSE E-MAIL (2026-09-20).
+    //
+    // La regle produit n'a jamais ete « avoir un compte » au sens classique :
+    // c'est « pouvoir retrouver sa commande et la suivre », et cela tient a
+    // une seule chose, une adresse verifiee. Depuis le passage a
+    // l'authentification par code (services/emailOtp.js), un visiteur peut
+    // attacher son adresse a sa session anonyme SANS mot de passe — son
+    // identifiant ne change pas, son livre reste en place.
+    //
+    // Se fonder sur `is_anonymous` serait donc fragile : selon la facon dont
+    // le fournisseur d'authentification bascule ce drapeau apres la
+    // verification d'une adresse, un acheteur parfaitement identifiable
+    // pourrait rester bloque en boucle devant le meme message. L'adresse,
+    // elle, est le fait observable — et sans session valide, `authenticate`
+    // a deja refuse la requete bien avant.
+    const emailDuCompte = String(req.user?.email || '').trim();
+    if (!emailDuCompte) {
       return res.status(403).json({
-        error: 'Creez votre compte pour commander : il vous permettra de retrouver votre livre et de suivre sa fabrication.',
+        error: 'Indiquez votre adresse e-mail pour commander : elle vous permettra de retrouver votre livre et de suivre sa fabrication.',
         requiresAccount: true
       });
     }

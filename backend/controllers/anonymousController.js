@@ -12,7 +12,10 @@
 // Ce controleur ne traite que les deux moments ou ce choix demande un
 // arbitrage cote serveur :
 //   1. la conversion du compte anonyme en compte reel (meme identifiant, donc
-//      rien a deplacer — il manque seulement la ligne `profiles`) ;
+//      rien a deplacer — il manque seulement la ligne `profiles`). Depuis le
+//      2026-09-20 cette conversion se fait le plus souvent SANS mot de passe :
+//      une adresse e-mail attachee a la session anonyme et verifiee par un
+//      code a 6 chiffres (frontend/services/emailOtp.js) ;
 //   2. le rattachement a un compte DEJA EXISTANT (identifiant different : les
 //      livres commences anonymement doivent changer de proprietaire, sinon
 //      ils deviennent orphelins et invisibles).
@@ -58,14 +61,16 @@ const completeAnonymousSignup = async (req, res) => {
     if (!req.user?.id) {
       return res.status(401).json({ error: 'Utilisateur non authentifie' });
     }
-    // Garde-fou : si le compte est encore anonyme, c'est que la conversion
-    // cote client a echoue. Creer un profil ici donnerait l'illusion d'un
-    // compte alors qu'il n'y a ni email ni mot de passe.
-    if (req.user.is_anonymous === true) {
-      return res.status(409).json({ error: "Le compte est encore anonyme : la creation du compte n'a pas abouti." });
-    }
-
+    // Garde-fou : ce qui manque pour creer un profil, c'est une ADRESSE,
+    // pas un mot de passe. Depuis l'authentification par code
+    // (frontend/services/emailOtp.js), un compte legitime peut n'avoir
+    // jamais eu de mot de passe — et, selon le moment ou le fournisseur
+    // bascule `is_anonymous`, peut meme porter encore ce drapeau alors que
+    // son adresse vient d'etre verifiee. On se fonde donc sur l'adresse.
     const email = String(req.user.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(409).json({ error: "Aucune adresse verifiee sur ce compte : la creation du compte n'a pas abouti." });
+    }
     const fullName = String(req.body?.full_name || req.user.user_metadata?.full_name || email.split('@')[0] || '').trim();
 
     const { error } = await supabase

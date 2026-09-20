@@ -15,7 +15,13 @@ const OTHER_REAL_ID = 'someone-else';
 const TOKENS = {
   'real-token': { id: REAL_ID, email: 'vrai@test.local', is_anonymous: false },
   'anon-token': { id: ANON_ID, is_anonymous: true },
-  'other-real-token': { id: OTHER_REAL_ID, email: 'autre@test.local', is_anonymous: false }
+  'other-real-token': { id: OTHER_REAL_ID, email: 'autre@test.local', is_anonymous: false },
+  // Authentification par code a 6 chiffres (2026-09-20) : une adresse est
+  // attachee a la session anonyme puis verifiee. Selon le moment ou le
+  // fournisseur bascule `is_anonymous`, ce compte peut porter les DEUX a la
+  // fois — une adresse verifiee et le drapeau anonyme. C'est precisement le
+  // cas qui bloquait l'acheteur en boucle quand on se fiait au drapeau.
+  'anon-avec-email-token': { id: 'anon-user-2', email: 'code@test.local', is_anonymous: true }
 };
 
 jest.mock('../config/supabase', () => {
@@ -161,12 +167,25 @@ describe('POST /api/auth/anonymous/complete', () => {
     expect(global.__anonSupabaseMock.__table('profiles').some((row) => row.id === REAL_ID)).toBe(true);
   });
 
-  it('REFUSE si le compte est encore anonyme (la conversion a echoue)', async () => {
+  it('REFUSE un compte sans aucune adresse verifiee (la conversion a echoue)', async () => {
     const response = await request(app)
       .post('/api/auth/anonymous/complete')
       .set('Authorization', 'Bearer anon-token')
       .send({ full_name: 'Jean Test' });
 
     expect(response.status).toBe(409);
+  });
+
+  // Le coeur de l'authentification par code : ce qui rend un compte
+  // utilisable, c'est son ADRESSE, pas la disparition d'un drapeau.
+  it('ACCEPTE un compte dont l\'adresse est verifiee, meme encore marque anonyme', async () => {
+    const response = await request(app)
+      .post('/api/auth/anonymous/complete')
+      .set('Authorization', 'Bearer anon-avec-email-token')
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body.email).toBe('code@test.local');
+    expect(global.__anonSupabaseMock.__table('profiles').some((row) => row.id === 'anon-user-2')).toBe(true);
   });
 });

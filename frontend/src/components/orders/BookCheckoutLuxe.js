@@ -207,17 +207,19 @@ const BookCheckoutLuxe = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const allerVersInscription = useCallback(() => {
-    // Meme cle que CreateBookSansIA/LoginLuxe/RegisterLuxe : l'inscription
-    // repart d'ici, sur CE livre, a l'etape ou on en etait.
-    try {
-      localStorage.setItem('returnTo', `${location.pathname}${location.search || ''}`);
-    } catch (_error) {
-      // Navigation privee ou stockage refuse : on va quand meme s'inscrire,
-      // le retour se fera simplement par le tableau de bord.
-    }
-    navigate('/register');
-  }, [location.pathname, location.search, navigate]);
+  // L'adresse est verifiee EN PLACE (voir StepPayment/EmailOtpForm) : il n'y
+  // a plus de redirection vers une page d'inscription, donc plus de
+  // `returnTo` a poser ni de retour a orchestrer. On se contente de prendre
+  // acte : la session n'est plus anonyme, et le paiement redevient possible.
+  const compteVerifie = useCallback(async (resultat) => {
+    setAnonymousSession(false);
+    setNotice({
+      type: 'success',
+      message: Number(resultat?.transferred) > 0
+        ? 'Adresse verifiee. Votre livre a bien ete rattache a votre compte.'
+        : 'Adresse verifiee. Vous pouvez finaliser votre commande.'
+    });
+  }, []);
 
   const canOrder = useMemo(
     () => isBookLifecycleAtLeast(getBookLifecycleStatusFromBook(book), 'finalized'),
@@ -893,11 +895,10 @@ const BookCheckoutLuxe = () => {
       return;
     } catch (error) {
       setNotice({ type: 'error', message: error.message });
-      // Refus « compte requis » : on emmene a l'inscription au lieu de
-      // laisser la personne devant un message sans issue.
+      // Refus « compte requis » (onglet reste ouvert, session expiree) : on
+      // fait reapparaitre la demande d'adresse, qui vit dans cet ecran.
       if (error?.requiresAccount) {
         setAnonymousSession(true);
-        allerVersInscription();
       }
     } finally {
       setSubmitting(false);
@@ -1351,7 +1352,8 @@ const BookCheckoutLuxe = () => {
               stripeEnabled={stripeTestEnabled}
               hasPendingPaymentOrder={hasPendingPaymentOrder}
               isAnonymous={anonymousSession}
-              onCreateAccount={allerVersInscription}
+              onAccountReady={compteVerifie}
+              emailPropose={address.email}
             />
           )}
 

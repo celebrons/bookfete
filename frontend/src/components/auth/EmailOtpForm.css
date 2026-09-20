@@ -1,0 +1,67 @@
+/* E-mail + code a 6 chiffres (voir EmailOtpForm.js). Memes tokens que le
+   reste du theme luxe : ce formulaire apparait aussi bien dans la page de
+   commande que sur sa propre page, il ne doit jamais avoir l'air rapporte. */
+.otp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.otp-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(31, 31, 31, 0.68);
+}
+
+.otp-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-light);
+}
+
+.otp-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(177, 54, 66, 0.28);
+  background: rgba(177, 54, 66, 0.08);
+  color: #7a202c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Le code se lit chiffre par chiffre : chasse fixe et lettres espacees,
+   pour qu'on puisse le comparer d'un coup d'oeil avec l'e-mail recu. */
+.otp-code-input {
+  font-size: 22px;
+  letter-spacing: 0.4em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  padding: 12px;
+}
+
+.otp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.otp-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--gold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.otp-link:hover { color: var(--ink); }
+
+@media (max-width: 520px) {
+  .otp-actions { flex-direction: column-reverse; }
+  .otp-actions .btn { width: 100%; }
+}
