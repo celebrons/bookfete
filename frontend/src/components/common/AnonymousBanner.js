@@ -31,9 +31,12 @@ function AnonymousBanner({ compact = false }) {
     <div className={`anon-banner ${compact ? 'is-compact' : ''}`} role="status">
       <span className="anon-banner-text">
         <strong>Votre livre est enregistré</strong> — mais il n'existe que sur cet appareil.
-        Créez votre compte pour le retrouver partout et le commander.
+        Donnez votre e-mail pour le retrouver partout et le commander.
       </span>
-      <Link className="anon-banner-action" to="/register">Créer mon compte</Link>
+      {/* Vers l adresse + code, pas vers un mot de passe a inventer
+          (2026-09-20). Cette page rattache justement le livre commence
+          sur cet appareil — c est exactement ce que ce bandeau promet. */}
+      <Link className="anon-banner-action" to="/mes-livres">Enregistrer mon livre</Link>
     </div>
   );
 }

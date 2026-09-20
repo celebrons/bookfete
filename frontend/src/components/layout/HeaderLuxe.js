@@ -175,7 +175,13 @@ const HeaderLuxe = () => {
               <Link to="/login" className="btn btn-outline">
                 Connexion
               </Link>
-              <Link to="/register" className="btn btn-primary">
+              {/* VERS LA CREATION, PAS VERS L INSCRIPTION (2026-09-20).
+                  Ce bouton est la premiere promesse du produit : composer
+                  son livre sans rien demander. Il ouvrait un formulaire
+                  d'inscription — l'inverse exact de ce que l'application
+                  sait faire depuis le demarrage sans compte. Les liens de
+                  la page d accueil, eux, pointaient deja au bon endroit. */}
+              <Link to="/create-book" className="btn btn-primary">
                 Créer un livre
               </Link>
             </>
