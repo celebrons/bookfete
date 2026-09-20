@@ -29,16 +29,21 @@
 // Le chemin A bascule automatiquement sur B si l'adresse appartient deja a
 // un compte : c'est la seule logique de decision de ce module.
 //
+// ETAT AU 2026-09-20 : seul le chemin B est actif — voir CONVERSION_SUR_PLACE
+// plus bas, qui explique pourquoi et comment revenir en arriere.
+//
 // PRE-REQUIS EXTERNES (tableau de bord Supabase), sans lesquels aucun code
 // n'arrive :
-//   1. modele d'e-mail « Magic Link » : utiliser {{ .Token }} et non
+//   1. modele d'e-mail de connexion : utiliser {{ .Token }} et non
 //      {{ .ConfirmationURL }}, sinon Supabase envoie un lien, pas un code ;
-//   2. SMTP personnalise (Resend) avec un domaine verifie : l'envoi integre
-//      de Supabase est plafonne a quelques e-mails par heure et interdit en
-//      production ;
-//   3. la limitation de debit « Email OTP » de Supabase est LA protection
-//      contre l'abus de demandes — elle vit la, pas dans notre serveur, que
-//      ces appels ne traversent jamais.
+//   2. un chemin d'envoi. ETAT AU 2026-09-20 : le service INTEGRE de
+//      Supabase, qui suffit pour une phase de test mais impose deux limites
+//      a connaitre — il n'envoie qu'aux MEMBRES DE L'ORGANISATION Supabase
+//      (sinon « Email address not authorized »), et environ 2 e-mails par
+//      heure et par projet. Un SMTP externe leve les deux ;
+//   3. la limitation de debit « Email OTP » est LA protection contre l'abus
+//      de demandes — elle vit dans Supabase, pas dans notre serveur, que ces
+//      appels ne traversent jamais.
 
 import { supabase } from './supabaseClient';
 import {
@@ -51,6 +56,34 @@ import { getApiBaseUrl } from './compositionApi';
 
 export const VOIE_CONVERSION = 'conversion';
 export const VOIE_CONNEXION = 'connexion';
+
+// UN SEUL CHEMIN TANT QUE L'ENVOI PASSE PAR SUPABASE (2026-09-20).
+//
+// La conversion sur place (chemin A) est la plus elegante : elle attache
+// l'adresse au compte anonyme, donc l'identifiant ne change pas et il n'y a
+// RIEN a transferer. Elle est pourtant desactivee pour l'instant, apres
+// verification des reglages reels du projet — deux raisons, chacune
+// suffisante :
+//
+//   1. ELLE UTILISE UN AUTRE MODELE D'E-MAIL. `updateUser({ email })`
+//      declenche le modele « Change Email Address », pas celui de connexion.
+//      Seul ce dernier a ete configure avec {{ .Token }} : un testeur
+//      recevrait un LIEN la ou l'ecran lui demande un CODE.
+//
+//   2. LE PROJET EST EN `mailer_autoconfirm: true` (releve le 2026-09-20 sur
+//      /auth/v1/settings). Le changement d'adresse peut alors etre applique
+//      SANS e-mail du tout : aucun code n'arriverait, et l'adresse serait
+//      attachee sans avoir ete verifiee.
+//
+// Le chemin B (signInWithOtp) n'a aucun de ces deux problemes : un seul
+// modele, celui qui est configure, et une verification obligatoire. Le livre
+// commence anonymement n'est pas perdu pour autant — il est rattache par
+// POST /auth/anonymous/link, route existante, eprouvee et testee.
+//
+// POUR REACTIVER la conversion sur place : configurer le modele « Change
+// Email Address » avec {{ .Token }}, activer « Confirm email », puis
+// repasser cette constante a true.
+const CONVERSION_SUR_PLACE = false;
 
 // Supabase ne renvoie pas de code d'erreur stable pour « cette adresse est
 // deja prise » : on reconnait donc le message, en restant large. Se tromper
@@ -88,7 +121,7 @@ export async function demanderUnCode(email) {
 
   const session = await getCurrentSession();
 
-  if (isAnonymousSession(session)) {
+  if (CONVERSION_SUR_PLACE && isAnonymousSession(session)) {
     const { error } = await supabase.auth.updateUser({ email: adresse });
     if (!error) {
       return { voie: VOIE_CONVERSION };
