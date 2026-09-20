@@ -68,6 +68,18 @@ async function rafraichir(fichier) {
   if (error) throw new Error(`telechargement : ${error.message}`);
   const contenu = Buffer.from(await data.arrayBuffer());
 
+  // GARDE-FOU : on s'apprete a ECRASER une photo par ce qu'on vient de
+  // telecharger. Si le telechargement a ete tronque (reseau, timeout), on
+  // ecrirait une image corrompue a la place d'une image intacte — pour
+  // changer un simple en-tete de cache. La taille annoncee par le stockage
+  // doit donc correspondre exactement.
+  if (fichier.taille > 0 && contenu.length !== fichier.taille) {
+    throw new Error(`taille incoherente (${contenu.length} recus, ${fichier.taille} attendus) — rien n'est ecrit`);
+  }
+  if (contenu.length === 0) {
+    throw new Error("contenu vide — rien n'est ecrit");
+  }
+
   // `upsert` : on remplace le fichier par lui-meme, seul l'en-tete change.
   const { error: erreurEnvoi } = await supabase.storage.from(BUCKET).upload(fichier.chemin, contenu, {
     contentType: fichier.type,
