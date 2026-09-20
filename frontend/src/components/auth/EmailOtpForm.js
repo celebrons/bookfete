@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { demanderUnCode, verifierLeCode } from '../../services/emailOtp';
 import './EmailOtpForm.css';
 
-// E-mail, puis code a 6 chiffres. Rien d'autre (2026-09-20).
+// E-mail, puis le code recu. Rien d'autre (2026-09-20).
 //
 // Pas de mot de passe a inventer, pas de confirmation, pas de nom : au
 // moment de commander, chaque champ supplementaire est un acheteur en
@@ -19,6 +19,14 @@ import './EmailOtpForm.css';
 // Le choix conversion/connexion est pris par le service (emailOtp.js) : ce
 // composant ne fait que le transporter d'une etape a l'autre.
 const DELAI_RENVOI_S = 60;
+
+// La longueur du code est un reglage du fournisseur d'authentification (de
+// 6 a 10 chiffres) que l'application ne peut pas lire. Le champ accepte
+// donc toute la plage : coder 6 en dur empechait de saisir un code de 8,
+// sans le moindre message — le champ refusait simplement les caracteres
+// suivants (constate le 2026-09-20).
+const CODE_MIN = 6;
+const CODE_MAX = 10;
 
 function EmailOtpForm({
   emailInitial = '',
@@ -93,7 +101,7 @@ function EmailOtpForm({
           required
         />
         <p className="otp-hint">
-          Nous vous envoyons un code à 6 chiffres. Pas de mot de passe à retenir.
+          Nous vous envoyons un code par e-mail. Pas de mot de passe à retenir.
         </p>
         {erreur && <p className="otp-error">{erreur}</p>}
         <div className="otp-actions">
@@ -113,17 +121,19 @@ function EmailOtpForm({
   return (
     <form className="otp-form" onSubmit={validerLeCode}>
       <label className="otp-label" htmlFor="otp-code">Code reçu par e-mail</label>
+      {/* Pas de « 123456 » en exemple : ce serait promettre six chiffres,
+          exactement l erreur qu on vient de corriger. */}
       <input
         id="otp-code"
         ref={champCode}
         type="text"
         className="input-luxe otp-code-input"
         value={code}
-        onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+        onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_MAX))}
         inputMode="numeric"
         autoComplete="one-time-code"
-        placeholder="123456"
-        maxLength={6}
+        placeholder="Votre code"
+        maxLength={CODE_MAX}
         required
       />
       <p className="otp-hint">
@@ -146,7 +156,7 @@ function EmailOtpForm({
         >
           {attenteRenvoi > 0 ? `Renvoyer (${attenteRenvoi} s)` : 'Renvoyer le code'}
         </button>
-        <button type="submit" className="btn btn-primary" disabled={enCours || code.length !== 6}>
+        <button type="submit" className="btn btn-primary" disabled={enCours || code.length < CODE_MIN}>
           {enCours ? 'Vérification…' : libelleAction}
         </button>
       </div>

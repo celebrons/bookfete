@@ -87,7 +87,7 @@ function StepPayment({
           <p>
             Elle vous permettra de retrouver ce livre, de suivre sa fabrication et de
             revenir sur votre commande — y compris depuis un autre appareil. Nous vous
-            envoyons un code à 6&nbsp;chiffres : <strong>pas de mot de passe à inventer</strong>.
+            envoyons un code par e-mail : <strong>pas de mot de passe à inventer</strong>.
             Votre livre est déjà enregistré, rien n’est perdu et vous ne quittez pas
             cette page.
           </p>

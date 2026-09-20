@@ -108,7 +108,7 @@ function messageLisible(erreur, repli) {
 }
 
 /**
- * Demande l'envoi d'un code a 6 chiffres.
+ * Demande l'envoi du code de connexion.
  * @returns {Promise<{voie: string}>} le chemin emprunte, a repasser a
  *   `verifierLeCode` — c'est lui qui determine comment Supabase doit
  *   verifier le code.
@@ -155,8 +155,12 @@ export async function demanderUnCode(email) {
 export async function verifierLeCode({ email, code, voie }) {
   const adresse = String(email || '').trim().toLowerCase();
   const jeton = String(code || '').trim();
-  if (!/^\d{6}$/.test(jeton)) {
-    throw new Error('Le code comporte 6 chiffres.');
+  // Bornes larges a dessein : la longueur exacte est un reglage du
+  // fournisseur (de 6 a 10 chiffres), invisible depuis l'application. Mieux
+  // vaut laisser passer un code de la mauvaise longueur et le faire refuser
+  // par le serveur — qui, lui, sait — que bloquer un code valide.
+  if (!/^\d{6,10}$/.test(jeton)) {
+    throw new Error('Le code ne contient que des chiffres. Recopiez-le tel qu il figure dans l e-mail.');
   }
 
   // `email_change` pour une conversion (on attache une adresse a un compte

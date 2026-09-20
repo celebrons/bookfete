@@ -49,7 +49,7 @@ function MesLivresLuxe() {
             <>
               <p className="orders-disclaimer" style={{ marginBottom: 16 }}>
                 Indiquez l’adresse e-mail utilisée lors de votre commande. Nous vous envoyons
-                un code à 6&nbsp;chiffres — il n’y a pas de mot de passe à retrouver.
+                un code de connexion — il n’y a pas de mot de passe à retrouver.
               </p>
               <EmailOtpForm
                 libelleAction="Voir mes livres"
