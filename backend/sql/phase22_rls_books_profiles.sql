@@ -95,6 +95,37 @@ create policy "profiles_self_update"
 -- Laisser un client creer ou supprimer une fiche n'a aucun usage legitime.
 
 -- ------------------------------------------------------------
+-- book_participants : l'inverse du probleme, trouve en verifiant
+-- ------------------------------------------------------------
+-- Constate le 2026-09-20 : la table contient 2 lignes reelles, et le
+-- navigateur en voit ZERO. Elle a donc RLS active SANS aucune politique
+-- (phase15_collective_mode.sql n'en pose aucune) : tout est refuse, y
+-- compris au proprietaire du livre.
+--
+-- Consequence silencieuse : le tableau de bord joint
+-- `participants:book_participants(status)` pour compter les participants
+-- d'un album collectif. Cette jointure revient vide pour tout le monde —
+-- les albums collectifs affichent donc toujours 0 participant, sans
+-- qu'aucune erreur ne le signale.
+--
+-- Une politique de LECTURE pour le proprietaire du livre suffit : les
+-- ecritures (invitations, changements de statut) passent par le backend en
+-- service_role, qui contourne RLS.
+alter table public.book_participants enable row level security;
+
+drop policy if exists "book_participants_owner_select" on public.book_participants;
+create policy "book_participants_owner_select"
+  on public.book_participants
+  for select
+  using (
+    exists (
+      select 1 from public.books b
+      where b.id = book_participants.book_id
+        and b.owner_id = auth.uid()
+    )
+  );
+
+-- ------------------------------------------------------------
 -- Verification (a lancer apres, cote serveur) :
 --   node scripts/check-rls.js
 -- Il rejoue exactement les acces qui passaient avant cette migration et
