@@ -26,6 +26,7 @@ const DEFAULT_FORMAT = { trimWidthMm: 210, trimHeightMm: 280 }; // "standard" (c
 const GOOGLE_FONTS_LINK = '<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Playfair+Display:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />';
 
 const typography = require('./typographySystem');
+const photoSource = require('./photoSource');
 
 function escapeHtml(value = '') {
   return String(value)
@@ -970,6 +971,10 @@ const BASE_CSS = `
  * @returns {string} document HTML complet, autonome
  */
 function renderBookHtml(input) {
+  // Quelle version de chaque photo envoyer ? Voir photoSource.js : par
+  // defaut celle d'ecran (4 a 5 fois plus legere), sauf quand l'appelant a
+  // deja choisi — c'est le cas du PDF et du fichier d'impression.
+  input = { ...input, items: photoSource.pourLAffichage(input.items, input.sourcePhoto) };
   // Fond perdu en millimetres. Zero pour le PDF telechargeable par le
   // client (pas de massicot), 3 pour le fichier d impression.
   const bleedMm = Number(input.bleedMm) > 0 ? Number(input.bleedMm) : 0;
@@ -1142,6 +1147,9 @@ ${pagesHtml || '<p style="padding:24px;font-family:sans-serif;">Ce livre n\'a pa
  * @returns {string}
  */
 function renderSinglePageHtml(input) {
+  // Toujours un affichage ecran : cette fonction ne sert qu'a l'atelier et a
+  // l'apercu, jamais a fabriquer un fichier.
+  input = { ...input, items: photoSource.pourLAffichage(input.items) };
   const book = input.book || {};
   const page = input.page;
   const items = Array.isArray(input.items) ? input.items : [];

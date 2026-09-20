@@ -1,11 +1,15 @@
 import React, { useEffect } from 'react';
 
-// Apercu plein ecran d'UNE photo a sa vraie resolution (retour utilisateur,
-// 2026-09-11 : "un petit oeil... pour voir la photo en taille reelle") —
-// utilise l'URL de l'ORIGINAL (item.url, jamais retaille, voir
-// storageService.js), jamais la version telle qu'elle apparait dans la
-// page (object-fit:cover + eventuel recadrage, voir pageRenderer.js) : le
-// but est de juger la photo elle-meme, pas son rendu final dans le livre.
+// Apercu plein ecran d'UNE photo entiere (retour utilisateur, 2026-09-11 :
+// "un petit oeil... pour voir la photo en taille reelle") — la photo telle
+// qu'elle est, et non telle qu'elle apparait dans la page (object-fit:cover
+// + eventuel recadrage, voir pageRenderer.js) : le but est de juger la
+// photo elle-meme, pas son rendu final dans le livre.
+//
+// L'appelant fournit la version d'ECRAN (1600 px, voir storageService.js),
+// pas l'original : sur un ecran courant la difference ne se voit pas, et
+// l'original pese cinq fois plus — 1,4 Mo telecharges a chaque coup d'oeil
+// (2026-09-20).
 // Meme mecanique de fermeture (clic en dehors/Echap, defilement bloque)
 // que AtelierBookView.js's "Voir a l'echelle" — reutilisable depuis
 // n'importe quel ecran de l'atelier, pas specifique aux pages interieures.

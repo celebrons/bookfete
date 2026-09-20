@@ -295,7 +295,14 @@ function AtelierSidebar({
                   <button
                     type="button"
                     className="atelier-sidebar-item-zoom"
-                    onClick={(event) => { event.stopPropagation(); quitter(); setPhotoOuverte(item.url); }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      quitter();
+                      // Version d'ecran (1600 px) et non l'original : sur un
+                      // ecran courant la difference ne se voit pas, et
+                      // l'original pese cinq fois plus (2026-09-20).
+                      setPhotoOuverte(item.metadata?.previewUrl || item.url);
+                    }}
                     aria-label="Voir la photo en grand"
                     title="Voir la photo en grand"
                   >

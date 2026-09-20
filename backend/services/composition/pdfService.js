@@ -35,6 +35,7 @@ const { pathToFileURL } = require('url');
 const PDFDocument = require('pdfkit');
 const sharp = require('../../config/sharp');
 const pageRenderer = require('./pageRenderer');
+const photoSource = require('./photoSource');
 
 const PDF_PREVIEW_DIR = path.join(__dirname, '..', '..', 'tmp', 'composition-preview');
 
@@ -1166,6 +1167,10 @@ async function renderPdfByPrintingDirect(input) {
     layouts: input.layouts,
     format,
     bleedMm,
+    // Les URL sont DEJA choisies ici (allegerLesPhotos ci-dessus : version
+    // redimensionnee pour la lecture, original pour le massicot). Le moteur
+    // de rendu ne doit surtout pas en choisir d'autres par-dessus.
+    sourcePhoto: photoSource.SOURCE_TELLE_QUELLE,
     spreadLayout: enPlanches,
     // Fichier d impression Gelato : la couverture enveloppante occupe une
     // premiere page a sa propre taille (voir pageRenderer).

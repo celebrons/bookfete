@@ -934,3 +934,43 @@ describe('renderBookHtml — legende par photo (content.photoCaptions)', () => {
     expect(body).not.toContain('<img onerror=x>');
   });
 });
+
+// Quelle version de chaque photo part dans le HTML ?
+//
+// Le rendu d'ECRAN (atelier, apercu) doit servir la version legere : c'est
+// le geste le plus frequent de l'application, et l'original y coutait cinq
+// fois plus de bande passante pour un resultat identique a l'oeil.
+//
+// Le rendu d'un FICHIER (PDF, impression) ne doit surtout pas subir cette
+// substitution : pdfService a deja choisi sa source, et une image d'ecran
+// envoyee au massicot serait un livre flou. Ce sont ces deux cas qu'on
+// verrouille ici.
+describe('renderBookHtml — quelle version de photo part au navigateur', () => {
+  const photo = {
+    id: 'photo-1',
+    kind: 'photo',
+    url: 'https://cdn.test/1-original.jpg',
+    metadata: { previewUrl: 'https://cdn.test/1-preview.jpg' }
+  };
+  const page = { page_index: 0, content: { kind: 'photo', blocks: [{ kind: 'photo', itemIds: ['photo-1'] }] } };
+
+  it('rendu d\'ecran : sert la version legere', () => {
+    const html = bodyOf(renderBookHtml({ book: {}, items: [photo], pages: [page] }));
+    expect(html).toContain('1-preview.jpg');
+    expect(html).not.toContain('1-original.jpg');
+  });
+
+  it('rendu d\'un fichier (« telle-quelle ») : l\'URL choisie par l\'appelant est respectee', () => {
+    const html = bodyOf(renderBookHtml({
+      book: {}, items: [photo], pages: [page], sourcePhoto: 'telle-quelle'
+    }));
+    expect(html).toContain('1-original.jpg');
+    expect(html).not.toContain('1-preview.jpg');
+  });
+
+  it('photo deposee avant l\'existence des derivees : l\'original reste affiche', () => {
+    const ancienne = { id: 'photo-1', kind: 'photo', url: 'https://cdn.test/vieille.jpg', metadata: {} };
+    const html = bodyOf(renderBookHtml({ book: {}, items: [ancienne], pages: [page] }));
+    expect(html).toContain('vieille.jpg');
+  });
+});

@@ -73,6 +73,22 @@ async function resizeImage(buffer, maxPx, quality) {
   }
 }
 
+// UN AN DE CACHE, ET C'EST VOLONTAIRE (2026-09-20).
+//
+// Ces fichiers sont IMMUABLES : leur nom porte un identifiant unique genere
+// au depot, et modifier une photo cree un nouveau fichier plutot que d'en
+// remplacer un. Rien ne peut donc changer derriere une URL donnee.
+//
+// Elles etaient pourtant servies avec max-age=3600. Revenir sur son livre
+// le lendemain retelechargeait tout, et un simple aller-retour entre deux
+// pages de l'atelier pouvait suffire. Sur une photothèque de 0,52 Go servie
+// 5,5 Go en un mois, une bonne part venait de la : les memes images,
+// encore et encore.
+//
+// Le drapeau immutable dit au navigateur de ne meme pas REVALIDER (pas de requete
+// conditionnelle, pas de 304) tant que le cache est frais.
+const CACHE_UN_AN = '31536000, immutable';
+
 // Genere une variante redimensionnee et l'uploade sous son propre nom de
 // fichier. Retourne son URL publique, ou null si le redimensionnement ou
 // l'upload echoue — jamais bloquant pour l'upload de l'original.
@@ -83,7 +99,7 @@ async function uploadResizedVariant(bucket, fileName, originalBuffer, maxPx, qua
   try {
     const { error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, resized, { contentType: 'image/jpeg', cacheControl: '3600' });
+      .upload(fileName, resized, { contentType: 'image/jpeg', cacheControl: CACHE_UN_AN });
     if (error) return null;
 
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(fileName);
@@ -142,7 +158,7 @@ const uploadFile = async (bucket, file, folder = '') => {
       .from(bucket)
       .upload(fileName, originalBuffer, {
         contentType: file.mimetype,
-        cacheControl: '3600'
+        cacheControl: CACHE_UN_AN
       });
 
     if (error) throw error;

@@ -278,7 +278,12 @@ function AtelierPageOverlay({
                     <button
                       type="button"
                       className="atelier-overlay-slot-icon-btn atelier-overlay-slot-view-btn"
-                      onClick={(event) => { event.stopPropagation(); setViewingUrl(item.url); }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        // Voir le commentaire de AtelierSidebar : version
+                        // d'ecran, pas l'original.
+                        setViewingUrl(item.metadata?.previewUrl || item.url);
+                      }}
                       title="Voir la photo en taille réelle"
                       aria-label="Voir la photo en taille réelle"
                     >
