@@ -55,11 +55,6 @@ async function trouverLaFeuilleDeStyle() {
   return `${BASE}${trouve[1]}`;
 }
 
-const PAGE_MODELE = (css, corps) => `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8">
-<link rel="stylesheet" href="${css}">
-</head><body style="margin:0">${corps}</body></html>`;
-
 const lignesDeDoublon = (nombre) => Array.from({ length: nombre }, (_, i) => `
   <li class="pq-recap-item">
     <span class="pq-recap-thumb pq-recap-thumb-empty"></span>
@@ -121,11 +116,42 @@ const ECRAN_PRODUIT = `
   </div>
 </div>`;
 
+// Ouvre la VRAIE page du site et y pose la maquette.
+//
+// Poser la maquette dans une page vide qui se contente de LIER la feuille
+// de style du site ne donne pas le meme rendu : cette feuille est alors
+// d'une autre origine, et le resultat mesure n'est plus celui du site (un
+// bouton dore y ressortait beige, constate le 2026-09-20). On garde donc
+// le document reel et on ne remplace que son contenu.
+async function poserLaMaquette(onglet, corps, fond) {
+  if (onglet.url() === 'about:blank') {
+    await onglet.goto(BASE, { waitUntil: 'networkidle2' });
+  }
+  await onglet.evaluate((html, couleur) => {
+    document.body.innerHTML = html;
+    document.body.style.margin = '0';
+    document.body.style.padding = '24px';
+    if (couleur) document.body.style.background = couleur;
+  }, corps, fond || null);
+}
+
 async function mesurer(page, selecteur) {
   return page.$eval(selecteur, (el) => {
     const r = el.getBoundingClientRect();
     return { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
   });
+}
+
+// Chrome "assombrit automatiquement" certains elements qu il juge trop
+// clairs — une carte blanche, typiquement. Le drapeau de lancement ne
+// suffit pas : il faut le dire a l onglet. Sans ca, un bouton dore est
+// mesure et capture en beige grisatre, et on verifie l interpretation de
+// Chrome au lieu de verifier le site (constate le 2026-09-20 : le meme
+// bouton sortait dore dans un panneau et gris dans une fenetre modale).
+async function neutraliserLeModeSombre(onglet) {
+  const session = await onglet.createCDPSession();
+  await session.send("Emulation.setAutoDarkModeOverride", { enabled: false });
+  await onglet.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
 }
 
 async function main() {
@@ -136,14 +162,19 @@ async function main() {
   const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'celebrons-ecrans-'));
   const navigateur = await puppeteer.launch({
     headless: 'new',
-    args: ['--no-sandbox', '--disable-dev-shm-usage', `--user-data-dir=${dossier}`]
+    // Chrome peut 'assombrir automatiquement' une page qu'il juge claire :
+    // les couleurs mesurees ne sont alors plus celles du site (constate le
+    // 2026-09-20 sur un bouton dore rendu beige). On le desactive, sinon on
+    // verifie l'interpretation de Chrome au lieu de verifier le site.
+    args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-features=WebContentsForceDark', `--user-data-dir=${dossier}`]
   });
 
   try {
     // --- 1. La fenetre avant commande, sur un ecran volontairement court ---
     const page = await navigateur.newPage();
+    await neutraliserLeModeSombre(page);
     await page.setViewport({ width: 1280, height: 620 });
-    await page.setContent(PAGE_MODELE(css, FENETRE_RECAP(14)), { waitUntil: 'load' });
+    await poserLaMaquette(page, FENETRE_RECAP(14));
 
     const fenetre = await mesurer(page, '.pq-recap-modal');
     const boutonContinuer = await mesurer(page, '#continuer');
@@ -169,7 +200,7 @@ async function main() {
 
     // Et sur un telephone, ou la place manque vraiment.
     await page.setViewport({ width: 390, height: 640 });
-    await page.setContent(PAGE_MODELE(css, FENETRE_RECAP(14)), { waitUntil: 'load' });
+    await poserLaMaquette(page, FENETRE_RECAP(14));
     const boutonTelephone = await mesurer(page, '#continuer');
     verifier(
       'sur telephone aussi, le bouton reste a l ecran',
@@ -179,7 +210,7 @@ async function main() {
 
     // --- 2 et 3. L ecran de choix du produit -------------------------------
     await page.setViewport({ width: 1280, height: 900 });
-    await page.setContent(PAGE_MODELE(css, ECRAN_PRODUIT), { waitUntil: 'load' });
+    await poserLaMaquette(page, ECRAN_PRODUIT);
 
     const panneau = await mesurer(page, '#panneau');
     const barre = await mesurer(page, '#barre');

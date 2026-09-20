@@ -202,6 +202,13 @@
   margin-top: 12px;
 }
 
+/* Deux actions dans un volet etroit : sans cette reduction, le remplissage
+   par defaut des boutons (32 px de chaque cote) les faisait passer a la
+   ligne l un sous l autre. */
+.tracking-pane-actions .btn {
+  padding: 11px 18px;
+}
+
 /* Bouton porteur d'une icone : l'icone precede le libelle, jamais a la
    place — une icone seule ne se lit pas de la meme facon par tout le monde. */
 .btn-icone {
