@@ -5,8 +5,26 @@ import {
   linkAnonymousBooksAfterLogin,
   rememberAnonymousTokenBeforeLogin
 } from '../../services/anonymousSession';
+import { messageReseau } from '../../services/httpClient';
 import '../../styles/luxe-theme.css';
 import './AuthLuxe.css';
+
+// RACCOURCI DE DEVELOPPEMENT, JAMAIS EN LIGNE (2026-09-21).
+//
+// La page de connexion affichait « Acces rapide compte test » avec
+// l'adresse, le MOT DE PASSE EN CLAIR, et un bouton pour entrer d'un clic.
+// C'etait servi a tout visiteur du site, et les identifiants se lisaient de
+// toute facon dans le fichier JavaScript publie.
+//
+// Constate juste avant d'ouvrir le site a des testeurs : n'importe lequel
+// d'entre eux — ou n'importe qui tombant sur l'adresse — aurait eu acces
+// aux livres, aux photos et aux commandes de ce compte.
+//
+// Le raccourci reste utile pendant le developpement local : il n'apparait
+// plus que la. `NODE_ENV` vaut 'production' dans toute version construite,
+// donc la question ne se pose plus au moment du deploiement — il n'y a rien
+// a penser a desactiver.
+const RACCOURCI_TEST_DISPONIBLE = process.env.NODE_ENV === 'development';
 
 const TEST1_CREDENTIALS = {
   email: 'test1@test.com',
@@ -55,7 +73,10 @@ const LoginLuxe = () => {
         navigate('/dashboard');
       }
     } catch (loginError) {
-      setError(loginError.message);
+      // Un reseau qui lache n'est pas un mot de passe refuse : on le dit
+      // dans la langue du site, avec ce qu'il faut faire. Hors cas reseau,
+      // le message d'origine est conserve — il est plus precis.
+      setError(messageReseau(loginError) || loginError.message);
     } finally {
       setLoading(false);
     }
@@ -170,23 +191,25 @@ const LoginLuxe = () => {
           </button>
         </form>
 
-        <div className="test-accounts">
-          <p className="test-accounts-title">Acces rapide compte test</p>
-          <div className="test-accounts-grid">
-            <button
-              type="button"
-              className="btn test-account-btn"
-              onClick={handleTest1Login}
-              disabled={loading}
-            >
-              <span className="test-account-email">{TEST1_CREDENTIALS.email}</span>
-              <span className="test-account-role">test1</span>
-            </button>
+        {RACCOURCI_TEST_DISPONIBLE && (
+          <div className="test-accounts">
+            <p className="test-accounts-title">Acces rapide compte test (developpement)</p>
+            <div className="test-accounts-grid">
+              <button
+                type="button"
+                className="btn test-account-btn"
+                onClick={handleTest1Login}
+                disabled={loading}
+              >
+                <span className="test-account-email">{TEST1_CREDENTIALS.email}</span>
+                <span className="test-account-role">test1</span>
+              </button>
+            </div>
+            <p className="test-accounts-note">
+              Mot de passe: <strong>{TEST1_CREDENTIALS.password}</strong>
+            </p>
           </div>
-          <p className="test-accounts-note">
-            Mot de passe: <strong>{TEST1_CREDENTIALS.password}</strong>
-          </p>
-        </div>
+        )}
 
         <div className="auth-divider">
           <span>OU</span>

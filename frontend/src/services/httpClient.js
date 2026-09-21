@@ -31,6 +31,40 @@ const COLD_START_TIMEOUT_MS = Number(process.env.REACT_APP_API_COLD_START_TIMEOU
 
 export const TIMEOUT_MESSAGE = 'Le serveur met trop de temps a repondre (il est peut-etre en train de redemarrer). Reessayez dans une minute.';
 
+// CE QUE LE NAVIGATEUR DIT, ET CE QU'IL FAUT MONTRER.
+//
+// Un telephone sur un reseau faible interrompt les requetes, et chaque
+// navigateur a sa formule — en anglais, et sans indiquer quoi faire :
+//
+//   Safari  : « The operation was aborted. » / « Load failed »
+//   Chrome  : « Failed to fetch »
+//   Firefox : « NetworkError when attempting to fetch resource. »
+//
+// Vu le 2026-09-21 sur un iPhone, en plein ecran de connexion : l'ecran
+// affichait « The operation was aborted. » et l'utilisateur n'avait aucune
+// idee de ce qu'il devait faire — ni meme si c'etait son mot de passe qui
+// etait refuse.
+//
+// Ces messages ne viennent pas de nos appels a nous (fetchWithWakeRetry
+// traduit deja les siens) mais des bibliotheques qui font leurs propres
+// requetes, comme le client d'authentification.
+//
+// Renvoie null quand l'erreur n'est PAS de nature reseau : l'appelant garde
+// alors son message d'origine, souvent plus precis (« mot de passe
+// incorrect » vaut mieux que « probleme de connexion »).
+export function messageReseau(error) {
+  const texte = `${error?.name || ''} ${error?.message || ''}`.toLowerCase();
+  if (!texte.trim()) return null;
+
+  if (/aborterror|was aborted|signal is aborted|timeout|timed out/.test(texte)) {
+    return TIMEOUT_MESSAGE;
+  }
+  if (/failed to fetch|load failed|networkerror|network request failed|connexion/.test(texte)) {
+    return 'Connexion interrompue. Verifiez votre reseau et reessayez.';
+  }
+  return null;
+}
+
 function isIdempotent(options = {}) {
   const method = String(options.method || 'GET').toUpperCase();
   return method === 'GET' || method === 'HEAD';
