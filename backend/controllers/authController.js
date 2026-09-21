@@ -1,4 +1,21 @@
+const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
+
+// UN CLIENT JETABLE POUR CHAQUE CONNEXION.
+//
+// signInWithPassword et signUp RETIENNENT la session sur le client qui
+// les appelle. Les lancer sur le client partage du backend le transformait
+// en client de la derniere personne connectee — voir le commentaire de
+// config/supabase.js pour ce que ca a casse.
+//
+// Un client neuf par appel coute une allocation et resout le probleme a la
+// racine : la session naît et meurt avec la requete, sans jamais pouvoir
+// contaminer quoi que ce soit.
+const clientJetable = () => createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+);
 
 const login = async (req, res) => {
   try {
@@ -9,7 +26,7 @@ const login = async (req, res) => {
       return res.status(400).json({ error: 'Email et mot de passe requis' });
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await clientJetable().auth.signInWithPassword({
       email: normalizedEmail,
       password
     });
@@ -46,7 +63,7 @@ const register = async (req, res) => {
       return res.status(400).json({ error: 'Mot de passe trop court (8 caracteres minimum)' });
     }
 
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await clientJetable().auth.signUp({
       email: normalizedEmail,
       password: safePassword,
       options: {
@@ -91,7 +108,7 @@ const register = async (req, res) => {
 
 const logout = async (req, res) => {
   try {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await clientJetable().auth.signOut();
     if (error) {
       return res.status(500).json({ error: error.message });
     }
