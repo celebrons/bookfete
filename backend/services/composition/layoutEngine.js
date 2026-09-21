@@ -476,6 +476,48 @@ function harmoniserLesDoublesPages(pages, layouts) {
   };
 
   const resultat = [...pages];
+
+  // D'ABORD, ON APPAIRE LES PLEINES PAGES SOLITAIRES.
+  //
+  // Le moteur alterne volontairement les familles de mise en page pour eviter
+  // la monotonie : deux pleines pages ne se retrouvent donc JAMAIS cote a
+  // cote d'elles-memes. Mesure sur un livre reel de 46 pages : 15 pleines
+  // pages, zero paire. Se contenter d'accorder les registres revenait donc a
+  // mettre une marge a TOUTES — le fond perdu disparaissait du produit,
+  // alors que c'est lui qui fait respirer un livre de photos.
+  //
+  // On echange donc deux pages entre deux doubles pages mal assorties : la
+  // pleine page de la seconde vient rejoindre celle de la premiere. Resultat,
+  // une double page immersive et une double page d'album, toutes deux
+  // coherentes, la ou il y avait deux melanges.
+  //
+  // Un ECHANGE, pas une reecriture : les memes pages, le meme contenu, a des
+  // places differentes. L'ordre des photos dans un livre automatique est
+  // celui de leur depot, pas un recit — les deplacer ne trahit rien.
+  const solitaires = [];
+  for (let gauche = 0; gauche + 1 < resultat.length; gauche += 2) {
+    const droite = gauche + 1;
+    const aGauche = estPleinePage(resultat[gauche]);
+    const aDroite = estPleinePage(resultat[droite]);
+    if (aGauche !== aDroite) {
+      solitaires.push({ pleine: aGauche ? gauche : droite, autre: aGauche ? droite : gauche });
+    }
+  }
+
+  for (let i = 0; i + 1 < solitaires.length; i += 2) {
+    const accueil = solitaires[i];
+    const donneur = solitaires[i + 1];
+    const a = accueil.autre;
+    const b = donneur.pleine;
+    [resultat[a], resultat[b]] = [resultat[b], resultat[a]];
+    // page_index suit la POSITION, jamais la page : c'est lui qui decide
+    // quelle moitie d'une photo sur double page est affichee (voir
+    // pageRenderer : parite de l'index).
+    resultat[a] = { ...resultat[a], page_index: a };
+    resultat[b] = { ...resultat[b], page_index: b };
+  }
+
+  // ENSUITE SEULEMENT, on accorde les registres.
   for (let gauche = 0; gauche + 1 < resultat.length; gauche += 2) {
     const droite = gauche + 1;
     const aGauche = estPleinePage(resultat[gauche]);

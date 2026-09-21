@@ -477,3 +477,59 @@ describe('layoutEngine — accord des registres sur une double page', () => {
     expect(apres[1].layout_id).toBe(GRILLE.id);
   });
 });
+
+// Appairer les pleines pages solitaires (2026-09-21).
+//
+// Le moteur alterne volontairement les familles de mise en page : deux
+// pleines pages ne se retrouvent donc jamais cote a cote d'elles-memes.
+// Mesure sur un livre reel de 46 pages : 15 pleines pages, ZERO paire.
+// Se contenter d'accorder les registres revenait donc a mettre une marge a
+// toutes, et le fond perdu disparaissait du produit.
+describe('layoutEngine — appairage des pleines pages', () => {
+  const FULL = { id: 'lay-full', slug: 'FULL_PHOTO', kind: 'photo', capacity: { slots: [{ type: 'photo' }] } };
+  const GRILLE = { id: 'lay-trois', slug: 'THREE_PHOTOS', kind: 'photo', capacity: { slots: [{ type: 'photo' }] } };
+  const harmoniser = require('../../services/composition/layoutEngine').__harmoniserPourLesTests;
+
+  const page = (index, layout, marqueur) => ({
+    page_index: index,
+    layout_id: layout.id,
+    content: { kind: 'photo', itemIds: [marqueur], blocks: [{ itemIds: [marqueur], kind: 'photo', layoutId: layout.id, presentationVariant: 0 }] }
+  });
+
+  const registre = (p) => (p.layout_id !== FULL.id
+    ? 'cadre'
+    : (p.content.blocks[0].presentationVariant === 1 ? 'cadre' : 'fond perdu'));
+
+  it('deux doubles pages mal assorties en donnent une immersive et une d\'album', () => {
+    // [pleine, grille] puis [grille, pleine] : deux melanges.
+    const avant = [page(0, FULL, 'a'), page(1, GRILLE, 'b'), page(2, GRILLE, 'c'), page(3, FULL, 'd')];
+    const apres = harmoniser(avant, [FULL, GRILLE]);
+
+    expect(registre(apres[0])).toBe(registre(apres[1]));
+    expect(registre(apres[2])).toBe(registre(apres[3]));
+    const immersives = [[0, 1], [2, 3]].filter(([g, d]) => registre(apres[g]) === 'fond perdu' && registre(apres[d]) === 'fond perdu');
+    expect(immersives.length).toBe(1);
+  });
+
+  it('aucun contenu n\'est perdu ni duplique par l\'echange', () => {
+    const avant = [page(0, FULL, 'a'), page(1, GRILLE, 'b'), page(2, GRILLE, 'c'), page(3, FULL, 'd')];
+    const apres = harmoniser(avant, [FULL, GRILLE]);
+    const marqueurs = apres.flatMap((p) => p.content.itemIds).sort();
+    expect(marqueurs).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('page_index suit toujours la POSITION apres echange', () => {
+    // Decisif : c'est la parite de l'index qui decide quelle moitie d'une
+    // photo sur double page est affichee (voir pageRenderer).
+    const avant = [page(0, FULL, 'a'), page(1, GRILLE, 'b'), page(2, GRILLE, 'c'), page(3, FULL, 'd')];
+    const apres = harmoniser(avant, [FULL, GRILLE]);
+    apres.forEach((p, index) => expect(p.page_index).toBe(index));
+  });
+
+  it('une seule pleine page solitaire reste avec sa marge, sans echange possible', () => {
+    const avant = [page(0, FULL, 'a'), page(1, GRILLE, 'b')];
+    const apres = harmoniser(avant, [FULL, GRILLE]);
+    expect(registre(apres[0])).toBe('cadre');
+    expect(apres[0].content.itemIds).toEqual(['a']);
+  });
+});
