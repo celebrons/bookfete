@@ -99,6 +99,36 @@ async function sendEmail({ to, subject, html, text, replyTo }) {
       // gratuite, quota), et le reformuler ferait perdre cette precision.
       const detail = corps?.message || corps?.error || `HTTP ${reponse.status}`;
       console.error(`[email] echec -> ${to} : ${detail}`);
+
+      // UN ECHEC D'ENVOI NE DOIT PAS RESTER DANS LE JOURNAL SYSTEME.
+      //
+      // Le 2026-09-21, un acheteur n'a jamais recu son lien de
+      // telechargement. L'email avait bien ete tente, et refuse :
+      //
+      //   « You can only send testing emails to your own email address »
+      //
+      // Le motif etait exact et immediatement actionnable — mais il ne
+      // vivait que dans journalctl. Cote produit, tout avait l'air normal :
+      // la commande etait payee, le PDF pret, et l'envoi « non bloquant »
+      // avait fait son travail en silence. Un echec d'email est rare et se
+      // repare en changeant une configuration : il doit se voir dans
+      // l'espace d'administration, pas se deterrer en SSH.
+      //
+      // Import tardif : ce module est charge tres tot, et le journal
+      // d'evenements ouvre une connexion a la base.
+      try {
+        // eslint-disable-next-line global-require
+        require('../events/eventLog').logEvent({
+          type: 'email.failed',
+          level: 'error',
+          actor: 'system',
+          message: `Email non remis a ${to}`,
+          metadata: { destinataire: to, sujet: subject, motif: String(detail).slice(0, 300) }
+        });
+      } catch (_error) {
+        // Journaliser un echec ne doit jamais en provoquer un autre.
+      }
+
       return { sent: false, error: detail, status: reponse.status };
     }
 

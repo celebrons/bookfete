@@ -226,23 +226,25 @@ function composeFrontCover({ book, items, template, format }) {
     // unique, pas une composition a plusieurs photos.
     variant = overridden.score >= COVER_PHOTO_THRESHOLDS.great ? 'COVER_PHOTO_TITLE' : 'COVER_PHOTO';
     photos = [overridden.item];
-  } else if (best && best.score >= COVER_PHOTO_THRESHOLDS.great) {
-    const strongRivals = ranked.filter((entry) => entry.score >= COVER_PHOTO_THRESHOLDS.highBarForMulti);
-    const noClearWinner = ranked.length >= 2
-      && (best.score - ranked[1].score) < COVER_PHOTO_THRESHOLDS.clearWinnerMargin;
-    const { profile } = detectContentProfile(items);
-
-    if (strongRivals.length >= MULTI_PHOTO_TRIGGER_COUNT && noClearWinner && profile === 'PHOTO') {
-      variant = 'COVER_MULTI_PHOTO';
-      photos = strongRivals.slice(0, MULTI_PHOTO_MAX).map((entry) => entry.item);
-    } else {
-      variant = 'COVER_PHOTO_TITLE';
-      photos = [best.item];
-    }
-  } else if (best && best.score >= COVER_PHOTO_THRESHOLDS.good) {
-    variant = 'COVER_PHOTO';
-    photos = [best.item];
   } else {
+    // PAR DEFAUT, UNE COUVERTURE DE TEXTE (2026-09-21).
+    //
+    // Le moteur choisissait ici la « meilleure » photo, et souvent trois
+    // d'un coup quand aucune ne se detachait. Le resultat etait un trio de
+    // photos pose sans intention : « le systeme remplit systematiquement la
+    // couverture avec 3 photos ».
+    //
+    // Le probleme n'etait pas le classement, qui fait bien son travail :
+    // c'est qu'une couverture se CHOISIT. Aucun calcul ne sait quelle photo
+    // represente un voyage ou un depart a la retraite, et se tromper la se
+    // voit plus que partout ailleurs — c'est la premiere chose qu'on
+    // regarde.
+    //
+    // Le titre sur la matiere choisie est sobre, juste a tous les coups, et
+    // invite a personnaliser plutot qu'a corriger. Les quatre formats avec
+    // photo restent a un clic dans le panneau couverture, et une photo
+    // choisie explicitement (frontPhotoId, juste au-dessus) reste prioritaire
+    // — ce chemin-la n'a pas bouge.
     variant = 'COVER_MINIMAL';
     photos = [];
   }

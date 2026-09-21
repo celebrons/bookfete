@@ -83,17 +83,18 @@ function AtelierGenerateModal({
           </p>
         )}
 
-        {/* L'AUTRE moitie de la verite, aussi importante que la garantie
-            ci-dessus : il n'existe aucun retour en arriere. Les pages
-            composees automatiquement AVANT sont remplacees par la nouvelle
-            generation (voir backend replaceBookPages : seules les pages
-            verrouillees survivent). Le taire rendrait la garantie trompeuse
-            — l'utilisateur a demande les deux : « je ne vais pas perdre ce
-            que j'ai fait manuellement ? et je pourrais revenir sur mon livre
-            d'avant ? » (2026-09-15). */}
+        {/* CE QUI SE PASSE, SANS DRAMATISER (2026-09-21).
+
+            Ce texte annoncait « il n'y a pas de retour en arriere ». Deux
+            problemes : c'etait intimidant au moment ou l'on demande juste
+            d'essayer une ambiance, et c'etait devenu FAUX — un point de
+            restauration est pose avant chaque generation (phase19), et
+            l'atelier propose « revenir a mon livre d'avant ».
+
+            On dit donc simplement ce qui change, et ce qui ne change pas. */}
         <p className="atelier-hint atelier-hint-warning">
-          En revanche, il n'y a pas de retour en arrière : les pages déjà composées automatiquement seront
-          remplacées par la nouvelle proposition. Vos photos et souvenirs, eux, ne sont jamais supprimés.
+          Les pages déjà composées automatiquement seront remplacées par la nouvelle
+          proposition. Vos photos et souvenirs, eux, ne sont jamais supprimés.
         </p>
 
         {loadingEstimate && <p className="atelier-hint">Verification du contenu...</p>}

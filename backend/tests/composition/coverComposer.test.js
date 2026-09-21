@@ -30,17 +30,36 @@ function textItem(id, displayOrder = 0, length = 100) {
 }
 
 describe('coverComposer.composeFrontCover — arbre de decision', () => {
-  it('une seule photo excellente -> COVER_PHOTO_TITLE (traitement le plus exigeant, photo la plus fiable)', () => {
+  // PAR DEFAUT, UNE COUVERTURE DE TEXTE (2026-09-21).
+  //
+  // Le moteur choisissait ici la « meilleure » photo, et souvent trois d'un
+  // coup. Retour utilisateur : « le systeme remplit systematiquement la
+  // couverture avec 3 photos ». Aucun calcul ne sait quelle photo represente
+  // un voyage — et se tromper la se voit plus que partout ailleurs.
+  it('une photo excellente ne s\'impose plus en couverture', () => {
     const items = [greatPhoto('p1')];
     const front = composeFrontCover({ book: { title: 'Titre' }, items, template: TEMPLATE, format: FORMAT });
-    expect(front.content.variant).toBe('COVER_PHOTO_TITLE');
-    expect(front.content.itemIds).toEqual(['p1']);
+    expect(front.content.variant).toBe('COVER_MINIMAL');
+    expect(front.content.itemIds).toEqual([]);
   });
 
-  it('une photo correcte mais pas excellente -> COVER_PHOTO (bandeau separe, sans risque)', () => {
-    const items = [mediumPhoto('p1')];
+  it('plusieurs photos excellentes non plus : jamais de trio impose', () => {
+    const items = [greatPhoto('p1', 0), greatPhoto('p2', 1), greatPhoto('p3', 2), greatPhoto('p4', 3)];
     const front = composeFrontCover({ book: { title: 'Titre' }, items, template: TEMPLATE, format: FORMAT });
-    expect(front.content.variant).toBe('COVER_PHOTO');
+    expect(front.content.variant).toBe('COVER_MINIMAL');
+    expect(front.content.itemIds).toEqual([]);
+  });
+
+  // Ce qui n'a PAS change, et qui doit etre protege : un choix explicite
+  // reste souverain, qu'il porte sur le format ou sur la photo.
+  it('une photo choisie explicitement reste souveraine', () => {
+    const items = [greatPhoto('p1'), greatPhoto('p2', 1)];
+    const front = composeFrontCover({
+      book: { title: 'Titre', cover_overrides: { frontPhotoId: 'p2' } },
+      items, template: TEMPLATE, format: FORMAT
+    });
+    expect(front.content.itemIds).toEqual(['p2']);
+    expect(front.content.variant).not.toBe('COVER_MINIMAL');
   });
 
   it('aucune photo -> COVER_MINIMAL', () => {
@@ -54,15 +73,6 @@ describe('coverComposer.composeFrontCover — arbre de decision', () => {
     expect(() => composeFrontCover({ book: { title: 'Titre' }, items: [], template: TEMPLATE, format: FORMAT })).not.toThrow();
     const front = composeFrontCover({ book: { title: 'Titre' }, items: [], template: TEMPLATE, format: FORMAT });
     expect(front.content.variant).toBe('COVER_MINIMAL');
-  });
-
-  it('plusieurs photos excellentes sans gagnant net + profil PHOTO -> COVER_MULTI_PHOTO, max 3', () => {
-    const items = [
-      greatPhoto('p1', 0), greatPhoto('p2', 1), greatPhoto('p3', 2), greatPhoto('p4', 3)
-    ];
-    const front = composeFrontCover({ book: { title: 'Titre' }, items, template: TEMPLATE, format: FORMAT });
-    expect(front.content.variant).toBe('COVER_MULTI_PHOTO');
-    expect(front.content.itemIds.length).toBeLessThanOrEqual(MULTI_PHOTO_MAX);
   });
 
   it('COVER_MULTI_PHOTO reste rare : un livre equilibre (texte+photos) avec plusieurs bonnes photos ne le declenche pas forcement', () => {
@@ -172,6 +182,17 @@ describe('coverComposer.composeFrontCover — libelle de l\'occasion (kicker)', 
 });
 
 describe('coverComposer.composeFrontCover — surcharges manuelles (cover_overrides)', () => {
+  it('le trio reste disponible, mais il se CHOISIT', () => {
+    const items = [greatPhoto('p1', 0), greatPhoto('p2', 1), greatPhoto('p3', 2)];
+    const front = composeFrontCover({
+      book: { title: 'Titre', cover_overrides: { frontVariant: 'COVER_MULTI_PHOTO' } },
+      items, template: TEMPLATE, format: FORMAT
+    });
+    expect(front.content.variant).toBe('COVER_MULTI_PHOTO');
+    expect(front.content.itemIds.length).toBeGreaterThan(1);
+    expect(front.content.itemIds.length).toBeLessThanOrEqual(MULTI_PHOTO_MAX);
+  });
+
   it('un livre qui n\'a jamais touche cover_overrides se comporte a l\'identique (non-regression)', () => {
     const items = [greatPhoto('p1'), weakPhoto('p2')];
     const withoutField = composeFrontCover({ book: { title: 'Titre' }, items, template: TEMPLATE, format: FORMAT });
@@ -199,13 +220,17 @@ describe('coverComposer.composeFrontCover — surcharges manuelles (cover_overri
     expect(front.content.itemIds).toEqual(['p2']);
   });
 
-  it('frontPhotoId orphelin (photo supprimee depuis) retombe silencieusement sur la selection automatique', () => {
+  it('frontPhotoId orphelin (photo supprimee depuis) retombe silencieusement sur la couverture de texte', () => {
     const items = [greatPhoto('p1')];
     const front = composeFrontCover({
       book: { title: 'Titre', cover_overrides: { frontPhotoId: 'photo-disparue' } },
       items, template: TEMPLATE, format: FORMAT
     });
-    expect(front.content.itemIds).toEqual(['p1']); // repli sur l'automatique
+    // Repli sur le comportement automatique, qui est desormais la
+    // couverture de texte : jamais une photo choisie a la place de celle
+    // qui a disparu — ce serait deviner a la place de l'utilisateur.
+    expect(front.content.variant).toBe('COVER_MINIMAL');
+    expect(front.content.itemIds).toEqual([]);
   });
 
   it('sous-titre et date surcharges apparaissent dans le contenu', () => {

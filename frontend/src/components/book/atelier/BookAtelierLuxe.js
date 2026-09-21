@@ -1543,6 +1543,20 @@ export default function BookAtelierLuxe() {
       setGenerateVariant((previous) => previous + 1);
       const freshPages = await listPages(book.id);
       setPages(freshPages || []);
+      // LE BROUILLON DOIT ETRE RECONSTRUIT, SINON LA PAGE AFFICHEE EST EFFACEE.
+      //
+      // La sauvegarde automatique plus haut efface une page dont le
+      // brouillon est vide (clearPage). Or son effet depend de `pages`, qui
+      // vient de changer, tandis que celui qui INITIALISE le brouillon ne
+      // depend que de currentPageIndex et contentVersion. Apres une
+      // generation, le brouillon restait donc celui d avant — vide — face a
+      // une page fraichement composee : la page affichee etait aussitot
+      // effacee, toujours la meme, la premiere.
+      //
+      // Constate le 2026-09-21 : « il laisse toujours la premiere page sans
+      // rien ». En base, page_index 0 sans mise en page ni contenu, alors
+      // que le moteur l avait bien remplie.
+      setContentVersion((previous) => previous + 1);
       setPagePreviewCache({});
       setCoverHtml(null);
       setBackCoverHtml(null);
