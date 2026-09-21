@@ -19,6 +19,7 @@ import {
   addTextItem,
   deleteContentItem,
   deleteAllContentItems,
+  estimatePrice,
   getRecommendedPageCount,
   extendBookPages,
   shrinkBookPages,
@@ -133,6 +134,15 @@ export default function BookAtelierLuxe() {
   const [generateError, setGenerateError] = useState('');
   const [generateVariant, setGenerateVariant] = useState(0);
   const [estimatedPages, setEstimatedPages] = useState(null);
+  // LE LIVRE VA-T-IL GRANDIR, ET DE COMBIEN COUTERA-T-IL (2026-09-21) ?
+  //
+  // Le moteur place TOUT le contenu sans jamais le tronquer, puis le livre
+  // est redimensionne pour le contenir : 69 photos ne tiennent pas en 30
+  // pages. C'est defendable — mais ca se faisait en silence, alors que le
+  // PRIX suit le nombre de pages. On choisissait 30, on se retrouvait avec
+  // 46, et on l'apprenait a la commande.
+  // { pagesPrevues, prixActuelCents, prixPrevuCents } ou null.
+  const [debordement, setDebordement] = useState(null);
   const [loadingEstimate, setLoadingEstimate] = useState(false);
   const [isConfirmSwitchOpen, setIsConfirmSwitchOpen] = useState(false);
 
@@ -1437,11 +1447,33 @@ export default function BookAtelierLuxe() {
       // pages ce contenu tient-il naturellement ? ») et les deux divergent
       // depuis que le moteur repartit le contenu sur le livre entier : 47
       // photos tiennent en 21 pages mais en remplissent 30.
-      setEstimatedPages(recommendation?.filledPages ?? recommendation?.estimatedPages ?? null);
+      const pagesPrevues = recommendation?.filledPages ?? recommendation?.estimatedPages ?? null;
+      setEstimatedPages(pagesPrevues);
+
+      // Le contenu demande-t-il plus de pages que le livre n'en compte ?
+      // Si oui, on va chercher les deux prix pour pouvoir annoncer l'ecart
+      // en euros — « 16 pages de plus » ne dit rien, « 74,50 EUR au lieu de
+      // 49 EUR » se comprend tout de suite.
+      const pagesActuelles = Number(book.page_count) || 0;
+      if (pagesPrevues && pagesActuelles && pagesPrevues > pagesActuelles) {
+        const [actuel, prevu] = await Promise.all([
+          estimatePrice(book.id, { printFormat: book.print_format, pageCount: pagesActuelles, type: 'print', quantity: 1 }).catch(() => null),
+          estimatePrice(book.id, { printFormat: book.print_format, pageCount: pagesPrevues, type: 'print', quantity: 1 }).catch(() => null)
+        ]);
+        setDebordement({
+          pagesPrevues,
+          pagesActuelles,
+          prixActuelCents: actuel?.unitCents ?? null,
+          prixPrevuCents: prevu?.unitCents ?? null
+        });
+      } else {
+        setDebordement(null);
+      }
     } catch (_err) {
       // Non bloquant : en cas d'echec de l'estimation, on ne bloque pas la
       // generation (mieux vaut laisser essayer que bloquer sans raison sure).
       setEstimatedPages(null);
+      setDebordement(null);
     } finally {
       setLoadingEstimate(false);
     }
@@ -1859,6 +1891,7 @@ export default function BookAtelierLuxe() {
         isGenerating={isGenerating}
         error={generateError}
         estimatedPages={estimatedPages}
+        debordement={debordement}
         loadingEstimate={loadingEstimate}
         minPages={MIN_AUTO_PAGES}
         manualPagesCount={pages.filter((page) => page.locked).length}

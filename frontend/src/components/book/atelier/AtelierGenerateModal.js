@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { ATELIER_MOODS } from './atelierMoods';
 
+// Prix en euros, meme presentation que partout ailleurs (voir
+// utils/orderWorkflow.formatPriceCents) — recopie ici plutot
+// qu'importee pour ne pas faire dependre une fenetre de l'atelier du
+// vocabulaire des commandes.
+const formatEuro = (cents) => new Intl.NumberFormat('fr-FR', {
+  style: 'currency', currency: 'EUR'
+}).format((Number(cents) || 0) / 100);
+
 // Point d'entree de la generation automatique depuis l'atelier (remplace le
 // role de l'etape 4 de l'ancien assistant /composer) : choisir une ambiance
 // puis generer — decision utilisateur actee, pas de comparaison cote-a-cote
@@ -12,6 +20,9 @@ function AtelierGenerateModal({
   isGenerating,
   error,
   estimatedPages,
+  // { pagesPrevues, pagesActuelles, prixActuelCents, prixPrevuCents } quand
+  // le contenu demande plus de pages que le livre n'en compte. Null sinon.
+  debordement,
   loadingEstimate,
   // Repli seulement : l'appelant passe toujours MIN_AUTO_PAGES
   // (BookAtelierLuxe.js), aligne sur layoutEngine.PAGE_COUNT_TIERS[0].
@@ -99,6 +110,26 @@ function AtelierGenerateModal({
 
         {loadingEstimate && <p className="atelier-hint">Verification du contenu...</p>}
 
+        {/* LE LIVRE VA GRANDIR, ET LE PRIX AVEC (2026-09-21).
+            Le moteur ne tronque jamais : tout le contenu est place, et le
+            livre est redimensionne pour le contenir. Ca se faisait en
+            silence — on choisissait 30 pages et on decouvrait 46 a la
+            commande. On l'annonce donc AVANT, chiffres a l'appui, et on
+            laisse decider : composer ainsi, ou revenir retirer des photos. */}
+        {debordement && (
+          <p className="atelier-hint atelier-hint-warning">
+            Votre contenu demande <strong>{debordement.pagesPrevues} pages</strong> alors que votre
+            livre en compte {debordement.pagesActuelles}. Célébrons ne laisse jamais une photo de côté :
+            le livre passera donc à {debordement.pagesPrevues} pages
+            {debordement.prixActuelCents != null && debordement.prixPrevuCents != null && (
+              <>, et son prix de <strong>{formatEuro(debordement.prixActuelCents)}</strong> à{' '}
+              <strong>{formatEuro(debordement.prixPrevuCents)}</strong></>
+            )}.
+            {' '}Pour garder {debordement.pagesActuelles} pages, fermez cette fenêtre et retirez des photos
+            dans « Mes souvenirs ».
+          </p>
+        )}
+
         {pagesRestantes > 0 && (
           <p className="atelier-hint atelier-hint-warning">
             Votre contenu remplit environ {estimatedPages} page{estimatedPages > 1 ? 's' : ''} sur les {minPages} de
@@ -134,6 +165,7 @@ function AtelierGenerateModal({
             className="btn btn-primary"
             onClick={() => onGenerate(selectedMood)}
             disabled={isGenerating || loadingEstimate}
+            title={debordement ? `Le livre passera a ${debordement.pagesPrevues} pages` : undefined}
           >
             {isGenerating ? 'Generation...' : 'Generer'}
           </button>

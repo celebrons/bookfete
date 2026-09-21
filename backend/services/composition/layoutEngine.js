@@ -451,6 +451,49 @@ function recommendPageCount(input = {}) {
   return { recommended, estimatedPages, filledPages, tiers };
 }
 
+// Accorde le registre visuel des pages qui se font face — voir l'appel dans
+// compose() pour la raison. Ne touche QUE la sous-presentation : jamais le
+// contenu place, jamais le format choisi, jamais l'ordre de lecture.
+//
+// `FULL_PHOTO` est le seul format dont la presentation change de registre
+// (variante 0 = fond perdu, variante 1 = photo dans sa marge — voir
+// pageRenderer.renderPhotoBlock). Les grilles, elles, sont toujours dans
+// leur cadre : une page pleine page qui leur fait face doit donc prendre sa
+// marge pour leur ressembler.
+//
+// `FULL_PHOTO_SPREAD` occupe deja les deux pages : elle est coherente par
+// construction et n'est pas touchee.
+function harmoniserLesDoublesPages(pages, layouts) {
+  const slugParId = new Map((layouts || []).map((layout) => [layout.id, layout.slug]));
+  const estPleinePage = (page) => slugParId.get(page?.layout_id) === 'FULL_PHOTO';
+
+  const ajuster = (page, variante) => {
+    if (!page || page.content?.blocks?.[0]?.presentationVariant === variante) return page;
+    const blocks = (page.content?.blocks || []).map((bloc, index) => (
+      index === 0 ? { ...bloc, presentationVariant: variante } : bloc
+    ));
+    return { ...page, content: { ...page.content, blocks } };
+  };
+
+  const resultat = [...pages];
+  for (let gauche = 0; gauche + 1 < resultat.length; gauche += 2) {
+    const droite = gauche + 1;
+    const aGauche = estPleinePage(resultat[gauche]);
+    const aDroite = estPleinePage(resultat[droite]);
+
+    if (aGauche && aDroite) {
+      // Deux pleines pages face a face : le fond perdu prend tout son sens.
+      resultat[gauche] = ajuster(resultat[gauche], 0);
+      resultat[droite] = ajuster(resultat[droite], 0);
+    } else if (aGauche) {
+      resultat[gauche] = ajuster(resultat[gauche], 1);
+    } else if (aDroite) {
+      resultat[droite] = ajuster(resultat[droite], 1);
+    }
+  }
+  return resultat;
+}
+
 /**
  * @param {object} input
  * @param {Array} input.items - book_content_items du livre (kind, text, url, contribution_id, display_order, id, metadata)
@@ -509,7 +552,30 @@ function compose(input) {
   const overflow = pagesAvailable > 0 && contentPages.length > pagesAvailable;
   const underflow = pagesAvailable > 0 && contentPages.length < pagesAvailable && contentPages.length > 0;
 
-  const pages = contentPages.map((page, index) => ({ ...page, page_index: index }));
+  // UNE DOUBLE PAGE SE LIT D'UN SEUL REGARD (2026-09-21).
+  //
+  // Jusqu'ici, la sous-presentation etait tiree au hasard PAR PAGE. Une
+  // photo pleine page a fond perdu pouvait donc faire face a une photo
+  // posee dans sa marge blanche : deux registres differents cote a cote,
+  // qui donnent l'impression d'une erreur plutot que d'un choix.
+  //
+  // Signale le 2026-09-21, captures a l'appui : « quand c'est une seule
+  // page, l'image prend toute la page ; du coup ce n'est pas beau quand en
+  // face tu as deux ou trois images qui, elles, respectent le cadre ».
+  //
+  // Les deux registres sont beaux — mais pas ensemble. Le fond perdu dit
+  // « immersion », le cadre dit « album ». On les accorde donc par PAIRE :
+  //
+  //   deux photos pleine page face a face  -> les deux a fond perdu
+  //   une photo pleine page face a autre chose -> elle prend sa marge
+  //
+  // Les pages se font face par parite : 0 avec 1, 2 avec 3 — meme
+  // convention que l'atelier (leftPageIndex = spread * 2) et que le rendu
+  // des photos sur double page.
+  const pages = harmoniserLesDoublesPages(
+    contentPages.map((page, index) => ({ ...page, page_index: index })),
+    layouts
+  );
   const totalWeight = units.reduce((sum, unit) => sum + (unit.weight || 1), 0);
 
   return { pages, overflow, underflow, pageBudget: pagesAvailable, totalWeight };
@@ -517,6 +583,9 @@ function compose(input) {
 
 module.exports = {
   compose,
+  // Expose la regle d accord des doubles pages : c est une decision
+  // visuelle qui merite ses propres tests, sans rejouer tout le moteur.
+  __harmoniserPourLesTests: harmoniserLesDoublesPages,
   buildUnitsFromItems,
   buildPages,
   weightOfItem,

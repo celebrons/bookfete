@@ -418,3 +418,62 @@ describe('layoutEngine.groupIntoBlocks / buildUnitsFromItems', () => {
     expect(units.map((u) => u.itemIds).flat().sort()).toEqual(['p1', 't1']);
   });
 });
+
+// Une double page se lit d'un seul regard (2026-09-21).
+//
+// La sous-presentation etait tiree au hasard PAR PAGE : une photo pleine
+// page a fond perdu pouvait faire face a une photo posee dans sa marge
+// blanche. Deux registres differents cote a cote donnent l'impression d'une
+// erreur plutot que d'un choix — signale captures a l'appui.
+//
+// Les pages se font face par parite : 0 avec 1, 2 avec 3.
+describe('layoutEngine — accord des registres sur une double page', () => {
+  const FULL = { id: 'lay-full', slug: 'FULL_PHOTO', kind: 'photo', capacity: { slots: [{ type: 'photo' }] } };
+  const GRILLE = { id: 'lay-trois', slug: 'THREE_PHOTOS', kind: 'photo', capacity: { slots: [{ type: 'photo' }, { type: 'photo' }, { type: 'photo' }] } };
+
+  const varianteDe = (page) => page.content?.blocks?.[0]?.presentationVariant;
+
+  // On construit les pages a la main : le but est d'eprouver la regle
+  // d'accord, pas de rejouer tout le moteur de mise en page.
+  const page = (index, layout, variante) => ({
+    page_index: index,
+    layout_id: layout.id,
+    content: { kind: 'photo', itemIds: ['x'], blocks: [{ itemIds: ['x'], kind: 'photo', layoutId: layout.id, presentationVariant: variante }] }
+  });
+
+  const harmoniser = require('../../services/composition/layoutEngine').__harmoniserPourLesTests;
+
+  it('deux pleines pages face a face : les deux a fond perdu', () => {
+    const resultat = harmoniser([page(0, FULL, 1), page(1, FULL, 0)], [FULL, GRILLE]);
+    expect(varianteDe(resultat[0])).toBe(0);
+    expect(varianteDe(resultat[1])).toBe(0);
+  });
+
+  it('une pleine page face a une grille : elle prend sa marge', () => {
+    const resultat = harmoniser([page(0, FULL, 0), page(1, GRILLE, 0)], [FULL, GRILLE]);
+    expect(varianteDe(resultat[0])).toBe(1);
+  });
+
+  it('meme chose quand la pleine page est a droite', () => {
+    const resultat = harmoniser([page(0, GRILLE, 0), page(1, FULL, 0)], [FULL, GRILLE]);
+    expect(varianteDe(resultat[1])).toBe(1);
+  });
+
+  it('deux grilles face a face : rien n est touche', () => {
+    const resultat = harmoniser([page(0, GRILLE, 1), page(1, GRILLE, 0)], [FULL, GRILLE]);
+    expect(varianteDe(resultat[0])).toBe(1);
+    expect(varianteDe(resultat[1])).toBe(0);
+  });
+
+  it('une page seule en fin de livre ne fait planter personne', () => {
+    expect(() => harmoniser([page(0, FULL, 0), page(1, GRILLE, 0), page(2, FULL, 0)], [FULL, GRILLE])).not.toThrow();
+  });
+
+  it('ne touche NI le contenu NI le format choisi', () => {
+    const avant = [page(0, FULL, 0), page(1, GRILLE, 0)];
+    const apres = harmoniser(avant, [FULL, GRILLE]);
+    expect(apres[0].layout_id).toBe(FULL.id);
+    expect(apres[0].content.itemIds).toEqual(['x']);
+    expect(apres[1].layout_id).toBe(GRILLE.id);
+  });
+});
