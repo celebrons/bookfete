@@ -30,7 +30,7 @@ export default function CreateBookSansIA() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [step, setStep] = useState('type'); // 'type' | 'details' | 'format'
+  const [step, setStep] = useState('type'); // 'type' | 'format'
   const [mode, setMode] = useState(null); // 'solo' | 'open'
   const [printFormat, setPrintFormat] = useState(null);
   const [formats, setFormats] = useState([]);
@@ -93,7 +93,10 @@ export default function CreateBookSansIA() {
     // 16) — minimum reellement imprimable chez Gelato ; 2026-09-11 : porte a
     // 30, voir backend/services/composition/layoutEngine.js PAGE_COUNT_TIERS.
     page_count: 30,
-    ...(values.mode === 'open'
+    // Renseignes seulement s ils ont ete repris d un brouillon : le
+    // parcours ne les demande plus (voir chooseMode). Ils restent
+    // modifiables dans Configuration et sur la couverture.
+    ...(values.mode === 'open' && values.recipientName?.trim()
       ? { recipient_name: values.recipientName.trim(), event_date: values.eventDate || null }
       : {})
   });
@@ -134,7 +137,10 @@ export default function CreateBookSansIA() {
     if (draft.printFormat) setPrintFormat(draft.printFormat);
     if (draft.recipientName) setRecipientName(draft.recipientName);
     if (draft.eventDate) setEventDate(draft.eventDate);
-    if (draft.mode) setStep(draft.printFormat ? 'format' : 'details');
+    // Un brouillon laisse AVANT le retrait de l etape « pour qui »
+    // (2026-09-22) peut encore designer 'details', qui n existe plus :
+    // on repart du format, la seule question restante.
+    if (draft.mode) setStep('format');
 
     // Le format remplace le titre comme condition de reprise : c'est
     // desormais le dernier choix du parcours, donc le signe qu'il etait
@@ -149,20 +155,20 @@ export default function CreateBookSansIA() {
 
   function chooseMode(nextMode) {
     setMode(nextMode);
-    // En solo, il ne reste PLUS RIEN a demander depuis la suppression du
-    // titre : on saute directement au format.
-    setStep(nextMode === 'solo' ? 'format' : 'details');
-  }
-
-  // Passe a l'ecran du format. Le seul champ encore exige est « pour qui »
-  // en mode collaboratif : les proches qui recevront le lien doivent savoir
-  // pour qui ils contribuent.
-  function goToFormat() {
-    if (mode === 'open' && !recipientName.trim()) {
-      setError('Dites-nous pour qui est ce livre pour continuer.');
-      return;
-    }
-    setError('');
+    // PLUS AUCUNE QUESTION AVANT LE FORMAT (2026-09-22).
+    //
+    // Le mode collaboratif exigeait encore un prenom — « pour qui est ce
+    // livre ? » — au motif que les proches recevant le lien devaient le
+    // savoir. L'intention etait juste, le blocage ne l'etait pas : on
+    // arretait quelqu'un venu creer un livre pour lui demander un mot qu'il
+    // pourra donner plus tard, et qui n'est utilise nulle part avant
+    // l'invitation.
+    //
+    // Le prenom du destinataire et la date restent modifiables dans
+    // Configuration et sur la couverture, et le message d'invitation les
+    // reprend quand ils existent. Le solo avait deja perdu sa derniere
+    // question de la meme facon (2026-09-15) ; les deux parcours se
+    // rejoignent.
     setStep('format');
   }
 
@@ -223,46 +229,6 @@ export default function CreateBookSansIA() {
             </div>
           )}
 
-          {/* Le mode SOLO n'a plus d'etape "details" : le titre etait son seul
-              champ obligatoire, et il a ete retire du parcours (2026-09-15).
-              Seul le mode collaboratif garde une question, parce que les
-              proches qui recevront le lien doivent savoir pour qui ils
-              contribuent. */}
-          {step === 'details' && mode === 'open' && (
-            <div className="ab-step">
-              <button type="button" className="ab-back-link" onClick={() => setStep('type')}>← Changer</button>
-              <h2 className="form-title">Pour qui est ce livre ?</h2>
-
-              {error ? <div className="wizard-error">{error}</div> : null}
-
-              <div className="form-group">
-                <label htmlFor="book-recipient">Son prénom</label>
-                <input
-                  id="book-recipient"
-                  type="text"
-                  value={recipientName}
-                  onChange={(event) => setRecipientName(event.target.value)}
-                  placeholder="Jean"
-                  autoFocus
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="book-event-date">Date de l'événement (facultatif)</label>
-                <input
-                  id="book-event-date"
-                  type="date"
-                  value={eventDate}
-                  onChange={(event) => setEventDate(event.target.value)}
-                />
-              </div>
-
-              <button type="button" className="btn btn-primary" onClick={goToFormat}>
-                Continuer
-              </button>
-            </div>
-          )}
-
           {/* CHOIX DU FORMAT, avant l'atelier.
               Il n'est pas cosmetique : il decide de la densite de composition,
               de la taille reelle des cadres photo — donc de la resolution
@@ -273,7 +239,7 @@ export default function CreateBookSansIA() {
               <button
                 type="button"
                 className="ab-back-link"
-                onClick={() => setStep(mode === 'open' ? 'details' : 'type')}
+                onClick={() => setStep('type')}
               >
                 ← Retour
               </button>

@@ -36,6 +36,7 @@ import AtelierConfirmSwitchDialog from './AtelierConfirmSwitchDialog';
 import AtelierOnboarding from './AtelierOnboarding';
 import AtelierFinishModal from './AtelierFinishModal';
 import AtelierDuplicatePhotosModal from './AtelierDuplicatePhotosModal';
+import AtelierPartagerLien from './AtelierPartagerLien';
 import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
 import AtelierPageActions from './AtelierPageActions';
@@ -1965,6 +1966,16 @@ export default function BookAtelierLuxe() {
                 panneau de droite : sur telephone les colonnes sont empilees,
                 le panneau se retrouve loin sous le livre, donc le lien etait
                 invisible au moment precis ou l'on en a besoin. */}
+            {/* Inviter des proches SANS quitter la composition : on y
+                pense en voyant les emplacements vides, pas en regardant
+                une liste de livres (2026-09-22). */}
+            {book?.collection_mode !== 'solo' && (
+              <AtelierPartagerLien
+                shareToken={book?.share_token}
+                recipientName={book?.recipient_name}
+              />
+            )}
+
             {snapshotBar}
             {undoBar}
 

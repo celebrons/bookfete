@@ -268,6 +268,18 @@ function AtelierSidebar({
         <div className="atelier-sidebar-grid">
           {items.map((item) => {
             const isUsed = usedItemIds?.has(item.id);
+            // RECONNAITRE CE QU'ON A RECU (2026-09-22).
+            //
+            // Une photo envoyee par un proche arrivait dans la bibliotheque
+            // exactement comme les siennes : « je n'ai pas recu la photo
+            // partagee — ou elle s'est peut-etre mise dans les autres
+            // photos ». Elle etait bien la, indiscernable parmi 75.
+            //
+            // Le nom du contributeur n'est pas toujours connu (le lien de
+            // partage ne l'exige pas) : on marque alors l'origine sans le
+            // nommer, plutot que d'afficher un « de ? » qui n'apprend rien.
+            const estRecue = item.source === 'contribution';
+            const auteur = item.metadata?.contributor_name || null;
             return (
               <div key={item.id} className="atelier-sidebar-item-wrap">
                 <button
@@ -278,12 +290,21 @@ function AtelierSidebar({
                   onMouseEnter={(event) => survoler(event, item)}
                   onMouseLeave={quitter}
                   className={`atelier-sidebar-item ${selectedItem?.id === item.id ? 'is-selected' : ''} ${isUsed ? 'is-used' : ''}`}
-                  title={item.kind === 'photo' ? (isUsed ? 'Photo (deja utilisee sur une page)' : 'Photo') : item.text}
+                  title={[
+                    item.kind === 'photo' ? 'Photo' : item.text,
+                    estRecue ? (auteur ? `Envoyee par ${auteur}` : 'Recue par le lien de partage') : null,
+                    isUsed ? 'Deja utilisee sur une page' : null
+                  ].filter(Boolean).join(' — ')}
                 >
                   {item.kind === 'photo' ? (
                     <img src={item.metadata?.thumbnailUrl || item.url} alt="" loading="lazy" />
                   ) : (
                     <span className="atelier-sidebar-text-preview">{item.text}</span>
+                  )}
+                  {estRecue && (
+                    <span className="atelier-sidebar-item-recue-badge">
+                      {auteur ? `♥ ${auteur}` : '♥ reçue'}
+                    </span>
                   )}
                   {isUsed && <span className="atelier-sidebar-item-used-badge">✓ utilisee</span>}
                 </button>
