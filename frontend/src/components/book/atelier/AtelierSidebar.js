@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AtelierPhotoLightbox from './AtelierPhotoLightbox';
 
 // Colonne gauche de l'atelier : "Mes souvenirs" — photos et souvenirs
@@ -59,7 +59,6 @@ function AtelierSidebar({
   selectedItem,
   onSelectItem,
   onUploadPhotos,
-  onAddText,
   onDeleteItem,
   uploadingPhotos,
   uploadProgress,
@@ -76,7 +75,9 @@ function AtelierSidebar({
   // Purement informatif : reste cliquable/glissable normalement, une
   // reutilisation deliberee (ex. meme photo en debut et fin de livre) n'est
   // jamais bloquee.
-  usedItemIds
+  usedItemIds,
+  // Un livre solo n a pas de contributeurs : pas d onglet « Recues ».
+  estSolo = false
 }) {
   // { url, rect } de la photo survolee, null sinon. `rect` est fige au moment
   // du survol : l'apercu ne suit pas la souris, il reste ancre a sa vignette.
@@ -103,8 +104,45 @@ function AtelierSidebar({
     setApercu(null);
   };
 
+  // TROIS FAMILLES, PAS DEUX (2026-09-22).
+  //
+  // L'onglet « Souvenirs » melangeait deux choses qui n'ont rien a voir :
+  // les textes qu'on ecrit soi-meme, et ce que les proches envoient. Et les
+  // PHOTOS des proches, elles, atterrissaient parmi les siennes — « on ne
+  // peut pas savoir qui a envoye quelle photo ».
+  //
+  //   « Mes photos » : les siennes.
+  //   « Reçues »     : tout ce qui arrive par le lien de partage, photos ET
+  //                    mots, avec le nom de qui les a envoyes. C'est le
+  //                    coeur d'un album collectif, ca meritait sa place.
+  //   « Souvenirs »  : les textes ecrits depuis la bibliotheque. N'apparait
+  //                    QUE si le livre en contient deja.
+  //
+  // Le champ « Ecrire un souvenir... » disparait : on ecrit desormais
+  // directement dans l'emplacement, sur la page (AtelierTextEditor). Ecrire
+  // un texte sans savoir ou il ira produisait des souvenirs orphelins.
+  // L'onglet reste pour ceux qui existent — 24 en base au moment du
+  // changement, dont 8 deja poses : les faire disparaitre les rendrait
+  // introuvables.
+  const estContribution = (item) => item?.source === 'contribution';
+  const mesPhotos = useMemo(() => photos.filter((item) => !estContribution(item)), [photos]);
+  const recues = useMemo(
+    () => [...photos.filter(estContribution), ...souvenirs.filter(estContribution)],
+    [photos, souvenirs]
+  );
+  const mesSouvenirs = useMemo(() => souvenirs.filter((item) => !estContribution(item)), [souvenirs]);
+
+  const ongletRecuesDisponible = !estSolo && recues.length > 0;
+  const ongletSouvenirsDisponible = mesSouvenirs.length > 0;
+
   const [activeTab, setActiveTab] = useState(initialTab === 'souvenirs' ? 'souvenirs' : 'photos');
-  const [newText, setNewText] = useState('');
+
+  // Un onglet qui disparait (dernier element retire, passage en solo) ne
+  // doit pas laisser la colonne sur du vide.
+  useEffect(() => {
+    if (activeTab === 'recues' && !ongletRecuesDisponible) setActiveTab('photos');
+    if (activeTab === 'souvenirs' && !ongletSouvenirsDisponible) setActiveTab('photos');
+  }, [activeTab, ongletRecuesDisponible, ongletSouvenirsDisponible]);
 
   // CE QUI RESTE A PLACER D'ABORD, CE QUI EST DEJA PLACE EN BAS (2026-09-19).
   //
@@ -118,13 +156,15 @@ function AtelierSidebar({
   // photo ne fait donc que la deplacer en fin de liste, sans rebattre le
   // reste. Vaut aussi pour les souvenirs : meme badge, meme besoin.
   const items = useMemo(() => {
-    const base = activeTab === 'photos' ? photos : souvenirs;
+    const base = activeTab === 'recues'
+      ? recues
+      : (activeTab === 'souvenirs' ? mesSouvenirs : mesPhotos);
     if (!usedItemIds || usedItemIds.size === 0) return base;
     return [
       ...base.filter((item) => !usedItemIds.has(item.id)),
       ...base.filter((item) => usedItemIds.has(item.id))
     ];
-  }, [activeTab, photos, souvenirs, usedItemIds]);
+  }, [activeTab, mesPhotos, recues, mesSouvenirs, usedItemIds]);
 
   const nombreUtilises = useMemo(
     () => (usedItemIds ? items.filter((item) => usedItemIds.has(item.id)).length : 0),
@@ -148,13 +188,6 @@ function AtelierSidebar({
     event.target.value = '';
   };
 
-  const handleAddTextClick = () => {
-    const text = newText.trim();
-    if (!text) return;
-    onAddText(text);
-    setNewText('');
-  };
-
   return (
     <aside className="atelier-sidebar">
       <div className="atelier-sidebar-tabs">
@@ -163,15 +196,26 @@ function AtelierSidebar({
           className={`atelier-sidebar-tab ${activeTab === 'photos' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('photos')}
         >
-          Photos ({photos.length})
+          {estSolo ? 'Photos' : 'Mes photos'} ({mesPhotos.length})
         </button>
-        <button
-          type="button"
-          className={`atelier-sidebar-tab ${activeTab === 'souvenirs' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('souvenirs')}
-        >
-          Souvenirs ({souvenirs.length})
-        </button>
+        {ongletRecuesDisponible && (
+          <button
+            type="button"
+            className={`atelier-sidebar-tab ${activeTab === 'recues' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('recues')}
+          >
+            Reçues ({recues.length})
+          </button>
+        )}
+        {ongletSouvenirsDisponible && (
+          <button
+            type="button"
+            className={`atelier-sidebar-tab ${activeTab === 'souvenirs' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('souvenirs')}
+          >
+            Souvenirs ({mesSouvenirs.length})
+          </button>
+        )}
       </div>
 
       <p className="atelier-sidebar-hint">
@@ -214,26 +258,7 @@ function AtelierSidebar({
               </div>
             )}
           </>
-        ) : (
-          <div className="atelier-sidebar-add-text">
-            <textarea
-              className="input-luxe"
-              rows={2}
-              value={newText}
-              onChange={(event) => setNewText(event.target.value)}
-              placeholder="Ecrire un souvenir..."
-              maxLength={4000}
-            />
-            <button
-              type="button"
-              className="btn btn-outline atelier-sidebar-add-btn"
-              onClick={handleAddTextClick}
-              disabled={!newText.trim()}
-            >
-              Ajouter
-            </button>
-          </div>
-        )}
+        ) : null}
         {addError && <p className="atelier-sidebar-add-error">{addError}</p>}
 
         {/* Vider l'onglet courant. Volontairement DISCRET et en retrait (petit
@@ -281,7 +306,17 @@ function AtelierSidebar({
             const estRecue = item.source === 'contribution';
             const auteur = item.metadata?.contributor_name || null;
             return (
-              <div key={item.id} className="atelier-sidebar-item-wrap">
+              // UN TEXTE N EST PAS UNE VIGNETTE (2026-09-22).
+              //
+              // Un souvenir etait pose dans le meme carre de 70 px qu une
+              // photo, en corps 10, coupe apres quatre lignes : illisible,
+              // donc inexploitable — « ca s'affiche en photo et donc
+              // inexploitable ». Il prend desormais toute la largeur de la
+              // colonne et se lit.
+              <div
+                key={item.id}
+                className={`atelier-sidebar-item-wrap ${item.kind === 'texte' ? 'is-texte' : ''}`}
+              >
                 <button
                   type="button"
                   draggable

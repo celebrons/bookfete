@@ -1368,18 +1368,14 @@ export default function BookAtelierLuxe() {
     await envoyerLesPhotos(selection);
   };
 
-  const handleAddText = async (text) => {
-    if (!book?.id || !text.trim()) return;
-    setSidebarAddError('');
-    try {
-      // 'library' : geste explicite de l'utilisateur, ce souvenir reste
-      // disponible qu'il soit pose sur une page ou non.
-      const created = await addTextItem(book.id, text.trim(), items.length, 'library');
-      setItems((previous) => [...previous, created]);
-    } catch (err) {
-      setSidebarAddError(err.message || "L'ajout du souvenir a echoue.");
-    }
-  };
+  // ECRIRE UN SOUVENIR DEPUIS LA BIBLIOTHEQUE N EXISTE PLUS (2026-09-22).
+  //
+  // On ecrit desormais directement dans l'emplacement, sur la page (voir
+  // AtelierTextEditor) : un texte ecrit sans savoir ou il ira produisait
+  // des souvenirs orphelins, et une colonne encombree de bouts de phrases
+  // qui ne trouvaient jamais leur place.
+  //
+  // La route d'ajout de texte, elle, reste utilisee par l'ecriture sur page.
 
   // "Tout supprimer" (photos ou souvenirs). Irreversible, et ca touche aussi
   // les pages deja composees : la confirmation nomme donc precisement ce qui
@@ -1938,12 +1934,12 @@ export default function BookAtelierLuxe() {
       {book.page_count ? (
         <div className="atelier-workspace">
           <AtelierSidebar
+            estSolo={book?.collection_mode === 'solo'}
             photos={photos}
             souvenirs={souvenirs}
             selectedItem={selectedSidebarItem}
             onSelectItem={setSelectedSidebarItem}
             onUploadPhotos={handleUploadPhotos}
-            onAddText={handleAddText}
             onDeleteItem={handleDeleteItem}
             uploadingPhotos={uploadingPhotos}
             uploadProgress={uploadProgress}

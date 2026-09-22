@@ -2531,3 +2531,26 @@
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* Un souvenir n'est pas une vignette (AtelierSidebar, 2026-09-22).
+   Pose dans le meme carre de 70 px qu'une photo, en corps 10 et coupe
+   apres quatre lignes, un texte etait illisible donc inexploitable.
+   Il prend toute la largeur de la colonne et se lit. */
+.atelier-sidebar-item-wrap.is-texte {
+  grid-column: 1 / -1;
+}
+
+.atelier-sidebar-item-wrap.is-texte .atelier-sidebar-item {
+  aspect-ratio: auto;
+  min-height: 0;
+  height: auto;
+  align-items: flex-start;
+  padding-top: 18px;
+}
+
+.atelier-sidebar-item-wrap.is-texte .atelier-sidebar-text-preview {
+  -webkit-line-clamp: 6;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px 10px;
+}
