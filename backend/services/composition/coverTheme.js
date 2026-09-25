@@ -126,11 +126,28 @@ function applyFormatAccent(theme, formatId) {
 // Cette palette repond aussi au commentaire d'applyFormatAccent ci-dessus,
 // qui notait qu'un seul ton Luxe avait ete retenu "pour rester dans le
 // budget de cette passe ; un selecteur pourra venir plus tard".
+// QUE DES MATIERES, JAMAIS UNE COULEUR VIVE.
+//
+// Elargie de 6 a 10 teintes le 2026-09-25, a la demande de l'utilisateur.
+// Les quatre ajouts ne sont pas des couleurs choisies au hasard : ce sont
+// des toiles de reliure classiques (vert anglais, bordeaux, bleu paon) plus
+// un rose poudre, seule teinte claire non neutre. La palette reste FERMEE —
+// un selecteur libre produirait des couvertures criardes, et c'est le
+// produit qui en souffrirait.
+//
+// Contraste verifie au moment de l'ajout, encre gagnante contre le fond :
+// vert 9,93 — bordeaux 12,00 — bleu paon 9,49 — poudre 10,91. Toutes
+// au-dessus du seuil AA (4,5). Une teinte qui n'y arriverait pas n'aurait
+// rien a faire ici : applyCoverColor deduit l'encre, il ne la rattrape pas.
 const COVER_COLORS = {
   ivoire: { label: 'Ivoire', hex: '#fffdf8' },
   blanc: { label: 'Blanc', hex: '#ffffff' },
   lin: { label: 'Lin', hex: '#ede6d6' },
   grege: { label: 'Grege', hex: '#d6cfc2' },
+  poudre: { label: 'Poudre', hex: '#e3cfc7' },
+  vert: { label: 'Vert foret', hex: '#2f4739' },
+  bordeaux: { label: 'Bordeaux', hex: '#5b2233' },
+  paon: { label: 'Bleu paon', hex: '#1c4a5a' },
   encre: { label: 'Encre', hex: '#241f18' },
   nuit: { label: 'Nuit', hex: '#1f2a33' }
 };

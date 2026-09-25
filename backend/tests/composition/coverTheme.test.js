@@ -97,7 +97,28 @@ describe('coverTheme.applyCoverColor', () => {
   const base = applyFormatAccent(COVER_THEMES.elegance, 'standard');
 
   it('propose une palette de matieres, sans couleur vive', () => {
-    expect(Object.keys(COVER_COLORS)).toEqual(['ivoire', 'blanc', 'lin', 'grege', 'encre', 'nuit']);
+    // Elargie de 6 a 10 le 2026-09-25 : trois toiles de reliure classiques
+    // (vert anglais, bordeaux, bleu paon) et un rose poudre. La liste est
+    // epinglee ICI exprès — la palette doit rester FERMEE, et une teinte
+    // ajoutee a la legere doit faire echouer un test, pas passer inapercue.
+    expect(Object.keys(COVER_COLORS)).toEqual([
+      'ivoire', 'blanc', 'lin', 'grege', 'poudre',
+      'vert', 'bordeaux', 'paon', 'encre', 'nuit'
+    ]);
+  });
+
+  it('la palette du selecteur de l atelier dit exactement la meme chose', () => {
+    // AtelierCoverPanel.js porte un miroir de cette table (duplication
+    // assumee, voir son commentaire). Les jetons doivent rester identiques :
+    // une pastille qui n'existe pas cote backend serait ignoree en silence,
+    // et l'utilisateur verrait sa couleur ne rien changer.
+    const fichier = require('fs').readFileSync(
+      require('path').join(__dirname, '../../../frontend/src/components/book/atelier/AtelierCoverPanel.js'),
+      'utf8'
+    );
+    Object.keys(COVER_COLORS).forEach((token) => {
+      expect(fichier).toContain(`token: '${token}'`);
+    });
   });
 
   it('applique la couleur choisie au fond ET au papier', () => {

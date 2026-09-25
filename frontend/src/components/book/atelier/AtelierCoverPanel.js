@@ -36,12 +36,19 @@ const KICKER_MODES = PHRASE_MODES;
 // reel, ceci ne sert qu'a afficher les pastilles.
 //
 // Que des matieres, aucune couleur vive : un selecteur libre produirait des
-// couvertures criardes, et c'est le produit qui en souffrirait.
+// couvertures criardes, et c'est le produit qui en souffrirait. Les quatre
+// teintes ajoutees le 2026-09-25 sont des toiles de reliure classiques
+// (vert anglais, bordeaux, bleu paon) et un rose poudre — la palette reste
+// FERMEE, et chaque teinte a ete verifiee au contraste cote backend.
 const COVER_COLORS = [
   { token: 'ivoire', label: 'Ivoire', hex: '#fffdf8' },
   { token: 'blanc', label: 'Blanc', hex: '#ffffff' },
   { token: 'lin', label: 'Lin', hex: '#ede6d6' },
   { token: 'grege', label: 'Grege', hex: '#d6cfc2' },
+  { token: 'poudre', label: 'Poudre', hex: '#e3cfc7' },
+  { token: 'vert', label: 'Vert foret', hex: '#2f4739' },
+  { token: 'bordeaux', label: 'Bordeaux', hex: '#5b2233' },
+  { token: 'paon', label: 'Bleu paon', hex: '#1c4a5a' },
   { token: 'encre', label: 'Encre', hex: '#241f18' },
   { token: 'nuit', label: 'Nuit', hex: '#1f2a33' }
 ];
