@@ -1039,8 +1039,27 @@ const BookCheckoutLuxe = () => {
     resumeAfterStripe();
   }, [location.search, bookId, navigate, stripeTestEnabled]);
 
+  // ON SURVEILLE LE PDF, PAS LE STATUT DE LA COMMANDE.
+  //
+  // Cette relecture ne partait qu'au statut `pdf_generating`. Or ce statut
+  // n'existe que pour une commande PDF SEULE : sur un « Pack », le statut
+  // decrit l'impression et vaut deja `print_queued` ou `sent_to_printer`.
+  // La boucle ne demarrait donc jamais, et rien ne venait relire
+  // `metadata.pdfReady` — le seul endroit ou vit l'etat du PDF.
+  //
+  // Resultat signale le 2026-09-25 : le PDF etait bel et bien pret cote
+  // serveur (visible dans l'espace admin), et l'ecran de suivi restait
+  // indefiniment sur « Assemblage du PDF... ». Rien ne le debloquait, meme
+  // en rechargeant la page.
+  //
+  // La condition porte maintenant sur ce qu'on attend vraiment : une
+  // commande payee, qui comporte un PDF, dont le PDF n'est pas encore pret.
+  // Elle couvre donc aussi `pdf_generating`, sans cas particulier.
   useEffect(() => {
-    if (!latestOrder?.id || latestOrder.status !== 'pdf_generating') {
+    if (!latestOrder?.id || !includesPdf(latestOrder.type)) {
+      return undefined;
+    }
+    if (!isOrderPaid(latestOrder.status) || isPdfReady(latestOrder)) {
       return undefined;
     }
 
@@ -1053,11 +1072,17 @@ const BookCheckoutLuxe = () => {
         if (!active) return;
 
         setLatestOrder(freshOrder);
-        if (freshOrder.status === 'pdf_ready' || freshOrder?.metadata?.pdfReady) {
+        if (isPdfReady(freshOrder)) {
           setNotice({
             type: 'success',
             message: 'Paiement valide. Le PDF final est genere et telechargeable.'
           });
+          return;
+        }
+        // Une generation qui a echoue ne se debloquera pas toute seule :
+        // on arrete de sonder plutot que de tourner indefiniment. Le
+        // message d'erreur, lui, est porte par l'ecran de suivi.
+        if (freshOrder?.metadata?.pdfError) {
           return;
         }
       } catch (_error) {
@@ -1077,7 +1102,7 @@ const BookCheckoutLuxe = () => {
         clearTimeout(timer);
       }
     };
-  }, [latestOrder?.id, latestOrder?.status]);
+  }, [latestOrder?.id, latestOrder?.status, latestOrder?.type, latestOrder?.metadata?.pdfReady]);
 
   useEffect(() => {
     if (!latestOrder?.id || !includesPdf(latestOrder.type)) {
