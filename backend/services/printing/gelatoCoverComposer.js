@@ -11,9 +11,10 @@
 //
 // PASSE 1 (2026-09-09, premier test d'integration) — simplifications
 // assumees, a ameliorer une fois la connexion bout-en-bout validee :
-//   - Tranche (spine) : couleur unie (theme.accent), SANS texte. Un vrai
-//     rendu de tranche (titre en petit, vertical) est repousse a une passe
-//     suivante — ne bloque pas un premier test de connectivite.
+//   - Tranche (spine) : REGLE le 2026-09-25 — elle porte desormais le titre
+//     et l'annee (voir gelatoSpine.js). Elle est restee un aplat de couleur
+//     tant qu'on ne savait pas quelle place l'imprimeur laissait vraiment ;
+//     le premier livre recu a repondu.
 //   - Zones de rabat/jointure (joint back/front, wraparoundEdge) : remplies
 //     de la couleur de fond du theme (theme.paper), pas d'extension
 //     "bleed" du contenu du recto/verso dans ces zones (un vrai fond perdu
@@ -31,6 +32,7 @@ const pageRenderer = require('../composition/pageRenderer');
 const pdfService = require('../composition/pdfService');
 const { composeFrontCover, composeBackCover } = require('../composition/coverComposer');
 const { fetchCoverDimensions } = require('./gelatoProductApi');
+const { construireSvgDuDos } = require('./gelatoSpine');
 
 // Meme resolution que pdfService.js (SCREENSHOT_SCALE=3, ~288dpi) — les
 // images capturees ET le canvas final doivent utiliser la MEME echelle
@@ -129,14 +131,28 @@ async function composeGelatoWraparoundCover({ book, items, template, format, gel
     }
   });
 
-  const spineRect = await sharp({
-    create: {
-      width: mmToPx(dims.spineSize.width),
-      height: mmToPx(dims.spineSize.height),
-      channels: 3,
-      background: theme.accent || '#8f8a7c'
-    }
-  }).png().toBuffer();
+  // LE DOS PORTE LE TITRE ET L'ANNEE (2026-09-25).
+  //
+  // Il etait jusqu'ici un aplat de couleur, en attendant de savoir ce que
+  // l'imprimeur rendait vraiment. Le premier livre recu a tranche : la
+  // bande a assez de place, meme a 30 pages — un livre rigide a 6 mm de
+  // dos des la pagination minimale.
+  //
+  // Ecrit a plat puis pivote d'un quart de tour : voir gelatoSpine.js, qui
+  // porte aussi le seuil en dessous duquel on ne signe pas le dos.
+  const svgDuDos = construireSvgDuDos({
+    largeurMm: dims.spineSize.width,
+    hauteurMm: dims.spineSize.height,
+    pxParMm: PX_PER_MM,
+    fond: theme.accent || '#8f8a7c',
+    titre: frontPage.content?.title || book?.title || '',
+    date: frontPage.content?.dateLabel || ''
+  });
+  const spineRect = await sharp(Buffer.from(svgDuDos))
+    // Le quart de tour horaire met la lecture de HAUT EN BAS, livre debout.
+    .rotate(90)
+    .png()
+    .toBuffer();
 
   const composited = await canvas
     .composite([
