@@ -42,6 +42,7 @@ import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
 import AtelierPageActions from './AtelierPageActions';
 import { findAtelierLayout } from './atelierLayouts';
 import { FORMAT_DIMENSIONS_MM } from './photoQuality';
+import { spreadPair, spreadCount, spreadOfPage, facingPageIndex, isLeftPage } from '../../../utils/pageParity';
 import AnonymousBanner from '../../common/AnonymousBanner';
 import '../../../styles/luxe-theme.css';
 import './BookAtelierLuxe.css';
@@ -386,7 +387,9 @@ export default function BookAtelierLuxe() {
   }, [pages, draftSlotItemIds]);
 
   const totalPages = book?.page_count || 0;
-  const interiorSpreadCount = Math.max(1, Math.ceil(totalPages / 2));
+  // Un vis-a-vis de plus qu'avant : la page 1 est seule a droite, elle
+  // occupe donc sa propre vue (voir utils/pageParity.js).
+  const interiorSpreadCount = Math.max(1, spreadCount(totalPages));
   const totalViews = interiorSpreadCount + 2; // couverture + double-pages + 4e
 
   // Verification affichee au clic sur "Terminer mon livre" (AtelierFinishModal)
@@ -438,17 +441,30 @@ export default function BookAtelierLuxe() {
     const raw = Number(searchParams.get('page'));
     if (!Number.isInteger(raw) || raw < 0 || raw >= book.page_count) return;
     deepLinkAppliedRef.current = true;
-    setViewIndex(Math.floor(raw / 2) + 1);
-    setSelectedSide(raw % 2 === 0 ? 'left' : 'right');
+    setViewIndex(spreadOfPage(raw) + 1);
+    setSelectedSide(isLeftPage(raw) ? 'left' : 'right');
   }, [book?.page_count, searchParams]);
 
   const viewKind = viewIndex === 0 ? 'cover' : viewIndex === lastViewIndex ? 'back-cover' : 'spread';
   const spreadNumber = viewKind === 'spread' ? viewIndex - 1 : null;
-  const leftPageIndex = spreadNumber != null ? spreadNumber * 2 : null;
-  const rightPageIndex = spreadNumber != null && leftPageIndex + 1 < totalPages ? leftPageIndex + 1 : null;
+  // LE PREMIER VIS-A-VIS N'A PAS DE PAGE DE GAUCHE.
+  //
+  // La page 1 d'un livre relie est seule a droite, face au contre-plat. On
+  // l'affiche donc telle quelle, plutot que de la coller a la page 2 —
+  // c'est ce mensonge qui a fait sortir une double page en recto-verso sur
+  // le livre imprime du 2026-09-25 (voir utils/pageParity.js).
+  const paire = spreadNumber != null ? spreadPair(spreadNumber) : null;
+  const leftPageIndex = paire && paire.left != null && paire.left < totalPages ? paire.left : null;
+  const rightPageIndex = paire && paire.right != null && paire.right < totalPages ? paire.right : null;
 
+  // Le cote choisi peut ne pas exister : au premier vis-a-vis il n'y a pas
+  // de page de gauche, au dernier il peut n'y avoir pas de page de droite.
+  // On retombe alors sur le cote qui existe, plutot que sur rien — sinon
+  // l'atelier s'ouvrait sur une page vide qu'on ne pouvait pas composer.
   const currentPageIndex = viewKind === 'spread'
-    ? (selectedSide === 'right' && rightPageIndex != null ? rightPageIndex : leftPageIndex)
+    ? (selectedSide === 'right'
+      ? (rightPageIndex != null ? rightPageIndex : leftPageIndex)
+      : (leftPageIndex != null ? leftPageIndex : rightPageIndex))
     : null;
 
   // Un retour en arriere ne vaut que pour la page ou l'erreur a ete faite :
@@ -769,10 +785,22 @@ export default function BookAtelierLuxe() {
   }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftPhotoCaptions, draftTextRoles, draftTextStyles, draftPageIndex, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
 
   // --- Photo sur double page -------------------------------------------
-  // Les deux pages d'une double page forment la paire (2k, 2k+1) — meme
-  // convention que leftPageIndex/rightPageIndex plus haut.
-  const siblingPageIndex = (index) => (index % 2 === 0 ? index + 1 : index - 1);
+  // Les deux pages d'une double page sont celles qui se FONT FACE dans le
+  // livre relie : (1,2), (3,4), (5,6)... La page 1 n'a personne en face
+  // d'elle et ne peut donc pas porter de double page (voir
+  // utils/pageParity.js, et le livre imprime qui l'a etabli).
+  const siblingPageIndex = (index) => facingPageIndex(index);
   const isSpreadLayout = (slug) => findAtelierLayout(slug)?.spread === true;
+
+  // Toutes les pages ne peuvent pas porter une double page : il faut une page
+  // EN FACE. La page 1 n'en a pas (elle est seule a droite), et la derniere
+  // page non plus si elle tombe a gauche. Proposer quand meme le format
+  // donnait une demi-photo sans sa moitie — c'est ce qui s'est imprime.
+  const doublePagePossible = (() => {
+    if (currentPageIndex == null) return false;
+    const enFace = facingPageIndex(currentPageIndex);
+    return enFace != null && enFace < totalPages;
+  })();
 
   // La page ENREGISTREE porte-t-elle une double page ? On interroge la page
   // sauvegardee et non le brouillon : "Changer de mise en page" remet le
@@ -789,7 +817,8 @@ export default function BookAtelierLuxe() {
   // deux ecritures concurrentes sur la meme double page se marcheraient dessus.
   const mirrorSpread = async (pageIndex, layoutId) => {
     const jumelle = siblingPageIndex(pageIndex);
-    if (jumelle < 0 || jumelle >= totalPages || !book?.id) return;
+    // null = la page 1, seule a droite : elle n'a pas de jumelle.
+    if (jumelle == null || jumelle >= totalPages || !book?.id) return;
     try {
       const saved = await queuePageWrite(jumelle, () => saveManualPage(book.id, jumelle, {
         layoutId,
@@ -813,7 +842,8 @@ export default function BookAtelierLuxe() {
   // page jumelle : sans ca, il resterait une demi-photo orpheline a cote.
   const releaseSpreadSibling = async (pageIndex) => {
     const jumelle = siblingPageIndex(pageIndex);
-    if (jumelle < 0 || jumelle >= totalPages || !book?.id) return;
+    // null = la page 1, seule a droite : elle n'a pas de jumelle.
+    if (jumelle == null || jumelle >= totalPages || !book?.id) return;
     const row = pages.find((page) => page.page_index === jumelle);
     const slug = row?.layout_id ? layoutsById[row.layout_id]?.slug : null;
     if (!isSpreadLayout(slug)) return;
@@ -1551,8 +1581,8 @@ export default function BookAtelierLuxe() {
       });
 
       setContentVersion((previous) => previous + 1);
-      setViewIndex(Math.floor(toIndex / 2) + 1);
-      setSelectedSide(toIndex % 2 === 0 ? 'left' : 'right');
+      setViewIndex(spreadOfPage(toIndex) + 1);
+      setSelectedSide(isLeftPage(toIndex) ? 'left' : 'right');
       // Volontairement AUCUN rechargement d'apercu ici (ni setRefreshToken,
       // ni refreshPagePreview) : la permutation ci-dessus suffit, et toute
       // requete supplementaire ne ferait que reintroduire la course.
@@ -1699,8 +1729,8 @@ export default function BookAtelierLuxe() {
       setSelectedSide('left');
       return;
     }
-    setViewIndex(Math.floor(target / 2) + 1);
-    setSelectedSide(target % 2 === 0 ? 'left' : 'right');
+    setViewIndex(spreadOfPage(target) + 1);
+    setSelectedSide(isLeftPage(target) ? 'left' : 'right');
   };
 
   const draftSlotItems = draftSlotItemIds.map((id) => (id ? itemsById[id] : null));
@@ -2034,6 +2064,7 @@ export default function BookAtelierLuxe() {
               printFormat={book.print_format}
               currentPageIndex={currentPageIndex}
               availableSlugs={availableLayoutSlugs}
+              doublePagePossible={doublePagePossible}
               // "Vider cette page" et "Position dans le livre" sont passes sur
               // la page elle-meme (voir pageActions plus bas).
             />

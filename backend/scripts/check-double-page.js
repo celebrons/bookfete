@@ -63,7 +63,13 @@ const check = (cond, msg) => { if (!cond) echecs += 1; console.log((cond ? '  OK
   const formatId = 'standard';
   const format = { formatId, ...resolveCoverFormat(formatId), ...resolveFormatDensity(formatId) };
 
-  // La double page occupe les pages interieures 4 et 5 (cas du livre reel).
+  // La double page occupe les pages interieures 3 et 4.
+  //
+  // PAS 4 et 5 : ce couple-la ne se fait PAS face dans un livre relie, et
+  // c'est precisement ce qui a fait sortir une double page en recto-verso
+  // sur le premier vrai livre imprime (« Voyage a Montreal », 2026-09-25).
+  // La page 1 du livre est seule a droite, donc les vis-a-vis sont (1,2),
+  // (3,4), (5,6)... soit, en index : (1,2), (3,4). Voir pageParity.js.
   const interiorPages = [0, 1, 2, 3, 4, 5].map(pageInterieure);
   const book = { id: 'temoin', title: 'Temoin double page', print_format: formatId };
 
@@ -81,18 +87,19 @@ const check = (cond, msg) => { if (!cond) echecs += 1; console.log((cond ? '  OK
     return dominant.r > dominant.b ? 'ROUGE' : 'BLEU';
   };
 
-  // Dans le document final : couverture = page 1, page blanche inseree =
-  // page 2, donc la page interieure i est la page PDF i + 3. Avec
-  // /PageLayout TwoPageLeft, les pages impaires sont a GAUCHE : la page
-  // interieure d'index PAIR est donc la page de GAUCHE de la double page.
+  // Dans le document final : la couverture est la page 1, donc la page
+  // interieure i est la page PDF i + 2 (plus aucune page blanche inseree —
+  // voir pdfService.assemblePdfFromImages). Avec /PageLayout TwoPageLeft,
+  // les pages PDF impaires sont a GAUCHE : la page interieure d'index
+  // IMPAIR est donc la page de GAUCHE de la double page.
   const captureDeLaPageInterieure = (i) => captures[i + 1]; // +1 : couverture en tete
 
-  const gauche = await teinte(captureDeLaPageInterieure(4)); // interieure 4 (paire)
-  const droite = await teinte(captureDeLaPageInterieure(5)); // interieure 5 (impaire)
+  const gauche = await teinte(captureDeLaPageInterieure(3)); // interieure 3 (impaire)
+  const droite = await teinte(captureDeLaPageInterieure(4)); // interieure 4 (paire)
 
   console.log('');
-  console.log(`  page interieure 4 (PDF 7, a gauche)  -> moitie ${gauche === 'ROUGE' ? 'GAUCHE (rouge)' : 'DROITE (bleue)'}`);
-  console.log(`  page interieure 5 (PDF 8, a droite)  -> moitie ${droite === 'ROUGE' ? 'GAUCHE (rouge)' : 'DROITE (bleue)'}`);
+  console.log(`  page interieure 3 (PDF 5, a gauche)  -> moitie ${gauche === 'ROUGE' ? 'GAUCHE (rouge)' : 'DROITE (bleue)'}`);
+  console.log(`  page interieure 4 (PDF 6, a droite)  -> moitie ${droite === 'ROUGE' ? 'GAUCHE (rouge)' : 'DROITE (bleue)'}`);
   console.log('');
 
   check(gauche !== droite, 'les deux pages montrent bien des moities DIFFERENTES');

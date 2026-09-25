@@ -2554,3 +2554,24 @@
   line-height: 1.5;
   padding: 8px 10px 10px;
 }
+
+/* CONTRE-PLAT : la place de la page de gauche, au tout premier vis-a-vis.
+   La page 1 d'un livre relie est seule a DROITE — on occupe donc sa gauche
+   par l'interieur de la couverture, plutot que de centrer la page 1 sans
+   rien expliquer. Volontairement inerte : ni cliquable, ni composable, elle
+   n'appartient pas au livre. */
+.atelier-page-pane.is-contreplat {
+  flex: 1;
+  background: linear-gradient(135deg, #efe8d8 0%, #e6dcc6 100%);
+  border: 1px dashed rgba(122, 101, 61, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.atelier-page-pane.is-contreplat .atelier-page-pane-label {
+  position: static;
+  opacity: 0.55;
+  font-style: italic;
+}

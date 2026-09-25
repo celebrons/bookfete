@@ -279,7 +279,7 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
   // PARITE du numero de page : c'est toute la mecanique, et rien d'autre ne
   // la porte — si elle casse, le livre imprime montre deux fois la meme
   // moitie sans que rien ne le signale.
-  it('FULL_PHOTO_SPREAD : la page PAIRE rend la moitie gauche, l IMPAIRE la moitie droite', () => {
+  it('FULL_PHOTO_SPREAD : la page IMPAIRE rend la moitie gauche, la PAIRE la moitie droite', () => {
     const layouts = [{ id: 'l-spread', slug: 'FULL_PHOTO_SPREAD', kind: 'photo' }];
     const items = [{ id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg' }];
     const pageAt = (pageIndex) => bodyOf(renderBookHtml({
@@ -292,13 +292,14 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
       }]
     }));
 
-    expect(pageAt(0)).toContain('photo-spread is-spread-left');
-    expect(pageAt(1)).toContain('photo-spread is-spread-right');
-    expect(pageAt(4)).toContain('photo-spread is-spread-left');
-    expect(pageAt(7)).toContain('photo-spread is-spread-right');
+    // Page 1 du livre (index 0) : seule a DROITE, face au contre-plat.
+    expect(pageAt(0)).toContain('photo-spread is-spread-right');
+    expect(pageAt(1)).toContain('photo-spread is-spread-left');
+    expect(pageAt(4)).toContain('photo-spread is-spread-right');
+    expect(pageAt(7)).toContain('photo-spread is-spread-left');
   });
 
-  it('FULL_PHOTO_SPREAD : la photo va a fond perdu et reserve une bande de reliure', () => {
+  it('FULL_PHOTO_SPREAD : la photo va a fond perdu et se recouvre au pli', () => {
     const html = renderBookHtml({
       book: {},
       items: [{ id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
@@ -307,8 +308,46 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     });
     // Fond perdu : la figure est posee sur TOUTE la page, marges comprises.
     expect(html).toMatch(/\.photo-spread \{[^}]*position: absolute;[^}]*inset: 0/);
-    // La bande centrale avalee par la reliure est bien reservee.
-    expect(html).toMatch(/width: calc\(200% \+ var\(--spread-gutter, 4mm\) \* 2\)/);
+    // RIEN NE MANQUE AU CENTRE (retour du livre imprime, 2026-09-25).
+    // Chaque page montre un peu PLUS que sa moitie : le signe MOINS est tout
+    // l'enjeu. Avec un PLUS, on retirait une bande centrale que la reliure
+    // avalait ensuite une seconde fois — c'est la "perte au centre" constatee
+    // sur le vrai livre.
+    expect(html).toMatch(/width: calc\(200% - var\(--spread-overlap, 4mm\) \* 2\)/);
+    expect(html).not.toMatch(/--spread-gutter/);
+  });
+
+  it('TWO_PHOTOS_STACKED : une photo "entiere" garde la meme marge exterieure que sa voisine', () => {
+    // Retour du livre imprime (2026-09-25) : « en page 3 les photos n'ont pas
+    // la meme marge exterieure ». La photo en mode "photo entiere" flottait,
+    // mise en boite, dans une cellule plus large qu'elle.
+    const html = renderBookHtml({
+      book: {},
+      items: [
+        { id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg', metadata: { ratio: 1.33 } },
+        { id: 'p2', kind: 'photo', url: 'https://cdn.test/2.jpg', metadata: { ratio: 0.75 } }
+      ],
+      layouts: [{ id: 'l-duo', slug: 'TWO_PHOTOS_STACKED', kind: 'photo' }],
+      pages: [{
+        page_index: 0,
+        content: {
+          kind: 'photo',
+          blocks: [{ kind: 'photo', itemIds: ['p1', 'p2'], layoutId: 'l-duo' }],
+          photoAdjustments: { p1: { fitMode: 'contain' } }
+        }
+      }]
+    });
+
+    // La rangee de la photo entiere s'adapte a sa forme, celle du bas garde
+    // le reste (jamais moins de 35% : sinon une photo en hauteur reduirait
+    // sa voisine a une bande).
+    expect(html).toMatch(/photo-grid-duo-v contain-haut/);
+    expect(html).toMatch(/\.photo-grid-duo-v\.contain-haut \{ grid-template-rows: auto minmax\(35%, 1fr\); \}/);
+    // Le ratio est pose sur le CADRE — sur l'image, aspect-ratio ne le
+    // verrait pas (une variable CSS ne remonte pas vers son parent).
+    expect(html).toMatch(/<span class="photo-frame is-contain" style="--photo-ratio:1\.33;">/);
+    // La photo en remplissage n'a aucune raison de porter un ratio.
+    expect(html).not.toMatch(/--photo-ratio:0\.75/);
   });
 
   it('PHOTO_WITH_CAPTION rend une figure avec figcaption, distincte de PHOTO_TEXT', () => {

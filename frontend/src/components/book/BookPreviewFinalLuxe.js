@@ -13,6 +13,7 @@ import {
 import { applyLifecycleStatus } from '../../utils/bookLifecycle';
 import { PageZoomStage, ZoomControls } from '../common/PageZoomStage';
 import PrintQualityRecapModal from '../common/PrintQualityRecapModal';
+import { spreadPair, spreadCount as compterVisAVis } from '../../utils/pageParity';
 import '../../styles/luxe-theme.css';
 import './BookPreviewFinalLuxe.css';
 
@@ -223,7 +224,9 @@ export default function BookPreviewFinalLuxe() {
   const photosCount = useMemo(() => items.filter((item) => item.kind === 'photo').length, [items]);
   const souvenirsCount = useMemo(() => items.filter((item) => item.kind === 'texte').length, [items]);
   const totalPages = book?.page_count || 0;
-  const spreadCount = Math.max(1, Math.ceil(totalPages / 2));
+  // La page 1 est seule a droite : elle occupe sa propre vue, d'ou un
+  // vis-a-vis de plus que la simple moitie (voir utils/pageParity.js).
+  const spreadCount = Math.max(1, compterVisAVis(totalPages));
   const totalViews = spreadCount + 2; // couverture + doubles-pages + 4e
   const currentFormat = normalizePrintFormat(book?.print_format);
   // Ratio REEL du format choisi, applique en style inline (voir plus bas)
@@ -244,8 +247,11 @@ export default function BookPreviewFinalLuxe() {
 
   const viewKind = viewIndex === 0 ? 'cover' : viewIndex === totalViews - 1 ? 'back-cover' : 'spread';
   const spreadNumber = viewKind === 'spread' ? viewIndex - 1 : null;
-  const leftPageIndex = spreadNumber != null ? spreadNumber * 2 : null;
-  const rightPageIndex = spreadNumber != null && leftPageIndex + 1 < totalPages ? leftPageIndex + 1 : null;
+  // Le premier vis-a-vis n'a pas de page de gauche : la page 1 s'ouvre seule,
+  // a droite, exactement comme dans le livre relie.
+  const paire = spreadNumber != null ? spreadPair(spreadNumber) : null;
+  const leftPageIndex = paire && paire.left != null && paire.left < totalPages ? paire.left : null;
+  const rightPageIndex = paire && paire.right != null && paire.right < totalPages ? paire.right : null;
 
   // Pagination REELLE de chaque format pour le contenu actuel
   // (formatComposer.js, cote serveur — pur, ne persiste rien) : rechargee a
@@ -451,15 +457,18 @@ export default function BookPreviewFinalLuxe() {
     ? 'Couverture'
     : viewKind === 'back-cover'
       ? '4e de couverture'
-      : rightPageIndex != null
+      : (leftPageIndex != null && rightPageIndex != null)
         ? `Pages ${leftPageIndex + 1}-${rightPageIndex + 1} / ${totalPages}`
-        : `Page ${leftPageIndex + 1} / ${totalPages}`;
+        : `Page ${(leftPageIndex != null ? leftPageIndex : rightPageIndex) + 1} / ${totalPages}`;
   const hasCurrentContent = viewKind === 'spread' ? Boolean(leftHtml || rightHtml) : Boolean(singleHtml);
-  const isFullscreenSpreadWithBothPages = viewKind === 'spread' && rightPageIndex != null;
+  // « Les deux pages » veut bien dire les deux : au premier vis-a-vis il n'y
+  // a que la page de droite, et la feuille doit alors faire une page de
+  // large, pas deux.
+  const isFullscreenSpreadWithBothPages = viewKind === 'spread' && leftPageIndex != null && rightPageIndex != null;
   const fullscreenContentWidthPx = isFullscreenSpreadWithBothPages ? naturalSpreadWidthPx : naturalPageWidthPx;
   // Cle de remontage : reinitialise le panoramique (PageZoomStage) et
   // rejoue la transition douce d'apparition a chaque page/format different.
-  const fullscreenPageChangeKey = `${currentFormat}-${viewKind}-${leftPageIndex}`;
+  const fullscreenPageChangeKey = `${currentFormat}-${viewKind}-${viewIndex}`;
 
   if (loading) {
     return <div className="atelier-loading">Chargement de votre livre...</div>;
@@ -494,16 +503,20 @@ export default function BookPreviewFinalLuxe() {
           </button>
           {viewKind === 'spread' ? (
             <div className="preview-final-spread">
-              <ScaledPageFrame
-                key={`${currentFormat}-left`}
-                html={leftHtml}
-                title="Page gauche"
-                naturalWidthPx={naturalPageWidthPx}
-                naturalHeightPx={naturalPageHeightPx}
-                wrapClassName="preview-final-frame-wrap"
-                wrapStyle={{ aspectRatio: pageAspectRatio }}
-                frameClassName="preview-final-frame"
-              />
+              {/* Pas de page a gauche au premier vis-a-vis : la page 1
+                  s'ouvre seule a droite, comme dans le livre relie. */}
+              {leftPageIndex != null && (
+                <ScaledPageFrame
+                  key={`${currentFormat}-left`}
+                  html={leftHtml}
+                  title="Page gauche"
+                  naturalWidthPx={naturalPageWidthPx}
+                  naturalHeightPx={naturalPageHeightPx}
+                  wrapClassName="preview-final-frame-wrap"
+                  wrapStyle={{ aspectRatio: pageAspectRatio }}
+                  frameClassName="preview-final-frame"
+                />
+              )}
               {rightPageIndex != null && (
                 <ScaledPageFrame
                   key={`${currentFormat}-right`}
@@ -677,10 +690,12 @@ export default function BookPreviewFinalLuxe() {
               >
                 {viewKind === 'spread' ? (
                   <div className="preview-final-zoom-spread preview-final-zoom-page-change" key={fullscreenPageChangeKey}>
-                    {leftHtml ? (
-                      <iframe title="Page gauche" srcDoc={leftHtml} className="preview-final-zoom-frame" />
-                    ) : (
-                      <div className="atelier-page-placeholder" />
+                    {leftPageIndex != null && (
+                      leftHtml ? (
+                        <iframe title="Page gauche" srcDoc={leftHtml} className="preview-final-zoom-frame" />
+                      ) : (
+                        <div className="atelier-page-placeholder" />
+                      )
                     )}
                     {isFullscreenSpreadWithBothPages && <span className="preview-final-zoom-spine" aria-hidden="true" />}
                     {rightPageIndex != null && (

@@ -264,9 +264,18 @@ function AtelierLayoutPanel({
   // arrive entre l'ajout d'un layout et l'execution de sa migration SQL
   // (2026-09-13, TWO_PHOTOS_STACKED). Non fourni -> aucun filtre, comportement
   // d'avant.
-  availableSlugs
+  availableSlugs,
+  // Une double page exige une page EN FACE. La page 1 est seule a droite et
+  // la derniere page peut tomber a gauche : dans ces deux cas le format
+  // "1 photo sur double page" n'a aucun sens, et le proposer produisait une
+  // demi-photo orpheline — defaut constate sur le premier livre imprime
+  // (2026-09-25). Non fourni -> on le propose, comportement d'avant.
+  doublePagePossible = true
 }) {
-  const isAvailable = (slug) => !availableSlugs || availableSlugs.has(slug);
+  const isAvailable = (slug) => (
+    (!availableSlugs || availableSlugs.has(slug))
+    && (doublePagePossible || !ATELIER_LAYOUTS.find((layout) => layout.slug === slug)?.spread)
+  );
   const draftLayout = ATELIER_LAYOUTS.find((layout) => layout.slug === draftLayoutSlug) || null;
   const galleryLayouts = (activeCategory ? layoutsByCategory(activeCategory) : ATELIER_LAYOUTS)
     .filter((layout) => isAvailable(layout.slug));

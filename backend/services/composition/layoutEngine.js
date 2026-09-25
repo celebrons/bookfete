@@ -326,9 +326,27 @@ function buildPages(input) {
   const formatId = input.formatId || undefined;
   const targetPages = Math.max(0, clampInt(input.targetPages, 0));
 
+  // UNE DOUBLE PAGE NE SE COMPOSE PAS TOUTE SEULE.
+  //
+  // FULL_PHOTO_SPREAD suppose que la MEME photo est posee sur les DEUX pages
+  // d'un vis-a-vis, chacune n'en montrant que sa moitie. Le moteur
+  // automatique, lui, raisonne page par page : il en posait une seule, et
+  // cette page n'affichait donc que la moitie de sa photo — l'autre moitie
+  // n'existait nulle part.
+  //
+  // Constate le 2026-09-25 en verifiant les livres existants : 39 pages de
+  // ce type, seules, reparties dans 9 livres (voir
+  // scripts/check-doubles-pages-existantes.js). Une photo coupee en deux
+  // sans raison, a chaque fois.
+  //
+  // La double page reste entierement disponible dans l'atelier, ou elle est
+  // posee sur les deux pages d'un coup (voir mirrorSpread) et refusee la ou
+  // il n'y a pas de page en face.
+  const jamaisEnAutomatique = (layout) => layout.slug === 'FULL_PHOTO_SPREAD';
+  const disponibles = layouts.filter((layout) => !jamaisEnAutomatique(layout));
   const pool = allowedSlugs.length > 0
-    ? layouts.filter((layout) => allowedSlugs.includes(layout.slug) || GUARANTEED_FALLBACK_SLUGS.includes(layout.slug))
-    : layouts;
+    ? disponibles.filter((layout) => allowedSlugs.includes(layout.slug) || GUARANTEED_FALLBACK_SLUGS.includes(layout.slug))
+    : disponibles;
   const fallbackPool = layouts.filter((layout) => GUARANTEED_FALLBACK_SLUGS.includes(layout.slug));
 
   let queue = allUnits.slice();
@@ -495,7 +513,11 @@ function harmoniserLesDoublesPages(pages, layouts) {
   // places differentes. L'ordre des photos dans un livre automatique est
   // celui de leur depot, pas un recit — les deplacer ne trahit rien.
   const solitaires = [];
-  for (let gauche = 0; gauche + 1 < resultat.length; gauche += 2) {
+  // On part de l'index 1, pas de 0 : la premiere page du livre est SEULE a
+  // droite, face au contre-plat (voir pageParity.js). Les vis-a-vis sont
+  // donc (1,2), (3,4), (5,6)... Partir de 0 revenait a accorder des pages
+  // qui ne se voient jamais ensemble — et a en laisser de vraies depareillees.
+  for (let gauche = 1; gauche + 1 < resultat.length; gauche += 2) {
     const droite = gauche + 1;
     const aGauche = estPleinePage(resultat[gauche]);
     const aDroite = estPleinePage(resultat[droite]);
@@ -517,8 +539,9 @@ function harmoniserLesDoublesPages(pages, layouts) {
     resultat[b] = { ...resultat[b], page_index: b };
   }
 
-  // ENSUITE SEULEMENT, on accorde les registres.
-  for (let gauche = 0; gauche + 1 < resultat.length; gauche += 2) {
+  // ENSUITE SEULEMENT, on accorde les registres. Memes vis-a-vis que
+  // ci-dessus : on part de 1.
+  for (let gauche = 1; gauche + 1 < resultat.length; gauche += 2) {
     const droite = gauche + 1;
     const aGauche = estPleinePage(resultat[gauche]);
     const aDroite = estPleinePage(resultat[droite]);

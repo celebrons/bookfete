@@ -123,6 +123,20 @@ describe('layoutEngine.compose — placement complet du contenu', () => {
     expect(placedItemIds(pages)).toEqual(items.map((i) => i.id).sort());
   });
 
+  it('ne pose JAMAIS une double page tout seul : elle se compose a deux', () => {
+    // Une double page suppose la MEME photo sur les deux pages d'un
+    // vis-a-vis. Le moteur raisonne page par page : il en posait une seule,
+    // qui n'affichait donc que la moitie de sa photo (39 pages dans ce cas
+    // parmi les livres existants, constate le 2026-09-25).
+    const SPREAD = { id: 'l-spread', slug: 'FULL_PHOTO_SPREAD', kind: 'photo', capacity: { slots: [{ type: 'photo' }] } };
+    const items = Array.from({ length: 16 }, (_, i) => photoItem(`p${i}`, i));
+    const { pages } = compose({ items, template: null, layouts: [...LAYOUTS, SPREAD], pageCount: 30 });
+
+    expect(pages.some((page) => page.layout_id === SPREAD.id)).toBe(false);
+    // ... et rien n'est perdu au passage : les photos sont toutes placees.
+    expect(placedItemIds(pages)).toEqual(items.map((item) => item.id).sort());
+  });
+
   it('livre principalement texte : place tous les temoignages', () => {
     const items = Array.from({ length: 30 }, (_, i) => textItem(`t${i}`, i, 60));
     const { pages } = compose({ items, template: TEMPLATE, layouts: LAYOUTS, pageCount: 48 });
@@ -443,20 +457,35 @@ describe('layoutEngine — accord des registres sur une double page', () => {
 
   const harmoniser = require('../../services/composition/layoutEngine').__harmoniserPourLesTests;
 
+  // LES VIS-A-VIS SONT (1,2), (3,4)... PAS (0,1).
+  //
+  // La page d'index 0 est la page 1 du livre : seule a droite, face au
+  // contre-plat (voir pageParity.js). Chaque cas de test commence donc par
+  // une page « de garde » a l'index 0, et la double page eprouvee est
+  // (1,2). Avant le 2026-09-25 ces tests accordaient (0,1) — deux pages qui
+  // ne se voient jamais ensemble dans le livre imprime.
   it('deux pleines pages face a face : les deux a fond perdu', () => {
-    const resultat = harmoniser([page(0, FULL, 1), page(1, FULL, 0)], [FULL, GRILLE]);
-    expect(varianteDe(resultat[0])).toBe(0);
+    const resultat = harmoniser([page(0, GRILLE, 0), page(1, FULL, 1), page(2, FULL, 0)], [FULL, GRILLE]);
     expect(varianteDe(resultat[1])).toBe(0);
+    expect(varianteDe(resultat[2])).toBe(0);
   });
 
   it('une pleine page face a une grille : elle prend sa marge', () => {
-    const resultat = harmoniser([page(0, FULL, 0), page(1, GRILLE, 0)], [FULL, GRILLE]);
-    expect(varianteDe(resultat[0])).toBe(1);
+    const resultat = harmoniser([page(0, GRILLE, 0), page(1, FULL, 0), page(2, GRILLE, 0)], [FULL, GRILLE]);
+    expect(varianteDe(resultat[1])).toBe(1);
   });
 
   it('meme chose quand la pleine page est a droite', () => {
-    const resultat = harmoniser([page(0, GRILLE, 0), page(1, FULL, 0)], [FULL, GRILLE]);
-    expect(varianteDe(resultat[1])).toBe(1);
+    const resultat = harmoniser([page(0, GRILLE, 0), page(1, GRILLE, 0), page(2, FULL, 0)], [FULL, GRILLE]);
+    expect(varianteDe(resultat[2])).toBe(1);
+  });
+
+  it('la premiere page du livre n est jamais accordee avec la deuxieme', () => {
+    // Elles ne se font pas face : la page 1 est seule a droite, la page 2
+    // ouvre le vis-a-vis suivant. Les accorder etait precisement le defaut
+    // qui a fait sortir une double page en recto-verso.
+    const resultat = harmoniser([page(0, FULL, 0), page(1, GRILLE, 0)], [FULL, GRILLE]);
+    expect(varianteDe(resultat[0])).toBe(0);
   });
 
   it('deux grilles face a face : rien n est touche', () => {
@@ -501,13 +530,14 @@ describe('layoutEngine — appairage des pleines pages', () => {
     : (p.content.blocks[0].presentationVariant === 1 ? 'cadre' : 'fond perdu'));
 
   it('deux doubles pages mal assorties en donnent une immersive et une d\'album', () => {
-    // [pleine, grille] puis [grille, pleine] : deux melanges.
-    const avant = [page(0, FULL, 'a'), page(1, GRILLE, 'b'), page(2, GRILLE, 'c'), page(3, FULL, 'd')];
+    // Index 0 = page 1 du livre, seule a droite. Les vis-a-vis eprouves sont
+    // donc (1,2) et (3,4) : [pleine, grille] puis [grille, pleine].
+    const avant = [page(0, GRILLE, 'z'), page(1, FULL, 'a'), page(2, GRILLE, 'b'), page(3, GRILLE, 'c'), page(4, FULL, 'd')];
     const apres = harmoniser(avant, [FULL, GRILLE]);
 
-    expect(registre(apres[0])).toBe(registre(apres[1]));
-    expect(registre(apres[2])).toBe(registre(apres[3]));
-    const immersives = [[0, 1], [2, 3]].filter(([g, d]) => registre(apres[g]) === 'fond perdu' && registre(apres[d]) === 'fond perdu');
+    expect(registre(apres[1])).toBe(registre(apres[2]));
+    expect(registre(apres[3])).toBe(registre(apres[4]));
+    const immersives = [[1, 2], [3, 4]].filter(([g, d]) => registre(apres[g]) === 'fond perdu' && registre(apres[d]) === 'fond perdu');
     expect(immersives.length).toBe(1);
   });
 
@@ -527,9 +557,9 @@ describe('layoutEngine — appairage des pleines pages', () => {
   });
 
   it('une seule pleine page solitaire reste avec sa marge, sans echange possible', () => {
-    const avant = [page(0, FULL, 'a'), page(1, GRILLE, 'b')];
+    const avant = [page(0, GRILLE, 'z'), page(1, FULL, 'a'), page(2, GRILLE, 'b')];
     const apres = harmoniser(avant, [FULL, GRILLE]);
-    expect(registre(apres[0])).toBe('cadre');
-    expect(apres[0].content.itemIds).toEqual(['a']);
+    expect(registre(apres[1])).toBe('cadre');
+    expect(apres[1].content.itemIds).toEqual(['a']);
   });
 });

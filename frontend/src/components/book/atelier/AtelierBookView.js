@@ -268,7 +268,7 @@ function AtelierBookView({
   // celle d'une page.
   const pageWidthPx = formatDimensions.widthMm * PX_PER_MM;
   const pageHeightPx = formatDimensions.heightMm * PX_PER_MM;
-  const isSpreadWithBothPages = viewKind === 'spread' && rightPageNumber != null;
+  const isSpreadWithBothPages = viewKind === 'spread' && leftPageNumber != null && rightPageNumber != null;
   const contentWidthPx = isSpreadWithBothPages ? pageWidthPx * 2 + SPREAD_GAP_PX : pageWidthPx;
   const contentHeightPx = pageHeightPx;
 
@@ -277,7 +277,7 @@ function AtelierBookView({
   // fichier) et (2) rejouer la transition douce d'apparition
   // (.atelier-zoom-page-change, cahier des charges §7 "transition douce
   // lors du changement de page").
-  const pageChangeKey = viewKind === 'spread' ? `spread-${leftPageNumber}` : viewKind;
+  const pageChangeKey = viewKind === 'spread' ? `spread-${leftPageNumber}-${rightPageNumber}` : viewKind;
 
   return (
     <div className="atelier-book-view">
@@ -330,17 +330,32 @@ function AtelierBookView({
 
         {viewKind === 'spread' && (
           <div className="atelier-spread">
-            <PagePane
-              html={leftHtml}
-              pageLabel={`Page ${leftPageNumber}`}
-              selectable
-              isSelected={selectedSide === 'left'}
-              onSelect={() => onSelectSide('left')}
-              overlay={selectedSide === 'left' ? overlay : null}
-              actions={pageActions}
-              aspectRatio={pageAspectRatio}
-              onExpand={() => setIsFullscreenOpen(true)}
-            />
+            {/* La page de GAUCHE peut manquer : au tout premier vis-a-vis,
+                la page 1 s'ouvre seule a DROITE, face au contre-plat de la
+                couverture — comme dans n'importe quel livre relie (voir
+                utils/pageParity.js).
+                On occupe quand meme sa place, avec le contre-plat nomme :
+                sans rien, la page 1 se retrouvait centree et on ne
+                comprenait pas pourquoi elle etait seule. La nommer explique
+                du meme coup POURQUOI le livre commence a droite. */}
+            {leftPageNumber == null && (
+              <div className="atelier-page-pane is-contreplat" style={pageAspectRatio ? { aspectRatio: pageAspectRatio } : undefined}>
+                <span className="atelier-page-pane-label">Intérieur de couverture</span>
+              </div>
+            )}
+            {leftPageNumber != null && (
+              <PagePane
+                html={leftHtml}
+                pageLabel={`Page ${leftPageNumber}`}
+                selectable
+                isSelected={selectedSide === 'left'}
+                onSelect={() => onSelectSide('left')}
+                overlay={selectedSide === 'left' ? overlay : null}
+                actions={pageActions}
+                aspectRatio={pageAspectRatio}
+                onExpand={() => setIsFullscreenOpen(true)}
+              />
+            )}
             {rightPageNumber != null && (
               <PagePane
                 html={rightHtml}
@@ -466,10 +481,12 @@ function AtelierBookView({
               >
                 {viewKind === 'spread' ? (
                   <div className="atelier-zoom-spread atelier-zoom-page-change" key={pageChangeKey}>
-                    {leftHtml ? (
-                      <iframe title={`Page ${leftPageNumber}`} srcDoc={leftHtml} className="atelier-zoom-frame" />
-                    ) : (
-                      <div className="atelier-page-placeholder" />
+                    {leftPageNumber != null && (
+                      leftHtml ? (
+                        <iframe title={`Page ${leftPageNumber}`} srcDoc={leftHtml} className="atelier-zoom-frame" />
+                      ) : (
+                        <div className="atelier-page-placeholder" />
+                      )
                     )}
                     {isSpreadWithBothPages && <span className="atelier-zoom-spine" aria-hidden="true" />}
                     {rightPageNumber != null && (

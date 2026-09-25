@@ -27,6 +27,7 @@ const GOOGLE_FONTS_LINK = '<link rel="preconnect" href="https://fonts.googleapis
 
 const typography = require('./typographySystem');
 const photoSource = require('./photoSource');
+const pageParity = require('./pageParity');
 
 function escapeHtml(value = '') {
   return String(value)
@@ -67,12 +68,24 @@ function clamp(value, min, max) {
 // 2026-09-14). Elle se pose donc DANS le cadre, par-dessus le bas de
 // l'image — aucune geometrie de page n'est modifiee, et ca marche
 // identiquement sur une photo pleine page comme dans une grille.
-function imgFrame(url, adjustment, caption) {
+//
+// `ratio` (optionnel) : largeur/hauteur REELLE de la photo source
+// (item.metadata.ratio). Ne sert qu'au mode "photo entiere" DANS une grille
+// de plusieurs photos — voir `.photo-grid .photo-frame.is-contain` dans
+// BASE_CSS. Absent, le comportement est strictement celui d'avant.
+function imgFrame(url, adjustment, caption, ratio) {
   const fitMode = adjustment?.fitMode === 'contain' ? 'contain' : 'cover';
   const focalX = clamp(adjustment?.focalX, 0, 1) ?? 0.5;
   const focalY = clamp(adjustment?.focalY, 0, 1) ?? 0.5;
   const zoom = clamp(adjustment?.zoom, PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX) ?? 1;
   const cls = fitMode === 'contain' ? 'photo-frame is-contain' : 'photo-frame';
+  const ratioNum = Number(ratio);
+  // Le ratio se pose sur le CADRE, pas sur l'image : c'est le cadre qui doit
+  // prendre la forme de la photo (aspect-ratio), et une variable CSS ne
+  // remonte jamais d'un enfant vers son parent.
+  const styleCadre = fitMode === 'contain' && Number.isFinite(ratioNum) && ratioNum > 0
+    ? ` style="--photo-ratio:${Math.round(ratioNum * 1000) / 1000};"`
+    : '';
   const style = `--fx:${Math.round(focalX * 1000) / 10}%;--fy:${Math.round(focalY * 1000) / 10}%;--zoom:${zoom};`;
   // La legende accepte DEUX formes : une chaine (couleur par defaut) ou
   // { texte, couleur }. L'ancienne forme reste valide telle quelle — les
@@ -87,7 +100,7 @@ function imgFrame(url, adjustment, caption) {
   const legende = typeof legendeTexte === 'string' && legendeTexte.trim()
     ? `<span class="photo-caption is-${legendeCouleur}">${escapeHtml(legendeTexte.trim())}</span>`
     : '';
-  return `<span class="${cls}"><img src="${escapeHtml(url || '')}" alt="" style="${style}" />${legende}</span>`;
+  return `<span class="${cls}"${styleCadre}><img src="${escapeHtml(url || '')}" alt="" style="${style}" />${legende}</span>`;
 }
 
 // Fragment de texte affiche pour cet item : le texte reel de l'item, sauf si
@@ -267,12 +280,12 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsBy
 
     // Photo etalee sur la DOUBLE PAGE : la meme image est posee sur les deux
     // pages, chacune n'en montrant que sa moitie. La moitie affichee se deduit
-    // de la PARITE du numero de page — index pair = page de gauche, impair =
-    // page de droite — exactement la convention de l'atelier
-    // (leftPageIndex = spread * 2). Aucune donnee supplementaire a stocker :
-    // la position de la page porte deja l'information.
+    // de la PARITE du numero de page — voir pageParity.js, qui porte seul
+    // cette regle et explique comment le vrai livre imprime l'a etablie.
+    // Aucune donnee supplementaire a stocker : la position de la page porte
+    // deja l'information.
     if (slug === 'FULL_PHOTO_SPREAD') {
-      const moitie = pageIndex % 2 === 0 ? 'is-spread-left' : 'is-spread-right';
+      const moitie = pageParity.isLeftPage(pageIndex) ? 'is-spread-left' : 'is-spread-right';
       return `<figure class="block-photo photo-spread ${moitie}" data-layout="${escapeHtml(slug)}">${imgFrame(item.url, adjustmentsByItemId[item.id])}</figure>`;
     }
 
@@ -280,7 +293,10 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsBy
     const cls = inset ? 'block-photo photo-solo photo-inset' : 'block-photo photo-solo';
     return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id])}</figure>`;
   }
-  const cells = orderedItems.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id]) : '<span class="photo-frame" aria-hidden="true"></span>'));
+  // Le ratio reel de la photo n'est transmis QUE dans une grille : c'est la
+  // seule situation ou deux photos voisines doivent aligner leurs bords
+  // exterieurs (voir `.photo-grid .photo-frame.is-contain`).
+  const cells = orderedItems.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id], item.metadata?.ratio) : '<span class="photo-frame" aria-hidden="true"></span>'));
   // "duo-v" = les deux photos EMPILEES (une colonne, deux rangees), donc deux
   // cadres larges et bas. Piege de vocabulaire a garder en tete : l'empilement
   // est vertical, les cadres sont horizontaux — c'est ce que l'utilisateur
@@ -291,17 +307,26 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsBy
     || slug === 'TWO_PHOTOS_STACKED'
     || (slug === 'TWO_PHOTOS' && slotCount === 2 && presentationVariant === 1);
   if (slotCount === 2 && vertical) {
-    return `<div class="block-photo photo-grid photo-grid-duo-v" data-layout="${escapeHtml(slug)}">${cells.join('')}</div>`;
+    // Quelle rangee doit s'adapter a sa photo ? Une photo en mode "photo
+    // entiere" ne peut aligner ses bords sur ceux de sa voisine que si SA
+    // rangee prend la hauteur que sa forme reclame — sinon elle reste en
+    // boite au milieu d'une rangee trop large pour elle (voir
+    // `.photo-grid-duo-v.contain-*` dans BASE_CSS).
+    const estEntiere = (item) => item && adjustmentsByItemId[item.id]?.fitMode === 'contain';
+    const hautEntiere = estEntiere(orderedItems[0]);
+    const basEntiere = estEntiere(orderedItems[1]);
+    const rangees = hautEntiere && basEntiere ? ' contain-les-deux'
+      : (hautEntiere ? ' contain-haut' : (basEntiere ? ' contain-bas' : ''));
+    return `<div class="block-photo photo-grid photo-grid-duo-v${rangees}" data-layout="${escapeHtml(slug)}">${cells.join('')}</div>`;
   }
   return `<div class="block-photo photo-grid photo-grid-${Math.min(slotCount, 6)}" data-layout="${escapeHtml(slug || '')}">${cells.join('')}</div>`;
 }
 
 // Sur quelle page d'une double page se trouve-t-on ?
 //
-// La reponse se lit sur la parite de la page INTERIEURE : index pair =
-// page de gauche, impair = page de droite (convention de l'atelier,
-// leftPageIndex = spread * 2). Mais `page_index` ne porte pas toujours ce
-// sens : pour un export PDF, composeCoversIntoPages renumerote tout afin
+// La reponse se lit sur la parite de la page INTERIEURE — voir pageParity.js
+// pour la regle et sa demonstration. Mais `page_index` ne porte pas toujours
+// ce sens : pour un export PDF, composeCoversIntoPages renumerote tout afin
 // de placer la couverture en tete, et decale donc la parite d'un cran.
 // Il conserve pour cela l'index d'origine dans `spreadIndex`, seul digne
 // de confiance ici. Deduire la moitie du seul `page_index` etait la cause
@@ -762,12 +787,24 @@ const BASE_CSS = `
         (inset: 0), donc PAR-DESSUS la marge de page. Sans ca, les deux
         moities se rejoindraient au niveau des marges et une bande blanche
         courrait le long du pli — ce qui ruine exactement l'effet recherche.
-     2. LA RELIURE MANGE LE MILIEU. L'image est dessinee sur 200% + 2 x la
-        gouttiere, et chaque page en montre 100% depuis SON bord exterieur :
-        la bande centrale (2 x --spread-gutter) n'est affichee nulle part.
-        C'est volontaire — c'est precisement la portion qui disparait dans le
-        pli. Les deux moities se raccordent donc correctement sur un livre
-        ouvert, au lieu de se chevaucher.
+     2. RIEN NE DOIT MANQUER AU CENTRE. L'image est dessinee sur 200% MOINS
+        2 x le recouvrement, et chaque page en montre 100% depuis SON bord
+        exterieur : chaque page montre donc un peu PLUS que sa moitie, et la
+        bande centrale (2 x --spread-overlap) est imprimee DEUX FOIS, une
+        fois de chaque cote du pli.
+
+        C'est l'inverse de ce qu'on faisait jusqu'au 2026-09-25. On retirait
+        alors une bande centrale (200% PLUS 2 x une gouttiere), en pariant
+        que c'etait exactement la portion avalee par la reliure. Le vrai
+        livre imprime a tranche : « lorsque c'est en double page, il faut pas
+        qu'il y'ait de perte au centre ». Sur une reliure qui ne s'ouvre pas
+        a plat, cette bande etait perdue DEUX fois — une fois parce qu'on ne
+        l'imprimait pas, une fois parce que le pli en mange encore.
+
+        Avec un recouvrement, ce que le pli cache a gauche reste visible a
+        droite : l'image redevient continue. Le prix est un leger doublon de
+        quelques millimetres, invisible puisqu'il tombe precisement dans la
+        courbure du pli.
      3. Valeur absolue, non mise a l'echelle par spaceScale : la perte de
         reliure est un fait physique de fabrication, pas un choix de densite
         typographique. */
@@ -776,13 +813,48 @@ const BASE_CSS = `
     position: absolute;
     top: 0;
     height: 100%;
-    width: calc(200% + var(--spread-gutter, 4mm) * 2);
+    width: calc(200% - var(--spread-overlap, 4mm) * 2);
   }
   .photo-spread.is-spread-left .photo-frame { left: 0; }
   .photo-spread.is-spread-right .photo-frame { right: 0; }
   .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
   .photo-inset .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
   .photo-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); height: 100%; }
+  /* MEME MARGE EXTERIEURE POUR TOUTES LES PHOTOS D'UNE GRILLE.
+     Retour du livre imprime (2026-09-25) : « en page 3 les photos n'ont pas
+     la meme marge exterieure ». La page empilait deux photos, l'une en mode
+     "photo entiere" (is-contain), l'autre en remplissage. La seconde
+     occupait toute la largeur de sa cellule ; la premiere, mise en boite
+     dans une cellule plus large qu'elle, flottait au milieu — donc plus
+     etroite, et ses bords ne tombaient pas sur ceux de sa voisine.
+     On donne ici au CADRE la forme de la photo (--photo-ratio, pose par
+     imgFrame) au lieu de laisser l'image flotter dans un cadre trop large :
+     le cadre garde 100% de la largeur, sa hauteur suit, et les bords
+     exterieurs de toutes les photos de la grille s'alignent enfin.
+     max-height protege le cas limite d'une photo si haute qu'elle ne tient
+     pas a pleine largeur : elle se remet alors en boite, faute de mieux. */
+  .photo-grid .photo-frame.is-contain {
+    height: auto;
+    max-height: 100%;
+    aspect-ratio: var(--photo-ratio, auto);
+    align-self: center;
+  }
+  /* L'image ne peut plus etre dimensionnee en pourcentage : la hauteur du
+     cadre vient d'aspect-ratio, et un height:100% s'y resout a zero (la
+     photo disparaissait purement et simplement). On la cale sur les quatre
+     bords du cadre, qui a desormais exactement sa forme. */
+  .photo-grid .photo-frame.is-contain img {
+    top: 0; left: 0; width: 100%; height: auto; max-height: 100%;
+  }
+  /* La rangee de la photo "entiere" prend la hauteur que sa forme reclame ;
+     l'autre se contente du reste, mais jamais moins de 35% de la page —
+     sinon une photo en hauteur reduisait sa voisine a une bande de quelques
+     millimetres. Au-dela de ce plafond, la photo entiere se remet en boite :
+     c'est le seul cas ou ses bords ne peuvent pas rejoindre ceux de l'autre,
+     et aucune mise en page ne le permettrait. */
+  .photo-grid-duo-v.contain-haut { grid-template-rows: auto minmax(35%, 1fr); }
+  .photo-grid-duo-v.contain-bas { grid-template-rows: minmax(35%, 1fr) auto; }
+  .photo-grid-duo-v.contain-les-deux { grid-template-rows: auto auto; align-content: center; }
   .photo-grid-1 { grid-template-columns: 1fr; }
   .photo-grid-2 { grid-template-columns: 1fr 1fr; }
   .photo-grid-duo-v { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }

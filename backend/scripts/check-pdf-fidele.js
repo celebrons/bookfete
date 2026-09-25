@@ -89,7 +89,7 @@ const extraireJpegs = (donnees) => {
   const chemin = await pdfService.renderPdfByPrinting({
     book: livre, pages, items, layouts, format,
     spreadLayout: false,
-    insertInsideCover: true,
+    insertInsideCover: false,
     fileBaseName: 'check-fidelite',
     onProgress: ({ phase, done, total }) => {
       process.stdout.write(`\r   ${phase} ${done}/${total}          `);

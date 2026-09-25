@@ -9,6 +9,11 @@
 // se deduit de la PARITE de l'index, elle basculait — dans le PDF, et
 // seulement dans le PDF. Le controle regardait donc a cote.
 //
+// QUELLE PARITE ? Corrigee le 2026-09-25 sur retour du premier vrai livre
+// imprime : index PAIR = page de DROITE, index IMPAIR = page de GAUCHE,
+// parce que la page 1 d'un livre relie est seule a droite. La regle et sa
+// demonstration vivent dans services/composition/pageParity.js.
+//
 // Ces tests couvrent les DEUX contextes, c'est tout l'interet :
 // l'atelier (pages non renumerotees) et l'export PDF (couvertures incluses).
 
@@ -52,12 +57,16 @@ const moitieDe = (html) => {
 };
 
 describe('Double page — dans l atelier (pages non renumerotees)', () => {
-  it('la page d index PAIR montre la moitie GAUCHE', () => {
-    expect(moitieDe(rendre(pageDouble(4)))).toBe('gauche');
+  it('la page d index IMPAIR montre la moitie GAUCHE', () => {
+    expect(moitieDe(rendre(pageDouble(5)))).toBe('gauche');
   });
 
-  it('la page d index IMPAIR montre la moitie DROITE', () => {
-    expect(moitieDe(rendre(pageDouble(5)))).toBe('droite');
+  it('la page d index PAIR montre la moitie DROITE', () => {
+    expect(moitieDe(rendre(pageDouble(4)))).toBe('droite');
+  });
+
+  it('la toute premiere page est a droite — elle n a rien en face d elle', () => {
+    expect(moitieDe(rendre(pageDouble(0)))).toBe('droite');
   });
 });
 
@@ -85,9 +94,9 @@ describe('Double page — dans l export PDF (couvertures incluses)', () => {
     expect(interieure5.page_index).toBe(6);
 
     // ... et pourtant les moities suivent la page INTERIEURE, pas l'index
-    // renumerote : paire a gauche, impaire a droite.
-    expect(moitieDe(rendre(interieure4))).toBe('gauche');
-    expect(moitieDe(rendre(interieure5))).toBe('droite');
+    // renumerote : impaire a gauche, paire a droite.
+    expect(moitieDe(rendre(interieure4))).toBe('droite');
+    expect(moitieDe(rendre(interieure5))).toBe('gauche');
   });
 
   it('conserve l index interieur d origine dans spreadIndex', () => {
@@ -96,10 +105,13 @@ describe('Double page — dans l export PDF (couvertures incluses)', () => {
     expect(pages[2].spreadIndex).toBe(1);
   });
 
-  it('une page sans spreadIndex retombe sur page_index (atelier, fichier imprimeur)', () => {
-    // gelatoPrintFile.js renumerote ses pages interieures lui-meme et ne
-    // passe jamais par composeCoversIntoPages : le repli doit rester juste.
-    expect(moitieDe(rendre({ ...pageDouble(2), spreadIndex: undefined }))).toBe('gauche');
-    expect(moitieDe(rendre({ ...pageDouble(3), spreadIndex: undefined }))).toBe('droite');
+  it('une page sans spreadIndex retombe sur page_index', () => {
+    // Le repli doit rester juste pour tout appelant qui rend une page telle
+    // quelle, sans renumerotation — l'atelier, un apercu unitaire.
+    // gelatoPrintFile.js, lui, ne s'y fie plus : il pose desormais
+    // explicitement spreadIndex avant d'inserer ses gardes blanches (voir
+    // tests/printing/gelatoPrintFile.test.js).
+    expect(moitieDe(rendre({ ...pageDouble(3), spreadIndex: undefined }))).toBe('gauche');
+    expect(moitieDe(rendre({ ...pageDouble(2), spreadIndex: undefined }))).toBe('droite');
   });
 });

@@ -121,7 +121,7 @@ const extraireJpegs = (donnees) => {
     return resultat;
   };
 
-  const commun = { book: livre, pages, items, layouts, format, bleedMm: BLEED, insertInsideCover: true };
+  const commun = { book: livre, pages, items, layouts, format, bleedMm: BLEED, insertInsideCover: false };
 
   const captures = await mesurer('captures  ', () => pdfService.renderPdfFromPages({
     ...commun, fileBaseName: 'comparaison-captures'

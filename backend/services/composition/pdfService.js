@@ -880,23 +880,26 @@ async function capturePagesAsImagesDirect({ book, pages, items, layouts, format,
 // la page PDF finale s'agrandit de bleedMm.
 // `insertInsideCover` : glisse une page blanche juste apres la couverture.
 //
-// Ce n'est pas cosmetique, c'est ce qui fait que les DOUBLES PAGES se
-// raccordent chez tout le monde. Une photo etalee sur deux pages est stockee
-// en deux moities : la gauche sur un index PAIR, la droite sur l'impair
-// suivant. Sans page de garde, la moitie gauche tombe sur une page PAIRE du
-// PDF — or la quasi-totalite des lecteurs apparient (1,2), (3,4), (5,6)... et
-// placent les pages IMPAIRES a gauche. Les deux moities se retrouvaient donc
-// inversees (signale le 2026-09-15 : « la partie gauche se retrouve sur la
-// droite »).
+// N'EST PLUS UTILISE PAR LE PDF DU LIVRE, et le parametre ne subsiste que
+// pour les scripts de diagnostic. La raison tient a la parite des pages.
 //
-// Avec la page de garde, la moitie gauche tombe sur une page impaire : elle
-// s'affiche a gauche, dans un lecteur conforme comme dans un lecteur naif.
-// Et cette page blanche n'est pas une verrue : elle represente exactement
-// l'interieur de la couverture, ce qu'on voit en ouvrant un vrai livre.
+// La quasi-totalite des lecteurs PDF apparient (1,2), (3,4), (5,6)... et
+// placent les pages IMPAIRES a gauche. Le document commence par la
+// couverture, en page 1 : la page 1 du LIVRE tombe donc en page 2 du PDF,
+// c'est-a-dire a DROITE — exactement sa place dans un livre relie, seule,
+// face au contre-plat (voir composition/pageParity.js). Les vis-a-vis
+// suivants s'enchainent alors juste : page 2 du livre en page 3 du PDF,
+// donc a gauche, face a la page 3 du livre.
 //
-// Le fichier envoye a l'imprimeur n'emprunte PAS ce chemin (voir
-// services/printing/gelatoPrintFile.js, qui assemble son propre document) :
-// aucune page n'y est ajoutee.
+// Une page blanche de plus decalait tout d'un cran et redonnait l'ancien
+// appariement, celui qui a fait sortir une double page en recto-verso sur
+// le premier vrai livre imprime (2026-09-25). Elle avait ete ajoutee le
+// 2026-09-15 pour corriger des moities inversees — elle soignait le
+// symptome a partir d'une regle de parite elle-meme fausse.
+//
+// Le fichier envoye a l'imprimeur n'emprunte de toute facon PAS ce chemin
+// (voir services/printing/gelatoPrintFile.js, qui assemble son propre
+// document avec ses vraies gardes).
 function assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm = 0, insertInsideCover = false) {
   return new Promise((resolve, reject) => {
     const pageWidthPt = (format.trimWidthMm + bleedMm * 2) * MM_TO_PT;
@@ -993,10 +996,11 @@ async function renderPdfFromPages(input) {
 
   await fsp.mkdir(PDF_PREVIEW_DIR, { recursive: true });
   const outputPath = path.join(PDF_PREVIEW_DIR, `${input.fileBaseName || 'book'}-${Date.now()}.pdf`);
-  // La page de garde n'a de sens que si le document commence bien par une
-  // couverture — c'est le cas de tout PDF passe par composeCoversIntoPages.
-  const commenceParUneCouverture = input.pages?.[0]?.content?.kind === 'front-cover';
-  await assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm, commenceParUneCouverture);
+  // AUCUNE page blanche apres la couverture : avec la couverture en page 1,
+  // la page 1 du livre tombe deja en page 2 du PDF, donc a droite, comme
+  // dans le livre relie. En ajouter une remettrait le decalage d'un cran
+  // (voir le commentaire de assemblePdfFromImages).
+  await assemblePdfFromImages(imageBuffers, format, outputPath, bleedMm, false);
   return outputPath;
 }
 

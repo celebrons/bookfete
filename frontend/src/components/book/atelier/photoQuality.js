@@ -93,8 +93,9 @@ export function resolveSlotSizeMm(layoutSlug, slotIndex, printFormat) {
   const { widthMm: usableW, heightMm: usableH, gapMm: gap } = resolveUsableAreaMm(printFormat);
   if (rawRatio === 'page') return { widthMm: usableW, heightMm: usableH };
   // Double page : on raisonne sur les dimensions de ROGNE (la photo deborde
-  // volontairement les marges), moins la bande avalee par la reliure. Miroir
-  // de photoQualityEngine.resolveSlotSizeMm — SPREAD_GUTTER_MM y vaut 4.
+  // volontairement les marges), moins le recouvrement imprime des deux cotes
+  // du pli. Miroir de photoQualityEngine.resolveSlotSizeMm —
+  // SPREAD_OVERLAP_MM y vaut 4, d'ou les 8 mm retires ici.
   if (rawRatio === 'spread') {
     const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
     return { widthMm: Math.max(1, dims.widthMm * 2 - 8), heightMm: dims.heightMm };

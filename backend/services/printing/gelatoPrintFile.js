@@ -93,7 +93,23 @@ async function buildGelatoPrintReadyPdf({
   });
   const fullSheetSize = dims.wraparoundInsideSize || dims.bleedSize;
 
-  const realPages = interiorPages.map((page, index) => ({ ...page, page_index: index }));
+  // `spreadIndex` : l'index d'ORIGINE de la page dans le livre, celui qui dit
+  // de quel cote d'une double page elle se trouve (voir
+  // pageRenderer.spreadIndexOf). On le fige AVANT toute renumerotation.
+  //
+  // Sans lui, la garde blanche inseree en tete decalait la parite d'un cran
+  // et pageRenderer donnait a chaque page la MAUVAISE moitie d'une photo en
+  // double page : la moitie droite imprimee sur la page de gauche, et
+  // inversement. Le livre « Voyage a Montreal » (commande du 2026-09-17) y a
+  // echappe de justesse — il a ete produit par l'ancien rendu par captures,
+  // qui inserait la garde APRES le rendu. Le passage au rendu par impression
+  // (2026-09-19) a deplace cette insertion AVANT, sans reporter spreadIndex :
+  // la premiere commande suivante serait sortie avec les moities echangees.
+  const realPages = interiorPages.map((page, index) => ({
+    ...page,
+    page_index: index,
+    spreadIndex: index
+  }));
 
   // LE CAHIER INTERIEUR, PAGE PAR PAGE, DANS L ORDRE EXACT ATTENDU.
   //
