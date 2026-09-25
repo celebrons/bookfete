@@ -25,7 +25,7 @@ import PhotoFitBadge from '../../common/PhotoFitBadge';
 // type : "Texte" n'indiquait ni qu'on peut y glisser un souvenir, ni qu'on
 // peut ecrire directement dedans (retour utilisateur 2026-09-11).
 const SLOT_LABELS = {
-  photo: 'Glisser une photo',
+  photo: 'Glisser ou choisir une photo',
   text: 'Glisser un souvenir ou écrire',
   title: 'Glisser un titre ou écrire'
 };
@@ -65,7 +65,13 @@ function AtelierPageOverlay({
   // Edition du texte directement sur la page (§1). Absent = comportement
   // d'avant (clic sur un texte = retrait a deux temps), donc aucun appelant
   // existant n'est casse s'il ne fournit pas ces props.
-  onSaveText, onCreateText, textRoles, textStyles
+  onSaveText, onCreateText, textRoles, textStyles,
+  // Emplacement PHOTO VIDE, au clic (retour utilisateur, 2026-09-25) : ouvre
+  // le choix entre une photo deja importee et un nouvel import depuis le
+  // disque (voir AtelierPhotoPickerModal.js, monte par l'appelant). Absent =
+  // comportement d'avant (rien ne se passe sur un emplacement vide sans
+  // selection prealable dans "Mes photos") — aucun appelant existant cassé.
+  onOpenPhotoPicker
 }) {
   // Index de l'emplacement en cours d'edition, et largeur REELLE de
   // l'incrustation en pixels : celle-ci sert a convertir les points
@@ -220,6 +226,17 @@ function AtelierPageOverlay({
                   onAdjustSlot(index);
                   return;
                 }
+                // Emplacement PHOTO VIDE (retour utilisateur, 2026-09-25) :
+                // ouvrir directement le choix entre une photo deja importee
+                // et un nouvel import, plutot que de forcer un detour par
+                // "Mes photos" avant de revenir cliquer ici. Meme logique de
+                // priorite que ci-dessus : seulement si rien n'est deja
+                // selectionne dans la colonne de gauche.
+                if (!selectedSidebarItem && !item && slotType === 'photo' && onOpenPhotoPicker) {
+                  setPendingRemoveIndex(null);
+                  onOpenPhotoPicker(index);
+                  return;
+                }
                 // Meme principe pour le TEXTE (cahier des charges
                 // typographique §1) : un clic sur un texte deja place ouvre
                 // l'edition EN PLACE, il n'arme pas un retrait — le retrait a
@@ -245,7 +262,9 @@ function AtelierPageOverlay({
                     : (slotType === 'photo'
                       ? 'Cliquer pour ajuster le cadrage'
                       : (onSaveText ? 'Cliquer pour modifier le texte' : undefined))))
-                : undefined}
+                : (!selectedSidebarItem && slotType === 'photo' && onOpenPhotoPicker
+                  ? 'Cliquer pour choisir ou importer une photo'
+                  : undefined)}
             >
               {!item && <span className="atelier-overlay-slot-label">{SLOT_LABELS[slotType] || 'Emplacement'}</span>}
               {!isPending && (

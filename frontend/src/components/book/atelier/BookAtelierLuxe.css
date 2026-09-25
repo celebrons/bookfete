@@ -476,6 +476,75 @@
    object-position + transform:scale) — apercu = PDF final. */
 .atelier-adjust-modal { max-width: 480px; }
 
+/* Emplacement photo vide : choisir une photo deja importee, ou en importer
+   une nouvelle depuis le disque (2026-09-25, AtelierPhotoPickerModal.js). */
+.atelier-photo-picker-modal { max-width: 460px; }
+
+.atelier-photo-picker-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.atelier-photo-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.atelier-photo-picker-thumb {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--border-soft, #e3ddd0);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-photo-picker-thumb:hover { border-color: var(--gold); transform: scale(1.03); }
+.atelier-photo-picker-thumb:disabled { cursor: default; opacity: 0.6; transform: none; }
+.atelier-photo-picker-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.atelier-photo-picker-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  color: var(--text-light);
+  font-size: 12px;
+}
+.atelier-photo-picker-divider::before,
+.atelier-photo-picker-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft, #e3ddd0);
+}
+
+.atelier-photo-picker-upload {
+  display: block;
+  text-align: center;
+  border: 1px dashed rgba(184, 146, 74, 0.55);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-photo-picker-upload:hover { background: rgba(184, 146, 74, 0.08); }
+.atelier-photo-picker-upload.is-disabled { opacity: 0.6; cursor: default; }
+
+.atelier-photo-picker-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #b42318;
+}
+
 .atelier-adjust-hint {
   margin: 0 0 var(--space-sm);
   font-size: 13px;

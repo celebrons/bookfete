@@ -39,6 +39,7 @@ import AtelierDuplicatePhotosModal from './AtelierDuplicatePhotosModal';
 import AtelierPartagerLien from './AtelierPartagerLien';
 import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
+import AtelierPhotoPickerModal from './AtelierPhotoPickerModal';
 import AtelierPageActions from './AtelierPageActions';
 import { findAtelierLayout } from './atelierLayouts';
 import { FORMAT_DIMENSIONS_MM } from './photoQuality';
@@ -122,6 +123,13 @@ export default function BookAtelierLuxe() {
   // la sauvegarde automatique.
   const [draftPageIndex, setDraftPageIndex] = useState(null);
   const [adjustTargetSlotIndex, setAdjustTargetSlotIndex] = useState(null);
+  // Emplacement PHOTO VIDE dont on vient d'ouvrir le choix (retour
+  // utilisateur, 2026-09-25 : "accéder aux photos importées ou en importer
+  // une nouvelle directement via ses fichiers"), et l'etat de l'import direct
+  // qui peut s'y faire — voir AtelierPhotoPickerModal.js.
+  const [pickerTargetSlotIndex, setPickerTargetSlotIndex] = useState(null);
+  const [pickerUploading, setPickerUploading] = useState(false);
+  const [pickerUploadError, setPickerUploadError] = useState('');
 
   const [coverHtml, setCoverHtml] = useState(null);
   const [backCoverHtml, setBackCoverHtml] = useState(null);
@@ -961,6 +969,51 @@ export default function BookAtelierLuxe() {
         delete next[removedItemId];
         return next;
       });
+    }
+  };
+
+  // Choisir/importer une photo pour un emplacement VIDE (retour
+  // utilisateur, 2026-09-25) — ouvert au clic direct sur le cadre, voir
+  // AtelierPageOverlay.js/AtelierPhotoPickerModal.js.
+  const photosNonUtilisees = useMemo(
+    () => photos.filter((photo) => !usedItemIds.has(photo.id)),
+    [photos, usedItemIds]
+  );
+
+  const handleOpenPhotoPicker = (slotIndex) => {
+    setPickerUploadError('');
+    setPickerTargetSlotIndex(slotIndex);
+  };
+
+  const handleClosePhotoPicker = () => {
+    setPickerTargetSlotIndex(null);
+    setPickerUploadError('');
+  };
+
+  const handlePickPhotoFromLibrary = (itemId) => {
+    if (pickerTargetSlotIndex == null) return;
+    handleAssignSlot(pickerTargetSlotIndex, itemId);
+    handleClosePhotoPicker();
+  };
+
+  // Import direct depuis le disque, POUR CET EMPLACEMENT PRECIS : un seul
+  // fichier, qui remplit l'emplacement des que l'envoi reussit — distinct de
+  // envoyerLesPhotos (lot vers la bibliotheque generale, avec detection de
+  // doublons) : ici le geste est deliberement cible sur un cadre precis, la
+  // detection de doublons du lot n'a pas sa place dans ce chemin court.
+  const handleUploadPhotoForPicker = async (file) => {
+    if (!book?.id || pickerTargetSlotIndex == null) return;
+    setPickerUploading(true);
+    setPickerUploadError('');
+    try {
+      const created = await uploadPhoto(book.id, file, items.length);
+      setItems((previous) => [...previous, created]);
+      handleAssignSlot(pickerTargetSlotIndex, created.id);
+      handleClosePhotoPicker();
+    } catch (err) {
+      setPickerUploadError(err.message || "La photo n'a pas pu être importée.");
+    } finally {
+      setPickerUploading(false);
     }
   };
 
@@ -1831,6 +1884,7 @@ export default function BookAtelierLuxe() {
       onCreateText={handleCreateText}
       textRoles={draftTextRoles}
       textStyles={draftTextStyles}
+      onOpenPhotoPicker={handleOpenPhotoPicker}
     />
   ) : null;
 
@@ -1948,6 +2002,16 @@ export default function BookAtelierLuxe() {
         onReset={adjustCoverFace ? handleResetCoverAdjustment : handleResetPhotoAdjustment}
         onClose={() => { setAdjustTargetSlotIndex(null); setAdjustCoverFace(null); }}
         onChooseSuggestedLayout={handleChooseSuggestedLayout}
+      />
+
+      <AtelierPhotoPickerModal
+        isOpen={pickerTargetSlotIndex != null}
+        photosDisponibles={photosNonUtilisees}
+        uploading={pickerUploading}
+        uploadError={pickerUploadError}
+        onPick={handlePickPhotoFromLibrary}
+        onUploadFile={handleUploadPhotoForPicker}
+        onClose={handleClosePhotoPicker}
       />
 
       {error && <div className="wizard-error atelier-error">{error}</div>}
