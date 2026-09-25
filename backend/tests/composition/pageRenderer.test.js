@@ -6,8 +6,12 @@ const { renderBookHtml, escapeHtml, PHOTO_ZOOM_MAX } = require('../../services/c
 // Le <style> (en <head>) contient les noms de classes CSS eux-memes : toute
 // recherche de "ce qui a ete rendu" doit se limiter au <body>, sous peine de
 // faux positifs/negatifs sur les selecteurs CSS.
+//
+// Le <body> porte desormais une classe (album-nu/filet/encadre, voir
+// albumStyleClass) : on ne peut plus chercher le tag "<body>" nu, il n'existe
+// plus jamais tel quel dans le rendu reel.
 function bodyOf(html) {
-  return html.slice(html.indexOf('<body>'));
+  return html.slice(html.indexOf('<body'));
 }
 
 describe('escapeHtml', () => {
@@ -1011,5 +1015,43 @@ describe('renderBookHtml — quelle version de photo part au navigateur', () => 
     const ancienne = { id: 'photo-1', kind: 'photo', url: 'https://cdn.test/vieille.jpg', metadata: {} };
     const html = bodyOf(renderBookHtml({ book: {}, items: [ancienne], pages: [page] }));
     expect(html).toContain('vieille.jpg');
+  });
+});
+
+describe('renderBookHtml — le style de l album se pose sur le document entier', () => {
+  const pageSimple = { page_index: 0, content: { kind: 'photo', blocks: [] } };
+
+  it('sans reglage, le document porte "album-nu" — aucun livre existant ne change d aspect', () => {
+    const html = renderBookHtml({ book: {}, items: [], pages: [pageSimple] });
+    expect(html).toMatch(/<body class="album-nu">/);
+  });
+
+  it('un style choisi se retrouve sur la classe du document', () => {
+    const html = renderBookHtml({
+      book: { cover_overrides: { albumStyle: 'filet' } },
+      items: [],
+      pages: [pageSimple]
+    });
+    expect(html).toMatch(/<body class="album-filet">/);
+  });
+
+  it('"encadre" pose un fond de page different et un filet par-dessus les cadres', () => {
+    const html = renderBookHtml({
+      book: { cover_overrides: { albumStyle: 'encadre' } },
+      items: [],
+      pages: [pageSimple]
+    });
+    expect(html).toContain('body.album-encadre .page { background: #f3ebdb; }');
+    expect(html).toContain('body.album-encadre .photo-frame::after');
+  });
+
+  it('"filet" fait apparaitre l or dans l ecart entre les photos d une grille', () => {
+    const html = renderBookHtml({
+      book: { cover_overrides: { albumStyle: 'filet' } },
+      items: [],
+      pages: [pageSimple]
+    });
+    expect(html).toContain('body.album-filet .photo-grid');
+    expect(html).toContain('background: var(--album-or);');
   });
 });

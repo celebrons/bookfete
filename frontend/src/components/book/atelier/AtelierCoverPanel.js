@@ -53,6 +53,16 @@ const COVER_COLORS = [
   { token: 'nuit', label: 'Nuit', hex: '#1f2a33' }
 ];
 
+// LE STYLE DE L ALBUM (2026-09-25) : comment les photos se separent les
+// unes des autres, UN SEUL reglage pour tout le livre — meme raison que la
+// couleur de couverture juste au-dessus, meme mecanique de miroir avec le
+// backend (services/composition/albumStyle.js).
+const ALBUM_STYLES = [
+  { token: 'nu', label: 'Nu' },
+  { token: 'filet', label: 'Filet' },
+  { token: 'encadre', label: 'Encadre' }
+];
+
 const FRONT_FORMATS = [
   { id: 'AUTO', label: 'Automatique' },
   { id: 'COVER_PHOTO', label: 'Photo et bandeau', shape: 'photo-band' },
@@ -249,6 +259,9 @@ const buildInitialState = (book) => {
     // backend coverTheme.applyCoverColor. Une valeur inconnue retombe sur
     // le defaut du theme plutot que d etre appliquee telle quelle.
     coverColor: COVER_COLORS.some((c) => c.token === overrides.coverColor) ? overrides.coverColor : '',
+    // Style de l'album (nu/filet/encadre) — voir backend albumStyle.js. Un
+    // jeton inconnu retombe sur 'nu', meme principe que coverColor.
+    albumStyle: ALBUM_STYLES.some((s) => s.token === overrides.albumStyle) ? overrides.albumStyle : 'nu',
     frontPhotoId: overrides.frontPhotoId || null,
     // Photo de 4e de couverture (retour utilisateur, 2026-09-10 : "permettre
     // de modifier la photo de la 4e de couverture") — meme principe que
@@ -332,6 +345,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
             frontVariant: formState.frontVariant,
             backVariant: formState.backVariant,
             coverColor: formState.coverColor || null,
+            albumStyle: formState.albumStyle || 'nu',
             frontPhotoId: formState.frontPhotoId || null,
             backPhotoId: formState.backPhotoId || null,
             subtitle: formState.subtitle,
@@ -446,6 +460,34 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
             </div>
             <p className="coverlite-hint">
               S'applique a la couverture, au dos et a la 4e — un livre n'a qu'une seule matiere.
+            </p>
+          </div>
+
+          {/* Style de l'album — UN SEUL reglage pour tout le livre, jamais
+              page par page (2026-09-25) : un choix qui changerait a chaque
+              page ne ferait plus un album, mais une collection de pages. */}
+          <div className="coverlite-group">
+            <span className="coverlite-group-label">Style de l'album</span>
+            <div className="coverlite-colors" role="group" aria-label="Style de l'album">
+              {ALBUM_STYLES.map((style) => (
+                <button
+                  key={style.token}
+                  type="button"
+                  // Reutilise la forme "Auto" (pilule texte) de la couleur
+                  // ci-dessus : c'est un choix textuel, pas une pastille de
+                  // teinte, la meme classe evite d'inventer un style de plus.
+                  className={`coverlite-color is-auto ${formState.albumStyle === style.token ? 'is-active' : ''}`}
+                  onClick={() => updateField('albumStyle', style.token)}
+                >
+                  {style.label}
+                </button>
+              ))}
+            </div>
+            <p className="coverlite-hint">
+              {formState.albumStyle === 'filet' && 'Un filet dore fin separe les photos d\'une meme page.'}
+              {formState.albumStyle === 'encadre' && 'Chaque photo est cernee d\'un filet, sur un fond creme.'}
+              {formState.albumStyle === 'nu' && 'Les photos se touchent, sans separation.'}
+              {' '}S'applique a tout le livre.
             </p>
           </div>
 

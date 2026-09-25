@@ -799,7 +799,10 @@ describe('coverComposer — cadrage manuel de la photo de couverture', () => {
   // Le <style> du document contient les NOMS DE CLASSES : chercher
   // "is-contain" dans le HTML entier trouverait le selecteur CSS, pas le
   // rendu. Toute verification se limite au <body>.
-  const corpsDe = (html) => html.slice(html.indexOf('<body>'));
+  //
+  // Le <body> porte une classe de style d'album (voir albumStyleClass) : on
+  // ne peut pas chercher le tag "<body>" nu, il n'existe plus tel quel.
+  const corpsDe = (html) => html.slice(html.indexOf('<body'));
 
   const rendre = (coverOverrides, face) => {
     const book = { id: 'b1', title: 'Voyage', collection_mode: 'solo', cover_overrides: coverOverrides };

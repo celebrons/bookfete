@@ -28,6 +28,7 @@ const GOOGLE_FONTS_LINK = '<link rel="preconnect" href="https://fonts.googleapis
 const typography = require('./typographySystem');
 const photoSource = require('./photoSource');
 const pageParity = require('./pageParity');
+const { albumStyleClass } = require('./albumStyle');
 
 function escapeHtml(value = '') {
   return String(value)
@@ -820,6 +821,52 @@ const BASE_CSS = `
   .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
   .photo-inset .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
   .photo-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); height: 100%; }
+  /* LE STYLE DE L'ALBUM (voir albumStyle.js pour le choix, pose en classe
+     sur le document). Trois traitements, un seul pour tout le livre.
+
+     Le ton : un or franc plutot que le beige pale des cadres existants
+     (#cbbd9c). Un filet doit se VOIR sur le papier une fois imprime ; un
+     ton trop clair y disparait et ne laisse qu'un flou.
+     0,4 mm a 288 dpi fait environ 4,5 px : un vrai trait, pas un cheveu qui
+     casse a l'impression. */
+  body { --album-or: #b8975a; }
+
+  /* NU : rien. Le comportement d'avant, et le defaut — un livre deja
+     compose ne doit pas changer d'aspect parce qu'un reglage est apparu.
+
+     FILET : le fond de la grille est dore et l'ecart entre photos se reduit
+     au trait lui-meme. C'est l'or qui apparait DANS l'interstice : aucune
+     bordure a poser sur les cadres, donc aucun double trait la ou deux
+     photos se touchent, et le filet suit tout seul n'importe quelle grille
+     (2, 3, 4 photos, empilee ou non). */
+  body.album-filet .photo-grid {
+    gap: 0.4mm;
+    background: var(--album-or);
+  }
+
+  /* ENCADRE : chaque photo cernee d'un filet, sur un fond creme.
+     Le filet est pose en ::after et non en bordure : le cadre contient une
+     image en position absolue qui recouvrirait une bordure interne, et une
+     bordure externe, elle, decalerait la grille. Le pseudo-element se pose
+     PAR-DESSUS l'image sans rien deplacer. */
+  /* Le fond doit se DISTINGUER du papier par defaut (#fffdf8, un ivoire
+     presque blanc), sinon "encadre" ne se lit plus que comme un lisere et
+     ne vaut pas d'etre un choix a part. Ce creme-la fait le passe-partout
+     sur lequel les photos sont posees. */
+  body.album-encadre .page { background: #f3ebdb; }
+  body.album-encadre .photo-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 0.5mm solid var(--album-or);
+    pointer-events: none;
+  }
+  /* Une photo a fond perdu deborde volontairement la page : l'encadrer
+     reviendrait a dessiner un trait dans la zone rognee par le massicot,
+     donc a l'imprimer de travers ou pas du tout. Une double page, elle, se
+     verrait coupee en deux par le filet au niveau du pli. */
+  body.album-encadre .photo-spread .photo-frame::after,
+  body.album-encadre .photo-solo:not(.photo-inset) .photo-frame::after { border: 0; }
   /* MEME MARGE EXTERIEURE POUR TOUTES LES PHOTOS D'UNE GRILLE.
      Retour du livre imprime (2026-09-25) : « en page 3 les photos n'ont pas
      la meme marge exterieure ». La page empilait deux photos, l'une en mode
@@ -1197,7 +1244,7 @@ ${typography.typographyCssRules()}
   ${BACK_COVER_CSS}
 </style>
 </head>
-<body>
+<body class="${albumStyleClass(input.book)}">
 ${couverture ? `<div class="feuille-couverture"><img src="${escapeHtml(couverture.url)}" alt="" /></div>` : ''}
 ${pagesHtml || '<p style="padding:24px;font-family:sans-serif;">Ce livre n\'a pas encore de pages composées — lancez POST /compose.</p>'}
 </body>
@@ -1344,7 +1391,7 @@ ${typography.typographyCssRules()}
 <style>
 </style>
 </head>
-<body>
+<body class="${albumStyleClass(input.book)}">
 ${pageHtml}
 </body>
 </html>`;

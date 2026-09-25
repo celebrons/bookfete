@@ -852,7 +852,9 @@ describe('routes/composition', () => {
       // Le SELECTEUR CSS .page.has-gold-frame reste toujours present dans
       // <style> (regle partagee) — c'est la classe posee sur <section>
       // qu'il ne faut pas trouver ici, d'ou la verification sur <body> seul.
-      expect(notLuxe.text.slice(notLuxe.text.indexOf('<body>'))).not.toContain('has-gold-frame');
+      // Le <body> porte lui-meme une classe de style d'album (voir
+      // albumStyleClass) : on cherche "<body" et non le tag nu "<body>".
+      expect(notLuxe.text.slice(notLuxe.text.indexOf('<body'))).not.toContain('has-gold-frame');
     });
 
     it('une page manuellement construite se rend avec son contenu reel (meme moteur que le PDF)', async () => {
