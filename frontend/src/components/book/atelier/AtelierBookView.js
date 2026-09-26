@@ -85,23 +85,40 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
       title={hint || undefined}
     >
       {hint && <span className="atelier-cover-photo-overlay-hint">{hint}</span>}
-      {/* Recadrer la photo de couverture. Un BOUTON a part, pas un clic sur
-          l'image : le clic sur l'image sert deja a REMPLACER la photo quand
-          une est selectionnee dans "Mes souvenirs", et les deux gestes ne
-          peuvent pas partager le meme declencheur.
-          Jusqu'au 2026-09-15, la couverture etait toujours recadree au centre
-          sans aucun recours — « il faut pouvoir ajuster la photo de la 4e de
-          couverture, la photo est tronquee ». */}
-      {onAdjust && hasPhoto && !isPhotoSelected && (
-        <button
-          type="button"
-          className="atelier-cover-adjust-btn"
-          onClick={(event) => { event.stopPropagation(); onAdjust(); }}
-          title="Ajuster le cadrage de cette photo"
-        >
-          <CropIcon />
-          Ajuster le cadrage
-        </button>
+      {/* Deux actions distinctes sur une photo deja en place : la remplacer
+          par une AUTRE, ou ajuster son cadrage — des BOUTONS a part, pas un
+          clic sur l'image (qui ouvre deja l'ajustement, voir plus haut).
+          "Changer la photo" manquait jusqu'ici (retour utilisateur,
+          2026-09-26 : "comment je fais si je veux changer la photo ?") — le
+          seul chemin restait indirect (choisir dans "Mes souvenirs" PUIS
+          cliquer l'image, ou Retirer PUIS recliquer). Meme fenetre que pour
+          un cadre vide (AtelierPhotoPickerModal via onOpenPicker), juste
+          declenchee depuis un cadre DEJA rempli cette fois. */}
+      {hasPhoto && !isPhotoSelected && (
+        <div className="atelier-cover-photo-actions">
+          {onOpenPicker && (
+            <button
+              type="button"
+              className="atelier-cover-action-btn"
+              onClick={(event) => { event.stopPropagation(); onOpenPicker(); }}
+              title="Choisir une autre photo"
+            >
+              <ChangeIcon />
+              Changer la photo
+            </button>
+          )}
+          {onAdjust && (
+            <button
+              type="button"
+              className="atelier-cover-action-btn"
+              onClick={(event) => { event.stopPropagation(); onAdjust(); }}
+              title="Ajuster le cadrage de cette photo"
+            >
+              <CropIcon />
+              Ajuster le cadrage
+            </button>
+          )}
+        </div>
       )}
       {/* Revenir a "Automatique" (laisser Celebrons choisir) — l'ancien
           panneau "Mise en page" offrait ce choix via une pastille dediee,
@@ -139,6 +156,16 @@ function CropIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M6.5 2v13.5A1.5 1.5 0 0 0 8 17h13.5" />
       <path d="M2.5 6.5H16A1.5 1.5 0 0 1 17.5 8v13.5" />
+    </svg>
+  );
+}
+
+function ChangeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="14" height="14" rx="2" />
+      <path d="M8 12l2.5 2.5L15 10" />
+      <path d="M21 8v6a2 2 0 0 1-2 2h-2" />
     </svg>
   );
 }

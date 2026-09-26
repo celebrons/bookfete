@@ -1609,20 +1609,32 @@
 }
 .atelier-cover-photo-overlay:hover .atelier-cover-photo-overlay-hint { opacity: 1; }
 
-/* Recadrer la photo de couverture (2026-09-15). Un bouton a part, pose en bas
-   du calque : le clic sur l'image sert deja a REMPLACER la photo quand une
-   est selectionnee dans "Mes souvenirs" — les deux gestes ne peuvent pas
-   partager le meme declencheur. Revele au survol, comme le reste du calque,
-   pour ne pas encombrer l'apercu au repos. */
-.atelier-cover-adjust-btn {
+/* Changer la photo / Ajuster le cadrage (2026-09-15, etendu 2026-09-26 avec
+   "Changer la photo" — retour utilisateur : "comment je fais si je veux
+   changer la photo ?", il n'y avait jusque-la aucun chemin direct). Deux
+   boutons cote a cote, poses en bas du calque, reveles au survol comme le
+   reste du calque pour ne pas encombrer l'apercu au repos — le clic sur
+   l'image elle-meme ouvre deja l'ajustement (voir plus haut), ces boutons
+   restent le chemin EXPLICITE et decouvrable des deux actions. */
+.atelier-cover-photo-actions {
   position: absolute;
   left: 50%;
   bottom: 14px;
   transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+.atelier-cover-photo-overlay:hover .atelier-cover-photo-actions { opacity: 1; }
+/* Toujours visible au clavier : sans ca, l'opacite 0 le rendrait inatteignable
+   pour qui ne survole pas a la souris. */
+.atelier-cover-photo-actions:focus-within { opacity: 1; }
+
+.atelier-cover-action-btn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  opacity: 0;
   border: none;
   border-radius: 999px;
   padding: 8px 16px;
@@ -1632,15 +1644,12 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
+  white-space: nowrap;
   cursor: pointer;
   transition: var(--transition-fast);
 }
-
-.atelier-cover-photo-overlay:hover .atelier-cover-adjust-btn { opacity: 1; }
-.atelier-cover-adjust-btn:hover { background: var(--gold, #c9a35f); color: #241f18; }
-/* Toujours visible au clavier : sans ca, l'opacite 0 le rendrait inatteignable
-   pour qui ne survole pas a la souris. */
-.atelier-cover-adjust-btn:focus-visible { opacity: 1; outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
+.atelier-cover-action-btn:hover { background: var(--gold, #c9a35f); color: #241f18; }
+.atelier-cover-action-btn:focus-visible { outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
 
 /* Revenir a "Automatique" (2026-09-26) — coin oppose au bouton d'ajustement
    (haut-droite plutot que bas-centre), meme pastille rouge que la croix de
