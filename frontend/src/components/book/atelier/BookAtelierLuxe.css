@@ -57,11 +57,15 @@
 
 /* Regroupe les deux actions secondaires a droite de l'en-tete — jamais plus
    de deux, sinon elles retourneraient dans un menu "..." plutot que de
-   s'aligner en ligne. */
+   s'aligner en ligne. Ecart volontairement plus large que --space-sm entre
+   les deux (retour utilisateur 2026-09-26 : "éloigne un peu 'composer
+   automatiquement' du bouton d'aide") — trop proches, les deux se lisaient
+   comme un seul groupe alors que ce sont deux actions sans rapport (l'une
+   compose tout le livre, l'autre ouvre l'aide). */
 .atelier-header-secondary {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-lg);
   margin-left: auto;
 }
 

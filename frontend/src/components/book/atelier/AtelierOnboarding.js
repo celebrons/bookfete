@@ -11,6 +11,13 @@ import React from 'react';
 // la mise en page vivent desormais dans des tiroirs ouverts a la demande
 // (voir AtelierToolsBar.js/AtelierDrawer.js), et le mode automatique n'est
 // plus un bouton visible en permanence.
+//
+// Reecrites a nouveau le meme jour, apres la deuxieme passe de finition
+// (retour utilisateur : "mets a jour le contenu de l'aide pour qu'il
+// s'adapte a tout ce qu'on a modifie") : la navigation de page est devenue
+// tres discrete (‹ N / M ›, plus de gros boutons Couverture/Precedente/
+// Suivante/4e) — sans explication, l'acces a la couverture/4e depuis le
+// tiroir Pages n'a plus rien d'evident. Nouvelle 5e carte dediee.
 const STEPS = [
   {
     icon: '🖼️',
@@ -25,7 +32,12 @@ const STEPS = [
   {
     icon: '▦',
     title: 'Mise en page',
-    text: 'Cliquez sur "Mise en page" (ou sur l\'icône posée sur la page) pour choisir la mise en page de la page affichée.'
+    text: 'Cliquez sur "Mise en page" (ou sur l\'icône posée sur la page) pour choisir la mise en page de la page affichée, juste à côté du livre.'
+  },
+  {
+    icon: '↔',
+    title: 'Naviguer dans les pages',
+    text: 'Les flèches ‹ › sous le livre font tourner les pages une à une. Pour aller directement à une page, à la couverture ou à la 4e de couverture, ouvrez "Pages".'
   },
   {
     icon: '✨',
