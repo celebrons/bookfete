@@ -57,9 +57,19 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
   // pages, en cliquant a l'interieur de la page couverture... cela va
   // ouvrir la fenetre directement pour choisir") — voir AtelierPageOverlay.js
   // et AtelierPhotoPickerModal.js, meme fenetre reutilisee ici.
-  // Rien a dire depuis le calque quand une photo est deja en place : le
-  // bouton dedie "Ajuster le cadrage" plus bas porte deja son propre
-  // message, un second texte redirait la meme chose en double au survol.
+  // « Quand je clique sur la photo en couverture il se passe rien » (retour
+  // utilisateur, 2026-09-26) : ce calque ne reagissait qu'au clic PRECIS sur
+  // le petit bouton "Ajuster le cadrage" (revele au survol) quand une photo
+  // etait deja en place — le reste de l'image, la zone la plus evidente a
+  // cliquer, ne faisait rien. Sur une page interieure, cliquer N'IMPORTE OU
+  // sur une photo deja placee ouvre l'ajustement (voir AtelierPageOverlay.js,
+  // meme priorite). Corrige pour la meme mecanique ici : le clic sur
+  // l'ensemble du calque ouvre l'ajustement des qu'une photo est en place,
+  // le bouton dedie reste EN PLUS (visible au survol), pas le seul chemin.
+  // Pas de pastille de texte pour le cas "photo deja en place" : le bouton
+  // "Ajuster le cadrage" (revele au survol, juste en dessous) porte deja ce
+  // message — en afficher un second, superpose au meme endroit, ferait
+  // double emploi plutot que d'aider.
   const hint = isPhotoSelected
     ? 'Cliquer pour utiliser cette photo'
     : (hasPhoto ? null : 'Cliquer pour choisir une photo');
@@ -69,11 +79,8 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
       onClick={(event) => {
         event.stopPropagation();
         if (isPhotoSelected) { onAssign(selectedSidebarItem.id); return; }
-        // Une photo deja en place garde son geste existant (bouton dedie
-        // "Ajuster le cadrage" ci-dessous, inchange) — seule l'ABSENCE de
-        // photo change de comportement ici : le clic ouvre desormais
-        // directement le choix au lieu de ne rien faire.
-        if (!hasPhoto && onOpenPicker) onOpenPicker();
+        if (hasPhoto) { if (onAdjust) onAdjust(); return; }
+        if (onOpenPicker) onOpenPicker();
       }}
       title={hint || undefined}
     >
