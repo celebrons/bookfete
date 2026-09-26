@@ -1,5 +1,5 @@
 /* C:\Users\USER\bookfete\frontend\src\styles\luxe-theme.css */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
 :root {
   --gold: #b8924a;
@@ -11,6 +11,24 @@
   --gray-soft: #fafafa;
   --text-light: #666666;
   --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Serif editorial (refonte visuelle 2026-09-26, §14 : "typographie type
+     Newsreader/Playfair pour certains elements editoriaux"). AVEC RETENUE :
+     seuls les moments reellement editoriaux la portent (titre du livre dans
+     l'atelier, titres de tiroir, nom du format sur les cartes de choix) —
+     tout le reste (boutons, libelles, contenu courant) garde --font-primary.
+     Ce n'est pas un re-habillage complet, juste quelques accents.
+     NOM DELIBEREMENT DISTINCT de --font-display : ce jeton existe deja
+     (styles/book-variables.css, "Playfair Display" — systeme de rendu du
+     livre historique, BookLuxe.css et ses 10 usages) et est un jeton
+     GLOBAL (:root, non scope au composant qui le charge) — le reutiliser
+     ici aurait fait basculer silencieusement l'UN OU L'AUTRE des deux
+     systemes selon l'ordre de chargement des CSS entre composants,
+     constate a l'ecran (le titre du tiroir rendait en Playfair, pas
+     Newsreader, des que AtelierCoverPanel — qui importe BookLuxe.css —
+     avait deja monte sa feuille de style). Les deux familles editoriales
+     coexistent desormais sous des noms distincts, sans jamais se marcher
+     dessus. */
+  --font-editorial: 'Newsreader', 'Playfair Display', Georgia, serif;
   --space-xs: 8px;
   --space-sm: 16px;
   --space-md: 24px;

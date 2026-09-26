@@ -36,7 +36,7 @@
 .format-choice-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 22px;
   margin-bottom: 22px;
 }
 
@@ -46,14 +46,24 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  padding: 18px 16px 16px;
+  /* Nettement plus de respiration (refonte visuelle 2026-09-26, §3 :
+     "cette page doit etre tres visuelle et respirer") — la carte etait
+     dense, pensee pour du texte seul ; elle porte maintenant aussi la
+     silhouette du format (FormatMockup.js). */
+  padding: 26px 22px 22px;
   border: 1px solid var(--border-soft, #e3ddd0);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--white, #fffdf8);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.format-choice-mockup {
+  align-self: center;
+  margin: 4px 0 14px;
+  filter: drop-shadow(0 6px 14px rgba(36, 31, 24, 0.14));
 }
 
 .format-choice-card:hover {
@@ -86,8 +96,9 @@
 }
 
 .format-choice-name {
-  font-size: 17px;
-  font-weight: 700;
+  font-family: var(--font-editorial, inherit);
+  font-size: 21px;
+  font-weight: 600;
   color: var(--ink, #241f18);
 }
 

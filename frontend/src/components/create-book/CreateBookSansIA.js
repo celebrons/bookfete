@@ -4,6 +4,7 @@ import { supabase } from '../../services/supabaseClient';
 import { createBook, listTemplates } from '../../services/compositionApi';
 import { listPrintFormats } from '../../services/ordersApi';
 import { ensureSession } from '../../services/anonymousSession';
+import FormatMockup from './FormatMockup';
 import './CreateBookSansIA.css';
 
 const RETURN_TO_KEY = 'returnTo';
@@ -261,6 +262,7 @@ export default function CreateBookSansIA() {
                     aria-pressed={printFormat === format.formatId}
                   >
                     {format.recommande && <span className="format-choice-badge">★ Recommandé</span>}
+                    <FormatMockup widthMm={format.widthMm} heightMm={format.heightMm} />
                     <span className="format-choice-name">{format.nom}</span>
                     <span className="format-choice-size">
                       {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm

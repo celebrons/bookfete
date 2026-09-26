@@ -39,7 +39,8 @@
 
 .atelier-title {
   margin: 0;
-  font-size: 24px;
+  font-family: var(--font-editorial);
+  font-size: 25px;
   color: var(--ink);
 }
 
@@ -211,7 +212,8 @@
 }
 
 .atelier-drawer-title {
-  font-size: 17px;
+  font-family: var(--font-editorial);
+  font-size: 19px;
   color: var(--ink);
 }
 
