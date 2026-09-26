@@ -28,47 +28,80 @@ import React, { useEffect } from 'react';
 // permanence (§10 de la demande : "reduire fortement les textes d'aide
 // permanents... utiliser plutot... tooltips, aide au survol") — posee comme
 // infobulle native sur le titre plutot qu'affichee en texte sous lui.
-function AtelierDrawer({ side = 'right', isOpen, onClose, title, subtitle, hint, children }) {
-  // Echap pour fermer + bloque le defilement de la page derriere — meme
-  // convention que le visualiseur plein ecran deja etabli dans ce projet
-  // (AtelierBookView.js/BookPreviewFinalLuxe.js), sans reprendre SA classe
-  // (has-fullscreen-viewer masque en plus l'en-tete du site, deja absent sur
-  // cette route depuis la refonte de Layout.js — la reprendre ici n'aurait
-  // aucun effet utile, seulement un nom trompeur).
+//
+// `variant` (retour utilisateur, 2026-09-26 — capture d'ecran a l'appui) :
+//
+//   'modal' (defaut, Mise en page/Pages) — fond plein ecran qui capture
+//   TOUS les clics, ferme au clic dehors. Sans consequence ici : ces deux
+//   tiroirs ont leur propre mini-apercu manipulable EN INTERNE (voir
+//   LayoutFormatMiniature), ils n'ont jamais besoin que la vraie page
+//   reste cliquable pendant qu'ils sont ouverts.
+//
+//   'rail' (Photos) — PAS DE FOND. « Je ne peux pas glisser de photo dans
+//   la page » : le fond plein ecran du mode modal, meme transparent,
+//   INTERCEPTE tout glisser-deposer et tout clic sur la page en dessous —
+//   exactement le geste central de cette bibliotheque. En mode rail, le
+//   panneau est un simple element du flux normal, pose a cote du livre
+//   (voir BookAtelierLuxe.js : desormais un ENFANT de .atelier-workspace,
+//   pas un calque fixe) : rien ne se pose par-dessus le livre, qui reste
+//   entierement visible ET cliquable/receveur de glisser-deposer pendant
+//   que le tiroir est ouvert. Sur petit ecran (<640px, voir le CSS), il n'y
+//   a de toute facon pas la place pour les deux a la fois : il redevient
+//   alors un panneau plein ecran classique, memes gestes qu'un modal.
+function AtelierDrawer({ side = 'right', variant = 'modal', isOpen, onClose, title, subtitle, hint, children }) {
+  const isRail = variant === 'rail';
+
+  // Echap pour fermer. Le blocage du defilement de page derriere (mode
+  // modal existant) n'a plus lieu d'etre en mode rail : rien ne recouvre
+  // la page, il n'y a donc rien a proteger d'un defilement accidentel.
   useEffect(() => {
     if (!isOpen) return undefined;
     const handleKeyDown = (event) => { if (event.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleKeyDown);
+    if (isRail) {
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isRail]);
 
   if (!isOpen) return null;
 
+  const panel = (
+    <div
+      className={`atelier-drawer atelier-drawer-${side} ${isRail ? 'is-rail' : ''}`}
+      onClick={isRail ? undefined : (event) => event.stopPropagation()}
+      role={isRail ? undefined : 'dialog'}
+      aria-modal={isRail ? undefined : true}
+      aria-label={title}
+    >
+      <div className="atelier-drawer-head">
+        <div className="atelier-drawer-head-text">
+          <span className="atelier-drawer-title" title={hint}>{title}</span>
+          {subtitle && <span className="atelier-drawer-subtitle">{subtitle}</span>}
+        </div>
+        <button type="button" className="atelier-drawer-close" onClick={onClose} aria-label="Fermer">×</button>
+      </div>
+      <div className="atelier-drawer-body">
+        {children}
+      </div>
+    </div>
+  );
+
+  // Mode rail : PAS de fond englobant — le panneau est renvoye TEL QUEL,
+  // l'appelant le place directement dans le flux (voir BookAtelierLuxe.js).
+  // Un fond ne reapparait qu'en CSS, sous 640px (voir .atelier-drawer-rail
+  // dans BookAtelierLuxe.css), la ou il n'y a de toute facon plus de livre
+  // visible a cote pour justifier de le laisser cliquable.
+  if (isRail) return panel;
+
   return (
     <div className={`atelier-drawer-backdrop is-${side}`} onClick={onClose}>
-      <div
-        className={`atelier-drawer atelier-drawer-${side}`}
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-      >
-        <div className="atelier-drawer-head">
-          <div className="atelier-drawer-head-text">
-            <span className="atelier-drawer-title" title={hint}>{title}</span>
-            {subtitle && <span className="atelier-drawer-subtitle">{subtitle}</span>}
-          </div>
-          <button type="button" className="atelier-drawer-close" onClick={onClose} aria-label="Fermer">×</button>
-        </div>
-        <div className="atelier-drawer-body">
-          {children}
-        </div>
-      </div>
+      {panel}
     </div>
   );
 }

@@ -2090,6 +2090,41 @@ export default function BookAtelierLuxe() {
               de pages vivent desormais dans des tiroirs (voir plus bas),
               ouverts uniquement a la demande depuis AtelierToolsBar. */}
           <div className="atelier-workspace">
+            {/* PHOTOS EN "RAIL", PAS EN TIROIR MODAL (retour utilisateur,
+                2026-09-26, capture d'ecran a l'appui) : "je ne peux pas
+                glisser de photo dans la page, et je ne vois pas non plus
+                toute la page". Le tiroir modal posait un fond plein ecran
+                qui interceptait le glisser-deposer ET masquait une partie
+                du livre. En mode rail (voir AtelierDrawer.js), ce panneau
+                est un ENFANT DE FLUX NORMAL de .atelier-workspace, a cote
+                de .atelier-center-column — rien ne se pose par-dessus le
+                livre, qui reste entierement visible et receveur de
+                glisser-deposer pendant que la bibliotheque est ouverte. */}
+            <AtelierDrawer
+              side="left"
+              variant="rail"
+              isOpen={activeDrawer === 'photos'}
+              onClose={() => setActiveDrawer(null)}
+              title="Photos"
+            >
+              <AtelierSidebar
+                estSolo={book?.collection_mode === 'solo'}
+                photos={photos}
+                souvenirs={souvenirs}
+                selectedItem={selectedSidebarItem}
+                onSelectItem={setSelectedSidebarItem}
+                onUploadPhotos={handleUploadPhotos}
+                onDeleteItem={handleDeleteItem}
+                uploadingPhotos={uploadingPhotos}
+                uploadProgress={uploadProgress}
+                onDeleteAll={handleDeleteAll}
+                deletingAll={deletingAll}
+                addError={sidebarAddError}
+                initialTab={searchParams.get('tab')}
+                usedItemIds={usedItemIds}
+              />
+            </AtelierDrawer>
+
             <div className="atelier-center-column">
               {/* Retour en arriere place AU-DESSUS DU LIVRE : sur telephone,
                   un tiroir ouvert recouvre l'ecran, le lien doit rester
@@ -2136,35 +2171,14 @@ export default function BookAtelierLuxe() {
             </div>
           </div>
 
-          {/* TROIS TIROIRS, UN SEUL A LA FOIS (activeDrawer, voir plus haut).
-              Chacun enveloppe un composant EXISTANT, sans le modifier : seul
-              l'endroit ou il est monte change (une colonne permanente devient
-              un panneau ouvert a la demande, par-dessus le livre — voir
-              AtelierDrawer.js). */}
-          <AtelierDrawer
-            side="left"
-            isOpen={activeDrawer === 'photos'}
-            onClose={() => setActiveDrawer(null)}
-            title="Photos"
-          >
-            <AtelierSidebar
-              estSolo={book?.collection_mode === 'solo'}
-              photos={photos}
-              souvenirs={souvenirs}
-              selectedItem={selectedSidebarItem}
-              onSelectItem={setSelectedSidebarItem}
-              onUploadPhotos={handleUploadPhotos}
-              onDeleteItem={handleDeleteItem}
-              uploadingPhotos={uploadingPhotos}
-              uploadProgress={uploadProgress}
-              onDeleteAll={handleDeleteAll}
-              deletingAll={deletingAll}
-              addError={sidebarAddError}
-              initialTab={searchParams.get('tab')}
-              usedItemIds={usedItemIds}
-            />
-          </AtelierDrawer>
-
+          {/* DEUX TIROIRS MODAUX RESTANTS, UN SEUL A LA FOIS (activeDrawer,
+              voir plus haut) — Photos est maintenant monte plus haut, EN
+              RAIL, a l'interieur de .atelier-workspace. Mise en page et
+              Pages n'ont pas ce besoin : ils ont leur propre apercu
+              manipulable en interne, jamais besoin que la vraie page reste
+              cliquable pendant qu'ils sont ouverts. Chacun enveloppe un
+              composant EXISTANT, sans le modifier : seul l'endroit ou il
+              est monte change (voir AtelierDrawer.js). */}
           <AtelierDrawer
             side="right"
             isOpen={activeDrawer === 'layout'}

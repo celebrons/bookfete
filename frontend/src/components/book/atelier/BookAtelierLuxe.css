@@ -194,6 +194,20 @@
   border-radius: 16px 16px 0 0;
 }
 
+/* RAIL (Photos, retour utilisateur 2026-09-26) : un enfant de flux normal,
+   pose A COTE du livre plutot que par-dessus — voir .atelier-workspace et
+   AtelierDrawer.js pour la raison. Meme hauteur de reference que les autres
+   panneaux de composition (.atelier-cover-panel : 82vh). */
+.atelier-drawer.is-rail {
+  width: 300px;
+  flex-shrink: 0;
+  height: auto;
+  max-height: 82vh;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
 .atelier-drawer-head {
   display: flex;
   align-items: flex-start;
@@ -911,27 +925,33 @@
 }
 .atelier-cover-panel .coverlite-group { margin-bottom: var(--space-sm); }
 
-/* Colonne centrale : conteneur unique regroupant le bandeau Annuler et le
-   livre, pour que .atelier-workspace garde exactement TROIS enfants — voir le
-   commentaire dans BookAtelierLuxe.js. min-width: 0 indispensable, sinon le
-   contenu du livre elargit la piste de grille. */
-/* LE LIVRE EST AU CENTRE (refonte visuelle 2026-09-25).
+/* LE LIVRE EST AU CENTRE (refonte visuelle 2026-09-25, revue 2026-09-26).
    Ancienne grille a 3 colonnes permanentes (bibliotheque / livre / mise en
-   page) : la bibliotheque et la mise en page vivent desormais dans des
-   tiroirs (AtelierDrawer, en position fixe, voir plus haut) plutot que de
-   partager la largeur avec le livre — .atelier-workspace n'a donc plus
-   qu'un seul enfant visuel, .atelier-center-column, qui peut etre
-   nettement plus large qu'avant. */
+   page) : Mise en page et Pages vivent dans des tiroirs modaux (position
+   fixe, voir plus haut), mais PAS Photos — voir .atelier-drawer-rail plus
+   bas, et le commentaire de AtelierDrawer.js pour la raison (le glisser-
+   deposer depuis un tiroir modal ne peut pas atteindre une page qu'un fond
+   plein ecran recouvre, meme visuellement).
+   .atelier-workspace est donc une rangee flex a DEUX enfants POSSIBLES —
+   le rail Photos (present dans le DOM seulement quand ouvert) et
+   .atelier-center-column, toujours present. */
 .atelier-workspace {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-md);
 }
 
 .atelier-center-column {
   display: flex;
   flex-direction: column;
+  /* flex: 1 1 0 et non le repli implicite (0 1 auto) : la colonne doit
+     pouvoir RETRECIR sous 1040px quand le rail Photos est ouvert sur un
+     ecran qui n'a pas la place pour les deux a leur taille naturelle —
+     "toute la page doit rester visible" prime desormais sur "le livre ne
+     bouge jamais" quand les deux ne peuvent pas coexister. */
+  flex: 1 1 0;
   min-width: 0;
-  width: 100%;
   max-width: 1040px;
 }
 
@@ -2595,6 +2615,22 @@
     height: 100vh;
   }
   .atelier-drawer-bottom { max-height: 82vh; }
+
+  /* Le rail Photos (desktop : cote a cote avec le livre, voir plus haut)
+     n'a plus sa place a cote de rien sous ce seuil : il redevient un
+     panneau plein ecran, comme les tiroirs modaux — c'est le SEUL cas ou
+     le rail se pose par-dessus le livre plutot qu'a cote, et c'est sans
+     consequence : il n'y a de toute facon pas la place d'afficher les
+     deux a la fois sur un si petit ecran. */
+  .atelier-drawer.is-rail {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    width: 100vw;
+    max-height: 100vh;
+    border: none;
+    border-radius: 0;
+  }
 }
 
 /* --- Couleur de couverture (2026-09-12) ---------------------------------
