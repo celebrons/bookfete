@@ -970,11 +970,28 @@
   color: var(--white);
 }
 
-.atelier-sidebar-hint {
-  margin: 0;
-  font-size: 11px;
+/* Puce de filtre "Non utilisees" (refonte visuelle 2026-09-26, remplace
+   le texte permanent "X deja placees regroupees en bas" — §5/§10). Meme
+   forme que .atelier-tool-btn.is-active (barre d'outils) : la reconnaitre
+   comme un interrupteur, pas un bouton d'action. */
+.atelier-sidebar-filter-chip {
+  align-self: flex-start;
+  padding: 5px 12px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 999px;
+  background: var(--white);
   color: var(--text-light);
-  line-height: 1.4;
+  font-family: var(--font-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-sidebar-filter-chip:hover { border-color: var(--gold); }
+.atelier-sidebar-filter-chip.is-active {
+  border-color: var(--gold);
+  background: var(--gold-light);
+  color: #7a5c2a;
 }
 
 .atelier-sidebar-empty {
@@ -1021,20 +1038,35 @@
   color: #b42318;
 }
 
-.atelier-sidebar-grid {
+/* LE NUAGE DE PHOTOS (refonte visuelle 2026-09-26, §5/§11 de la demande).
+   Remplace l'ancienne grille a 2 colonnes egales par une mosaique : chaque
+   tuile occupe 1, 2 ou 3 pistes selon tileSpanFor(item.id) (voir
+   AtelierSidebar.js — deterministe, jamais aleatoire d'un rendu a l'autre).
+   `dense` comble les trous laisses par les grandes tuiles automatiquement,
+   sans calcul manuel de position. */
+.atelier-photo-cloud {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  /* minmax(..., auto) et non une valeur fixe : un souvenir (grid-column:
+     1/-1, voir .is-texte plus bas) occupe alors sa PROPRE rangee — rien
+     d'autre n'y partage la largeur — et peut la faire grandir pour son
+     texte sans deborder sur les tuiles voisines. Une tuile photo, elle,
+     n'a jamais besoin de plus que le minimum : elle reste carree. */
+  grid-auto-rows: minmax(78px, auto);
+  grid-auto-flow: dense;
+  gap: 8px;
 }
 
 .atelier-sidebar-item-wrap {
   position: relative;
+  grid-row: span var(--tile-span, 1);
+  grid-column: span var(--tile-span, 1);
 }
 
 .atelier-sidebar-item {
   position: relative;
   width: 100%;
-  aspect-ratio: 1;
+  height: 100%;
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid transparent;
@@ -1057,16 +1089,19 @@
 .atelier-sidebar-item.is-used.is-selected img,
 .atelier-sidebar-item.is-used.is-selected .atelier-sidebar-text-preview { opacity: 0.7; }
 
-.atelier-sidebar-item-used-badge {
+/* Point discret plutot qu'un bandeau de texte "utilisee" (refonte visuelle
+   2026-09-26, §5 : "sous forme discrete : filtre, petit badge, etat
+   visuel"). L'explication complete reste dans le title de la vignette. */
+.atelier-sidebar-item-used-dot {
   position: absolute;
-  inset: auto 0 0 0;
-  padding: 3px 4px;
-  background: rgba(20, 16, 10, 0.72);
-  color: #d9c48f;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-align: center;
+  top: 5px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold, #c9a35f);
+  border: 1.5px solid rgba(255, 253, 248, 0.9);
+  box-shadow: 0 1px 3px rgba(20, 16, 10, 0.35);
   pointer-events: none;
 }
 
@@ -2695,13 +2730,6 @@
 /* Regroupement des elements deja places en bas de la bibliotheque
    (AtelierSidebar.js, 2026-09-19) : sans cette ligne, le regroupement
    passerait pour un ordre aleatoire. */
-.atelier-sidebar-sorthint {
-  margin: 0 0 6px;
-  font-size: 10.5px;
-  line-height: 1.35;
-  color: var(--text-light);
-}
-
 /* --- Photos deja presentes (AtelierDuplicatePhotosModal, 2026-09-20) -----
    Remplace un window.confirm. On montre les photos, pas leurs noms de
    fichier : c'est en les voyant qu'on reconnait le dossier qu'on vient de

@@ -35,6 +35,35 @@ import AtelierPhotoLightbox from './AtelierPhotoLightbox';
 const APERCU_LARGEUR = 260;
 const APERCU_MARGE = 12;
 
+// « VOICI MES SOUVENIRS », PAS « VOICI UNE LISTE DE 72 FICHIERS »
+// (refonte visuelle 2026-09-26, §5/§11 de la demande).
+//
+// La grille etait une suite stricte de carres identiques — un gestionnaire
+// de fichiers. Chaque vignette recoit desormais une taille (1, 2 ou 3
+// tuiles de grille), pour un rendu en mosaique plutot qu'en liste.
+//
+// DETERMINISTE, PAS ALEATOIRE : le hash depend uniquement de l'identifiant
+// de la photo, donc une meme photo garde toujours la meme taille — rouvrir
+// le tiroir, changer de page, revenir demain, rien ne rebat la mosaique.
+// Pas de librairie de masonry : juste `grid-row`/`grid-column: span N`
+// (voir .atelier-photo-cloud dans BookAtelierLuxe.css) sur une grille
+// `grid-auto-flow: dense`, qui comble les trous toute seule.
+//
+// Repartition volontairement inegale (60/30/10) : une mosaique ou toutes
+// les tailles sont equiprobables paraitrait bruyante ; l'essentiel reste
+// petit, quelques photos respirent plus.
+function tileSpanFor(id) {
+  if (!id) return 1;
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  const rang = hash % 10;
+  if (rang < 6) return 1;
+  if (rang < 9) return 2;
+  return 3;
+}
+
 function PhotoHoverPreview({ apercu }) {
   if (!apercu) return null;
   const placeADroite = apercu.rect.right + APERCU_MARGE + APERCU_LARGEUR <= window.innerWidth;
@@ -136,6 +165,11 @@ function AtelierSidebar({
   const ongletSouvenirsDisponible = mesSouvenirs.length > 0;
 
   const [activeTab, setActiveTab] = useState(initialTab === 'souvenirs' ? 'souvenirs' : 'photos');
+  // Filtre « Non utilisees » (§5 : "conserver l'information deja
+  // utilisee/non utilisee, mais sous forme discrete : filtre, petit badge").
+  // Local, non persiste : repart a "tout montrer" a chaque ouverture du
+  // tiroir, jamais un etat qu'on pourrait oublier avoir laisse actif.
+  const [onlyUnused, setOnlyUnused] = useState(false);
 
   // Un onglet qui disparait (dernier element retire, passage en solo) ne
   // doit pas laisser la colonne sur du vide.
@@ -169,6 +203,14 @@ function AtelierSidebar({
   const nombreUtilises = useMemo(
     () => (usedItemIds ? items.filter((item) => usedItemIds.has(item.id)).length : 0),
     [items, usedItemIds]
+  );
+
+  // Ce qui s'affiche REELLEMENT : `items` reste la source complete (pour le
+  // compte du filtre et "Tout supprimer"), ce tableau applique juste le
+  // filtre en plus quand il est actif.
+  const itemsAffiches = useMemo(
+    () => (onlyUnused && usedItemIds ? items.filter((item) => !usedItemIds.has(item.id)) : items),
+    [items, onlyUnused, usedItemIds]
   );
 
   const handleDragStart = (event, item) => {
@@ -218,9 +260,21 @@ function AtelierSidebar({
         )}
       </div>
 
-      <p className="atelier-sidebar-hint">
-        Glissez un element dans un emplacement, ou cliquez dessus puis cliquez sur un emplacement.
-      </p>
+      {/* Le filtre remplace l'ancien texte permanent "X deja placees
+          regroupees en bas" (§10 : reduire les textes d'aide permanents) —
+          et redonne la main : plutot que de SUBIR le regroupement, on peut
+          choisir de ne voir que ce qui manque encore. N'apparait que s'il y
+          a quelque chose a filtrer. */}
+      {nombreUtilises > 0 && (
+        <button
+          type="button"
+          className={`atelier-sidebar-filter-chip ${onlyUnused ? 'is-active' : ''}`}
+          onClick={() => setOnlyUnused((previous) => !previous)}
+          aria-pressed={onlyUnused}
+        >
+          Non utilisées {onlyUnused ? '' : `(${items.length - nombreUtilises})`}
+        </button>
+      )}
 
       <div className="atelier-sidebar-add">
         {activeTab === 'photos' ? (
@@ -283,15 +337,19 @@ function AtelierSidebar({
         <p className="atelier-sidebar-empty">
           {activeTab === 'photos' ? 'Aucune photo pour le moment.' : 'Aucun souvenir pour le moment.'}
         </p>
+      ) : itemsAffiches.length === 0 ? (
+        // Le filtre cache tout : distinct du cas "rien du tout" — ici il y a
+        // bien du contenu, juste deja place en entier.
+        <p className="atelier-sidebar-empty">
+          Tout est déjà placé dans le livre.
+        </p>
       ) : (
         <>
-        {nombreUtilises > 0 && nombreUtilises < items.length && (
-          <p className="atelier-sidebar-sorthint">
-            {activeTab === 'photos' ? 'Photos' : 'Souvenirs'} deja place{activeTab === 'photos' ? 'es' : 's'} regroupe{activeTab === 'photos' ? 'es' : 's'} en bas ({nombreUtilises}).
-          </p>
-        )}
-        <div className="atelier-sidebar-grid">
-          {items.map((item) => {
+        {/* MOSAIQUE, PAS UNE GRILLE DE FICHIERS (§5/§11 : "voici mes
+            souvenirs" plutot que "voici une liste de 72 fichiers") — voir
+            tileSpanFor ci-dessus et .atelier-photo-cloud (BookAtelierLuxe.css). */}
+        <div className="atelier-photo-cloud">
+          {itemsAffiches.map((item) => {
             const isUsed = usedItemIds?.has(item.id);
             // RECONNAITRE CE QU'ON A RECU (2026-09-22).
             //
@@ -316,6 +374,11 @@ function AtelierSidebar({
               <div
                 key={item.id}
                 className={`atelier-sidebar-item-wrap ${item.kind === 'texte' ? 'is-texte' : ''}`}
+                // La taille de tuile ne concerne QUE les photos — un
+                // souvenir garde sa largeur pleine et sa hauteur au
+                // contenu (.is-texte l'ignore de toute facon), pas de
+                // variable posee pour rien.
+                style={item.kind === 'photo' ? { '--tile-span': tileSpanFor(item.id) } : undefined}
               >
                 <button
                   type="button"
@@ -341,7 +404,10 @@ function AtelierSidebar({
                       {auteur ? `♥ ${auteur}` : '♥ reçue'}
                     </span>
                   )}
-                  {isUsed && <span className="atelier-sidebar-item-used-badge">✓ utilisee</span>}
+                  {/* Point discret plutot qu'un bandeau de texte (§5 :
+                      "sous forme discrete... petit badge, etat visuel").
+                      L'information complete reste dans le title ci-dessus. */}
+                  {isUsed && <span className="atelier-sidebar-item-used-dot" aria-hidden="true" />}
                 </button>
                 {/* Loupe : voir la photo en grand AVANT de la placer. Double
                     emploi assume avec l'apercu au survol — celui-ci n'existe
