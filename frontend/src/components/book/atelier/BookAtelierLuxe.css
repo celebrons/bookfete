@@ -15,12 +15,17 @@
   padding: var(--space-md);
 }
 
+/* EN-TETE TRES DISCRETE (refonte visuelle 2026-09-25).
+   Remplace l'en-tete du site (masquee sur cette route, voir Layout.js) :
+   retour, titre, format+pagination, et seulement deux actions secondaires,
+   texte plutot que boutons pleins — l'atelier n'a plus qu'une seule ligne
+   de chrome permanent. */
 .atelier-header {
   display: flex;
   align-items: baseline;
   gap: var(--space-md);
   flex-wrap: wrap;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
 }
 
 .atelier-back-link {
@@ -28,12 +33,13 @@
   opacity: 0.7;
   text-decoration: none;
   font-size: 14px;
+  flex-shrink: 0;
 }
 .atelier-back-link:hover { opacity: 1; }
 
 .atelier-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
   color: var(--ink);
 }
 
@@ -44,23 +50,210 @@
   color: var(--text-light);
 }
 
-.atelier-help-btn {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border-radius: 50%;
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1;
-}
-
-.atelier-generate-btn {
+/* Regroupe les deux actions secondaires a droite de l'en-tete — jamais plus
+   de deux, sinon elles retourneraient dans un menu "..." plutot que de
+   s'aligner en ligne. */
+.atelier-header-secondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   margin-left: auto;
 }
+
+/* Mode automatique : un lien texte, pas un bouton plein (retour utilisateur
+   §9 — "ne pas afficher un gros bouton permanent"). L'explication de ce
+   qu'il declenche vit dans l'infobulle (title), pas en permanence a l'ecran. */
+.atelier-header-link {
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  font-family: var(--font-primary);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+.atelier-header-link:hover { opacity: 0.72; }
+
+.atelier-help-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(184, 146, 74, 0.4);
+  background: transparent;
+  color: var(--text-light);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-help-btn:hover { border-color: var(--gold); color: var(--gold); }
 
 .atelier-error {
   margin-bottom: var(--space-md);
 }
+
+/* --- Barre d'outils contextuelle (AtelierToolsBar, refonte 2026-09-25) --
+   Trois pastilles, discretes : "je clique sur ce dont j'ai besoin, le
+   panneau apparait". Centree, pas collee a un bord — elle n'appartient a
+   aucune colonne, elle flotte au-dessus du livre comme les tiroirs
+   qu'elle declenche. */
+.atelier-tools-bar {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.atelier-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-tool-btn:hover { border-color: var(--gold); }
+.atelier-tool-btn.is-active {
+  border-color: var(--gold);
+  background: var(--gold-light);
+  color: #7a5c2a;
+}
+
+.atelier-tool-icon { font-size: 14px; line-height: 1; }
+
+.atelier-tool-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-light);
+  background: rgba(36, 31, 24, 0.06);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.atelier-tool-btn.is-active .atelier-tool-count { color: #7a5c2a; background: rgba(184, 146, 74, 0.16); }
+
+/* Resume regroupe des alertes (§7 : "Pages · 32   2 pages a completer"
+   plutot que des pastilles disseminees) — n'apparait que s'il y a
+   effectivement quelque chose a signaler (voir AtelierToolsBar.js). */
+.atelier-tool-alert {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9a5b12;
+  background: rgba(201, 130, 34, 0.14);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* --- Tiroirs contextuels (AtelierDrawer, refonte 2026-09-25) -----------
+   Coquille commune a Photos / Mise en page / Pages. EN POSITION FIXE, PAS
+   DANS LA GRILLE : le livre ne retrecit jamais quand un tiroir s'ouvre —
+   c'est l'exigence centrale de la refonte. z-index 55 : sous les modales
+   existantes de l'atelier (.atelier-modal-backdrop, 60) et la loupe photo
+   (75), pour qu'un modale ou un agrandissement ouvert DEPUIS un tiroir
+   s'affiche bien par-dessus lui. */
+.atelier-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(36, 31, 24, 0.32);
+  display: flex;
+}
+.atelier-drawer-backdrop.is-left { justify-content: flex-start; }
+.atelier-drawer-backdrop.is-right { justify-content: flex-end; }
+.atelier-drawer-backdrop.is-bottom { align-items: flex-end; }
+
+.atelier-drawer {
+  background: var(--white);
+  box-shadow: 0 30px 70px -25px rgba(36, 31, 24, 0.45);
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh;
+}
+.atelier-drawer-left,
+.atelier-drawer-right {
+  width: min(400px, 92vw);
+  height: 100vh;
+}
+.atelier-drawer-bottom {
+  width: 100%;
+  max-height: min(60vh, 620px);
+  border-radius: 16px 16px 0 0;
+}
+
+.atelier-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid rgba(223, 216, 201, 0.7);
+  flex-shrink: 0;
+}
+
+.atelier-drawer-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.atelier-drawer-title {
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.atelier-drawer-subtitle {
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.atelier-drawer-close {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.atelier-drawer-close:hover { color: var(--ink); }
+
+.atelier-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+}
+/* Le contenu enveloppe (AtelierSidebar/AtelierLayoutPanel/AtelierCoverPanel/
+   AtelierPageFilmstrip) porte deja son propre fond/bordure/defilement,
+   pense pour une colonne de grille — a l'interieur du tiroir, c'est le
+   tiroir qui gere le fond et le defilement, le contenu doit juste occuper
+   la place disponible. */
+.atelier-drawer-body > .atelier-sidebar,
+.atelier-drawer-body > .atelier-layout-panel,
+.atelier-drawer-body > .atelier-cover-panel {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  max-height: none;
+  height: 100%;
+  overflow: visible;
+}
+.atelier-drawer-body > .atelier-filmstrip { padding: 4px 0; }
 
 /* --- Filmstrip de pages (navigation directe, pleine largeur) ----------- */
 /* Retour utilisateur : atteindre une page precise dans un livre de 16+
@@ -720,17 +913,24 @@
    livre, pour que .atelier-workspace garde exactement TROIS enfants — voir le
    commentaire dans BookAtelierLuxe.js. min-width: 0 indispensable, sinon le
    contenu du livre elargit la piste de grille. */
+/* LE LIVRE EST AU CENTRE (refonte visuelle 2026-09-25).
+   Ancienne grille a 3 colonnes permanentes (bibliotheque / livre / mise en
+   page) : la bibliotheque et la mise en page vivent desormais dans des
+   tiroirs (AtelierDrawer, en position fixe, voir plus haut) plutot que de
+   partager la largeur avec le livre — .atelier-workspace n'a donc plus
+   qu'un seul enfant visuel, .atelier-center-column, qui peut etre
+   nettement plus large qu'avant. */
+.atelier-workspace {
+  display: flex;
+  justify-content: center;
+}
+
 .atelier-center-column {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-
-.atelier-workspace {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 280px;
-  gap: var(--space-md);
-  align-items: start;
+  width: 100%;
+  max-width: 1040px;
 }
 
 /* --- Colonne gauche : Mes souvenirs --------------------------------- */
@@ -2288,19 +2488,14 @@
    (.atelier-page-action-btn.is-danger). */
 
 @media (max-width: 1080px) {
-  /* `minmax(0, 1fr)` et non `1fr` : un element de grille a `min-width: auto`
-     par defaut, donc son contenu peut ELARGIR la piste au-dela du conteneur.
-     Mesure au telephone (390 px) : la colonne faisait 558 px et la page
-     defilait lateralement de 192 px, alors meme que l'empilement en une
-     colonne s'appliquait correctement. */
-  .atelier-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .atelier-sidebar,
-  .atelier-layout-panel,
+  /* Il n'y a plus de grille a 3 colonnes a empiler (refonte 2026-09-25) :
+     la bibliotheque et la mise en page vivent dans des tiroirs en position
+     fixe, qui se superposent au livre a n'importe quelle largeur sans le
+     deformer. Seul .atelier-book-stage garde besoin d'un repli — un enfant
+     flex peut sinon elargir son conteneur au-dela de l'ecran (mesure au
+     telephone, 390 px). */
   .atelier-book-stage {
     min-width: 0;
-    max-height: none;
   }
 }
 
@@ -2330,7 +2525,8 @@
   .atelier-category-btn,
   .atelier-sidebar-add-btn,
   .atelier-layout-change-btn,
-  .atelier-generate-btn {
+  .atelier-header-link,
+  .atelier-tool-btn {
     min-height: 44px;
   }
 
@@ -2362,6 +2558,16 @@
   }
   .atelier-help-btn,
   .atelier-filmstrip-add { min-width: 44px; min-height: 44px; }
+
+  /* Sous ce seuil, un tiroir lateral de 400 px ne laisserait presque plus
+     rien voir du livre a cote de lui : il devient un panneau plein ecran
+     (§15 : "adapter naturellement la logique en panneaux/tiroirs"). */
+  .atelier-drawer-left,
+  .atelier-drawer-right {
+    width: 100vw;
+    height: 100vh;
+  }
+  .atelier-drawer-bottom { max-height: 82vh; }
 }
 
 /* --- Couleur de couverture (2026-09-12) ---------------------------------

@@ -41,6 +41,8 @@ import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
 import AtelierPhotoPickerModal from './AtelierPhotoPickerModal';
 import AtelierPageActions from './AtelierPageActions';
+import AtelierDrawer from './AtelierDrawer';
+import AtelierToolsBar from './AtelierToolsBar';
 import { findAtelierLayout } from './atelierLayouts';
 import { FORMAT_DIMENSIONS_MM } from './photoQuality';
 import { spreadPair, spreadCount, spreadOfPage, facingPageIndex, isLeftPage } from '../../../utils/pageParity';
@@ -130,6 +132,21 @@ export default function BookAtelierLuxe() {
   const [pickerTargetSlotIndex, setPickerTargetSlotIndex] = useState(null);
   const [pickerUploading, setPickerUploading] = useState(false);
   const [pickerUploadError, setPickerUploadError] = useState('');
+
+  // QUEL TIROIR EST OUVERT (refonte visuelle 2026-09-25 : "le livre est au
+  // centre, les outils sont secondaires et contextuels").
+  //
+  // Avant cette refonte, la bibliotheque de photos, la mise en page et la
+  // pellicule de pages etaient TOUTES visibles en permanence, dans une
+  // grille a 3 colonnes fixes. Elles vivent desormais dans un tiroir
+  // (AtelierDrawer.js) ouvert a la demande, par-dessus le livre plutot qu'a
+  // cote de lui — le livre ne retrecit donc jamais quand un outil s'ouvre.
+  //
+  // Un seul a la fois : deux tiroirs superposes seraient illisibles, meme
+  // principe deja etabli par AtelierPageActions (son etat `open`).
+  // 'photos' | 'layout' | 'pages' | null.
+  const [activeDrawer, setActiveDrawer] = useState(null);
+  const toggleDrawer = (name) => setActiveDrawer((previous) => (previous === name ? null : name));
 
   const [coverHtml, setCoverHtml] = useState(null);
   const [backCoverHtml, setBackCoverHtml] = useState(null);
@@ -1922,12 +1939,19 @@ export default function BookAtelierLuxe() {
       {/* Rappel discret quand on travaille sans compte : c'est l'ecran ou
           l'on passe le plus de temps, donc celui ou il faut le dire. */}
       <AnonymousBanner compact />
+      {/* EN-TETE TRES DISCRETE (refonte visuelle 2026-09-25).
+          Remplace ce que le site affichait par-dessus l'atelier jusqu'ici
+          (logo, "Comment ca marche", tableau de bord, administration,
+          email, deconnexion — voir Layout.js, qui ne rend plus ce bandeau
+          sur cette route) : ← Retour, le titre, le format, rien de plus en
+          permanence. Le mode automatique n'est plus un gros bouton mais un
+          lien texte, explique au survol seulement (§9 de la demande). */}
       <header className="atelier-header">
         {/* Plus de lien vers /book/:bookId (l'onglet "Edition" n'existe
             plus, remplace par l'atelier lui-meme — voir BookPageLuxe.js qui
             redirige desormais cette route directement ici) : retour direct
             au tableau de bord. */}
-        <Link to="/dashboard" className="atelier-back-link">← Retour au tableau de bord</Link>
+        <Link to="/dashboard" className="atelier-back-link">← Retour</Link>
         <h1 className="atelier-title">{book.title || 'Mon livre'}</h1>
         {/* Le FORMAT reste visible pendant toute la composition : il decide de
             la taille reelle des cadres photo — donc de la resolution
@@ -1937,27 +1961,40 @@ export default function BookAtelierLuxe() {
             table que le rendu. */}
         <span className="atelier-header-note">
           {formatCourant
-            ? `${formatCourant.nom} · ${formatCourant.taille}`
+            ? `${formatCourant.nom} · ${formatCourant.taille}${totalPages ? ` · ${totalPages} pages` : ''}`
             : 'Atelier de creation personnalisee'}
         </span>
-        <button
-          type="button"
-          className="btn btn-outline atelier-help-btn"
-          onClick={() => setShowOnboarding(true)}
-          title="Revoir les explications"
-          aria-label="Revoir les explications"
-        >
-          ?
-        </button>
-        <button
-          type="button"
-          className="btn btn-outline atelier-generate-btn"
-          onClick={handleGenerateButtonClick}
-          title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
-        >
-          ✨ Passer en mode automatique
-        </button>
+        <span className="atelier-header-secondary">
+          <button
+            type="button"
+            className="atelier-header-link"
+            onClick={handleGenerateButtonClick}
+            title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
+          >
+            ✦ Composer automatiquement
+          </button>
+          <button
+            type="button"
+            className="atelier-help-btn"
+            onClick={() => setShowOnboarding(true)}
+            title="Revoir les explications"
+            aria-label="Revoir les explications"
+          >
+            ?
+          </button>
+        </span>
       </header>
+
+      {/* Meme garde que le reste de l'atelier : sans pages, il n'y a rien a
+          composer, donc rien a ouvrir depuis cette barre. */}
+      {book.page_count ? (
+        <AtelierToolsBar
+          activeDrawer={activeDrawer}
+          onToggle={toggleDrawer}
+          photosCount={photos.length}
+          totalPages={totalPages}
+        />
+      ) : null}
 
       <AtelierConfirmSwitchDialog
         isOpen={isConfirmSwitchOpen}
@@ -2026,146 +2063,176 @@ export default function BookAtelierLuxe() {
       )}
 
       {book.page_count ? (
-        <div className="atelier-workspace">
-          <AtelierSidebar
-            estSolo={book?.collection_mode === 'solo'}
-            photos={photos}
-            souvenirs={souvenirs}
-            selectedItem={selectedSidebarItem}
-            onSelectItem={setSelectedSidebarItem}
-            onUploadPhotos={handleUploadPhotos}
-            onDeleteItem={handleDeleteItem}
-            uploadingPhotos={uploadingPhotos}
-            uploadProgress={uploadProgress}
-            onDeleteAll={handleDeleteAll}
-            deletingAll={deletingAll}
-            addError={sidebarAddError}
-            initialTab={searchParams.get('tab')}
-            usedItemIds={usedItemIds}
-          />
+        <>
+          {/* LE LIVRE EST AU CENTRE (refonte visuelle 2026-09-25).
+              Ancienne grille a 3 colonnes permanentes (bibliotheque / livre /
+              mise en page) remplacee par une seule colonne, centree, bien
+              plus large : la bibliotheque, la mise en page et la pellicule
+              de pages vivent desormais dans des tiroirs (voir plus bas),
+              ouverts uniquement a la demande depuis AtelierToolsBar. */}
+          <div className="atelier-workspace">
+            <div className="atelier-center-column">
+              {/* Retour en arriere place AU-DESSUS DU LIVRE : sur telephone,
+                  un tiroir ouvert recouvre l'ecran, le lien doit rester
+                  joignable independamment. */}
+              {/* Inviter des proches SANS quitter la composition : on y
+                  pense en voyant les emplacements vides, pas en regardant
+                  une liste de livres (2026-09-22). */}
+              {book?.collection_mode !== 'solo' && (
+                <AtelierPartagerLien
+                  shareToken={book?.share_token}
+                  recipientName={book?.recipient_name}
+                />
+              )}
 
-          {/* Colonne centrale. Le bandeau "Annuler" et le livre sont
-              REGROUPES dans ce conteneur, et non poses cote a cote : les
-              enfants directs de .atelier-workspace sont les elements d'une
-              grille a TROIS colonnes. En ajouter un quatrieme decalait tout
-              d'un cran — le livre passait dans la colonne de droite et le
-              panneau de mise en page sortait de l'ecran (regression introduite
-              puis corrigee le 2026-09-14, signalee sur capture). */}
-          <div className="atelier-center-column">
-            {/* Retour en arriere place AU-DESSUS DU LIVRE et non dans le
-                panneau de droite : sur telephone les colonnes sont empilees,
-                le panneau se retrouve loin sous le livre, donc le lien etait
-                invisible au moment precis ou l'on en a besoin. */}
-            {/* Inviter des proches SANS quitter la composition : on y
-                pense en voyant les emplacements vides, pas en regardant
-                une liste de livres (2026-09-22). */}
-            {book?.collection_mode !== 'solo' && (
-              <AtelierPartagerLien
-                shareToken={book?.share_token}
-                recipientName={book?.recipient_name}
+              {snapshotBar}
+              {undoBar}
+
+              <AtelierBookView
+              viewKind={viewKind}
+              loading={loadingPreview}
+              singleHtml={viewKind === 'cover' ? coverHtml : viewKind === 'back-cover' ? backCoverHtml : null}
+              leftHtml={leftPageIndex != null ? pagePreviewCache[leftPageIndex] : null}
+              rightHtml={rightPageIndex != null ? pagePreviewCache[rightPageIndex] : null}
+              leftPageNumber={leftPageIndex != null ? leftPageIndex + 1 : null}
+              rightPageNumber={rightPageIndex != null ? rightPageIndex + 1 : null}
+              totalPages={totalPages}
+              selectedSide={selectedSide}
+              onSelectSide={setSelectedSide}
+              onPrevious={() => canGoPrevious && goToView(viewIndex - 1)}
+              onNext={() => canGoNext && goToView(viewIndex + 1)}
+              onGoToCover={() => goToView(0)}
+              onGoToBackCover={() => goToView(lastViewIndex)}
+              canGoPrevious={canGoPrevious}
+              canGoNext={canGoNext}
+              navLabel={navLabel}
+              overlay={pageOverlay}
+              pageActions={pageActions}
+              printFormat={book.print_format}
+              onAssignCoverPhoto={handleAssignCoverPhoto}
+              onAdjustCoverPhoto={(face) => setAdjustCoverFace(face)}
+              coverHasPhoto={Boolean(coverPhotoItem)}
+              selectedSidebarItem={selectedSidebarItem}
               />
-            )}
-
-            {snapshotBar}
-            {undoBar}
-
-            <AtelierBookView
-            viewKind={viewKind}
-            loading={loadingPreview}
-            singleHtml={viewKind === 'cover' ? coverHtml : viewKind === 'back-cover' ? backCoverHtml : null}
-            leftHtml={leftPageIndex != null ? pagePreviewCache[leftPageIndex] : null}
-            rightHtml={rightPageIndex != null ? pagePreviewCache[rightPageIndex] : null}
-            leftPageNumber={leftPageIndex != null ? leftPageIndex + 1 : null}
-            rightPageNumber={rightPageIndex != null ? rightPageIndex + 1 : null}
-            totalPages={totalPages}
-            selectedSide={selectedSide}
-            onSelectSide={setSelectedSide}
-            onPrevious={() => canGoPrevious && goToView(viewIndex - 1)}
-            onNext={() => canGoNext && goToView(viewIndex + 1)}
-            onGoToCover={() => goToView(0)}
-            onGoToBackCover={() => goToView(lastViewIndex)}
-            canGoPrevious={canGoPrevious}
-            canGoNext={canGoNext}
-            navLabel={navLabel}
-            overlay={pageOverlay}
-            pageActions={pageActions}
-            printFormat={book.print_format}
-            onAssignCoverPhoto={handleAssignCoverPhoto}
-            onAdjustCoverPhoto={(face) => setAdjustCoverFace(face)}
-            coverHasPhoto={Boolean(coverPhotoItem)}
-            selectedSidebarItem={selectedSidebarItem}
-            />
+            </div>
           </div>
 
-          {viewKind === 'spread' ? (
-            <AtelierLayoutPanel
-              activeCategory={activeCategory}
-              onSelectCategory={setActiveCategory}
-              draftLayoutSlug={draftLayoutSlug}
-              onChooseLayout={handleChooseLayout}
-              slotItems={draftSlotItems}
-              onAssignSlot={handleAssignSlot}
-              onRemoveSlot={handleRemoveSlot}
-              onChangeFormat={() => {
-                // Surtout NE RIEN liberer ici : ce bouton ouvre seulement la
-                // galerie, il n'engage aucun changement. Le faire cassait la
-                // double page des le clic, avant meme que l'utilisateur ait
-                // choisi quoi que ce soit — "quand je clique sur changer la
-                // mise en page sans choisir de nouveau format, il remet la
-                // photo sur une seule page" (2026-09-14). La liberation se
-                // fait au moment du CHOIX reel, a partir de la page
-                // enregistree (voir savedPageIsSpread).
-                captureUndo();
-                setDraftLayoutSlug(null);
-                setDraftSlotItemIds([]);
-                setDraftPhotoAdjustments({});
-                setDraftTextRoles({});
-                setDraftTextStyles({});
-              }}
-              selectedSidebarItem={selectedSidebarItem}
-              saveStatus={saveStatus}
-              saveError={saveError}
-              printFormat={book.print_format}
-              currentPageIndex={currentPageIndex}
-              availableSlugs={availableLayoutSlugs}
-              doublePagePossible={doublePagePossible}
-              // "Vider cette page" et "Position dans le livre" sont passes sur
-              // la page elle-meme (voir pageActions plus bas).
+          {/* TROIS TIROIRS, UN SEUL A LA FOIS (activeDrawer, voir plus haut).
+              Chacun enveloppe un composant EXISTANT, sans le modifier : seul
+              l'endroit ou il est monte change (une colonne permanente devient
+              un panneau ouvert a la demande, par-dessus le livre — voir
+              AtelierDrawer.js). */}
+          <AtelierDrawer
+            side="left"
+            isOpen={activeDrawer === 'photos'}
+            onClose={() => setActiveDrawer(null)}
+            title="Photos"
+          >
+            <AtelierSidebar
+              estSolo={book?.collection_mode === 'solo'}
+              photos={photos}
+              souvenirs={souvenirs}
+              selectedItem={selectedSidebarItem}
+              onSelectItem={setSelectedSidebarItem}
+              onUploadPhotos={handleUploadPhotos}
+              onDeleteItem={handleDeleteItem}
+              uploadingPhotos={uploadingPhotos}
+              uploadProgress={uploadProgress}
+              onDeleteAll={handleDeleteAll}
+              deletingAll={deletingAll}
+              addError={sidebarAddError}
+              initialTab={searchParams.get('tab')}
+              usedItemIds={usedItemIds}
             />
-          ) : (
-            <AtelierCoverPanel
-              book={book}
-              face={viewKind === 'cover' ? 'front' : 'back'}
-              onUpdateBook={handleUpdateBook}
-              onSaved={handleCoverSaved}
-              onSwitchFace={() => goToView(viewKind === 'cover' ? lastViewIndex : 0)}
-            />
-          )}
-        </div>
+          </AtelierDrawer>
+
+          <AtelierDrawer
+            side="right"
+            isOpen={activeDrawer === 'layout'}
+            onClose={() => setActiveDrawer(null)}
+            title={viewKind === 'spread' ? 'Mise en page' : 'Couverture'}
+          >
+            {viewKind === 'spread' ? (
+              <AtelierLayoutPanel
+                activeCategory={activeCategory}
+                onSelectCategory={setActiveCategory}
+                draftLayoutSlug={draftLayoutSlug}
+                onChooseLayout={handleChooseLayout}
+                slotItems={draftSlotItems}
+                onAssignSlot={handleAssignSlot}
+                onRemoveSlot={handleRemoveSlot}
+                onChangeFormat={() => {
+                  // Surtout NE RIEN liberer ici : ce bouton ouvre seulement la
+                  // galerie, il n'engage aucun changement. Le faire cassait la
+                  // double page des le clic, avant meme que l'utilisateur ait
+                  // choisi quoi que ce soit — "quand je clique sur changer la
+                  // mise en page sans choisir de nouveau format, il remet la
+                  // photo sur une seule page" (2026-09-14). La liberation se
+                  // fait au moment du CHOIX reel, a partir de la page
+                  // enregistree (voir savedPageIsSpread).
+                  captureUndo();
+                  setDraftLayoutSlug(null);
+                  setDraftSlotItemIds([]);
+                  setDraftPhotoAdjustments({});
+                  setDraftTextRoles({});
+                  setDraftTextStyles({});
+                }}
+                selectedSidebarItem={selectedSidebarItem}
+                saveStatus={saveStatus}
+                saveError={saveError}
+                printFormat={book.print_format}
+                currentPageIndex={currentPageIndex}
+                availableSlugs={availableLayoutSlugs}
+                doublePagePossible={doublePagePossible}
+                // "Vider cette page" et "Position dans le livre" sont passes sur
+                // la page elle-meme (voir pageActions plus bas).
+              />
+            ) : (
+              <AtelierCoverPanel
+                book={book}
+                face={viewKind === 'cover' ? 'front' : 'back'}
+                onUpdateBook={handleUpdateBook}
+                onSaved={handleCoverSaved}
+                onSwitchFace={() => goToView(viewKind === 'cover' ? lastViewIndex : 0)}
+              />
+            )}
+          </AtelierDrawer>
+        </>
       ) : null}
 
       {book.page_count ? (
-        <AtelierPageFilmstrip
-          pageStatuses={finishStats.pageStatuses}
-          qualityWarningsByPage={qualityWarningsByPage}
-          activeTarget={viewKind === 'cover' ? 'cover' : viewKind === 'back-cover' ? 'back-cover' : currentPageIndex}
-          printFormat={book.print_format}
-          onSelect={goToFilmstripTarget}
-          onAddPages={handleAddPages}
-          addingPages={addingPages}
-          onRemovePages={handleRemovePages}
-          removingPages={removingPages}
-          // Le serveur reste l'autorite (il refuse en 422), mais griser le
-          // bouton evite de proposer une action qu'on sait deja impossible.
-          // `totalPages` (book.page_count) et NON `pages.length` : une page
-          // vide n'a pas de ligne en base, donc compter les lignes sous-estime
-          // le livre et grisait le bouton a tort sur un livre peu rempli
-          // (2026-09-14, meme famille que l'ecart page_count / pages reelles).
-          canRemovePages={totalPages - 2 >= MIN_AUTO_PAGES}
-          minPages={MIN_AUTO_PAGES}
-          onMovePage={handleMovePage}
-          movingPage={movingPage}
-        />
+        <AtelierDrawer
+          side="bottom"
+          isOpen={activeDrawer === 'pages'}
+          onClose={() => setActiveDrawer(null)}
+          title="Toutes les pages"
+        >
+          <AtelierPageFilmstrip
+            pageStatuses={finishStats.pageStatuses}
+            qualityWarningsByPage={qualityWarningsByPage}
+            activeTarget={viewKind === 'cover' ? 'cover' : viewKind === 'back-cover' ? 'back-cover' : currentPageIndex}
+            printFormat={book.print_format}
+            // Choisir une page est un geste complet en soi (contrairement a
+            // la bibliotheque de photos, ou on veut souvent en placer
+            // plusieurs de suite) : le tiroir se referme, le livre reprend
+            // toute la place sur la page choisie.
+            onSelect={(target) => { goToFilmstripTarget(target); setActiveDrawer(null); }}
+            onAddPages={handleAddPages}
+            addingPages={addingPages}
+            onRemovePages={handleRemovePages}
+            removingPages={removingPages}
+            // Le serveur reste l'autorite (il refuse en 422), mais griser le
+            // bouton evite de proposer une action qu'on sait deja impossible.
+            // `totalPages` (book.page_count) et NON `pages.length` : une page
+            // vide n'a pas de ligne en base, donc compter les lignes sous-estime
+            // le livre et grisait le bouton a tort sur un livre peu rempli
+            // (2026-09-14, meme famille que l'ecart page_count / pages reelles).
+            canRemovePages={totalPages - 2 >= MIN_AUTO_PAGES}
+            minPages={MIN_AUTO_PAGES}
+            onMovePage={handleMovePage}
+            movingPage={movingPage}
+          />
+        </AtelierDrawer>
       ) : null}
 
       {book.page_count ? (
