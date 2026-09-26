@@ -18,6 +18,15 @@ import React from 'react';
 // Volontairement UN SEUL fichier a la fois (pas de selection multiple) :
 // cette fenetre remplit UN emplacement precis, pas la bibliotheque entiere —
 // l'ajout en lot reste le "+ Ajouter des photos" de la colonne de gauche.
+//
+// Reutilisee pour la couverture/4e (retour utilisateur, 2026-09-26 : "les
+// photos seront gerees comme sur les pages") — MEME fenetre, mais la
+// couverture n'exclut PAS les photos deja placees ailleurs dans le livre
+// (contrairement a un emplacement de page interieure) : reutiliser la
+// meilleure photo du livre en couverture est un usage courant, pas une
+// confusion. `title`/`introHint`/`emptyHint` sont donc surchargeables par
+// l'appelant plutot que fixes en dur — repli sur le texte "emplacement de
+// page" d'origine si non fournis, aucun appelant existant n'est casse.
 function AtelierPhotoPickerModal({
   isOpen,
   photosDisponibles = [],
@@ -25,7 +34,10 @@ function AtelierPhotoPickerModal({
   uploadError,
   onPick,
   onUploadFile,
-  onClose
+  onClose,
+  title = 'Choisir une photo',
+  introHint = 'Vos photos importées, pas encore utilisées :',
+  emptyHint = 'Toutes vos photos importées sont déjà placées dans le livre.'
 }) {
   if (!isOpen) return null;
 
@@ -45,13 +57,13 @@ function AtelierPhotoPickerModal({
     <div className="atelier-modal-backdrop" onClick={requestClose}>
       <div className="atelier-modal atelier-photo-picker-modal" onClick={(event) => event.stopPropagation()}>
         <div className="atelier-modal-head">
-          <h2 className="atelier-modal-title">Choisir une photo</h2>
+          <h2 className="atelier-modal-title">{title}</h2>
           <button type="button" className="atelier-modal-close" onClick={requestClose} disabled={uploading} aria-label="Fermer">×</button>
         </div>
 
         {photosDisponibles.length > 0 ? (
           <>
-            <p className="atelier-photo-picker-hint">Vos photos importées, pas encore utilisées :</p>
+            <p className="atelier-photo-picker-hint">{introHint}</p>
             <div className="atelier-photo-picker-grid">
               {photosDisponibles.map((item) => (
                 <button
@@ -70,7 +82,7 @@ function AtelierPhotoPickerModal({
           </>
         ) : (
           <p className="atelier-photo-picker-hint">
-            Toutes vos photos importées sont déjà placées dans le livre.
+            {emptyHint}
           </p>
         )}
 

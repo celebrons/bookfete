@@ -130,6 +130,14 @@ export default function BookAtelierLuxe() {
   // une nouvelle directement via ses fichiers"), et l'etat de l'import direct
   // qui peut s'y faire — voir AtelierPhotoPickerModal.js.
   const [pickerTargetSlotIndex, setPickerTargetSlotIndex] = useState(null);
+  // Meme fenetre, cette fois pour la couverture/4e (retour utilisateur,
+  // 2026-09-26 : "les photos seront gerees comme sur les pages, en cliquant
+  // a l'interieur de la page couverture") — 'front' | 'back' | null.
+  // Distinct de pickerTargetSlotIndex plutot que fusionne dedans : la
+  // couverture affiche TOUTES les photos (pas seulement les non utilisees,
+  // voir plus bas photosNonUtilisees vs photos), un simple index de slot ne
+  // suffirait pas a porter cette distinction proprement.
+  const [pickerTargetCoverFace, setPickerTargetCoverFace] = useState(null);
   const [pickerUploading, setPickerUploading] = useState(false);
   const [pickerUploadError, setPickerUploadError] = useState('');
 
@@ -999,33 +1007,54 @@ export default function BookAtelierLuxe() {
 
   const handleOpenPhotoPicker = (slotIndex) => {
     setPickerUploadError('');
+    setPickerTargetCoverFace(null);
     setPickerTargetSlotIndex(slotIndex);
+  };
+
+  // Meme fenetre, pour la couverture/4e (retour utilisateur, 2026-09-26) —
+  // voir CoverPhotoOverlay dans AtelierBookView.js, ouvert au clic direct
+  // sur un cadre de couverture vide.
+  const handleOpenCoverPhotoPicker = (face) => {
+    setPickerUploadError('');
+    setPickerTargetSlotIndex(null);
+    setPickerTargetCoverFace(face);
   };
 
   const handleClosePhotoPicker = () => {
     setPickerTargetSlotIndex(null);
+    setPickerTargetCoverFace(null);
     setPickerUploadError('');
   };
 
   const handlePickPhotoFromLibrary = (itemId) => {
+    if (pickerTargetCoverFace) {
+      handleAssignCoverPhoto(pickerTargetCoverFace, itemId);
+      handleClosePhotoPicker();
+      return;
+    }
     if (pickerTargetSlotIndex == null) return;
     handleAssignSlot(pickerTargetSlotIndex, itemId);
     handleClosePhotoPicker();
   };
 
-  // Import direct depuis le disque, POUR CET EMPLACEMENT PRECIS : un seul
-  // fichier, qui remplit l'emplacement des que l'envoi reussit — distinct de
-  // envoyerLesPhotos (lot vers la bibliotheque generale, avec detection de
-  // doublons) : ici le geste est deliberement cible sur un cadre precis, la
-  // detection de doublons du lot n'a pas sa place dans ce chemin court.
+  // Import direct depuis le disque, POUR CET EMPLACEMENT PRECIS (page OU
+  // couverture/4e) : un seul fichier, qui remplit la cible des que l'envoi
+  // reussit — distinct de envoyerLesPhotos (lot vers la bibliotheque
+  // generale, avec detection de doublons) : ici le geste est deliberement
+  // cible sur un cadre precis, la detection de doublons du lot n'a pas sa
+  // place dans ce chemin court.
   const handleUploadPhotoForPicker = async (file) => {
-    if (!book?.id || pickerTargetSlotIndex == null) return;
+    if (!book?.id || (pickerTargetSlotIndex == null && !pickerTargetCoverFace)) return;
     setPickerUploading(true);
     setPickerUploadError('');
     try {
       const created = await uploadPhoto(book.id, file, items.length);
       setItems((previous) => [...previous, created]);
-      handleAssignSlot(pickerTargetSlotIndex, created.id);
+      if (pickerTargetCoverFace) {
+        handleAssignCoverPhoto(pickerTargetCoverFace, created.id);
+      } else {
+        handleAssignSlot(pickerTargetSlotIndex, created.id);
+      }
       handleClosePhotoPicker();
     } catch (err) {
       setPickerUploadError(err.message || "La photo n'a pas pu être importée.");
@@ -1133,9 +1162,28 @@ export default function BookAtelierLuxe() {
     const html = viewKind === 'cover' ? coverHtml : backCoverHtml;
     if (!html) return null;
     // L'apercu est du HTML complet : on y retrouve l'URL de la photo posee.
-    const trouve = photos.find((photo) => photo.url && html.includes(photo.url));
+    // Le rendu embarque metadata.previewUrl (variante redimensionnee pour
+    // l'ecran, voir AtelierSidebar.js/AtelierPhotoAdjustModal.js — meme
+    // convention partout dans l'atelier), PAS photo.url (l'original) : sans
+    // ce second essai, une photo de couverture fraichement assignee n'etait
+    // jamais detectee (bug trouve le 2026-09-26 en testant le nouveau
+    // "Retirer" ci-dessous — le bouton n'apparaissait jamais).
+    const trouve = photos.find((photo) => (
+      (photo.url && html.includes(photo.url))
+      || (photo.metadata?.previewUrl && html.includes(photo.metadata.previewUrl))
+    ));
     return trouve || null;
   }, [viewKind, coverHtml, backCoverHtml, photos]);
+
+  // Le gabarit choisi contient-il une photo, pour chaque face (retour
+  // utilisateur, 2026-09-26 : "si le template contient une photo") — MIROIR
+  // de showPhotoPicker/showBackPhotoPicker dans AtelierCoverPanel.js (meme
+  // convention de duplication assumee que le reste de ce fichier). Determine
+  // si CoverPhotoOverlay reagit au clic ou reste invisible (voir
+  // AtelierBookView.js).
+  const frontHasPhotoSlot = (book?.cover_overrides?.frontVariant || 'AUTO') !== 'COVER_MINIMAL';
+  const backCoverVariant = book?.cover_overrides?.backVariant || 'AUTO';
+  const backHasPhotoSlot = backCoverVariant === 'AUTO' || backCoverVariant === 'BACK_PHOTO_STATS';
 
   // Reglage enregistre pour cette face (cover_overrides.frontPhotoAdjust /
   // backPhotoAdjust) — la meme forme que pour une photo interieure, donc la
@@ -2061,13 +2109,22 @@ export default function BookAtelierLuxe() {
       />
 
       <AtelierPhotoPickerModal
-        isOpen={pickerTargetSlotIndex != null}
-        photosDisponibles={photosNonUtilisees}
+        isOpen={pickerTargetSlotIndex != null || pickerTargetCoverFace != null}
+        // La couverture montre TOUTES les photos (pas seulement les non
+        // utilisees) : reutiliser la meilleure photo du livre en couverture
+        // est un usage courant, voir le commentaire de pickerTargetCoverFace
+        // plus haut et d'AtelierPhotoPickerModal.js.
+        photosDisponibles={pickerTargetCoverFace ? photos : photosNonUtilisees}
         uploading={pickerUploading}
         uploadError={pickerUploadError}
         onPick={handlePickPhotoFromLibrary}
         onUploadFile={handleUploadPhotoForPicker}
         onClose={handleClosePhotoPicker}
+        title={pickerTargetCoverFace
+          ? (pickerTargetCoverFace === 'front' ? 'Choisir la photo de couverture' : 'Choisir la photo de 4e de couverture')
+          : undefined}
+        introHint={pickerTargetCoverFace ? 'Vos photos importées :' : undefined}
+        emptyHint={pickerTargetCoverFace ? 'Importez une photo pour pouvoir en choisir une ici.' : undefined}
       />
 
       {error && <div className="wizard-error atelier-error">{error}</div>}
@@ -2164,6 +2221,9 @@ export default function BookAtelierLuxe() {
               onAssignCoverPhoto={handleAssignCoverPhoto}
               onAdjustCoverPhoto={(face) => setAdjustCoverFace(face)}
               coverHasPhoto={Boolean(coverPhotoItem)}
+              onOpenCoverPhotoPicker={handleOpenCoverPhotoPicker}
+              frontHasPhotoSlot={frontHasPhotoSlot}
+              backHasPhotoSlot={backHasPhotoSlot}
               selectedSidebarItem={selectedSidebarItem}
               />
             </div>

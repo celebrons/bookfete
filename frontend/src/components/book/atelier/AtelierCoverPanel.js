@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { listContentItems } from '../../../services/compositionApi';
 import '../BookLuxe.css';
 
 // Controle manuel LEGER sur la couverture automatique (coverComposer.js),
@@ -14,6 +13,15 @@ import '../BookLuxe.css';
 // (front/back) est deja determinee par ce que l'utilisateur feuillette,
 // passee en prop `face` — meme principe que "naviguer vers une page la
 // selectionne pour edition" deja etabli pour les pages interieures.
+//
+// NE CHOISIT PLUS LA PHOTO (retour utilisateur, 2026-09-26) : uniquement
+// templates/parametres desormais — gabarit, couleur, style d'album, textes.
+// Le choix de la photo de couverture/4e se fait en cliquant DIRECTEMENT sur
+// la page affichee (CoverPhotoOverlay dans AtelierBookView.js, meme fenetre
+// de choix — AtelierPhotoPickerModal.js — que pour un emplacement de page
+// interieure). Deux raisons : coherence avec les pages, et ce panneau donne
+// desormais plus de place aux reglages qui lui restent, une couverture etant
+// une page unique (contrairement a une double-page interieure).
 
 const PHRASE_MODES = [
   { id: 'auto', label: 'Automatique' },
@@ -191,38 +199,6 @@ function FormatGallery({ formats, selectedId, onSelect }) {
   );
 }
 
-// Galerie de choix de photo (recto ET verso, meme composant — retour
-// utilisateur 2026-09-10 : "pareil pour la 4e de couverture"). "Automatique"
-// laisse le systeme choisir/decider si une photo doit meme apparaitre.
-function CoverPhotoPicker({ photos, loading, selectedId, onSelect }) {
-  if (loading) return <p className="coverlite-hint">Chargement des photos...</p>;
-  return (
-    <>
-      <div className="coverlite-photo-grid">
-        <button
-          type="button"
-          className={`coverlite-photo-option is-auto ${!selectedId ? 'is-selected' : ''}`}
-          onClick={() => onSelect(null)}
-          title="Laisser le systeme choisir la meilleure photo"
-        >
-          <span>Automatique</span>
-        </button>
-        {photos.map((photo) => (
-          <button
-            key={photo.id}
-            type="button"
-            className={`coverlite-photo-option ${selectedId === photo.id ? 'is-selected' : ''}`}
-            onClick={() => onSelect(photo.id)}
-          >
-            <img src={photo.metadata?.thumbnailUrl || photo.url} alt="" />
-          </button>
-        ))}
-      </div>
-      {photos.length === 0 && <p className="coverlite-hint">Ajoutez des photos pour pouvoir en choisir une ici.</p>}
-    </>
-  );
-}
-
 // Les trois chiffres de la 4e de couverture (voir backend coverCopy.js :
 // formatStatsLine). Chacun peut etre retire — demande utilisateur du
 // 2026-09-19 : "donner la possibilite d'enlever le nombre de photos".
@@ -262,11 +238,15 @@ const buildInitialState = (book) => {
     // Style de l'album (nu/filet/encadre) — voir backend albumStyle.js. Un
     // jeton inconnu retombe sur 'nu', meme principe que coverColor.
     albumStyle: ALBUM_STYLES.some((s) => s.token === overrides.albumStyle) ? overrides.albumStyle : 'nu',
-    frontPhotoId: overrides.frontPhotoId || null,
-    // Photo de 4e de couverture (retour utilisateur, 2026-09-10 : "permettre
-    // de modifier la photo de la 4e de couverture") — meme principe que
-    // frontPhotoId, cote verso (voir coverComposer.js: composeBackCover).
-    backPhotoId: overrides.backPhotoId || null,
+    // frontPhotoId/backPhotoId n'ont PLUS de champ ici (retour utilisateur,
+    // 2026-09-26 : "inutile d'avoir les photos dans l'encart de mise en
+    // page... les photos seront gerees comme sur les pages, en cliquant a
+    // l'interieur de la page couverture") — le choix se fait desormais en
+    // cliquant directement sur la couverture/4e affichee (voir
+    // CoverPhotoOverlay dans AtelierBookView.js, meme mecanisme que les
+    // pages interieures). Ce panneau ne les LIT plus ni ne les ECRIT plus :
+    // ils survivent au spread `...book.cover_overrides` du payload
+    // d'enregistrement plus bas, intacts.
     subtitle: normalizeText(overrides.subtitle),
     dateLabel: normalizeText(overrides.dateLabel),
     closingPhraseMode,
@@ -280,8 +260,6 @@ const buildInitialState = (book) => {
 const getStateSignature = (state) => JSON.stringify(state);
 
 function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) {
-  const [photos, setPhotos] = useState([]);
-  const [loadingPhotos, setLoadingPhotos] = useState(true);
   const [formState, setFormState] = useState(() => buildInitialState(book));
   const [savedSignature, setSavedSignature] = useState(() => getStateSignature(buildInitialState(book)));
   const [saveStatus, setSaveStatus] = useState('idle');
@@ -293,26 +271,6 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
     setSavedSignature(getStateSignature(nextState));
     setSaveStatus('idle');
   }, [book?.id, book?.cover_overrides, book?.title]);
-
-  useEffect(() => {
-    if (!book?.id) return undefined;
-    let cancelled = false;
-    setLoadingPhotos(true);
-
-    listContentItems(book.id)
-      .then((items) => {
-        if (cancelled) return;
-        setPhotos((items || []).filter((item) => item.kind === 'photo'));
-      })
-      .catch(() => {
-        if (!cancelled) setPhotos([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingPhotos(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [book?.id]);
 
   const stateSignature = useMemo(() => getStateSignature(formState), [formState]);
 
@@ -346,8 +304,6 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
             backVariant: formState.backVariant,
             coverColor: formState.coverColor || null,
             albumStyle: formState.albumStyle || 'nu',
-            frontPhotoId: formState.frontPhotoId || null,
-            backPhotoId: formState.backPhotoId || null,
             subtitle: formState.subtitle,
             dateLabel: formState.dateLabel,
             closingPhraseMode: formState.closingPhraseMode,
@@ -378,13 +334,6 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
     saved: '✓ Enregistre',
     error: "Erreur d'enregistrement"
   }[saveStatus];
-
-  const showPhotoPicker = formState.frontVariant !== 'COVER_MINIMAL';
-  // Verso : une photo n'apparait jamais pour BACK_MINIMAL/BACK_STATS forces
-  // explicitement (choix assume de ne PAS en montrer, voir coverComposer.js
-  // resolveForcedBackComposition) — le picker n'a de sens que pour AUTO
-  // (peut resoudre vers une photo) ou BACK_PHOTO_STATS force.
-  const showBackPhotoPicker = formState.backVariant === 'AUTO' || formState.backVariant === 'BACK_PHOTO_STATS';
 
   return (
     <aside className="atelier-layout-panel atelier-cover-panel">
@@ -500,18 +449,6 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
             />
           </div>
 
-          {showPhotoPicker && (
-            <div className="coverlite-group">
-              <span className="coverlite-group-label">Photo de couverture</span>
-              <CoverPhotoPicker
-                photos={photos}
-                loading={loadingPhotos}
-                selectedId={formState.frontPhotoId}
-                onSelect={(id) => updateField('frontPhotoId', id)}
-              />
-            </div>
-          )}
-
           {/* "Kicker" : petite ligne au-dessus du titre, ex. "Fin de projet"
               — automatiquement tiree de l'occasion choisie a la creation du
               livre, mais restee non modifiable jusqu'ici (retour
@@ -605,22 +542,6 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               />
             )}
           </div>
-
-          {/* Photo de 4e de couverture (retour utilisateur, 2026-09-10 :
-              "pareil pour la 4e de couverture") — jusqu'ici seul le recto
-              avait ce controle, meme composant/meme principe ici
-              (cover_overrides.backPhotoId, voir coverComposer.js). */}
-          {showBackPhotoPicker && (
-            <div className="coverlite-group">
-              <span className="coverlite-group-label">Photo de 4e de couverture</span>
-              <CoverPhotoPicker
-                photos={photos}
-                loading={loadingPhotos}
-                selectedId={formState.backPhotoId}
-                onSelect={(id) => updateField('backPhotoId', id)}
-              />
-            </div>
-          )}
 
           {/* CHIFFRES DE LA 4e — chacun peut etre retire (2026-09-19).
               Masque sur le format "Sobre", qui n'affiche aucun chiffre :

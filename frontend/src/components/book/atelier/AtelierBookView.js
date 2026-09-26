@@ -42,19 +42,42 @@ function ExpandIcon() {
 // emplacement (toute la page), pas une grille de slots. L'iframe en dessous
 // a pointer-events:none (BookAtelierLuxe.css), le clic passe donc
 // naturellement a travers jusqu'ici.
-function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto }) {
-  if (!onAssign) return null;
+// `hasPhotoSlot` : le gabarit choisi pour cette face contient-il seulement
+// une photo (retour utilisateur, 2026-09-26 : "si le template contient une
+// photo") ? Un texte-seul (COVER_MINIMAL/BACK_MINIMAL/BACK_STATS) n'a pas
+// d'emplacement photo du tout — sans ce garde, le calque proposait quand
+// meme "cliquer pour choisir une photo" sur un gabarit qui n'en affiche
+// jamais aucune. Absent (undefined) -> true, pour ne rien casser d'un
+// appelant qui ne le passerait pas.
+function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, onOpenPicker, onRemove, hasPhotoSlot = true }) {
+  if (!onAssign || !hasPhotoSlot) return null;
   const isPhotoSelected = selectedSidebarItem?.kind === 'photo';
+  // Meme mecanique qu'un emplacement de page interieure vide (retour
+  // utilisateur, 2026-09-26 : "les photos seront gerees comme sur les
+  // pages, en cliquant a l'interieur de la page couverture... cela va
+  // ouvrir la fenetre directement pour choisir") — voir AtelierPageOverlay.js
+  // et AtelierPhotoPickerModal.js, meme fenetre reutilisee ici.
+  // Rien a dire depuis le calque quand une photo est deja en place : le
+  // bouton dedie "Ajuster le cadrage" plus bas porte deja son propre
+  // message, un second texte redirait la meme chose en double au survol.
   const hint = isPhotoSelected
     ? 'Cliquer pour utiliser cette photo'
-    : 'Sélectionnez une photo dans "Mes souvenirs", puis cliquez ici';
+    : (hasPhoto ? null : 'Cliquer pour choisir une photo');
   return (
     <div
       className={`atelier-cover-photo-overlay ${isPhotoSelected ? 'is-armed' : ''}`}
-      onClick={(event) => { event.stopPropagation(); if (isPhotoSelected) onAssign(selectedSidebarItem.id); }}
-      title={hint}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (isPhotoSelected) { onAssign(selectedSidebarItem.id); return; }
+        // Une photo deja en place garde son geste existant (bouton dedie
+        // "Ajuster le cadrage" ci-dessous, inchange) — seule l'ABSENCE de
+        // photo change de comportement ici : le clic ouvre desormais
+        // directement le choix au lieu de ne rien faire.
+        if (!hasPhoto && onOpenPicker) onOpenPicker();
+      }}
+      title={hint || undefined}
     >
-      <span className="atelier-cover-photo-overlay-hint">{hint}</span>
+      {hint && <span className="atelier-cover-photo-overlay-hint">{hint}</span>}
       {/* Recadrer la photo de couverture. Un BOUTON a part, pas un clic sur
           l'image : le clic sur l'image sert deja a REMPLACER la photo quand
           une est selectionnee dans "Mes souvenirs", et les deux gestes ne
@@ -73,7 +96,34 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto }
           Ajuster le cadrage
         </button>
       )}
+      {/* Revenir a "Automatique" (laisser Celebrons choisir) — l'ancien
+          panneau "Mise en page" offrait ce choix via une pastille dediee,
+          disparue avec la galerie de photos qu'il portait (retour
+          utilisateur, 2026-09-26). Sans cette croix, une photo choisie a la
+          main serait impossible a "deselectionner" : on ne pourrait plus
+          que la remplacer par une AUTRE photo precise, jamais revenir au
+          choix automatique. Coin oppose au bouton d'ajustement pour ne
+          jamais se chevaucher. */}
+      {onRemove && hasPhoto && !isPhotoSelected && (
+        <button
+          type="button"
+          className="atelier-cover-remove-btn"
+          onClick={(event) => { event.stopPropagation(); onRemove(); }}
+          title="Revenir au choix automatique de la photo"
+          aria-label="Revenir au choix automatique de la photo"
+        >
+          <XIcon />
+        </button>
+      )}
     </div>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+      <path d="M5 5L19 19M19 5L5 19" />
+    </svg>
   );
 }
 
@@ -214,6 +264,16 @@ function AtelierBookView({
   // n'apparait et le comportement d'avant est inchange).
   onAdjustCoverPhoto,
   coverHasPhoto,
+  // Ouvre la fenetre de choix (AtelierPhotoPickerModal, partagee avec les
+  // pages interieures) au clic sur un cadre VIDE — retour utilisateur,
+  // 2026-09-26. Facultatif : sans lui, un clic sur un cadre vide ne fait
+  // rien (repli neutre).
+  onOpenCoverPhotoPicker,
+  // Le gabarit choisi contient-il une photo, pour CHAQUE face — voir
+  // CoverPhotoOverlay. Absents -> true (repli neutre, le calque reste actif
+  // comme avant pour un appelant qui ne les passerait pas).
+  frontHasPhotoSlot,
+  backHasPhotoSlot,
   selectedSidebarItem
 }) {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -305,6 +365,9 @@ function AtelierBookView({
                 selectedSidebarItem={selectedSidebarItem}
                 onAdjust={onAdjustCoverPhoto ? () => onAdjustCoverPhoto('front') : null}
                 hasPhoto={coverHasPhoto}
+                onOpenPicker={onOpenCoverPhotoPicker ? () => onOpenCoverPhotoPicker('front') : null}
+                onRemove={onAssignCoverPhoto ? () => onAssignCoverPhoto('front', null) : null}
+                hasPhotoSlot={frontHasPhotoSlot}
               />
             )}
           />
@@ -323,6 +386,9 @@ function AtelierBookView({
                 selectedSidebarItem={selectedSidebarItem}
                 onAdjust={onAdjustCoverPhoto ? () => onAdjustCoverPhoto('back') : null}
                 hasPhoto={coverHasPhoto}
+                onOpenPicker={onOpenCoverPhotoPicker ? () => onOpenCoverPhotoPicker('back') : null}
+                onRemove={onAssignCoverPhoto ? () => onAssignCoverPhoto('back', null) : null}
+                hasPhotoSlot={backHasPhotoSlot}
               />
             )}
           />

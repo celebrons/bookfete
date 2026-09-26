@@ -1642,6 +1642,31 @@
    pour qui ne survole pas a la souris. */
 .atelier-cover-adjust-btn:focus-visible { opacity: 1; outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
 
+/* Revenir a "Automatique" (2026-09-26) — coin oppose au bouton d'ajustement
+   (haut-droite plutot que bas-centre), meme pastille rouge que la croix de
+   retrait d'un emplacement de page interieure (.atelier-overlay-slot-
+   remove-btn), pour rester reconnaissable comme le meme geste. */
+.atelier-cover-remove-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(180, 35, 24, 0.75);
+  color: var(--white);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-cover-photo-overlay:hover .atelier-cover-remove-btn { opacity: 1; }
+.atelier-cover-remove-btn:hover { background: #b42318; }
+.atelier-cover-remove-btn:focus-visible { opacity: 1; outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
+
 /* UN EMPLACEMENT VIDE NE PORTE PLUS DE POINTILLES EN PERMANENCE (refonte
    2026-09-26, §1 : "les pointillés doivent être un état d'interaction, pas
    un élément permanent"). Base quasi invisible (un trait tres pale, juste
