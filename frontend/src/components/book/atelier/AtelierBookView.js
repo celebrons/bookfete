@@ -138,13 +138,10 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
           encombrerait pour rien et rendrait ambigu ce sur quoi elles
           agissent. */}
       {selectable && isSelected && actions}
-      {/* « Page en cours de modification » se lisait comme un travail du
-          SYSTEME — l utilisateur pouvait croire qu une operation tournait en
-          arriere-plan et qu il fallait attendre. On s adresse donc a lui
-          directement : c est LUI qui modifie cette page (2026-09-18). */}
-      {selectable && isSelected && (
-        <span className="atelier-page-pane-editing-badge">✎ Vous modifiez cette page</span>
-      )}
+      {/* Le badge "Vous modifiez cette page" a disparu (refonte 2026-09-26,
+          §1 : "l'utilisateur sait qu'il est en train de modifier la page") —
+          le fin contour or de .is-selected suffit desormais a le montrer,
+          sans texte permanent superpose au livre. */}
       {isInactive && (
         <span className="atelier-page-pane-inactive-hint">Cliquer pour modifier</span>
       )}
@@ -217,10 +214,6 @@ function AtelierBookView({
   // n'apparait et le comportement d'avant est inchange).
   onAdjustCoverPhoto,
   coverHasPhoto,
-  // Sauts directs aux deux extremites du livre. Facultatifs : sans eux, la
-  // barre se comporte exactement comme avant.
-  onGoToCover,
-  onGoToBackCover,
   selectedSidebarItem
 }) {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -375,43 +368,34 @@ function AtelierBookView({
 
       <div className="atelier-book-nav">
         <div className="atelier-book-nav-side" aria-hidden="true" />
+        {/* NAVIGATION ALLEGEE (refonte 2026-09-26, §4) : deux fleches fines
+            et un numero, plus de gros boutons rectangulaires. Les sauts
+            directs vers la couverture/4e (autrefois deux boutons ici)
+            vivent desormais dans le tiroir "Pages" (AtelierPageFilmstrip a
+            deja des cellules Cvr/4e, voir plus bas) — une action secondaire,
+            pas la navigation principale. */}
         <div className="atelier-book-nav-controls">
-          {/* Sauts directs aux deux extremites. Sans eux, atteindre la 4e d'un
-              livre de 30 pages demandait 16 clics, et autant pour revenir
-              (retour utilisateur 2026-09-15 : « on est obliges de feuilleter
-              tout l'album »). La pellicule du bas offre deja ces deux cibles,
-              mais elle defile : sur un livre long elles en sortent. */}
-          {onGoToCover && (
-            <button
-              type="button"
-              className="btn btn-outline atelier-book-nav-jump"
-              onClick={onGoToCover}
-              disabled={!canGoPrevious}
-              title="Aller à la couverture"
-            >
-              ⇤ Couverture
-            </button>
-          )}
-          <button type="button" className="btn btn-outline" onClick={onPrevious} disabled={!canGoPrevious}>
-            ← precedente
+          <button
+            type="button"
+            className="atelier-book-nav-arrow"
+            onClick={onPrevious}
+            disabled={!canGoPrevious}
+            aria-label="Page précédente"
+          >
+            ‹
           </button>
           <span className="atelier-book-nav-label">
             {navLabel}{totalPages ? ` / ${totalPages}` : ''}
           </span>
-          <button type="button" className="btn btn-outline" onClick={onNext} disabled={!canGoNext}>
-            suivante →
+          <button
+            type="button"
+            className="atelier-book-nav-arrow"
+            onClick={onNext}
+            disabled={!canGoNext}
+            aria-label="Page suivante"
+          >
+            ›
           </button>
-          {onGoToBackCover && (
-            <button
-              type="button"
-              className="btn btn-outline atelier-book-nav-jump"
-              onClick={onGoToBackCover}
-              disabled={!canGoNext}
-              title="Aller à la 4e de couverture"
-            >
-              4e ⇥
-            </button>
-          )}
         </div>
         {/* Deplace hors du coin de page (retour utilisateur : "le rendre
             plus visible/permanent renforcerait la confiance avant Terminer

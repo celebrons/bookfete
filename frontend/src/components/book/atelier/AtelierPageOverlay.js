@@ -21,13 +21,22 @@ import PhotoFitBadge from '../../common/PhotoFitBadge';
 // L'iframe en dessous a pointer-events:none (voir BookAtelierLuxe.css) : les
 // clics/drops passent donc naturellement a travers jusqu'a ces emplacements,
 // sans qu'il soit necessaire de communiquer avec le contenu de l'iframe.
-// Libelles d'un emplacement VIDE. Ils doivent dire quoi FAIRE, pas nommer un
-// type : "Texte" n'indiquait ni qu'on peut y glisser un souvenir, ni qu'on
-// peut ecrire directement dedans (retour utilisateur 2026-09-11).
+//
+// Libelles d'un emplacement VIDE (refonte 2026-09-26, §6 : "supprimer les
+// textes d'aide permanents... dans une zone vide, utiliser simplement
+// 'Ajouter une photo'"). Le detail du geste (glisser OU choisir) ne
+// disparait pas : il vit desormais dans le `title` (infobulle au survol,
+// voir plus bas), pas dans un texte affiche en permanence.
 const SLOT_LABELS = {
-  photo: 'Glisser ou choisir une photo',
-  text: 'Glisser un souvenir ou écrire',
-  title: 'Glisser un titre ou écrire'
+  photo: 'Ajouter une photo',
+  text: 'Ajouter un souvenir',
+  title: 'Ajouter un titre'
+};
+
+const SLOT_HINTS = {
+  photo: 'Glissez une photo ici, ou cliquez pour choisir dans votre bibliothèque',
+  text: 'Glissez un souvenir ici, ou cliquez pour écrire',
+  title: 'Glissez un titre ici, ou cliquez pour écrire'
 };
 
 function XIcon() {
@@ -116,6 +125,16 @@ function AtelierPageOverlay({
   // Apercu plein ecran d'une photo a sa vraie resolution (retour
   // utilisateur, 2026-09-11) — voir AtelierPhotoLightbox.js.
   const [viewingUrl, setViewingUrl] = useState(null);
+  // Emplacement SURVOLE PENDANT UN GLISSEMENT (refonte 2026-09-26, §1 :
+  // "les pointillés doivent être un état d'interaction, pas un élément
+  // permanent"). Deliberement local a CET emplacement (dragenter/dragleave,
+  // pas un etat global "un glissement est en cours quelque part") : c'est
+  // la ou la photo tomberait maintenant qui doit s'illuminer, pas tous les
+  // emplacements a la fois. `:hover` CSS aurait ete plus simple, mais ne
+  // convient pas ici : le survol au clavier ou en glisser-deposer natif
+  // (HTML5 drag) ne declenche pas de facon fiable les evenements de souris
+  // dont depend `:hover` — dragenter/dragleave sont l API prevue pour ca.
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   // Retour utilisateur (2026-09-10) : "confirmer le retrait" restait affiche
   // si on cliquait ailleurs QUE sur un autre emplacement (ex. la barre
@@ -202,10 +221,22 @@ function AtelierPageOverlay({
           return (
             <div
               key={index}
-              className={`atelier-overlay-slot ${item ? 'is-filled' : ''} ${rejects ? 'is-rejecting' : ''} ${isPending ? 'is-pending-remove' : ''}`}
+              className={`atelier-overlay-slot ${item ? 'is-filled' : ''} ${rejects ? 'is-rejecting' : ''} ${isPending ? 'is-pending-remove' : ''} ${dragOverIndex === index ? 'is-drag-target' : ''}`}
               style={{ top: `${rect.top}%`, left: `${rect.left}%`, width: `${rect.width}%`, height: `${rect.height}%` }}
               onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => { event.stopPropagation(); handleDrop(event, index, slotType); }}
+              onDragEnter={() => setDragOverIndex(index)}
+              // `relatedTarget` : un dragleave se declenche aussi en passant
+              // d'un enfant a un autre DANS le meme emplacement (l'etiquette,
+              // le badge qualite...) — sans ce filtre, les pointillés
+              // clignotaient tout du long du survol au lieu de rester fixes.
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setDragOverIndex(null);
+              }}
+              onDrop={(event) => {
+                event.stopPropagation();
+                setDragOverIndex(null);
+                handleDrop(event, index, slotType);
+              }}
               onClick={(event) => {
                 event.stopPropagation();
                 // Un retrait ARME passe avant tout : c'est le second clic qui
@@ -262,9 +293,11 @@ function AtelierPageOverlay({
                     : (slotType === 'photo'
                       ? 'Cliquer pour ajuster le cadrage'
                       : (onSaveText ? 'Cliquer pour modifier le texte' : undefined))))
-                : (!selectedSidebarItem && slotType === 'photo' && onOpenPhotoPicker
-                  ? 'Cliquer pour choisir ou importer une photo'
-                  : undefined)}
+                // Emplacement vide : le detail du geste (glisser OU choisir/
+                // ecrire) vit ici, au survol — le libelle visible en
+                // permanence reste court (voir SLOT_LABELS, §6 de la
+                // refonte 2026-09-26).
+                : (SLOT_HINTS[slotType] || undefined)}
             >
               {!item && <span className="atelier-overlay-slot-label">{SLOT_LABELS[slotType] || 'Emplacement'}</span>}
               {!isPending && (

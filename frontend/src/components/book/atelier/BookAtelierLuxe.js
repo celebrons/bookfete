@@ -2155,8 +2155,6 @@ export default function BookAtelierLuxe() {
               onSelectSide={setSelectedSide}
               onPrevious={() => canGoPrevious && goToView(viewIndex - 1)}
               onNext={() => canGoNext && goToView(viewIndex + 1)}
-              onGoToCover={() => goToView(0)}
-              onGoToBackCover={() => goToView(lastViewIndex)}
               canGoPrevious={canGoPrevious}
               canGoNext={canGoNext}
               navLabel={navLabel}

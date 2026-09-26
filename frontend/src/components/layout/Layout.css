@@ -8,6 +8,17 @@
   flex: 1;
 }
 
+/* FOND CHALEUREUX AUTOUR DU LIVRE (refonte visuelle 2026-09-26, §8) :
+   "tester un fond legerement ivoire/blanc chaud... plus proche d'un
+   veritable espace de creation de livre, moins logiciel". Le reste du
+   site garde le blanc pur (body, luxe-theme.css) — seule la route
+   immersive de l'atelier (voir Layout.js) recoit ce ton, en pleine
+   largeur, pour que le livre (blanc, voir .atelier-page-pane) s'en
+   detache visuellement par contraste plutot que par une ombre seule. */
+.layout-immersive {
+  background: #faf7f0;
+}
+
 /* Masque l'en-tete global (logo/menu) pendant qu'un visualiseur plein ecran
    est ouvert (atelier "Voir a l'echelle", Apercu final) — retour
    utilisateur : gagner l'espace vertical qu'occupe cette barre plutot que
