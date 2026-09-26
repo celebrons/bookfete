@@ -264,6 +264,13 @@ function AtelierBookView({
   const isSpreadWithBothPages = viewKind === 'spread' && leftPageNumber != null && rightPageNumber != null;
   const contentWidthPx = isSpreadWithBothPages ? pageWidthPx * 2 + SPREAD_GAP_PX : pageWidthPx;
   const contentHeightPx = pageHeightPx;
+  // Boite de REFERENCE pour l'ajustement "fit" — TOUJOURS celle d'une
+  // double-page complete, meme sur la couverture/4e ou un premier/dernier
+  // feuillet solitaire (retour utilisateur, 2026-09-26 : "une seule page est
+  // affichee en tres grand, tres contrastant avec la double page"). Voir le
+  // commentaire de PageZoomStage.js pour le calcul complet.
+  const fitWidthPx = pageWidthPx * 2 + SPREAD_GAP_PX;
+  const fitHeightPx = pageHeightPx;
 
   // Cle de remontage : change a chaque page/vue differente, pour (1)
   // reinitialiser le panoramique (PageZoomStage.resetPanKey, voir ce
@@ -459,6 +466,8 @@ function AtelierBookView({
               <PageZoomStage
                 contentWidthPx={contentWidthPx}
                 contentHeightPx={contentHeightPx}
+                fitWidthPx={fitWidthPx}
+                fitHeightPx={fitHeightPx}
                 zoom={zoom}
                 onZoomChange={setZoom}
                 resetPanKey={pageChangeKey}

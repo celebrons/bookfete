@@ -466,6 +466,13 @@ export default function BookPreviewFinalLuxe() {
   // large, pas deux.
   const isFullscreenSpreadWithBothPages = viewKind === 'spread' && leftPageIndex != null && rightPageIndex != null;
   const fullscreenContentWidthPx = isFullscreenSpreadWithBothPages ? naturalSpreadWidthPx : naturalPageWidthPx;
+  // Boite de REFERENCE pour l'ajustement "fit" de PageZoomStage — TOUJOURS
+  // celle d'une double-page complete, meme sur la couverture/4e ou un
+  // premier/dernier feuillet solitaire (meme correctif que l'atelier, retour
+  // utilisateur 2026-09-26 : "une seule page est affichee en tres grand, tres
+  // contrastant avec la double page" — voir le commentaire de
+  // PageZoomStage.js pour le calcul complet).
+  const fullscreenFitWidthPx = naturalSpreadWidthPx;
   // Cle de remontage : reinitialise le panoramique (PageZoomStage) et
   // rejoue la transition douce d'apparition a chaque page/format different.
   const fullscreenPageChangeKey = `${currentFormat}-${viewKind}-${viewIndex}`;
@@ -684,6 +691,8 @@ export default function BookPreviewFinalLuxe() {
               <PageZoomStage
                 contentWidthPx={fullscreenContentWidthPx}
                 contentHeightPx={naturalPageHeightPx}
+                fitWidthPx={fullscreenFitWidthPx}
+                fitHeightPx={naturalPageHeightPx}
                 zoom={zoom}
                 onZoomChange={setZoom}
                 resetPanKey={fullscreenPageChangeKey}

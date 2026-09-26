@@ -41,6 +41,23 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 export function PageZoomStage({
   contentWidthPx,
   contentHeightPx,
+  // OPTIONNELS (retour utilisateur 2026-09-26 : "grande difference d'affichage
+  // entre une seule page et une double page, une seule page est affichee en
+  // tres grand") — la boite de REFERENCE pour calculer l'ajustement "fit",
+  // distincte du contenu reellement rendu (contentWidthPx/Height). Sans eux,
+  // fitScale = min(conteneurW/contentW, conteneurH/contentH) est calcule
+  // INDEPENDAMMENT pour chaque vue : une page seule (beaucoup moins large
+  // qu'une double-page) reste alors souvent limitee par la HAUTEUR alors
+  // qu'une double-page est limitee par la LARGEUR — deux echelles differentes
+  // pour la "meme" page, jusqu'a 2x plus grande en fenetre etroite/haute
+  // (mesure). En passant TOUJOURS la meme boite de reference (celle d'une
+  // double-page complete) quelle que soit la vue, l'echelle "fit" reste
+  // identique partout — une page seule se centre simplement dans l'espace
+  // libre (le conteneur est deja centre en CSS, voir PageZoomStage.css) au
+  // lieu de grossir pour le combler. Repli sur contentWidthPx/Height si
+  // absents : comportement inchange pour tout appelant qui ne les passe pas.
+  fitWidthPx,
+  fitHeightPx,
   zoom,
   onZoomChange,
   // Change de valeur -> reinitialise le panoramique (ex. l'index de la page
@@ -80,8 +97,10 @@ export function PageZoomStage({
     return () => observer.disconnect();
   }, []);
 
-  const fitScale = containerSize.width > 0 && containerSize.height > 0 && contentWidthPx > 0 && contentHeightPx > 0
-    ? Math.min(containerSize.width / contentWidthPx, containerSize.height / contentHeightPx)
+  const refWidthPx = fitWidthPx || contentWidthPx;
+  const refHeightPx = fitHeightPx || contentHeightPx;
+  const fitScale = containerSize.width > 0 && containerSize.height > 0 && refWidthPx > 0 && refHeightPx > 0
+    ? Math.min(containerSize.width / refWidthPx, containerSize.height / refHeightPx)
     : 1;
   const activeScale = zoom === 'fit' ? fitScale : zoom;
 

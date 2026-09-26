@@ -31,23 +31,25 @@ import React, { useEffect } from 'react';
 //
 // `variant` (retour utilisateur, 2026-09-26 — capture d'ecran a l'appui) :
 //
-//   'modal' (defaut, Mise en page/Pages) — fond plein ecran qui capture
-//   TOUS les clics, ferme au clic dehors. Sans consequence ici : ces deux
-//   tiroirs ont leur propre mini-apercu manipulable EN INTERNE (voir
-//   LayoutFormatMiniature), ils n'ont jamais besoin que la vraie page
-//   reste cliquable pendant qu'ils sont ouverts.
+//   'modal' (defaut, Pages) — fond plein ecran qui capture TOUS les clics,
+//   ferme au clic dehors. Sans consequence ici : ce tiroir a sa propre
+//   pellicule de vignettes manipulable EN INTERNE, il n'a jamais besoin que
+//   la vraie page reste cliquable pendant qu'il est ouvert.
 //
-//   'rail' (Photos) — PAS DE FOND. « Je ne peux pas glisser de photo dans
-//   la page » : le fond plein ecran du mode modal, meme transparent,
-//   INTERCEPTE tout glisser-deposer et tout clic sur la page en dessous —
-//   exactement le geste central de cette bibliotheque. En mode rail, le
-//   panneau est un simple element du flux normal, pose a cote du livre
-//   (voir BookAtelierLuxe.js : desormais un ENFANT de .atelier-workspace,
-//   pas un calque fixe) : rien ne se pose par-dessus le livre, qui reste
-//   entierement visible ET cliquable/receveur de glisser-deposer pendant
-//   que le tiroir est ouvert. Sur petit ecran (<640px, voir le CSS), il n'y
-//   a de toute facon pas la place pour les deux a la fois : il redevient
-//   alors un panneau plein ecran classique, memes gestes qu'un modal.
+//   'rail' (Photos, puis Mise en page — meme retour utilisateur applique aux
+//   deux) — PAS DE FOND. « Je ne peux pas glisser de photo dans la page » :
+//   le fond plein ecran du mode modal, meme transparent, INTERCEPTE tout
+//   glisser-depose et tout clic sur la page en dessous — exactement le
+//   geste central de la bibliotheque de photos. En mode rail, le panneau
+//   est un simple element du flux normal, pose a cote du livre (voir
+//   BookAtelierLuxe.js : un ENFANT de .atelier-workspace, pas un calque
+//   fixe) : rien ne se pose par-dessus le livre, qui reste entierement
+//   visible ET cliquable/receveur de glisser-deposer pendant que le tiroir
+//   est ouvert — et qui se decale visuellement (« le livre est pousse »)
+//   puisque la colonne du livre partage desormais la largeur disponible
+//   avec le rail. Sur petit ecran (<640px, voir le CSS), il n'y a de toute
+//   facon pas la place pour les deux a la fois : il redevient alors un
+//   panneau plein ecran classique, memes gestes qu'un modal.
 function AtelierDrawer({ side = 'right', variant = 'modal', isOpen, onClose, title, subtitle, hint, children }) {
   const isRail = variant === 'rail';
 

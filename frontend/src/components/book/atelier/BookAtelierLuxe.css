@@ -938,14 +938,16 @@
 
 /* LE LIVRE EST AU CENTRE (refonte visuelle 2026-09-25, revue 2026-09-26).
    Ancienne grille a 3 colonnes permanentes (bibliotheque / livre / mise en
-   page) : Mise en page et Pages vivent dans des tiroirs modaux (position
-   fixe, voir plus haut), mais PAS Photos — voir .atelier-drawer-rail plus
-   bas, et le commentaire de AtelierDrawer.js pour la raison (le glisser-
-   deposer depuis un tiroir modal ne peut pas atteindre une page qu'un fond
-   plein ecran recouvre, meme visuellement).
-   .atelier-workspace est donc une rangee flex a DEUX enfants POSSIBLES —
-   le rail Photos (present dans le DOM seulement quand ouvert) et
-   .atelier-center-column, toujours present. */
+   page) : Pages reste dans un tiroir modal (position fixe, voir plus haut),
+   mais PAS Photos ni Mise en page — voir .atelier-drawer-rail plus bas, et
+   le commentaire de AtelierDrawer.js pour la raison (le glisser-depose
+   depuis un tiroir modal ne peut pas atteindre une page qu'un fond plein
+   ecran recouvre, meme visuellement ; retour utilisateur 2026-09-26 :
+   Mise en page doit "pousser le livre" exactement comme Photos).
+   .atelier-workspace est donc une rangee flex a TROIS enfants POSSIBLES —
+   le rail Photos a gauche, .atelier-center-column toujours present, et le
+   rail Mise en page a droite (chacun present dans le DOM seulement quand
+   ouvert). */
 .atelier-workspace {
   display: flex;
   justify-content: center;

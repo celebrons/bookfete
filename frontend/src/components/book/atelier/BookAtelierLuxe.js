@@ -2167,67 +2167,69 @@ export default function BookAtelierLuxe() {
               selectedSidebarItem={selectedSidebarItem}
               />
             </div>
-          </div>
 
-          {/* DEUX TIROIRS MODAUX RESTANTS, UN SEUL A LA FOIS (activeDrawer,
-              voir plus haut) — Photos est maintenant monte plus haut, EN
-              RAIL, a l'interieur de .atelier-workspace. Mise en page et
-              Pages n'ont pas ce besoin : ils ont leur propre apercu
-              manipulable en interne, jamais besoin que la vraie page reste
-              cliquable pendant qu'ils sont ouverts. Chacun enveloppe un
-              composant EXISTANT, sans le modifier : seul l'endroit ou il
-              est monte change (voir AtelierDrawer.js). */}
-          <AtelierDrawer
-            side="right"
-            isOpen={activeDrawer === 'layout'}
-            onClose={() => setActiveDrawer(null)}
-            title={viewKind === 'spread' ? 'Mise en page' : 'Couverture'}
-          >
-            {viewKind === 'spread' ? (
-              <AtelierLayoutPanel
-                activeCategory={activeCategory}
-                onSelectCategory={setActiveCategory}
-                draftLayoutSlug={draftLayoutSlug}
-                onChooseLayout={handleChooseLayout}
-                slotItems={draftSlotItems}
-                onAssignSlot={handleAssignSlot}
-                onRemoveSlot={handleRemoveSlot}
-                onChangeFormat={() => {
-                  // Surtout NE RIEN liberer ici : ce bouton ouvre seulement la
-                  // galerie, il n'engage aucun changement. Le faire cassait la
-                  // double page des le clic, avant meme que l'utilisateur ait
-                  // choisi quoi que ce soit — "quand je clique sur changer la
-                  // mise en page sans choisir de nouveau format, il remet la
-                  // photo sur une seule page" (2026-09-14). La liberation se
-                  // fait au moment du CHOIX reel, a partir de la page
-                  // enregistree (voir savedPageIsSpread).
-                  captureUndo();
-                  setDraftLayoutSlug(null);
-                  setDraftSlotItemIds([]);
-                  setDraftPhotoAdjustments({});
-                  setDraftTextRoles({});
-                  setDraftTextStyles({});
-                }}
-                selectedSidebarItem={selectedSidebarItem}
-                saveStatus={saveStatus}
-                saveError={saveError}
-                printFormat={book.print_format}
-                currentPageIndex={currentPageIndex}
-                availableSlugs={availableLayoutSlugs}
-                doublePagePossible={doublePagePossible}
-                // "Vider cette page" et "Position dans le livre" sont passes sur
-                // la page elle-meme (voir pageActions plus bas).
-              />
-            ) : (
-              <AtelierCoverPanel
-                book={book}
-                face={viewKind === 'cover' ? 'front' : 'back'}
-                onUpdateBook={handleUpdateBook}
-                onSaved={handleCoverSaved}
-                onSwitchFace={() => goToView(viewKind === 'cover' ? lastViewIndex : 0)}
-              />
-            )}
-          </AtelierDrawer>
+            {/* MISE EN PAGE EN RAIL, A DROITE (retour utilisateur, 2026-09-26 :
+                "faire la meme chose que pour les photos, pousser le livre a
+                gauche"). Meme raisonnement que le rail Photos : un enfant de
+                flux normal de .atelier-workspace, a cote du livre plutot
+                qu'un calque par-dessus — .atelier-center-column retrecit et
+                le livre se decale visuellement vers la gauche pendant que ce
+                panneau est ouvert, au lieu de disparaitre sous un fond plein
+                ecran. Le contenu (AtelierLayoutPanel/AtelierCoverPanel) n'est
+                pas modifie, seul l'endroit ou il est monte change. */}
+            <AtelierDrawer
+              side="right"
+              variant="rail"
+              isOpen={activeDrawer === 'layout'}
+              onClose={() => setActiveDrawer(null)}
+              title={viewKind === 'spread' ? 'Mise en page' : 'Couverture'}
+            >
+              {viewKind === 'spread' ? (
+                <AtelierLayoutPanel
+                  activeCategory={activeCategory}
+                  onSelectCategory={setActiveCategory}
+                  draftLayoutSlug={draftLayoutSlug}
+                  onChooseLayout={handleChooseLayout}
+                  slotItems={draftSlotItems}
+                  onAssignSlot={handleAssignSlot}
+                  onRemoveSlot={handleRemoveSlot}
+                  onChangeFormat={() => {
+                    // Surtout NE RIEN liberer ici : ce bouton ouvre seulement la
+                    // galerie, il n'engage aucun changement. Le faire cassait la
+                    // double page des le clic, avant meme que l'utilisateur ait
+                    // choisi quoi que ce soit — "quand je clique sur changer la
+                    // mise en page sans choisir de nouveau format, il remet la
+                    // photo sur une seule page" (2026-09-14). La liberation se
+                    // fait au moment du CHOIX reel, a partir de la page
+                    // enregistree (voir savedPageIsSpread).
+                    captureUndo();
+                    setDraftLayoutSlug(null);
+                    setDraftSlotItemIds([]);
+                    setDraftPhotoAdjustments({});
+                    setDraftTextRoles({});
+                    setDraftTextStyles({});
+                  }}
+                  selectedSidebarItem={selectedSidebarItem}
+                  saveStatus={saveStatus}
+                  saveError={saveError}
+                  printFormat={book.print_format}
+                  currentPageIndex={currentPageIndex}
+                  availableSlugs={availableLayoutSlugs}
+                  doublePagePossible={doublePagePossible}
+                  // "Vider cette page" et "Position dans le livre" sont passes sur
+                  // la page elle-meme (voir pageActions plus bas).
+                />
+              ) : (
+                <AtelierCoverPanel
+                  book={book}
+                  face={viewKind === 'cover' ? 'front' : 'back'}
+                  onUpdateBook={handleUpdateBook}
+                  onSaved={handleCoverSaved}
+                  onSwitchFace={() => goToView(viewKind === 'cover' ? lastViewIndex : 0)}
+                />
+              )}
+            </AtelierDrawer>
+          </div>
         </>
       ) : null}
 
