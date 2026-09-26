@@ -36,13 +36,35 @@ function ClearIcon() {
   );
 }
 
+// Trois cases inegales : evoque une mise en page (des emplacements), pas un
+// simple quadrillage — a distinguer du pictogramme "Pages" de la barre
+// d'outils (AtelierToolsBar), qui lui evoque une pile de pages.
+function LayoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <rect x="1.5" y="1.5" width="13" height="13" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M8.3 1.5 V14.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M1.5 8.7 H8.3" stroke="currentColor" strokeWidth="1.3" opacity="0.55" />
+    </svg>
+  );
+}
+
 function AtelierPageActions({
   pageNumber,
   totalPages,
   onMoveToPosition,
   movingPage,
   onClearPage,
-  hasContent
+  hasContent,
+  // Deuxieme chemin vers le tiroir "Mise en page" (refonte visuelle
+  // 2026-09-26, §6 : "selectionner/survoler la page -> afficher une petite
+  // action 'Modifier la mise en page' -> ouvrir un panneau contextuel").
+  // Contrairement a Deplacer/Vider, ce bouton n'ouvre PAS un volet local
+  // ici : il declenche directement le tiroir externe (AtelierDrawer, voir
+  // BookAtelierLuxe.js) — un reglage complet, deja construit, pas besoin
+  // d'un second popover qui ferait doublon. Absent -> pas de 3e icone,
+  // comportement d'avant inchange.
+  onOpenLayoutDrawer
 }) {
   // Un seul volet ouvert a la fois : deux petits panneaux superposes dans un
   // coin seraient illisibles.
@@ -92,7 +114,8 @@ function AtelierPageActions({
 
   const canMove = Boolean(onMoveToPosition) && pageNumber != null && totalPages > 1;
   const canClear = Boolean(onClearPage) && hasContent;
-  if (!canMove && !canClear) return null;
+  const canOpenLayout = Boolean(onOpenLayoutDrawer);
+  if (!canMove && !canClear && !canOpenLayout) return null;
 
   return (
     // stopPropagation : la page entiere est cliquable (elle se selectionne),
@@ -102,6 +125,20 @@ function AtelierPageActions({
       ref={rootRef}
       onClick={(event) => event.stopPropagation()}
     >
+      {canOpenLayout && (
+        <div className="atelier-page-action">
+          <button
+            type="button"
+            className="atelier-page-action-btn"
+            onClick={onOpenLayoutDrawer}
+            title="Modifier la mise en page de cette page"
+            aria-label="Modifier la mise en page de cette page"
+          >
+            <LayoutIcon />
+          </button>
+        </div>
+      )}
+
       {canMove && (
         <div className="atelier-page-action">
           <button
@@ -210,7 +247,7 @@ function AtelierPageActions({
             <div className="atelier-page-popover">
               <span className="atelier-page-popover-title">Vider cette page ?</span>
               <p className="atelier-page-popover-hint">
-                Les souvenirs restent dans votre bibliothèque à gauche, seule la page est vidée.
+                Les souvenirs restent dans votre bibliothèque, seule la page est vidée.
               </p>
               <div className="atelier-page-popover-actions">
                 <button

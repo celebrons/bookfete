@@ -1825,6 +1825,7 @@ export default function BookAtelierLuxe() {
       movingPage={movingPage}
       onClearPage={handleClearPage}
       hasContent={hasContent}
+      onOpenLayoutDrawer={() => setActiveDrawer('layout')}
     />
   ) : null;
 
@@ -1993,6 +1994,24 @@ export default function BookAtelierLuxe() {
           onToggle={toggleDrawer}
           photosCount={photos.length}
           totalPages={totalPages}
+          // Alerte REGROUPEE (§7 : "Pages · 32   2 pages a completer" plutot
+          // que des pastilles disseminees). finishStats est deja calcule
+          // pour la modale de fin — reutilise tel quel, aucune donnee de
+          // plus a suivre.
+          //
+          // N'apparait QUE s'il y a une vraie PROGRESSION PARTIELLE (au
+          // moins une page faite, au moins une a faire) — verifie a
+          // l'ecran : sur un livre tout juste cree, ou aucune page n'est
+          // encore composee, ca affichait "30 a completer" en orange des
+          // le premier regard. Exactement le bruit permanent que cette
+          // refonte visait a supprimer — un livre vierge n'a rien de
+          // "manquant", il n'a simplement pas encore commence. Meme
+          // principe deja retenu pour la bibliotheque de photos (l'ancien
+          // indice "regroupees en bas" ne s'affichait, lui aussi, qu'en
+          // presence d'un vrai melange).
+          pagesAlert={finishStats.incompletePages > 0 && finishStats.incompletePages < totalPages
+            ? `${finishStats.incompletePages} à compléter`
+            : null}
         />
       ) : null}
 
@@ -2206,6 +2225,7 @@ export default function BookAtelierLuxe() {
           isOpen={activeDrawer === 'pages'}
           onClose={() => setActiveDrawer(null)}
           title="Toutes les pages"
+          hint="Glissez une vignette pour déplacer la page — ou réglez sa position par le picto au coin de la page."
         >
           <AtelierPageFilmstrip
             pageStatuses={finishStats.pageStatuses}

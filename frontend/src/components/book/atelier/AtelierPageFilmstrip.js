@@ -190,7 +190,6 @@ function AtelierPageFilmstrip({
   } : {});
 
   return (
-    <>
     <div className={`atelier-filmstrip ${movingPage ? 'is-moving' : ''}`}>
       {/* Couvertures : ni "complete" ni "vide" au meme sens qu'une page
           interieure (toujours un contenu par defaut) — classe neutre
@@ -260,12 +259,6 @@ function AtelierPageFilmstrip({
         onSelect={onSelect}
       />
     </div>
-    {onMovePage && (
-      <p className="atelier-filmstrip-hint">
-        Glissez une vignette pour déplacer la page — ou réglez sa position par le picto au coin de la page.
-      </p>
-    )}
-    </>
   );
 }
 

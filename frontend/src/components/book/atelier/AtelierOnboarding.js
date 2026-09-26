@@ -5,11 +5,17 @@ import React from 'react';
 // jamais reaffiche automatiquement une fois ferme), reouvrables ensuite via
 // le bouton "?" du header. Volontairement une carte compacte plutot qu'une
 // fenetre modale bloquante : l'atelier reste utilisable derriere.
+//
+// Reecrites pour la refonte visuelle du 2026-09-26 : "A gauche"/"A droite"
+// decrivaient des colonnes fixes qui n'existent plus — la bibliotheque et
+// la mise en page vivent desormais dans des tiroirs ouverts a la demande
+// (voir AtelierToolsBar.js/AtelierDrawer.js), et le mode automatique n'est
+// plus un bouton visible en permanence.
 const STEPS = [
   {
     icon: '🖼️',
-    title: 'Mes souvenirs',
-    text: "A gauche : ajoutez vos photos et vos textes (bouton \"+ Ajouter\")."
+    title: 'Vos photos',
+    text: 'Cliquez sur "Photos" en haut pour ouvrir votre bibliothèque, y ajouter des photos et des textes.'
   },
   {
     icon: '🖱️',
@@ -19,12 +25,12 @@ const STEPS = [
   {
     icon: '▦',
     title: 'Mise en page',
-    text: 'A droite : choisissez la mise en page de la page affichée au centre.'
+    text: 'Cliquez sur "Mise en page" (ou sur l\'icône posée sur la page) pour choisir la mise en page de la page affichée.'
   },
   {
     icon: '✨',
     title: 'Mode automatique',
-    text: 'Ou laissez Celebrons composer tout le livre, puis ajustez les pages que vous voulez à la main.'
+    text: 'Ou laissez Celebrons composer tout le livre ("Composer automatiquement", en haut), puis ajustez les pages que vous voulez à la main.'
   }
 ];
 

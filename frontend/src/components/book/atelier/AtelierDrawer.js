@@ -23,7 +23,12 @@ import React, { useEffect } from 'react';
 //
 // `side` : 'left' (Photos), 'right' (Mise en page), 'bottom' (Pages — une
 // pellicule de vignettes veut de la largeur, pas une colonne etroite).
-function AtelierDrawer({ side = 'right', isOpen, onClose, title, subtitle, children }) {
+//
+// `hint` (optionnel) : une explication qui n'a pas besoin d'etre visible en
+// permanence (§10 de la demande : "reduire fortement les textes d'aide
+// permanents... utiliser plutot... tooltips, aide au survol") — posee comme
+// infobulle native sur le titre plutot qu'affichee en texte sous lui.
+function AtelierDrawer({ side = 'right', isOpen, onClose, title, subtitle, hint, children }) {
   // Echap pour fermer + bloque le defilement de la page derriere — meme
   // convention que le visualiseur plein ecran deja etabli dans ce projet
   // (AtelierBookView.js/BookPreviewFinalLuxe.js), sans reprendre SA classe
@@ -55,7 +60,7 @@ function AtelierDrawer({ side = 'right', isOpen, onClose, title, subtitle, child
       >
         <div className="atelier-drawer-head">
           <div className="atelier-drawer-head-text">
-            <span className="atelier-drawer-title">{title}</span>
+            <span className="atelier-drawer-title" title={hint}>{title}</span>
             {subtitle && <span className="atelier-drawer-subtitle">{subtitle}</span>}
           </div>
           <button type="button" className="atelier-drawer-close" onClick={onClose} aria-label="Fermer">×</button>
