@@ -90,13 +90,27 @@ const BACK_FORMATS = [
 
 const SAVE_DEBOUNCE_MS = 700;
 
+// MIROIR de FORMAT_DIMENSIONS_MM (AtelierBookView.js/BookPreviewFinalLuxe.js)
+// — meme convention de duplication assumee que COVER_COLORS/ALBUM_STYLES un
+// peu plus haut. Sert uniquement a donner aux vignettes le bon RATIO (retour
+// utilisateur, 2026-09-27 : "les miniatures doivent representer fidelement
+// le rendu reel de la couverture") : sans ca, un livret carre (200x200)
+// affichait des vignettes portrait comme un standard/luxe (210x280) — un
+// format entier rendu faux d'un simple coup d'oeil.
+const COVER_RATIO_BY_FORMAT = {
+  livret: 200 / 200,
+  standard: 210 / 280,
+  luxe: 210 / 280
+};
+
 const normalizeText = (value) => (value === null || value === undefined ? '' : String(value).trim());
 
-function CoverFormatMiniPreview({ shape }) {
+function CoverFormatMiniPreview({ shape, ratio }) {
+  const pageStyle = ratio ? { aspectRatio: ratio } : undefined;
   switch (shape) {
     case 'photo-band':
       return (
-        <div className="cvrmini-page">
+        <div className="cvrmini-page" style={pageStyle}>
           <span className="cvrmini-photo" style={{ height: '78%' }} />
           <span className="cvrmini-band" style={{ height: '22%' }}>
             <span className="cvrmini-line" style={{ width: '60%' }} />
@@ -105,7 +119,7 @@ function CoverFormatMiniPreview({ shape }) {
       );
     case 'photo-full':
       return (
-        <div className="cvrmini-page">
+        <div className="cvrmini-page" style={pageStyle}>
           <span className="cvrmini-photo cvrmini-photo-bg" />
           <span className="cvrmini-scrim" />
           <span className="cvrmini-line cvrmini-line-on-photo" style={{ width: '55%' }} />
@@ -113,7 +127,7 @@ function CoverFormatMiniPreview({ shape }) {
       );
     case 'text-only':
       return (
-        <div className="cvrmini-page cvrmini-center">
+        <div className="cvrmini-page cvrmini-center" style={pageStyle}>
           <span className="cvrmini-line" style={{ width: '70%' }} />
           <span className="cvrmini-rule" />
           <span className="cvrmini-line cvrmini-line-sm" style={{ width: '45%' }} />
@@ -121,7 +135,7 @@ function CoverFormatMiniPreview({ shape }) {
       );
     case 'photo-trio':
       return (
-        <div className="cvrmini-page">
+        <div className="cvrmini-page" style={pageStyle}>
           <span className="cvrmini-photo" style={{ height: '46%' }} />
           <span className="cvrmini-row" style={{ height: '24%' }}>
             <span className="cvrmini-photo" />
@@ -134,7 +148,7 @@ function CoverFormatMiniPreview({ shape }) {
       );
     case 'split':
       return (
-        <div className="cvrmini-page cvrmini-row-full">
+        <div className="cvrmini-page cvrmini-row-full" style={pageStyle}>
           <span className="cvrmini-photo" style={{ width: '55%', height: '100%' }} />
           <span className="cvrmini-col">
             <span className="cvrmini-line" style={{ width: '75%' }} />
@@ -144,21 +158,21 @@ function CoverFormatMiniPreview({ shape }) {
       );
     case 'framed':
       return (
-        <div className="cvrmini-page cvrmini-center">
+        <div className="cvrmini-page cvrmini-center" style={pageStyle}>
           <span className="cvrmini-photo cvrmini-photo-framed" />
           <span className="cvrmini-line" style={{ width: '55%' }} />
         </div>
       );
     case 'back-minimal':
       return (
-        <div className="cvrmini-page cvrmini-center">
+        <div className="cvrmini-page cvrmini-center" style={pageStyle}>
           <span className="cvrmini-line cvrmini-line-italic" style={{ width: '65%' }} />
           <span className="cvrmini-dot" />
         </div>
       );
     case 'back-stats':
       return (
-        <div className="cvrmini-page cvrmini-center">
+        <div className="cvrmini-page cvrmini-center" style={pageStyle}>
           <span className="cvrmini-line cvrmini-line-italic" style={{ width: '65%' }} />
           <span className="cvrmini-stats"><i /><i /><i /></span>
           <span className="cvrmini-dot" />
@@ -166,7 +180,7 @@ function CoverFormatMiniPreview({ shape }) {
       );
     case 'back-photo':
       return (
-        <div className="cvrmini-page cvrmini-center">
+        <div className="cvrmini-page cvrmini-center" style={pageStyle}>
           <span className="cvrmini-photo cvrmini-photo-small" />
           <span className="cvrmini-line cvrmini-line-italic" style={{ width: '55%' }} />
           <span className="cvrmini-stats"><i /><i /><i /></span>
@@ -174,14 +188,14 @@ function CoverFormatMiniPreview({ shape }) {
       );
     default:
       return (
-        <div className="cvrmini-page cvrmini-auto">
+        <div className="cvrmini-page cvrmini-auto" style={pageStyle}>
           <span>Auto</span>
         </div>
       );
   }
 }
 
-function FormatGallery({ formats, selectedId, onSelect }) {
+function FormatGallery({ formats, selectedId, onSelect, ratio }) {
   return (
     <div className="coverlite-format-grid">
       {formats.map((format) => (
@@ -191,7 +205,7 @@ function FormatGallery({ formats, selectedId, onSelect }) {
           className={`coverlite-format-option ${selectedId === format.id ? 'is-selected' : ''}`}
           onClick={() => onSelect(format.id)}
         >
-          <CoverFormatMiniPreview shape={format.shape} />
+          <CoverFormatMiniPreview shape={format.shape} ratio={ratio} />
           <span className="coverlite-format-label">{format.label}</span>
         </button>
       ))}
@@ -260,6 +274,7 @@ const buildInitialState = (book) => {
 const getStateSignature = (state) => JSON.stringify(state);
 
 function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) {
+  const coverRatio = COVER_RATIO_BY_FORMAT[book?.print_format] || COVER_RATIO_BY_FORMAT.standard;
   const [formState, setFormState] = useState(() => buildInitialState(book));
   const [savedSignature, setSavedSignature] = useState(() => getStateSignature(buildInitialState(book)));
   const [saveStatus, setSaveStatus] = useState('idle');
@@ -337,23 +352,31 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
 
   return (
     <aside className="atelier-layout-panel atelier-cover-panel">
-      <div className="atelier-layout-panel-head">
-        <span className="atelier-layout-panel-title">{face === 'front' ? 'Couverture' : '4e de couverture'}</span>
-        {saveStatusLabel && (
+      {/* Plus de titre "Couverture"/"4e de couverture" ici (retour
+          utilisateur, 2026-09-27 : deja porte par le titre du tiroir,
+          AtelierDrawer.js — voir BookAtelierLuxe.js, title={viewKind===
+          'spread' ? 'Mise en page' : 'Couverture'}). Le statut d'enregistrement
+          garde sa place, seul, aligne a droite. */}
+      {saveStatusLabel && (
+        <div className="atelier-layout-panel-head atelier-layout-panel-head-status-only">
           <span className={`atelier-save-status is-${saveStatus === 'error' ? 'error' : saveStatus === 'saved' ? 'saved' : 'saving'}`}>
             {saveStatusLabel}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Passage direct d'une face a l'autre. Les deux faces sont aux deux
           EXTREMITES opposees du livre : pour aller du recto a la 4e il
           fallait feuilleter tout le livre, ou repasser par la pellicule
           (retour utilisateur 2026-09-14). Or on les regle ensemble — meme
-          teinte, meme habillage, la photo de l'une depend de l'autre. */}
+          teinte, meme habillage, la photo de l'une depend de l'autre.
+          Libelle plus discret et lien texte simple (retour utilisateur,
+          2026-09-27 : "fonctionnel mais visuellement un peu trop present")
+          — un bloc pleine largeur a bordure pointillee attirait autant l'oeil
+          que les vrais reglages en dessous, pour une action secondaire. */}
       {onSwitchFace && (
         <button type="button" className="coverlite-face-switch" onClick={onSwitchFace}>
-          {face === 'front' ? 'Aller à la 4e de couverture →' : '← Revenir à la couverture'}
+          {face === 'front' ? 'Voir la 4e de couverture →' : '← Revenir à la couverture'}
         </button>
       )}
 
@@ -446,6 +469,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               formats={FRONT_FORMATS}
               selectedId={formState.frontVariant}
               onSelect={(id) => updateField('frontVariant', id)}
+              ratio={coverRatio}
             />
           </div>
 
@@ -514,6 +538,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               formats={BACK_FORMATS}
               selectedId={formState.backVariant}
               onSelect={(id) => updateField('backVariant', id)}
+              ratio={coverRatio}
             />
           </div>
 

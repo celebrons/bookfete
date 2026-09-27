@@ -1631,23 +1631,28 @@
    pour qui ne survole pas a la souris. */
 .atelier-cover-photo-actions:focus-within { opacity: 1; }
 
+/* Plus discrets (retour utilisateur, 2026-09-27 : "ne doivent pas attirer
+   davantage l'attention que la couverture elle-meme") — taille et opacite de
+   fond reduites par rapport a la version precedente, toujours reveles au
+   survol seulement (voir .atelier-cover-photo-overlay:hover ci-dessus). */
 .atelier-cover-action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   border: none;
   border-radius: 999px;
-  padding: 8px 16px;
-  background: rgba(36, 31, 24, 0.82);
+  padding: 6px 12px;
+  background: rgba(36, 31, 24, 0.6);
   color: var(--white);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
   white-space: nowrap;
   cursor: pointer;
   transition: var(--transition-fast);
 }
+.atelier-cover-action-btn svg { width: 12px; height: 12px; }
 .atelier-cover-action-btn:hover { background: var(--gold, #c9a35f); color: #241f18; }
 .atelier-cover-action-btn:focus-visible { outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
 
@@ -2039,6 +2044,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+/* Couverture/4e (2026-09-27) : plus de titre ici (deja dans l'en-tete du
+   tiroir) — seul le statut d'enregistrement reste, aligne a droite comme
+   avant plutot que colle a gauche par defaut d'un flex a un seul enfant. */
+.atelier-layout-panel-head-status-only {
+  justify-content: flex-end;
+  margin-bottom: 10px;
 }
 
 .atelier-layout-panel-title {
