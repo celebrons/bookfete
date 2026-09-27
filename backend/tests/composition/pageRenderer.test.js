@@ -1055,3 +1055,56 @@ describe('renderBookHtml — le style de l album se pose sur le document entier'
     expect(html).toContain('background: var(--album-or);');
   });
 });
+
+// Regression (2026-09-27) : une photo en double page (FULL_PHOTO_SPREAD)
+// retrouvee scindee entre deux feuilles NON adjacentes dans le PDF
+// telechargeable ("PDF de lecture", spreadLayout: true) — chaque moitie
+// appariee a une photo voisine sans rapport au lieu de former une seule
+// image. Cause : la mise en planches appariait (0,1),(2,3)... au lieu de
+// (page interieure 0 SEULE), (1,2),(3,4)... — la regle de pageParity.js
+// (page 1 seule a droite, face au contre-plat) corrigee ailleurs le
+// 2026-09-25 mais jamais reportee ici.
+describe('renderBookHtml — mise en planches (spreadLayout), appariement des feuilles', () => {
+  const pageVide = (pageIndex) => ({ page_index: pageIndex, content: {} });
+
+  // Extrait, pour chaque <div class="feuille ...">, les data-page-index
+  // qu'elle porte — les feuilles sont des freres, jamais imbriquees, un
+  // decoupage sur la chaine litterale suffit donc a les isoler.
+  const feuillesDe = (html) => bodyOf(html)
+    .split('<div class="feuille')
+    .slice(1)
+    .map((chunk) => [...chunk.matchAll(/data-page-index="(\d+)"/g)].map((m) => Number(m[1])));
+
+  it('la page interieure 0 est SEULE sur sa feuille ; les suivantes s appairent (1,2),(3,4)...', () => {
+    // Meme forme que composeCoversIntoPages : couverture=0, interieur=1..5
+    // (5 pages), 4e de couverture=6.
+    const pages = [
+      pageVide(0),
+      pageVide(1), pageVide(2), pageVide(3), pageVide(4), pageVide(5),
+      pageVide(6)
+    ];
+    const html = renderBookHtml({ book: {}, pages, items: [], spreadLayout: true });
+
+    expect(feuillesDe(html)).toEqual([
+      [0],    // couverture, seule
+      [1],    // page interieure 0 (page 1 du livre) : seule, aucun vis-a-vis
+      [2, 3], // vis-a-vis reel : pages interieures 1 et 2
+      [4, 5], // vis-a-vis reel : pages interieures 3 et 4
+      [6]     // 4e de couverture, seule
+    ]);
+  });
+
+  it('nombre de pages interieures PAIR : la derniere se retrouve seule avec la 4e (pas de vis-a-vis orphelin)', () => {
+    // 4 pages interieures (1..4), 4e de couverture=5.
+    const pages = [pageVide(0), pageVide(1), pageVide(2), pageVide(3), pageVide(4), pageVide(5)];
+    const html = renderBookHtml({ book: {}, pages, items: [], spreadLayout: true });
+
+    expect(feuillesDe(html)).toEqual([
+      [0],
+      [1],
+      [2, 3],
+      [4],
+      [5]
+    ]);
+  });
+});

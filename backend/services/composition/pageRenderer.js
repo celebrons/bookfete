@@ -1153,10 +1153,20 @@ function renderBookHtml(input) {
     const feuilles = [];
     // La couverture, seule.
     feuilles.push([rendus[0]]);
-    // L interieur, deux par deux — meme appariement que l atelier
-    // (leftPageIndex = spread * 2), donc ce que l utilisateur a compose.
+    // L interieur : la page 1 (index interieur 0) est SEULE a droite — aucun
+    // vis-a-vis, face au contre-plat (voir pageParity.js). Les vis-a-vis
+    // reels s enchainent ensuite (1,2), (3,4), (5,6)...
+    //
+    // Cette fonction appariait auparavant (0,1), (2,3)... — l ancienne regle,
+    // fausse, corrigee partout ailleurs le 2026-09-25 (pageParity.js,
+    // "quatre endroits") mais jamais reportee ici : une photo en double page
+    // (FULL_PHOTO_SPREAD, sur les index interieurs 2s-1 et 2s) tombait alors
+    // sur DEUX FEUILLES DIFFERENTES, chaque moitie appariee a une photo
+    // voisine sans rapport au lieu de former une seule image. Signale le
+    // 2026-09-27 (photo "LISBOA" scindee entre deux feuilles non adjacentes).
     const interieur = rendus.slice(1, -1);
-    for (let i = 0; i < interieur.length; i += 2) {
+    if (interieur.length > 0) feuilles.push([interieur[0]]);
+    for (let i = 1; i < interieur.length; i += 2) {
       feuilles.push(interieur.slice(i, i + 2));
     }
     // La 4e de couverture, seule.
