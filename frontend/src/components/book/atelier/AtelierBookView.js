@@ -612,17 +612,36 @@ function AtelierBookView({
                 principale. stopPropagation sur tout le bloc (pas bouton par
                 bouton) : sans lui, cliquer "Suivante" ou "+" fermerait
                 aussi le calque (voir le commentaire plus haut sur la
-                fermeture au clic exterieur). */}
+                fermeture au clic exterieur).
+                UNE SEULE RANGEE (retour utilisateur, 2026-09-27 : le calque
+                "apparait plus petit que l'atelier lui-meme, pas top") —
+                avant, deux rangees (gros boutons "‹ Précédente"/"Suivante ›"
+                + une rangee de zoom separee) consommaient a elles seules
+                pres de 90px de hauteur, au detriment de la place laissee a
+                la page elle-meme. Fleches fines (memes .atelier-book-nav-
+                arrow que la navigation principale, variante claire pour ce
+                fond sombre) + zoom, cote a cote sur une seule ligne. */}
             <div className="atelier-realsize-footer" onClick={(event) => event.stopPropagation()}>
-              <div className="atelier-realsize-nav">
-                <button type="button" className="btn btn-outline" onClick={onPrevious} disabled={!canGoPrevious}>
-                  ‹ Précédente
-                </button>
-                <span className="atelier-realsize-nav-label">{navLabel}</span>
-                <button type="button" className="btn btn-outline" onClick={onNext} disabled={!canGoNext}>
-                  Suivante ›
-                </button>
-              </div>
+              <button
+                type="button"
+                className="atelier-realsize-nav-arrow"
+                onClick={onPrevious}
+                disabled={!canGoPrevious}
+                aria-label="Page précédente"
+              >
+                ‹
+              </button>
+              <span className="atelier-realsize-nav-label">{navLabel}</span>
+              <button
+                type="button"
+                className="atelier-realsize-nav-arrow"
+                onClick={onNext}
+                disabled={!canGoNext}
+                aria-label="Page suivante"
+              >
+                ›
+              </button>
+              <span className="atelier-realsize-footer-divider" aria-hidden="true" />
               <ZoomControls zoom={zoom} onZoomChange={setZoom} />
             </div>
           </div>

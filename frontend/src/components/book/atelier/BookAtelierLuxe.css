@@ -1381,15 +1381,22 @@
 .atelier-realsize-toggle-btn:hover { background: rgba(184, 146, 74, 0.16); border-color: var(--gold); }
 .atelier-realsize-toggle-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* Quasi-opaque (retour utilisateur, 2026-09-27 : "il apparait superposé
+   avec l'atelier derrière", capture a l'appui) — a 0.8, le texte et les
+   contours de l'atelier restaient clairement lisibles au travers, donnant
+   une impression de double affichage plutot qu'un vrai calque plein ecran.
+   0.8 -> 0.97 : l'atelier derriere n'est plus qu'une ombre, pas un second
+   contenu qu'on lit par erreur. Padding reduit (var(--space-md), 24px ->
+   14px) pour laisser un peu plus d'espace vertical a la page elle-meme. */
 .atelier-realsize-backdrop {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: rgba(20, 16, 10, 0.8);
+  background: rgba(16, 13, 8, 0.97);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-md);
+  padding: 14px;
 }
 
 /* Plus de max-width (retour utilisateur : "sur un grand ecran, le livre
@@ -1494,30 +1501,54 @@
   .atelier-zoom-page-change { animation: none; }
 }
 
-/* Navigation + zoom, regroupees dans un seul bloc "pied" qui stoppe la
-   propagation du clic (voir AtelierBookView.js) — meme disposition que
-   .preview-final-fullscreen-nav (BookPreviewFinalLuxe.css), pour rester
-   coherent entre les deux calques plein ecran du produit. */
+/* Navigation + zoom, une SEULE rangee (retour utilisateur, 2026-09-27 — voir
+   le commentaire de AtelierBookView.js) — deux rangees empilees (gros
+   boutons "Précédente"/"Suivante" + zoom separe) couttaient ~90px de
+   hauteur, repris sur la page elle-meme. stoppe la propagation du clic (voir
+   AtelierBookView.js) : sans elle, cliquer "Suivante" ou "+" fermerait
+   aussi le calque. */
 .atelier-realsize-footer {
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.atelier-realsize-nav {
-  display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-md);
+  gap: 10px;
 }
-.atelier-realsize-nav .btn { background: rgba(255, 255, 255, 0.92); }
 .atelier-realsize-nav-label {
-  min-width: 140px;
+  min-width: 120px;
   text-align: center;
   font-size: 13px;
   font-weight: 600;
   color: var(--white);
+}
+
+/* Fleches claires pour ce fond sombre — meme forme/poids que
+   .atelier-book-nav-arrow (navigation principale de l'atelier), variante de
+   couleur seulement, pour rester le MEME geste visuel entre les deux
+   endroits ou l'on tourne les pages. */
+.atelier-realsize-nav-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--white);
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-realsize-nav-arrow:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+.atelier-realsize-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.atelier-realsize-footer-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
 }
 .atelier-page-pane.is-selectable { cursor: pointer; }
 /* Page en cours de modification : bordure epaisse + halo, sans ambiguite
