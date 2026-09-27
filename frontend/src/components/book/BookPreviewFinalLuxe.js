@@ -748,22 +748,30 @@ export default function BookPreviewFinalLuxe() {
               </PageZoomStage>
             </div>
 
-            <div className="preview-final-fullscreen-footer" onClick={(event) => event.stopPropagation()}>
-              <div className="preview-final-fullscreen-nav">
-                <button type="button" className="btn btn-outline preview-final-nav-jump" onClick={goToCover} disabled={!canGoPrevious} title="Aller à la couverture">
-                  ⇤ Couverture
-                </button>
-                <button type="button" className="btn btn-outline" onClick={goPrevious} disabled={!canGoPrevious}>
-                  ‹ Précédent
-                </button>
-                <span className="preview-final-fullscreen-nav-label">{viewLabel}</span>
-                <button type="button" className="btn btn-outline" onClick={goNext} disabled={!canGoNext}>
-                  Suivant ›
-                </button>
-                <button type="button" className="btn btn-outline preview-final-nav-jump" onClick={goToBackCover} disabled={!canGoNext} title="Aller à la 4e de couverture">
-                  4e ⇥
-                </button>
-              </div>
+            {/* UNE SEULE RANGEE, fleches fines sur fond sombre (meme correction
+                que .atelier-realsize-footer, BookAtelierLuxe.css/AtelierBookView.js,
+                retour utilisateur 2026-09-27 : "l'arriere apparait lors de
+                l'apercu" — les gros boutons btn-outline + le fond a 80%
+                d'opacite laissaient l'atelier/la page se lire derriere, et
+                consommaient assez de hauteur pour que le livre affiche soit
+                plus petit que l'atelier lui-meme). stopPropagation sur tout
+                le bloc : sans lui, cliquer une fleche ou "+" fermerait aussi
+                le calque. */}
+            <div className="preview-final-realsize-footer" onClick={(event) => event.stopPropagation()}>
+              <button type="button" className="preview-final-realsize-jump" onClick={goToCover} disabled={!canGoPrevious} title="Aller à la couverture" aria-label="Aller à la couverture">
+                ⇤
+              </button>
+              <button type="button" className="preview-final-realsize-nav-arrow" onClick={goPrevious} disabled={!canGoPrevious} aria-label="Page précédente">
+                ‹
+              </button>
+              <span className="preview-final-fullscreen-nav-label">{viewLabel}</span>
+              <button type="button" className="preview-final-realsize-nav-arrow" onClick={goNext} disabled={!canGoNext} aria-label="Page suivante">
+                ›
+              </button>
+              <button type="button" className="preview-final-realsize-jump" onClick={goToBackCover} disabled={!canGoNext} title="Aller à la 4e de couverture" aria-label="Aller à la 4e de couverture">
+                ⇥
+              </button>
+              <span className="preview-final-realsize-footer-divider" aria-hidden="true" />
               <ZoomControls zoom={zoom} onZoomChange={setZoom} />
             </div>
           </div>

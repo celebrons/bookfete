@@ -4,7 +4,13 @@
 .pq-recap-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  /* Au-dessus de .site-header (HeaderLuxe.css, z-index:1000) : sur la page
+     "Votre livre est prêt", ce calque s'ouvre au clic sur "Commander mon
+     livre" SANS passer par le mode plein ecran "Prévisualiser" (qui masque
+     l'en-tete via body.has-fullscreen-viewer) — a 80, la fenetre restait
+     cachee sous la barre du menu principal (retour utilisateur 2026-09-27).
+  */
+  z-index: 1010;
   background: rgba(36, 31, 24, 0.55);
   display: flex;
   align-items: center;

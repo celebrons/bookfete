@@ -47,6 +47,13 @@ const PRICING_CONFIG = {
 
 const DEFAULT_FORMAT = 'standard';
 
+// PDF seul (retour utilisateur, 2026-09-27) : prix fixe, independant du
+// format/de la pagination — aucun exemplaire physique, aucune livraison.
+// Etait code en dur (3900 cts) directement dans routes/orders.js ; deplace
+// ici pour la meme raison que le reste de ce fichier — une seule source de
+// verite, modifiable a un seul endroit.
+const PDF_PRICE_CENTS = 799;
+
 // Livraison : structure par PAYS puis par FORMAT (retour utilisateur §20 :
 // "prevoir une structure permettant d'ajouter d'autres pays plus tard").
 // Seule la France est renseignee pour l'instant.
@@ -71,6 +78,7 @@ module.exports = {
   PRICING_VERSION,
   PRICING_CONFIG,
   DEFAULT_FORMAT,
+  PDF_PRICE_CENTS,
   SHIPPING_PRICE_CENTS,
   DEFAULT_COUNTRY,
   resolveFormatConfig,

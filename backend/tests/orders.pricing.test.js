@@ -42,11 +42,11 @@ describe('routes/orders.computeOrderPricing', () => {
     expect(pricing.unitCents).toBe(7730); // standard, 64 pages
   });
 
-  it('type "pdf" : prix fixe, independant du nombre de pages, sans livraison', () => {
+  it('type "pdf" : prix fixe (7,99€), independant du nombre de pages, sans livraison', () => {
     const pricing = computeOrderPricing({ book: { page_count: 200 }, type: 'pdf', quantity: 1 });
-    expect(pricing.unitCents).toBe(3900);
+    expect(pricing.unitCents).toBe(799);
     expect(pricing.shippingCents).toBe(0);
-    expect(pricing.totalCents).toBe(3900);
+    expect(pricing.totalCents).toBe(799);
   });
 
   it('type "pack" : prix impression + 20 EUR, livraison incluse au total', () => {
@@ -88,8 +88,8 @@ describe('routes/orders.computeOrderPricing — grille par format (18 valeurs du
   it('type "pdf" reste un prix fixe, quel que soit le format', () => {
     const livret = computeOrderPricing({ book: { page_count: 34, print_format: 'livret' }, type: 'pdf', quantity: 1 });
     const luxe = computeOrderPricing({ book: { page_count: 34, print_format: 'luxe' }, type: 'pdf', quantity: 1 });
-    expect(livret.unitCents).toBe(3900);
-    expect(luxe.unitCents).toBe(3900);
+    expect(livret.unitCents).toBe(799);
+    expect(luxe.unitCents).toBe(799);
   });
 });
 

@@ -186,7 +186,7 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
     const pdf = await request(app)
       .get(`/api/orders/book/${BOOK_ID}/price-estimate?type=pdf`)
       .set('Authorization', 'Bearer valid-token');
-    expect(pdf.body.totalCents).toBe(3900); // tarif PDF plat, ignore print_format/page_count
+    expect(pdf.body.totalCents).toBe(799); // tarif PDF plat (7,99€), ignore print_format/page_count
     expect(pdf.body.shippingCents).toBe(0); // aucun exemplaire physique, aucune livraison
 
     const pack = await request(app)

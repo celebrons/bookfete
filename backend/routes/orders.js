@@ -8,6 +8,7 @@ const gelatoClient = require('../services/printing/gelatoClient');
 const { removePrintFilesForOrder } = require('../services/printing/printFileStorage');
 const { logEvent } = require('../services/events/eventLog');
 const { calculateBookPrice } = require('../services/pricing/calculateBookPrice');
+const { PDF_PRICE_CENTS } = require('../services/pricing/pricingConfig');
 
 // Envois a l'imprimeur EN COURS, par commande.
 //
@@ -313,7 +314,7 @@ const computeOrderPricing = ({ book, type, quantity }) => {
   const pricing = calculateBookPrice({ format: requestedFormat, pageCount: safePages });
   const printFormat = pricing.format;
   const printUnitCents = pricing.bookPriceCents;
-  const pdfUnitCents = 3900; // Hors grille (aucun exemplaire physique, aucune livraison) — inchange par ce chantier.
+  const pdfUnitCents = PDF_PRICE_CENTS; // Hors grille (aucun exemplaire physique, aucune livraison) — 7,99€ (retour utilisateur 2026-09-27).
 
   let unitCents = pdfUnitCents;
   let shippingCents = 0;

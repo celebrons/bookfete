@@ -480,11 +480,14 @@
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgba(20, 16, 10, 0.8);
+  /* 0.97 (quasi-opaque), pas 0.8 : a 0.8 la page/l'atelier derriere restait
+     lisible a travers le calque (retour utilisateur 2026-09-27, meme
+     correction que .atelier-realsize-backdrop dans BookAtelierLuxe.css). */
+  background: rgba(16, 13, 8, 0.97);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-md);
+  padding: 14px;
   overflow: hidden;
 }
 
@@ -599,27 +602,72 @@
   .preview-final-zoom-page-change { animation: none; }
 }
 
-/* Navigation + zoom, regroupees dans un seul bloc "pied" qui stoppe la
-   propagation du clic (voir BookPreviewFinalLuxe.js : sans ca, cliquer
-   "Suivant" ou "+" fermerait aussi le calque). */
-.preview-final-fullscreen-footer {
+/* Navigation + zoom, UNE SEULE RANGEE (retour utilisateur 2026-09-27 — meme
+   correction que .atelier-realsize-footer, BookAtelierLuxe.css) : deux
+   rangees empilees (gros boutons btn-outline + zoom separe) coutaient assez
+   de hauteur pour que le livre affiche ici soit plus petit que dans
+   l'atelier. stoppe la propagation du clic (voir BookPreviewFinalLuxe.js) :
+   sans elle, cliquer une fleche ou "+" fermerait aussi le calque. */
+.preview-final-realsize-footer {
   flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.preview-final-fullscreen-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-md);
+  gap: 10px;
 }
-.preview-final-fullscreen-nav .btn { background: rgba(255, 255, 255, 0.92); }
 .preview-final-fullscreen-nav-label {
-  min-width: 140px;
+  min-width: 120px;
   text-align: center;
   font-size: 13px;
   font-weight: 600;
   color: var(--white);
+}
+
+/* Fleches claires sur ce fond sombre — meme forme/poids que
+   .atelier-realsize-nav-arrow (BookAtelierLuxe.css), variante de couleur
+   seulement, pour rester le MEME geste visuel entre les deux endroits ou
+   l'on tourne les pages en plein ecran. */
+.preview-final-realsize-nav-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--white);
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.preview-final-realsize-nav-arrow:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+.preview-final-realsize-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Sauts directs couverture/4e : memes raccourcis discrets qu'ailleurs sur
+   cette page (.preview-final-nav-jump), variante claire pour ce fond
+   sombre. */
+.preview-final-realsize-jump {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.preview-final-realsize-jump:hover:not(:disabled) { color: var(--white); background: rgba(255, 255, 255, 0.14); }
+.preview-final-realsize-jump:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.preview-final-realsize-footer-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
 }
