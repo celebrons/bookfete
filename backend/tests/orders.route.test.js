@@ -13,7 +13,19 @@ jest.mock('../config/supabase', () => {
     {
       books: [
         { id: 'order-book-1', owner_id: 'owner-test-1', title: 'Mon livre', page_count: 24, print_format: 'luxe' },
-        { id: 'order-book-2', owner_id: 'someone-else', title: "Livre d'un autre", page_count: 24 }
+        { id: 'order-book-2', owner_id: 'someone-else', title: "Livre d'un autre", page_count: 24 },
+        // Finalise (statut 'termine' -> lifecycle 'finalized') : seul un
+        // livre a ce stade passe le garde-fou de POST /api/orders (voir
+        // getBookLifecycleStatusFromBook). Dedie aux tests de creation de
+        // commande (adresse de facturation, 2026-09-27).
+        {
+          id: 'order-book-finalise',
+          owner_id: 'owner-test-1',
+          title: 'Livre finalise',
+          page_count: 30,
+          print_format: 'standard',
+          statut: 'termine'
+        }
       ],
       // Commandes utilisees par les tests de suivi de production (2026-09-11).
       orders: [
@@ -611,5 +623,78 @@ describe('DELETE /api/orders/:orderId', () => {
 
     expect(response.status).toBe(409);
     expect(idsInStore()).toContain('order-payee-test');
+  });
+});
+
+// Facturation (retour utilisateur, 2026-09-27) : "meme que la livraison"
+// cochee par defaut cote frontend — le corps de requete n'envoie
+// billingAddress QUE si la case a ete decochee. Le serveur doit alors
+// deduire lui-meme la facturation de la livraison quand elle est absente,
+// et ne jamais la fusionner avec la livraison quand elle est fournie.
+describe('POST /api/orders — adresse de facturation', () => {
+  let app;
+  const FINALIZED_BOOK_ID = 'order-book-finalise';
+  const adresseLivraison = {
+    email: 'client@test.local',
+    fullName: 'Jean Client',
+    line1: '10 rue de la Livraison',
+    postalCode: '75002',
+    city: 'Paris',
+    country: 'France'
+  };
+
+  beforeAll(() => {
+    app = buildApp();
+  });
+
+  it('sans billingAddress : la facturation est deduite de la livraison', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'print', quantity: 1, shippingAddress: adresseLivraison });
+
+    expect(response.status).toBe(201);
+    expect(response.body.metadata.billingSameAsShipping).toBe(true);
+    expect(response.body.metadata.billingAddress).toEqual(expect.objectContaining({
+      fullName: 'Jean Client', line1: '10 rue de la Livraison', postalCode: '75002', city: 'Paris', country: 'France'
+    }));
+  });
+
+  it('avec billingAddress distincte : stockee telle quelle, jamais fusionnee avec la livraison', async () => {
+    const adresseFacturation = {
+      fullName: 'Societe Test SARL',
+      line1: '5 avenue de la Facturation',
+      postalCode: '69001',
+      city: 'Lyon',
+      country: 'France'
+    };
+
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        bookId: FINALIZED_BOOK_ID,
+        type: 'print',
+        quantity: 1,
+        shippingAddress: adresseLivraison,
+        billingAddress: adresseFacturation
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.metadata.billingSameAsShipping).toBe(false);
+    expect(response.body.metadata.billingAddress).toEqual(expect.objectContaining(adresseFacturation));
+    // La livraison, elle, reste inchangee et distincte de la facturation.
+    expect(response.body.shipping_address).toEqual(expect.objectContaining({ fullName: 'Jean Client', city: 'Paris' }));
+  });
+
+  it('commande PDF seule : aucune adresse de facturation enregistree (rien a facturer physiquement)', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1 });
+
+    expect(response.status).toBe(201);
+    expect(response.body.metadata.billingAddress).toBeUndefined();
+    expect(response.body.metadata.billingSameAsShipping).toBeUndefined();
   });
 });

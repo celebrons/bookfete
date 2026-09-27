@@ -31,7 +31,28 @@ const FIELDS = [
   { name: 'phone', placeholder: 'Telephone' }
 ];
 
-function StepAddress({ address, onChangeField, locked, incomplete }) {
+// Facturation : sous-ensemble de FIELDS — ni email ni telephone, deja portes
+// par l'adresse de livraison et sans rapport avec une facture.
+const BILLING_FIELDS = [
+  { name: 'fullName', placeholder: 'Nom complet' },
+  { name: 'line1', placeholder: 'Adresse', autocomplete: true },
+  { name: 'line2', placeholder: 'Complement' },
+  { name: 'postalCode', placeholder: 'Code postal', autocomplete: true },
+  { name: 'city', placeholder: 'Ville' },
+  { name: 'country', placeholder: 'Pays' }
+];
+
+function StepAddress({
+  address,
+  onChangeField,
+  locked,
+  incomplete,
+  billingSameAsShipping,
+  onToggleBillingSame,
+  billingAddress,
+  onChangeBillingField,
+  billingIncomplete
+}) {
   return (
     <article className="orders-panel">
       <h2>Adresse de livraison</h2>
@@ -67,6 +88,56 @@ function StepAddress({ address, onChangeField, locked, incomplete }) {
         <p className="orders-disclaimer">
           Nom, adresse, code postal, ville et pays sont necessaires pour l'expedition.
         </p>
+      )}
+
+      {/* Facturation : cochee par defaut (cas le plus frequent, de loin),
+          decochable pour saisir une adresse distincte — retour utilisateur
+          2026-09-27. Les champs de facturation n'apparaissent QUE si la case
+          est decochee : un formulaire toujours visible aurait double la
+          longueur de cet ecran pour un cas minoritaire. */}
+      <label className="orders-billing-toggle">
+        <input
+          type="checkbox"
+          checked={billingSameAsShipping}
+          onChange={onToggleBillingSame}
+          disabled={locked}
+        />
+        Adresse de facturation identique à l'adresse de livraison
+      </label>
+
+      {!billingSameAsShipping && (
+        <div className="orders-billing-fields">
+          <h3>Adresse de facturation</h3>
+          <div className="orders-form-grid">
+            {BILLING_FIELDS.map((field) => (field.autocomplete ? (
+              <AddressAutocomplete
+                key={field.name}
+                field={field.name}
+                value={billingAddress[field.name] || ''}
+                address={billingAddress}
+                onChangeField={onChangeBillingField}
+                placeholder={field.placeholder}
+                disabled={locked}
+              />
+            ) : (
+              <input
+                key={field.name}
+                className="input-luxe"
+                name={field.name}
+                type={field.type || 'text'}
+                value={billingAddress[field.name] || ''}
+                onChange={onChangeBillingField}
+                placeholder={field.placeholder}
+                disabled={locked}
+              />
+            )))}
+          </div>
+          {billingIncomplete && (
+            <p className="orders-disclaimer">
+              Nom, adresse, code postal, ville et pays sont necessaires pour la facturation.
+            </p>
+          )}
+        </div>
       )}
     </article>
   );

@@ -1712,6 +1712,17 @@ router.post('/', authenticate, async (req, res) => {
     const quantity = Number(req.body?.quantity || 1);
     const shippingAddress = sanitizeAddress(req.body?.shippingAddress);
     const notes = cleanString(req.body?.notes || '', 600);
+    // Facturation (retour utilisateur, 2026-09-27) : "meme que la livraison"
+    // par defaut cote frontend — body.billingAddress n'est envoye QUE quand
+    // la case a ete decochee, donc son absence signifie "identique". Jamais
+    // bloquant pour la creation de commande (aucun usage aval aujourd'hui,
+    // contrairement a l'adresse de livraison qui conditionne l'impression) :
+    // simplement enregistree pour reference, dans metadata (pas de nouvelle
+    // colonne SQL, meme choix que le snapshot de prix).
+    const billingSameAsShipping = !req.body?.billingAddress;
+    const billingAddress = billingSameAsShipping
+      ? shippingAddress
+      : sanitizeAddress(req.body.billingAddress);
 
     if (!ORDER_TYPES.has(type)) {
       return res.status(400).json({ error: 'Type de commande invalide' });
@@ -1814,7 +1825,8 @@ router.post('/', authenticate, async (req, res) => {
       shipping_address: type === 'pdf' ? null : shippingAddress,
       metadata: {
         notes,
-        pricing: pricing.breakdown
+        pricing: pricing.breakdown,
+        ...(type === 'pdf' ? {} : { billingAddress, billingSameAsShipping })
       },
       snapshot,
       created_at: nowIso,

@@ -288,6 +288,42 @@
   gap: 10px;
 }
 
+/* Case "adresse de facturation identique" (retour utilisateur, 2026-09-27) :
+   sous le formulaire de livraison, avant les champs de facturation qu'elle
+   commande. Coche standard (pas de style custom) : c'est un reglage, pas une
+   action produit qui merite un traitement visuel particulier. */
+.orders-billing-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: rgba(31, 31, 31, 0.8);
+  cursor: pointer;
+}
+
+.orders-billing-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold, #b8924a);
+  cursor: pointer;
+}
+
+.orders-billing-fields {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(184, 146, 74, 0.18);
+}
+
+.orders-billing-fields h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(31, 31, 31, 0.7);
+}
+
 .orders-summary {
   display: grid;
   gap: 10px;

@@ -129,6 +129,12 @@ const BookCheckoutLuxe = () => {
   const [orderType, setOrderType] = useState('pdf');
   const [quantity, setQuantity] = useState(1);
   const [address, setAddress] = useState(DEFAULT_ADDRESS);
+  // Facturation (retour utilisateur, 2026-09-27) : cochee par defaut ("meme
+  // que l'adresse de livraison"), decochable pour saisir une adresse a part
+  // (ex. entreprise qui livre chez un particulier). Champs distincts de
+  // `address` — jamais partages tant que la case reste cochee.
+  const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+  const [billingAddress, setBillingAddress] = useState(DEFAULT_ADDRESS);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState(null);
   const [latestOrder, setLatestOrder] = useState(null);
@@ -279,6 +285,15 @@ const BookCheckoutLuxe = () => {
       .every((field) => String(address?.[field] || '').trim().length > 0)
   ), [address]);
 
+  // Meme exigence que l'adresse de livraison, mais seulement quand la case
+  // "meme adresse" est decochee — sinon la facturation suit `address` et n'a
+  // rien a valider separement.
+  const billingComplete = useMemo(() => (
+    billingSameAsShipping
+    || ['fullName', 'line1', 'postalCode', 'city', 'country']
+      .every((field) => String(billingAddress?.[field] || '').trim().length > 0)
+  ), [billingSameAsShipping, billingAddress]);
+
   // Etape REELLE : une commande payee renvoie au suivi (sans retour possible),
   // une commande en attente de paiement renvoie a l'ecran paiement. Tant
   // qu'aucune commande n'existe, l'utilisateur avance librement dans les
@@ -395,6 +410,16 @@ const BookCheckoutLuxe = () => {
         ...previous,
         ...shipping
       }));
+
+      // Meme reprise que l'adresse de livraison, pour une commande deja
+      // creee (awaiting_payment) rechargee sur cet ecran : voir
+      // routes/orders.js, metadata.billingAddress/billingSameAsShipping.
+      const sameAsShipping = latestOrder?.metadata?.billingSameAsShipping;
+      if (typeof sameAsShipping === 'boolean') setBillingSameAsShipping(sameAsShipping);
+      const billing = latestOrder?.metadata?.billingAddress;
+      if (billing && typeof billing === 'object') {
+        setBillingAddress((previous) => ({ ...previous, ...billing }));
+      }
     }
   }, [checkoutFormLocked, latestOrder]);
 
@@ -442,6 +467,11 @@ const BookCheckoutLuxe = () => {
   const setAddressField = (event) => {
     const { name, value } = event.target;
     setAddress((previous) => ({ ...previous, [name]: value }));
+  };
+
+  const setBillingAddressField = (event) => {
+    const { name, value } = event.target;
+    setBillingAddress((previous) => ({ ...previous, [name]: value }));
   };
 
   const getAuthHeaders = async () => {
@@ -877,7 +907,12 @@ const BookCheckoutLuxe = () => {
         bookId,
         type: orderType,
         quantity,
-        shippingAddress: includesPrint(orderType) ? address : null
+        shippingAddress: includesPrint(orderType) ? address : null,
+        // "Meme que la livraison" (cochee par defaut, retour utilisateur
+        // 2026-09-27) : n'envoie une adresse de facturation DISTINCTE que si
+        // la case a ete decochee — sinon le serveur la deduit lui-meme de
+        // l'adresse de livraison (voir routes/orders.js).
+        billingAddress: includesPrint(orderType) && !billingSameAsShipping ? billingAddress : null
       });
 
       // L'adresse d'expedition est aussi MEMORISEE sur le compte : elle
@@ -1373,6 +1408,11 @@ const BookCheckoutLuxe = () => {
               onChangeField={setAddressField}
               locked={checkoutFormLocked}
               incomplete={!addressComplete}
+              billingSameAsShipping={billingSameAsShipping}
+              onToggleBillingSame={() => setBillingSameAsShipping((previous) => !previous)}
+              billingAddress={billingAddress}
+              onChangeBillingField={setBillingAddressField}
+              billingIncomplete={!billingComplete}
             />
           )}
 
@@ -1429,7 +1469,7 @@ const BookCheckoutLuxe = () => {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={currentStepKey === 'address' && !addressComplete}
+                  disabled={currentStepKey === 'address' && (!addressComplete || !billingComplete)}
                   onClick={() => setManualStep(derivedStep + 1)}
                 >
                   Continuer
