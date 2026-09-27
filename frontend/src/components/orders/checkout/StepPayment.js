@@ -16,6 +16,7 @@ function StepPayment({
   orderType,
   quantity,
   unitCents,
+  shippingCents,
   totalCents,
   address,
   bookTitle,
@@ -58,6 +59,16 @@ function StepPayment({
           <span>Quantite</span>
           <strong>{quantity}</strong>
         </div>
+        {/* Livraison distinguee (§3/§13 : "le prix total doit etre
+            parfaitement visible avant le paiement" — sans le detail, ce
+            dernier ecran avant Stripe montrerait un total qui inclut la
+            livraison sans jamais le dire). */}
+        {withPrint && Number.isFinite(shippingCents) && (
+          <div>
+            <span>Livraison</span>
+            <strong>{formatPriceCents(shippingCents)}</strong>
+          </div>
+        )}
         <div>
           <span>Total a payer</span>
           <strong>{formatPriceCents(totalCents)}</strong>

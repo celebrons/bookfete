@@ -151,7 +151,10 @@ export const createBook = (payload) => request('/books', {
 
 export const listTemplates = () => request('/catalog/templates');
 export const listLayouts = () => request('/catalog/layouts');
-export const listProducts = () => request('/catalog/products');
+// listProducts (book_products) retire (chantier "tarification dynamique",
+// 2026-09-27) : cette table etait deja confirmee morte (price_cents=0/
+// active=false partout, sa route backend meme pas montee dans server.js,
+// aucun appelant frontend) — voir services/pricing/ pour la vraie grille.
 
 // --- Contenu d'un livre ------------------------------------------------------
 
@@ -280,7 +283,20 @@ export const getFormatOptions = (bookId) => request(`/books/${bookId}/format-opt
 // persiste, et met a jour book.print_format/book.page_count — ce que
 // "Commander mon livre" imprimera correspond donc toujours a ce qui vient
 // d'etre recompose ici. Reponse : { book, pages, pageCount }.
+// N'a plus d'appelant depuis le chantier "tarification dynamique"
+// (2026-09-27) — voir changeFormatOnly ci-dessous — mais laisse en place
+// (fonctionne toujours) au cas ou un usage futur en aurait besoin.
 export const chooseFormat = (bookId, formatId) => request(`/books/${bookId}/format`, {
+  method: 'POST',
+  body: JSON.stringify({ formatId })
+});
+
+// Change UNIQUEMENT print_format (retour utilisateur, 2026-09-27, §9 :
+// "changer de format ne doit PAS renvoyer l'utilisateur dans l'atelier...
+// seul le produit physique et le prix changent") — aucune recomposition,
+// aucun changement de pagination/contenu, contrairement a chooseFormat
+// ci-dessus. Reponse : { book }.
+export const changeFormatOnly = (bookId, formatId) => request(`/books/${bookId}/format-only`, {
   method: 'POST',
   body: JSON.stringify({ formatId })
 });

@@ -26,6 +26,7 @@ import {
   movePage,
   updateContentItem
 } from '../../../services/compositionApi';
+import { formatEuros, formatEurosDelta } from '../../../utils/formatPrice';
 import AtelierSidebar from './AtelierSidebar';
 import AtelierBookView from './AtelierBookView';
 import AtelierLayoutPanel from './AtelierLayoutPanel';
@@ -90,6 +91,17 @@ export default function BookAtelierLuxe() {
   const [items, setItems] = useState([]);
   const [layouts, setLayouts] = useState([]);
   const [pages, setPages] = useState([]);
+
+  // Prix discret de l'atelier (chantier "tarification dynamique",
+  // 2026-09-27, §6) — { bookPriceCents } le plus recent connu pour ce
+  // format/cette pagination. priceDelta : indication BREVE ("+2 pages ·
+  // +2,20 €") affichee au moment d'un ajout/retrait de pages ou d'un
+  // changement de format, puis effacee toute seule (§7/§8/§11) — jamais un
+  // panneau permanent, jamais un second calcul de la formule ici (voir
+  // estimatePrice -> GET /orders/book/:id/price-estimate, deja importe).
+  const [priceInfo, setPriceInfo] = useState(null);
+  const [priceDelta, setPriceDelta] = useState(null);
+  const priceDeltaTimeoutRef = useRef(null);
 
   const [viewIndex, setViewIndex] = useState(1); // 0 = couverture, dernier = 4e, sinon double-page
   const [selectedSide, setSelectedSide] = useState('left');
@@ -363,6 +375,38 @@ export default function BookAtelierLuxe() {
   useEffect(() => { refreshQualityWarnings(); }, [refreshQualityWarnings, pages.length, book?.print_format]);
 
   useEffect(() => { refreshSnapshot(); }, [refreshSnapshot]);
+
+  // Prix discret (§6) : recalcule des que le format ou la pagination change
+  // — jamais un second calcul local, toujours estimatePrice (deja utilise
+  // plus bas pour le debordement de generation automatique). Non bloquant :
+  // un echec laisse simplement l'ancien prix affiche plutot que de casser
+  // l'atelier pour un souci secondaire d'affichage.
+  useEffect(() => {
+    if (!book?.id || !book?.print_format || !book?.page_count) return undefined;
+    let cancelled = false;
+    estimatePrice(book.id, { printFormat: book.print_format, pageCount: book.page_count, type: 'print', quantity: 1 })
+      .then((result) => { if (!cancelled) setPriceInfo(result); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [book?.id, book?.print_format, book?.page_count]);
+
+  // Efface le timeout en attente au demontage — evite un setState sur un
+  // composant deja parti si l'utilisateur quitte l'atelier juste apres un
+  // ajout/retrait de pages.
+  useEffect(() => () => {
+    if (priceDeltaTimeoutRef.current) clearTimeout(priceDeltaTimeoutRef.current);
+  }, []);
+
+  // Affiche breivement "+2 pages · +2,20 €" (ou l'equivalent pour un
+  // changement de format), puis revient tout seul a l'affichage normal
+  // (§7/§8/§11 : "pas besoin d'une grosse animation... puis l'interface
+  // revient a son etat normal"). Reutilisable pour toute variation de prix
+  // future (pages ou format), pas seulement les pages.
+  const showPriceDelta = (delta) => {
+    if (priceDeltaTimeoutRef.current) clearTimeout(priceDeltaTimeoutRef.current);
+    setPriceDelta(delta);
+    priceDeltaTimeoutRef.current = setTimeout(() => setPriceDelta(null), 2600);
+  };
 
   // { [pageIndex]: nombre de photos signalees }. Seules les PHOTOS comptent
   // ici : le controle renvoie aussi des avertissements de texte, qui ont leur
@@ -1756,6 +1800,32 @@ export default function BookAtelierLuxe() {
     }
   };
 
+  // Prix apres un ajout/retrait de pages (§7/§8) : reprend le prix DEJA
+  // affiche (priceInfo, avant l'action) pour calculer l'ecart, puis va
+  // chercher le nouveau prix — jamais la formule recalculee ici, toujours
+  // estimatePrice. `newPageCount` passe explicitement (pas book.page_count,
+  // pas encore a jour au moment ou ceci est appele) : plus sur qu'attendre
+  // le prochain rendu.
+  const announcePriceChange = async (newPageCount, pageDelta) => {
+    if (!book?.id || !book?.print_format) return;
+    const before = priceInfo?.bookPriceCents ?? null;
+    try {
+      const result = await estimatePrice(book.id, {
+        printFormat: book.print_format,
+        pageCount: newPageCount,
+        type: 'print',
+        quantity: 1
+      });
+      setPriceInfo(result);
+      if (before != null && Number.isFinite(result?.bookPriceCents)) {
+        const diffCents = result.bookPriceCents - before;
+        if (diffCents !== 0) showPriceDelta({ pages: pageDelta, priceCents: diffCents });
+      }
+    } catch (_err) {
+      // Non bloquant : un echec laisse simplement l'ancien prix affiche.
+    }
+  };
+
   // Agrandir volontairement le livre (bouton "+2" du filmstrip) — jamais une
   // recomposition, jamais touche aux pages existantes (voir
   // routes/composition.js: POST /pages/extend). Meme mecanique de
@@ -1769,6 +1839,7 @@ export default function BookAtelierLuxe() {
       setBook((previous) => ({ ...previous, ...updatedBook }));
       setPages(freshPages || []);
       setRefreshToken((previous) => previous + 1);
+      announcePriceChange(updatedBook.page_count, 2);
     } catch (err) {
       setError(err.message || "Impossible d'ajouter des pages.");
     } finally {
@@ -1792,6 +1863,7 @@ export default function BookAtelierLuxe() {
       setBook((previous) => ({ ...previous, ...updatedBook }));
       setPages(freshPages || []);
       setRefreshToken((previous) => previous + 1);
+      announcePriceChange(updatedBook.page_count, -2);
     };
 
     setRemovingPages(true);
@@ -2012,6 +2084,17 @@ export default function BookAtelierLuxe() {
           {formatCourant
             ? `${formatCourant.nom} · ${formatCourant.taille}${totalPages ? ` · ${totalPages} pages` : ''}`
             : 'Atelier de creation personnalisee'}
+          {/* Prix discret (§6 : "STANDARD · 34 pages · 44,30 €" ou
+              equivalent — jamais un panneau, juste ce texte). */}
+          {Number.isFinite(priceInfo?.bookPriceCents) && ` · ${formatEuros(priceInfo.bookPriceCents)}`}
+          {/* Indication breve au moment d'un changement (§7/§8/§11) — puis
+              disparait toute seule (showPriceDelta/priceDeltaTimeoutRef). */}
+          {priceDelta && (
+            <span className="atelier-header-price-delta">
+              {priceDelta.pages ? `${priceDelta.pages > 0 ? '+' : ''}${priceDelta.pages} pages · ` : ''}
+              {formatEurosDelta(priceDelta.priceCents)}
+            </span>
+          )}
         </span>
         <span className="atelier-header-secondary">
           <button

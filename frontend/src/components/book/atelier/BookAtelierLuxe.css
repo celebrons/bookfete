@@ -55,6 +55,32 @@
   color: var(--text-light);
 }
 
+/* Indication breve de variation de prix (§7/§8/§11 : "pas besoin d'une
+   grosse animation... puis l'interface revient a son etat normal") — une
+   petite pastille doree, discrete mais assez marquee pour qu'on comprenne
+   pourquoi le prix a bouge, jamais un bandeau ou un second panneau. Fondu en
+   CSS (pas de librairie d'animation) ; la disparition elle-meme est geree en
+   JS (showPriceDelta, BookAtelierLuxe.js), ce style ne fait que l'habiller
+   pendant qu'elle est affichee. */
+@keyframes atelierPriceDeltaIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.atelier-header-price-delta {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(184, 146, 74, 0.14);
+  color: #7a5c2a;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  animation: atelierPriceDeltaIn 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .atelier-header-price-delta { animation: none; }
+}
+
 /* Regroupe les deux actions secondaires a droite de l'en-tete — jamais plus
    de deux, sinon elles retourneraient dans un menu "..." plutot que de
    s'aligner en ligne. Ecart volontairement plus large que --space-sm entre

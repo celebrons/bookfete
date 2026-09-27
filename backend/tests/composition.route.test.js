@@ -194,7 +194,6 @@ function buildApp() {
   const app = express();
   app.use(express.json());
   app.use('/', require('../routes/composition'));
-  app.use('/', require('../routes/products'));
   return app;
 }
 
@@ -218,12 +217,10 @@ describe('routes/composition', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(2);
     });
-
-    it('GET /api/catalog/products renvoie les produits actifs', async () => {
-      const response = await request(app).get('/api/catalog/products');
-      expect(response.status).toBe(200);
-      expect(response.body[0]).toMatchObject({ page_count: 24 });
-    });
+    // GET /api/catalog/products (book_products) retire (chantier
+    // "tarification dynamique", 2026-09-27) : table confirmee inactive
+    // (price_cents=0/active=false partout), zero appelant frontend — voir
+    // services/pricing/ pour la vraie grille tarifaire.
   });
 
   describe('content-items — authentification et ownership', () => {

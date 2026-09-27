@@ -154,8 +154,15 @@ export const getApiBaseUrl = buildApiBaseUrl;
 // creation, avant toute authentification. Le prix vient du serveur et non
 // d'une table recopiee ici — il est calcule avec la meme formule que celui
 // facture a la commande, donc les deux ne peuvent pas diverger.
-export const listPrintFormats = async () => {
-  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}/orders/formats`);
+//
+// `pageCount` optionnel (chantier "tarification dynamique", 2026-09-27, §10) :
+// quand un livre existe deja avec une vraie pagination, chaque format renvoie
+// EN PLUS son prix a CETTE pagination (currentPriceCents) — un seul appel
+// plutot que trois (un par format, comme le faisait BookPreviewFinalLuxe.js
+// avant ce chantier).
+export const listPrintFormats = async (pageCount) => {
+  const query = Number.isFinite(pageCount) && pageCount > 0 ? `?page_count=${pageCount}` : '';
+  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}/orders/formats${query}`);
   if (!response.ok) throw new Error('Formats indisponibles');
   return response.json();
 };

@@ -7,6 +7,7 @@ const { submitPrintOrderToGelato, isGelatoLiveOrdersEnabled } = require('../serv
 const gelatoClient = require('../services/printing/gelatoClient');
 const { removePrintFilesForOrder } = require('../services/printing/printFileStorage');
 const { logEvent } = require('../services/events/eventLog');
+const { calculateBookPrice } = require('../services/pricing/calculateBookPrice');
 
 // Envois a l'imprimeur EN COURS, par commande.
 //
@@ -275,57 +276,68 @@ const isAddressValid = (address) => (
   Boolean(address?.fullName && address?.line1 && address?.postalCode && address?.city && address?.country)
 );
 
-// Tarif d'impression par type d'album (books.print_format, voir
-// coverFormat.js pour les 3 memes ids et leurs dimensions physiques).
-// Hypothese de travail (aucun cout d'impression reel connu a ce jour) :
-// un seul endroit a ajuster si les vrais couts different.
-const FORMAT_PRICING = {
-  livret: { baseCents: 3400, perPageCents: 60, minCents: 4900 },
-  standard: { baseCents: 4900, perPageCents: 85, minCents: 6900 },
-  luxe: { baseCents: 6900, perPageCents: 130, minCents: 9900 }
-};
+// Grille tarifaire : voir services/pricing/pricingConfig.js (source unique,
+// chantier "tarification dynamique" 2026-09-27) — remplace l'ancienne
+// FORMAT_PRICING ad hoc (base + prix/page + plancher) qui ne correspondait
+// pas a la grille commerciale reelle (base a 30 pages + palier tous les
+// 2 pages). DEFAULT_PRINT_FORMAT garde son nom/role d'avant : repli quand
+// books.print_format est absent/inconnu, utilise par plusieurs routes de ce
+// fichier (formats/prix + creation de commande).
 const DEFAULT_PRINT_FORMAT = 'standard';
 
-const resolveFormatPricing = (printFormat) => FORMAT_PRICING[printFormat] || FORMAT_PRICING[DEFAULT_PRINT_FORMAT];
-
-// Prix de DEPART d'un format : celui du livre au plancher produit (30 pages).
-// C'est ce que "a partir de XX EUR" doit annoncer — calcule avec la MEME
-// formule que le prix reel d'une commande (computeOrderPricing), jamais un
-// tarif d'affichage saisi a part qui finirait par diverger.
-const startingPriceCents = (printFormat, pages) => {
-  const pricing = resolveFormatPricing(printFormat);
-  return Math.max(pricing.minCents, pricing.baseCents + Math.round(pages * pricing.perPageCents));
-};
+// Prix de DEPART d'un format : celui du livre (hors livraison) au plancher
+// produit (30 pages). C'est ce que "a partir de XX EUR" doit annoncer —
+// calcule avec la MEME formule que le prix reel d'une commande
+// (computeOrderPricing/calculateBookPrice), jamais un tarif d'affichage
+// saisi a part qui finirait par diverger.
+const startingPriceCents = (printFormat, pages) => calculateBookPrice({ format: printFormat, pageCount: pages }).bookPriceCents;
 
 // book.page_count (pas book.pages, une colonne heritee de l'ancien flux IA
 // jamais mise a jour par le moteur de composition actuel) : la vraie valeur,
 // obligatoire pour composer le livre (voir routes/composition.js), donc le
 // seul nombre qui correspond reellement au livre imprime.
+//
+// Livraison (retour utilisateur, 2026-09-27) : AJOUTEE ICI pour la premiere
+// fois — jusqu'a ce chantier, `total_cents` ne portait que le prix du livre,
+// aucune livraison n'etait facturee. `shippingCents` n'est PAS multiplie par
+// la quantite (un forfait par COMMANDE, pas par exemplaire — coherent avec
+// les exemples du cahier des charges) ; `unitCents` garde son sens d'avant
+// (prix du livre par exemplaire), seul `totalCents` change de definition
+// pour inclure vraiment le total paye.
 const computeOrderPricing = ({ book, type, quantity }) => {
   const pages = Number(book?.page_count || 0);
   const safePages = Number.isFinite(pages) && pages > 0 ? pages : 64;
   const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
-  const printFormat = book?.print_format && FORMAT_PRICING[book.print_format] ? book.print_format : DEFAULT_PRINT_FORMAT;
-  const pricing = resolveFormatPricing(printFormat);
-  const printUnitCents = Math.max(pricing.minCents, pricing.baseCents + Math.round(safePages * pricing.perPageCents));
-  const pdfUnitCents = 3900;
+  const requestedFormat = book?.print_format || DEFAULT_PRINT_FORMAT;
+
+  const pricing = calculateBookPrice({ format: requestedFormat, pageCount: safePages });
+  const printFormat = pricing.format;
+  const printUnitCents = pricing.bookPriceCents;
+  const pdfUnitCents = 3900; // Hors grille (aucun exemplaire physique, aucune livraison) — inchange par ce chantier.
 
   let unitCents = pdfUnitCents;
+  let shippingCents = 0;
   if (type === 'print') {
     unitCents = printUnitCents;
+    shippingCents = pricing.shippingPriceCents;
   } else if (type === 'pack') {
-    unitCents = printUnitCents + 2000;
+    unitCents = printUnitCents + 2000; // Supplement fixe inchange, hors grille fournie.
+    shippingCents = pricing.shippingPriceCents;
   }
 
   return {
     quantity: safeQuantity,
     unitCents,
-    totalCents: unitCents * safeQuantity,
+    shippingCents,
+    totalCents: (unitCents * safeQuantity) + shippingCents,
     breakdown: {
       pages: safePages,
       printFormat,
       printUnitCents,
-      pdfUnitCents
+      pdfUnitCents,
+      bookPriceCents: pricing.bookPriceCents,
+      shippingPriceCents: shippingCents,
+      pricingVersion: pricing.pricingVersion
     }
   };
 };
@@ -1271,15 +1283,32 @@ router.post('/email/test', authenticate, async (req, res) => {
 //
 // Publique (pas de authenticate) : le choix du format arrive avant toute
 // session dans le parcours, et il n'y a la aucune donnee personnelle.
-router.get('/formats', (_req, res) => {
-  const { MIN_BOOK_PAGES } = require('../services/composition/bookContentService');
+//
+// `?page_count=` optionnel (retour utilisateur, 2026-09-27, §10) : quand un
+// livre existe deja avec une vraie pagination, chaque format renvoie EN PLUS
+// son prix a CETTE pagination (currentPriceCents) — "Livret 34 pages 33,70€"
+// est plus utile que "a partir de 29,90€" des que le nombre de pages reel est
+// connu. Un seul appel plutot que 3 (un par format) : BookPreviewFinalLuxe.js
+// appelait jusqu'ici price-estimate trois fois pour construire ce meme
+// tableau. Absent/invalide -> comportement inchange (formats sans
+// currentPriceCents, seulement startingPriceCents).
+router.get('/formats', (req, res) => {
+  const { MIN_BOOK_PAGES, MAX_BOOK_PAGES } = require('../services/composition/bookContentService');
   const { COVER_FORMATS } = require('../services/composition/coverFormat');
+  const { resolveShippingCents, DEFAULT_COUNTRY } = require('../services/pricing/pricingConfig');
 
   const LIBELLES = {
     livret: { nom: 'Livret', accroche: 'Simple & élégant' },
     standard: { nom: 'Standard', accroche: 'Le meilleur équilibre entre élégance, qualité et prix', recommande: true },
     luxe: { nom: 'Luxe', accroche: 'Premium & intemporel' }
   };
+
+  const requestedPageCount = Number(req.query.page_count);
+  const currentPageCount = Number.isFinite(requestedPageCount)
+    && requestedPageCount >= MIN_BOOK_PAGES
+    && requestedPageCount <= MAX_BOOK_PAGES
+    ? requestedPageCount
+    : null;
 
   const formats = Object.keys(LIBELLES).map((formatId) => {
     const dims = COVER_FORMATS[formatId];
@@ -1290,7 +1319,14 @@ router.get('/formats', (_req, res) => {
       heightMm: dims.trimHeightMm,
       // "a partir de" : le prix au plancher produit, pas un prix moyen.
       minPages: MIN_BOOK_PAGES,
-      startingPriceCents: startingPriceCents(formatId, MIN_BOOK_PAGES)
+      startingPriceCents: startingPriceCents(formatId, MIN_BOOK_PAGES),
+      // Livraison France uniquement pour l'instant (§20) — meme repli que le
+      // reste de ce chantier tant qu'un seul pays est configure.
+      shippingPriceCents: resolveShippingCents(formatId, DEFAULT_COUNTRY),
+      ...(currentPageCount ? {
+        currentPageCount,
+        currentPriceCents: startingPriceCents(formatId, currentPageCount)
+      } : {})
     };
   });
 
@@ -1376,6 +1412,13 @@ router.get('/book/:bookId/price-estimate', authenticate, async (req, res) => {
       printFormat: pricing.breakdown.printFormat,
       pageCount: pricing.breakdown.pages,
       unitCents: pricing.unitCents,
+      // bookPriceCents/shippingCents distingues explicitement (retour
+      // utilisateur, 2026-09-27, §3 : "ne jamais faire 44,30€ livraison
+      // incluse") — totalCents les incluait deja tous les deux mais sans
+      // les distinguer, ce qui forcait chaque appelant a reconstituer le
+      // detail a la main.
+      bookPriceCents: pricing.breakdown.bookPriceCents,
+      shippingCents: pricing.shippingCents,
       totalCents: pricing.totalCents
     });
   } catch (error) {
@@ -1730,6 +1773,11 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const pricing = computeOrderPricing({ book, type, quantity });
+    // bookPriceCents/shippingPriceCents/pricingVersion FIGES ici (retour
+    // utilisateur, 2026-09-27, §18/§19) : une commande deja creee ne relit
+    // plus jamais services/pricing/pricingConfig.js — changer les tarifs
+    // demain ne doit jamais modifier le prix d'une commande deja passee.
+    // Pas de nouvelle colonne SQL : snapshot est deja un jsonb ecrit ici.
     const snapshot = {
       bookId: book.id,
       title: book.title || 'Livre sans titre',
@@ -1738,6 +1786,11 @@ router.post('/', authenticate, async (req, res) => {
       pages: Number(book.page_count || 0) || null,
       printFormat: book.print_format || 'standard',
       lifecycleStatus,
+      bookPriceCents: pricing.breakdown.bookPriceCents,
+      shippingPriceCents: pricing.breakdown.shippingPriceCents,
+      totalPriceCents: pricing.totalCents,
+      currency: 'EUR',
+      pricingVersion: pricing.breakdown.pricingVersion,
       createdAt: getNowIso()
     };
 
@@ -1826,6 +1879,11 @@ router.post('/:orderId/checkout-session', authenticate, async (req, res) => {
         bookId: String(order.book_id || ''),
         orderNumber: String(order.order_number || '')
       },
+      // Livre + livraison en DEUX lignes distinctes (retour utilisateur,
+      // 2026-09-27, §3/§13 : "ne jamais faire 44,30€ livraison incluse") —
+      // avant ce chantier, order.unit_cents ne portait que le livre et la
+      // livraison n'etait de toute facon pas facturee du tout. Montant fige
+      // au moment de la commande (order.snapshot), jamais recalcule ici.
       line_items: [
         {
           quantity: Number(order.quantity || 1),
@@ -1837,7 +1895,17 @@ router.post('/:orderId/checkout-session', authenticate, async (req, res) => {
               description: `Commande ${order.order_number || ''} (${order.type || 'pdf'})`
             }
           }
-        }
+        },
+        ...(Number(order.snapshot?.shippingPriceCents) > 0 ? [{
+          quantity: 1,
+          price_data: {
+            currency: String(order.currency || 'EUR').toLowerCase(),
+            unit_amount: Number(order.snapshot.shippingPriceCents),
+            product_data: {
+              name: 'Livraison'
+            }
+          }
+        }] : [])
       ]
     });
 

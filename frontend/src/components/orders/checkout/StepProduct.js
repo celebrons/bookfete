@@ -52,6 +52,7 @@ function StepProduct({
   onChangeQuantity,
   locked,
   unitCents,
+  shippingCents,
   totalCents,
   pricesByType = {}
 }) {
@@ -126,6 +127,18 @@ function StepProduct({
           <span>Quantité</span>
           <strong>{quantity}</strong>
         </div>
+        {/* Livraison distinguee du prix du livre (chantier "tarification
+            dynamique", 2026-09-27, §3 : "ne jamais faire 44,30€ livraison
+            incluse") — totalCents l'inclut deja, cette ligne dit ce qu'elle
+            represente au lieu de laisser le total "sauter" sans explication.
+            Absente pour le PDF (aucune livraison, voir le disclaimer plus
+            bas). */}
+        {includesPrint(orderType) && Number.isFinite(shippingCents) && (
+          <div>
+            <span>Livraison</span>
+            <strong>{formatPriceCents(shippingCents)}</strong>
+          </div>
+        )}
         <div>
           <span>Total</span>
           <strong>{formatPriceCents(totalCents)}</strong>

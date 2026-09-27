@@ -5,12 +5,12 @@ import {
   listContentItems,
   fetchCoverPreviewHtml,
   fetchInteriorPagePreviewHtml,
-  estimatePrice,
-  getFormatOptions,
-  chooseFormat,
+  changeFormatOnly,
   getPrintQualityCheck
 } from '../../services/compositionApi';
+import { listPrintFormats } from '../../services/ordersApi';
 import { applyLifecycleStatus } from '../../utils/bookLifecycle';
+import { formatEurosDelta } from '../../utils/formatPrice';
 import { PageZoomStage, ZoomControls } from '../common/PageZoomStage';
 import PrintQualityRecapModal from '../common/PrintQualityRecapModal';
 import { spreadPair, spreadCount as compterVisAVis } from '../../utils/pageParity';
@@ -174,14 +174,20 @@ export default function BookPreviewFinalLuxe() {
   const [loadingPage, setLoadingPage] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const [pricesByFormat, setPricesByFormat] = useState({});
-  // { livret: pageCount, standard: pageCount, luxe: pageCount } — pagination
-  // REELLE de chaque format pour le contenu actuel (formatComposer.js, cote
-  // serveur), plus jamais un seul champ page_count partage entre les 3
-  // formats : chaque format recompose le contenu different, donc peut avoir
-  // un nombre de pages different (voir formatComposer.js).
-  const [formatOptions, setFormatOptions] = useState({});
+  // Prix de chaque format A LA PAGINATION ACTUELLE DU LIVRE (chantier
+  // "tarification dynamique", 2026-09-27, §9/§10) — { livret: { bookPriceCents,
+  // shippingCents }, ... }. Un SEUL champ de pagination desormais partage par
+  // les 3 formats (book.page_count) : changer de format ne touche plus au
+  // contenu ni au nombre de pages (voir changeFormatOnly), donc plus besoin
+  // d'une pagination differente par format (l'ancien formatOptions/
+  // getFormatOptions, retire).
+  const [formatPricing, setFormatPricing] = useState({});
   const [switchingFormat, setSwitchingFormat] = useState(false);
+  // Indication breve de variation de prix au changement de format (§9/§11) —
+  // meme mecanique que l'atelier (BookAtelierLuxe.js: priceDelta), disparait
+  // toute seule.
+  const [priceDelta, setPriceDelta] = useState(null);
+  const priceDeltaTimeoutRef = useRef(null);
   const [ordering, setOrdering] = useState(false);
   // Ecran recapitulatif qualite avant commande (cahier des charges v2, §2).
   const [qualityWarnings, setQualityWarnings] = useState([]);
@@ -253,39 +259,38 @@ export default function BookPreviewFinalLuxe() {
   const leftPageIndex = paire && paire.left != null && paire.left < totalPages ? paire.left : null;
   const rightPageIndex = paire && paire.right != null && paire.right < totalPages ? paire.right : null;
 
-  // Pagination REELLE de chaque format pour le contenu actuel
-  // (formatComposer.js, cote serveur — pur, ne persiste rien) : rechargee a
-  // chaque livre different et a chaque changement de format reussi
-  // (handleChooseFormat ci-dessous), jamais calculee/devinee cote client.
-  const loadFormatOptions = useCallback(async () => {
-    if (!book?.id) return;
-    try {
-      const { formats } = await getFormatOptions(book.id);
-      setFormatOptions(Object.fromEntries((formats || []).map((entry) => [entry.formatId, entry])));
-    } catch (_err) {
-      // Silencieux : les cartes affichent alors "…" a la place du nombre de
-      // pages plutot que de bloquer tout l'ecran pour un souci secondaire.
-    }
-  }, [book?.id]);
-
-  useEffect(() => { loadFormatOptions(); }, [loadFormatOptions]);
-
-  // Prix de CHAQUE format a SA PROPRE pagination (formatOptions) — plus un
-  // seul pageCount partage entre les 3 formats (voir formatOptions plus
-  // haut) : meme mecanisme d'estimation deja utilise par Configuration
-  // (estimatePrice, jamais persiste par cet appel).
+  // Prix des 3 formats A LA PAGINATION ACTUELLE DU LIVRE (chantier
+  // "tarification dynamique", 2026-09-27, §9/§10) — un seul appel a
+  // GET /orders/formats?page_count=X (public, deja utilise par le choix de
+  // format initial, CreateBookSansIA.js) au lieu de 3 appels estimatePrice.
+  // book.page_count ne bouge plus jamais d'un format a l'autre : changer de
+  // format ne recompose plus rien (voir handleChooseFormat plus bas).
   useEffect(() => {
-    if (!book?.id || Object.keys(formatOptions).length === 0) return undefined;
+    if (!book?.id || !totalPages) return undefined;
     let cancelled = false;
-    Promise.all(PRINT_FORMATS.map((format) => {
-      const pageCount = formatOptions[format.id]?.pageCount;
-      if (!pageCount) return Promise.resolve([format.id, null]);
-      return estimatePrice(book.id, { printFormat: format.id, pageCount })
-        .then((result) => [format.id, result.unitCents])
-        .catch(() => [format.id, null]);
-    })).then((entries) => { if (!cancelled) setPricesByFormat(Object.fromEntries(entries)); });
+    listPrintFormats(totalPages)
+      .then(({ formats }) => {
+        if (cancelled) return;
+        setFormatPricing(Object.fromEntries((formats || []).map((entry) => [
+          entry.formatId,
+          { bookPriceCents: entry.currentPriceCents ?? entry.startingPriceCents, shippingCents: entry.shippingPriceCents }
+        ])));
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
-  }, [book?.id, formatOptions]);
+  }, [book?.id, totalPages, currentFormat]);
+
+  useEffect(() => () => {
+    if (priceDeltaTimeoutRef.current) clearTimeout(priceDeltaTimeoutRef.current);
+  }, []);
+
+  // Affiche brievement "Format Luxe · +11,40 €" puis revient tout seul a
+  // l'affichage normal (§9/§11 : "pas besoin d'une grosse animation").
+  const showPriceDelta = (delta) => {
+    if (priceDeltaTimeoutRef.current) clearTimeout(priceDeltaTimeoutRef.current);
+    setPriceDelta(delta);
+    priceDeltaTimeoutRef.current = setTimeout(() => setPriceDelta(null), 2600);
+  };
 
   // Feuilletage en mode livre : couverture seule -> doubles-pages (gauche/
   // droite) -> 4e seule. Memes routes que l'atelier
@@ -382,33 +387,40 @@ export default function BookPreviewFinalLuxe() {
   const SPREAD_GAP_PX = 16;
   const naturalSpreadWidthPx = naturalPageWidthPx * 2 + SPREAD_GAP_PX;
 
-  // Recompose (contenu non verrouille) + persiste immediatement (voir
-  // formatComposer.js — meme principe "pas de bouton Valider" que le reste
-  // du projet) et met a jour book.print_format/book.page_count d'un coup :
-  // ce que "Commander mon livre" imprimera correspond donc toujours a ce qui
-  // vient d'etre recompose ici, jamais un format choisi puis une pagination
-  // qui reste celle d'un autre format.
+  // Change UNIQUEMENT le format (chantier "tarification dynamique",
+  // 2026-09-27, §9 : "changer de format ne doit PAS renvoyer l'utilisateur
+  // dans l'atelier... le contenu reste exactement identique... seul le
+  // produit physique et le prix changent") — changeFormatOnly ne recompose
+  // rien et ne touche jamais book.page_count, contrairement a l'ancien
+  // chooseFormat (toujours disponible, simplement plus appele depuis cet
+  // ecran). La page actuellement affichee reste donc valide : plus besoin
+  // de revenir a la couverture apres coup.
   const handleChooseFormat = async (formatId) => {
     if (formatId === currentFormat || switchingFormat) return;
     setSwitchingFormat(true);
     setError('');
+    // Indication breve (§9/§11 : "Format Luxe · +11,40 €") — l'ecart du
+    // TOTAL (livre + livraison, la livraison differe aussi selon le format,
+    // voir la grille), pas seulement du livre : c'est ce que la ligne
+    // "Total" affiche juste en dessous, l'ecart annonce doit correspondre a
+    // ce qui bouge vraiment. Les deux prix sont deja connus localement
+    // (formatPricing), aucun appel reseau supplementaire necessaire.
+    const totalFor = (id) => {
+      const entry = formatPricing[id];
+      return Number.isFinite(entry?.bookPriceCents) && Number.isFinite(entry?.shippingCents)
+        ? entry.bookPriceCents + entry.shippingCents
+        : null;
+    };
+    const before = totalFor(currentFormat);
+    const after = totalFor(formatId);
+    const formatLabel = PRINT_FORMATS.find((format) => format.id === formatId)?.label || formatId;
     try {
-      const { book: updatedBook } = await chooseFormat(bookId, formatId);
+      const { book: updatedBook } = await changeFormatOnly(bookId, formatId);
       setBook((previous) => ({ ...previous, ...updatedBook }));
-      // RETOUR A LA COUVERTURE.
-      //
-      // Changer de format recompose le livre : la pagination change, donc
-      // la planche n°7 d'avant n'est plus la planche n°7 d'apres. Rester
-      // sur le meme numero montrait un contenu different sans prevenir, et
-      // pouvait meme designer une planche qui n existe plus dans le format
-      // choisi. On revient a la couverture : le debut du livre est le seul
-      // repere qui a le meme sens dans les trois formats.
-      setViewIndex(0);
-      loadFormatOptions();
+      if (Number.isFinite(before) && Number.isFinite(after) && before !== after) {
+        showPriceDelta({ label: `Format ${formatLabel}`, priceCents: after - before });
+      }
     } catch (err) {
-      // Remonte le vrai message serveur (ex. "Il faut ajouter du contenu
-      // pour atteindre 28 pages minimum...") plutot qu'un message generique
-      // qui cacherait la vraie raison du blocage.
       setError(err?.message || 'Impossible de changer le format.');
     } finally {
       setSwitchingFormat(false);
@@ -461,6 +473,15 @@ export default function BookPreviewFinalLuxe() {
         ? `Pages ${leftPageIndex + 1}-${rightPageIndex + 1} / ${totalPages}`
         : `Page ${(leftPageIndex != null ? leftPageIndex : rightPageIndex) + 1} / ${totalPages}`;
   const hasCurrentContent = viewKind === 'spread' ? Boolean(leftHtml || rightHtml) : Boolean(singleHtml);
+  // Total = livre + livraison du format actuel (§3 : jamais un montant
+  // "livraison incluse" sans le detail juste au-dessus, mais un total unique
+  // est bien affiche sur le bouton de commande — §13). null tant que les
+  // deux ne sont pas connus, plutot qu'un total partiel trompeur.
+  const currentBookPriceCents = formatPricing[currentFormat]?.bookPriceCents;
+  const currentShippingCents = formatPricing[currentFormat]?.shippingCents;
+  const currentTotalCents = Number.isFinite(currentBookPriceCents) && Number.isFinite(currentShippingCents)
+    ? currentBookPriceCents + currentShippingCents
+    : null;
   // « Les deux pages » veut bien dire les deux : au premier vis-a-vis il n'y
   // a que la page de droite, et la feuille doit alors faire une page de
   // large, pas deux.
@@ -592,65 +613,65 @@ export default function BookPreviewFinalLuxe() {
           </div>
 
           <div className="preview-final-sidebar-section">
-            <span className="preview-final-sidebar-label">Format</span>
+            <span className="preview-final-sidebar-label">Votre format</span>
+            {/* Pagination IDENTIQUE pour les 3 formats desormais (retour
+                utilisateur, 2026-09-27, §9) : changer de format ne recompose
+                plus rien, book.page_count ne bouge jamais d'une carte a
+                l'autre — plus de warning "pas assez/trop de contenu pour ce
+                format" (ancien mecanisme, lie a la recomposition retiree). */}
             <div className="preview-final-format-list">
-              {PRINT_FORMATS.map((format) => {
-                const formatOption = formatOptions[format.id];
-                const formatPageCount = formatOption?.pageCount;
-                // meetsMinimum/meetsMaximum absents (options pas encore
-                // chargees) : jamais bloquant par defaut, seulement une fois
-                // qu'on SAIT que le contenu est hors bornes (voir
-                // routes/composition.js: GET /format-options).
-                const belowMinimum = formatOption?.meetsMinimum === false;
-                const aboveMaximum = formatOption?.meetsMaximum === false;
-                const outOfRange = belowMinimum || aboveMaximum;
-                return (
-                  <button
-                    key={format.id}
-                    type="button"
-                    className={`preview-final-format-card ${currentFormat === format.id ? 'is-selected' : ''} ${outOfRange ? 'is-below-minimum' : ''}`}
-                    onClick={() => handleChooseFormat(format.id)}
-                    disabled={switchingFormat || outOfRange}
-                    title={
-                      belowMinimum
-                        ? `Ajoutez du contenu pour atteindre le minimum imprimable (${formatPageCount} page${formatPageCount > 1 ? 's' : ''} actuellement).`
-                        : aboveMaximum
-                          ? `Retirez du contenu pour repasser sous le maximum imprimable (${formatPageCount} pages actuellement).`
-                          : undefined
-                    }
-                  >
-                    <span
-                      className={`preview-final-format-spine is-${format.spine}`}
-                      style={{ '--spine-thickness': `${Math.min(10, 2 + (formatPageCount || 16) / 8)}px` }}
-                      aria-hidden="true"
-                    />
-                    <span className="preview-final-format-name">{format.label} {format.badge || ''}</span>
-                    <span className="preview-final-format-tagline">{format.tagline}</span>
-                    <span className="preview-final-format-description">{format.description}</span>
-                    <span className="preview-final-format-dimensions">{format.dimensions} · {format.coverLabel}</span>
-                    <span className="preview-final-format-pagecount">
-                      {formatPageCount != null ? `${formatPageCount} pages` : '…'}
-                    </span>
-                    {belowMinimum ? (
-                      <span className="preview-final-format-warning">Pas assez de contenu pour ce format</span>
-                    ) : aboveMaximum ? (
-                      <span className="preview-final-format-warning">Trop de contenu pour ce format</span>
-                    ) : (
-                      <span className="preview-final-format-price">{formatEuro(pricesByFormat[format.id])}</span>
-                    )}
-                  </button>
-                );
-              })}
+              {PRINT_FORMATS.map((format) => (
+                <button
+                  key={format.id}
+                  type="button"
+                  className={`preview-final-format-card ${currentFormat === format.id ? 'is-selected' : ''}`}
+                  onClick={() => handleChooseFormat(format.id)}
+                  disabled={switchingFormat}
+                >
+                  <span
+                    className={`preview-final-format-spine is-${format.spine}`}
+                    style={{ '--spine-thickness': `${Math.min(10, 2 + (totalPages || 16) / 8)}px` }}
+                    aria-hidden="true"
+                  />
+                  <span className="preview-final-format-name">{format.label} {format.badge || ''}</span>
+                  <span className="preview-final-format-tagline">{format.tagline}</span>
+                  <span className="preview-final-format-description">{format.description}</span>
+                  <span className="preview-final-format-dimensions">{format.dimensions} · {format.coverLabel}</span>
+                  {/* Meme pagination pour les 3 cartes (retour utilisateur,
+                      §9) — affichee quand meme sur chacune : confirme
+                      visuellement qu'elle ne bouge pas d'un format a l'autre. */}
+                  <span className="preview-final-format-pagecount">{totalPages} pages</span>
+                  <span className="preview-final-format-price">{formatEuro(formatPricing[format.id]?.bookPriceCents)}</span>
+                </button>
+              ))}
             </div>
           </div>
 
+          {/* Prix detaille (§13/§14 : "a la fin, le prix devient un element
+              central") — livre et livraison distingues, jamais un seul
+              montant "livraison incluse" (§3). */}
           <div className="preview-final-sidebar-section preview-final-total">
-            <span className="preview-final-sidebar-label">Total</span>
-            <p className="preview-final-total-price">{formatEuro(pricesByFormat[currentFormat])}</p>
+            {priceDelta && (
+              <p className="preview-final-price-delta">
+                {priceDelta.label} · {formatEurosDelta(priceDelta.priceCents)}
+              </p>
+            )}
+            <div className="preview-final-price-line">
+              <span>Votre livre</span>
+              <span>{formatEuro(currentBookPriceCents)}</span>
+            </div>
+            <div className="preview-final-price-line">
+              <span>Livraison</span>
+              <span>{formatEuro(currentShippingCents)}</span>
+            </div>
+            <div className="preview-final-price-line preview-final-price-line-total">
+              <span className="preview-final-sidebar-label">Total</span>
+              <p className="preview-final-total-price">{formatEuro(currentTotalCents)}</p>
+            </div>
           </div>
 
           <button type="button" className="btn btn-primary preview-final-order-btn" onClick={handleOrder} disabled={ordering}>
-            {ordering ? 'Un instant...' : 'Commander mon livre →'}
+            {ordering ? 'Un instant...' : `Commander mon livre → ${formatEuro(currentTotalCents)}`}
           </button>
         </aside>
       </div>

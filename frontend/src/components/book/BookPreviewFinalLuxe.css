@@ -415,25 +415,50 @@
   white-space: nowrap;
 }
 
-/* Format sous le minimum imprimable (28 pages, voir GET /format-options:
-   meetsMinimum) : carte desactivee plutot qu'un clic qui echoue apres coup —
-   meme esprit que le blocage deja en place sur la generation automatique
-   (AtelierGenerateModal). */
-.preview-final-format-card.is-below-minimum {
-  opacity: 0.55;
-  cursor: not-allowed;
+/* is-below-minimum/preview-final-format-warning retires (chantier
+   "tarification dynamique", 2026-09-27) : liés à l'ancien mécanisme de
+   recomposition par format (getFormatOptions/meetsMinimum), lui-même retire
+   — changer de format ne recompose plus rien, donc plus de "trop/pas assez
+   de contenu pour CE format" possible (voir handleChooseFormat). */
+
+/* Prix detaille (§13/§14) : Livre / Livraison sur deux lignes discretes,
+   Total mis en avant — jamais un montant unique "livraison incluse" (§3). */
+.preview-final-price-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 4px;
 }
-.preview-final-format-card.is-below-minimum:hover { border-color: rgba(223, 216, 201, 0.9); }
-.preview-final-format-warning {
-  grid-row: 1 / span 5;
-  grid-column: 2;
-  align-self: center;
-  max-width: 90px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: #b42318;
-  text-align: right;
+.preview-final-price-line-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(223, 216, 201, 0.7);
+  align-items: center;
+}
+
+/* Indication breve de variation de prix (§9/§11), meme idiome que l'atelier
+   (.atelier-header-price-delta, BookAtelierLuxe.css) — disparait toute
+   seule (showPriceDelta). */
+@keyframes previewFinalPriceDeltaIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.preview-final-price-delta {
+  margin: 0 0 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(184, 146, 74, 0.14);
+  color: #7a5c2a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  animation: previewFinalPriceDeltaIn 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-final-price-delta { animation: none; }
 }
 
 .preview-final-total-price {

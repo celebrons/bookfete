@@ -151,12 +151,19 @@ const BookCheckoutLuxe = () => {
   // (BookPreviewFinalLuxe.js), donc jamais 3 prix divergents pour le meme
   // livre. `total` reste 0 tant que la premiere estimation n'est pas revenue
   // plutot que d'afficher un chiffre invente en attendant.
+  // shipping ajoute (chantier "tarification dynamique", 2026-09-27, §3 :
+  // "ne jamais faire 44,30€ livraison incluse") — deja renvoye par la meme
+  // reponse (price-estimate), simplement pas encore lu ici avant ce
+  // chantier. `total` incluait DEJA la livraison depuis le meme chantier
+  // cote backend ; ce qui change ici, c'est de pouvoir l'AFFICHER a part.
   const [estimate, setEstimate] = useState({ total: 0 });
   useEffect(() => {
     if (!book?.id) return undefined;
     let cancelled = false;
     estimatePrice(book.id, { printFormat: book.print_format, pageCount: book.page_count, type: orderType, quantity })
-      .then((result) => { if (!cancelled) setEstimate({ total: result.totalCents, unit: result.unitCents }); })
+      .then((result) => {
+        if (!cancelled) setEstimate({ total: result.totalCents, unit: result.unitCents, shipping: result.shippingCents });
+      })
       .catch(() => { if (!cancelled) setEstimate({ total: 0 }); });
     return () => { cancelled = true; };
   }, [book?.id, book?.print_format, book?.page_count, orderType, quantity]);
@@ -251,6 +258,11 @@ const BookCheckoutLuxe = () => {
   const effectiveUnit = checkoutFormLocked
     ? Number(latestOrder?.unit_cents || estimate.unit || 0)
     : (estimate.unit || 0);
+  // Une fois la commande creee, la livraison vient du snapshot FIGE (§18/§19
+  // — jamais recalculee), pas d'une nouvelle estimation.
+  const effectiveShipping = checkoutFormLocked
+    ? Number(latestOrder?.snapshot?.shippingPriceCents ?? estimate.shipping ?? 0)
+    : (estimate.shipping || 0);
 
   // Etapes affichees : l'adresse disparait completement pour une commande
   // PDF (rien a livrer) — jamais une etape grisee qu'on n'atteindra pas.
@@ -1349,6 +1361,7 @@ const BookCheckoutLuxe = () => {
               onChangeQuantity={setQuantity}
               locked={checkoutFormLocked}
               unitCents={effectiveUnit}
+              shippingCents={effectiveShipping}
               totalCents={effectiveTotal}
               pricesByType={pricesByType}
             />
@@ -1368,6 +1381,7 @@ const BookCheckoutLuxe = () => {
               orderType={effectiveOrderType}
               quantity={effectiveQuantity}
               unitCents={effectiveUnit}
+              shippingCents={effectiveShipping}
               totalCents={effectiveTotal}
               address={address}
               bookTitle={book?.title}

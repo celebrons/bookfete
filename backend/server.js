@@ -38,7 +38,6 @@ const bookRoutes = require('./routes/books');
 const chapterRoutes = require('./routes/chapters');
 const inviteRoutes = require('./routes/invites');
 const compositionRoutes = require('./routes/composition');
-const productRoutes = require('./routes/products');
 const collectiveRoutes = require('./routes/collective');
 
 // DERRIERE UN PROXY ?
@@ -213,7 +212,6 @@ app.use('/api/chapters', chapterRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/', compositionRoutes);
-app.use('/', productRoutes);
 app.use('/', collectiveRoutes);
 
 app.get('/api/health', (_req, res) => {

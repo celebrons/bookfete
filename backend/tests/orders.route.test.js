@@ -119,13 +119,20 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
     expect(response.status).toBe(404);
   });
 
-  it('sans parametre : utilise les valeurs reelles du livre (luxe, 24 pages)', async () => {
+  // Livre fixture (BOOK_ID) : print_format 'luxe', page_count 24 — SOUS le
+  // plancher produit (30, voir bookContentService.MIN_BOOK_PAGES). La grille
+  // tarifaire (services/pricing/) ramene toute pagination sous 30 au prix de
+  // 30 pages (jamais un prix plus bas que le plancher produit) : luxe a 24
+  // (comme a 30) pages coute donc 4990, pas un prix proportionnel a 24.
+  it('sans parametre : utilise les valeurs reelles du livre (luxe, 24 pages -> ramene au plancher 30)', async () => {
     const response = await request(app)
       .get(`/api/orders/book/${BOOK_ID}/price-estimate`)
       .set('Authorization', 'Bearer valid-token');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ printFormat: 'luxe', pageCount: 24, unitCents: 10020, totalCents: 10020 });
+    expect(response.body).toEqual({
+      printFormat: 'luxe', pageCount: 24, unitCents: 4990, bookPriceCents: 4990, shippingCents: 539, totalCents: 5529
+    });
   });
 
   it('print_format en query surcharge le format reel du livre, sans le persister', async () => {
@@ -134,7 +141,9 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
       .set('Authorization', 'Bearer valid-token');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ printFormat: 'livret', pageCount: 24, unitCents: 4900, totalCents: 4900 });
+    expect(response.body).toEqual({
+      printFormat: 'livret', pageCount: 24, unitCents: 2990, bookPriceCents: 2990, shippingCents: 500, totalCents: 3490
+    });
   });
 
   it('page_count en query surcharge la pagination reelle, pour previsualiser avant sauvegarde', async () => {
@@ -143,7 +152,9 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
       .set('Authorization', 'Bearer valid-token');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ printFormat: 'luxe', pageCount: 64, unitCents: 15220, totalCents: 15220 });
+    expect(response.body).toEqual({
+      printFormat: 'luxe', pageCount: 64, unitCents: 9920, bookPriceCents: 9920, shippingCents: 539, totalCents: 10459
+    });
   });
 
   it('print_format et page_count combines', async () => {
@@ -152,7 +163,9 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
       .set('Authorization', 'Bearer valid-token');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ printFormat: 'standard', pageCount: 64, unitCents: 10340, totalCents: 10340 });
+    expect(response.body).toEqual({
+      printFormat: 'standard', pageCount: 64, unitCents: 7730, bookPriceCents: 7730, shippingCents: 500, totalCents: 8230
+    });
   });
 
   it('ne persiste jamais la surcharge (le livre reel n\'est pas modifie)', async () => {
@@ -164,7 +177,9 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
       .get(`/api/orders/book/${BOOK_ID}/price-estimate`)
       .set('Authorization', 'Bearer valid-token');
 
-    expect(again.body).toEqual({ printFormat: 'luxe', pageCount: 24, unitCents: 10020, totalCents: 10020 });
+    expect(again.body).toEqual({
+      printFormat: 'luxe', pageCount: 24, unitCents: 4990, bookPriceCents: 4990, shippingCents: 539, totalCents: 5529
+    });
   });
 
   it("type et quantity (optionnels, defaut 'print'/1) simulent le vrai prix d'une commande PDF/Pack/quantite multiple", async () => {
@@ -172,17 +187,20 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
       .get(`/api/orders/book/${BOOK_ID}/price-estimate?type=pdf`)
       .set('Authorization', 'Bearer valid-token');
     expect(pdf.body.totalCents).toBe(3900); // tarif PDF plat, ignore print_format/page_count
+    expect(pdf.body.shippingCents).toBe(0); // aucun exemplaire physique, aucune livraison
 
     const pack = await request(app)
       .get(`/api/orders/book/${BOOK_ID}/price-estimate?type=pack`)
       .set('Authorization', 'Bearer valid-token');
-    expect(pack.body.unitCents).toBe(10020 + 2000);
+    expect(pack.body.unitCents).toBe(4990 + 2000);
+    expect(pack.body.shippingCents).toBe(539);
 
     const doublePrint = await request(app)
       .get(`/api/orders/book/${BOOK_ID}/price-estimate?type=print&quantity=2`)
       .set('Authorization', 'Bearer valid-token');
-    expect(doublePrint.body.unitCents).toBe(10020);
-    expect(doublePrint.body.totalCents).toBe(10020 * 2);
+    expect(doublePrint.body.unitCents).toBe(4990);
+    // La livraison est un forfait par COMMANDE, jamais multiplie par la quantite (§3).
+    expect(doublePrint.body.totalCents).toBe((4990 * 2) + 539);
   });
 });
 

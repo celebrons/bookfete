@@ -935,6 +935,41 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, async (
   }
 });
 
+// POST /api/books/:bookId/format-only
+// Change UNIQUEMENT books.print_format — aucune recomposition, aucun
+// changement de pagination/contenu (retour utilisateur, 2026-09-27, chantier
+// "tarification dynamique", §9 : "changer le format ne doit PAS renvoyer
+// l'utilisateur dans l'atelier... le contenu reste exactement identique...
+// seul le produit physique et le prix changent"). Distincte de la route
+// ci-dessus (POST /format, qui recompose via formatComposer.js) : cette
+// derniere reste en place pour qui en aurait besoin, mais l'ecran "Votre
+// livre est pret" appelle desormais celle-ci. Body : { formatId }.
+router.post('/api/books/:bookId/format-only', authenticate, requireOwnedBook, async (req, res) => {
+  try {
+    const { book } = req;
+    const formatId = req.body?.formatId;
+    if (!formatId || !Object.prototype.hasOwnProperty.call(COVER_FORMATS, formatId)) {
+      return res.status(400).json({ error: 'Format inconnu.' });
+    }
+
+    if (formatId === book.print_format) {
+      return res.json({ book });
+    }
+
+    const { data: updatedBook, error } = await supabase
+      .from('books')
+      .update({ print_format: formatId })
+      .eq('id', book.id)
+      .select('*')
+      .single();
+    if (error) throw error;
+
+    res.json({ book: updatedBook });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/books/:bookId/preview.html
 // Premier apercu du livre compose, ouvrable directement au navigateur.
 // Ne depend d'aucun binaire externe (contrairement au PDF) : c'est le moyen
