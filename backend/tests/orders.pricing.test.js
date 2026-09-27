@@ -49,11 +49,20 @@ describe('routes/orders.computeOrderPricing', () => {
     expect(pricing.totalCents).toBe(799);
   });
 
-  it('type "pack" : prix impression + 20 EUR, livraison incluse au total', () => {
+  it('type "pack" : (PDF + imprime) moins 10%, livraison incluse au total', () => {
     const pricing = computeOrderPricing({ book: { page_count: 34 }, type: 'pack', quantity: 1 });
-    expect(pricing.unitCents).toBe(4430 + 2000);
+    const attendu = Math.round((799 + 4430) * 0.9); // 4706
+    expect(pricing.unitCents).toBe(attendu);
     expect(pricing.shippingCents).toBe(500);
-    expect(pricing.totalCents).toBe(4430 + 2000 + 500);
+    expect(pricing.totalCents).toBe(attendu + 500);
+  });
+
+  it('type "pack" : la remise de 10% suit le prix reel du format (pas un supplement fixe)', () => {
+    const standard = computeOrderPricing({ book: { page_count: 34, print_format: 'standard' }, type: 'pack', quantity: 1 });
+    const luxe = computeOrderPricing({ book: { page_count: 34, print_format: 'luxe' }, type: 'pack', quantity: 1 });
+    expect(standard.unitCents).toBe(Math.round((799 + 4430) * 0.9));
+    expect(luxe.unitCents).toBe(Math.round((799 + 5570) * 0.9));
+    expect(luxe.unitCents).toBeGreaterThan(standard.unitCents);
   });
 
   it('multiplie unitCents par la quantite, mais PAS la livraison (un forfait par commande)', () => {

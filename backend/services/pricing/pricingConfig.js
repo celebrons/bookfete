@@ -54,6 +54,12 @@ const DEFAULT_FORMAT = 'standard';
 // verite, modifiable a un seul endroit.
 const PDF_PRICE_CENTS = 799;
 
+// Pack PDF + imprimé (retour utilisateur, 2026-09-27) : "le prix du pdf +
+// le prix du livre imprimé, MOINS 10% sur ce total (hors livraison)" — plus
+// un supplement fixe. La remise porte sur PDF+imprime uniquement, jamais
+// sur la livraison (ajoutee a part, apres coup, comme pour tous les types).
+const PACK_DISCOUNT_PERCENT = 10;
+
 // Livraison : structure par PAYS puis par FORMAT (retour utilisateur §20 :
 // "prevoir une structure permettant d'ajouter d'autres pays plus tard").
 // Seule la France est renseignee pour l'instant.
@@ -79,6 +85,7 @@ module.exports = {
   PRICING_CONFIG,
   DEFAULT_FORMAT,
   PDF_PRICE_CENTS,
+  PACK_DISCOUNT_PERCENT,
   SHIPPING_PRICE_CENTS,
   DEFAULT_COUNTRY,
   resolveFormatConfig,

@@ -192,7 +192,7 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
     const pack = await request(app)
       .get(`/api/orders/book/${BOOK_ID}/price-estimate?type=pack`)
       .set('Authorization', 'Bearer valid-token');
-    expect(pack.body.unitCents).toBe(4990 + 2000);
+    expect(pack.body.unitCents).toBe(Math.round((799 + 4990) * 0.9)); // (PDF + imprime) - 10%
     expect(pack.body.shippingCents).toBe(539);
 
     const doublePrint = await request(app)

@@ -8,7 +8,7 @@ const gelatoClient = require('../services/printing/gelatoClient');
 const { removePrintFilesForOrder } = require('../services/printing/printFileStorage');
 const { logEvent } = require('../services/events/eventLog');
 const { calculateBookPrice } = require('../services/pricing/calculateBookPrice');
-const { PDF_PRICE_CENTS } = require('../services/pricing/pricingConfig');
+const { PDF_PRICE_CENTS, PACK_DISCOUNT_PERCENT } = require('../services/pricing/pricingConfig');
 
 // Envois a l'imprimeur EN COURS, par commande.
 //
@@ -322,7 +322,11 @@ const computeOrderPricing = ({ book, type, quantity }) => {
     unitCents = printUnitCents;
     shippingCents = pricing.shippingPriceCents;
   } else if (type === 'pack') {
-    unitCents = printUnitCents + 2000; // Supplement fixe inchange, hors grille fournie.
+    // PDF + imprime, moins PACK_DISCOUNT_PERCENT sur ce total (hors
+    // livraison) — retour utilisateur 2026-09-27, remplace l'ancien
+    // supplement fixe (+20 EUR) qui ignorait le prix reel du PDF/du format.
+    const pdfPlusPrintCents = pdfUnitCents + printUnitCents;
+    unitCents = Math.round(pdfPlusPrintCents * (100 - PACK_DISCOUNT_PERCENT) / 100);
     shippingCents = pricing.shippingPriceCents;
   }
 
