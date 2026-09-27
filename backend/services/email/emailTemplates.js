@@ -42,7 +42,8 @@ const prix = (cents) => {
 // faux pour un proche invite a contribuer : il n'a rien cree du tout.
 const PIEDS = {
   createur: 'Vous recevez cet email parce que vous avez créé un livre sur Célébrons.',
-  invite: 'Vous recevez cet email parce que quelqu’un vous a invité à contribuer à son livre souvenir.'
+  invite: 'Vous recevez cet email parce que quelqu’un vous a invité à contribuer à son livre souvenir.',
+  interne: 'Alerte technique interne — envoyée aux adresses listées dans ADMIN_EMAILS.'
 };
 
 function habillage({ titre, corps, bouton, details, pied = 'createur' }) {
@@ -291,6 +292,27 @@ function nouvelleContribution({ lien, titreLivre, contributeur, photos, souvenir
   };
 }
 
+// Alerte technique interne (retour utilisateur, 2026-09-27 — chantier
+// "fiabilite de la commande de bout en bout") : paiement Stripe echoue/
+// expire, generation PDF echouee apres nouvelles tentatives, etc. UN SEUL
+// gabarit generique plutot qu'un par type d'incident — le sujet et les
+// lignes portent deja le detail, dupliquer la mise en forme n'apporterait
+// rien. `pied: 'interne'` (jamais 'createur'/'invite', qui n'auraient aucun
+// sens pour un message qui ne parle pas d'un livre a son proprietaire).
+function alerteAdmin({ sujet, lignes = [], details = [] }) {
+  const titre = sujet;
+  return {
+    subject: `[Célébrons] ${sujet}`,
+    html: habillage({
+      titre,
+      corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''),
+      details,
+      pied: 'interne'
+    }),
+    text: texteDe({ titre, lignes, details })
+  };
+}
+
 function essai({ destinataire }) {
   const titre = 'Vos emails fonctionnent';
   const lignes = [
@@ -314,6 +336,7 @@ module.exports = {
   paiementRecu,
   pdfPret,
   etapeDeFabrication,
+  alerteAdmin,
   essai,
   ETAPES,
   prix

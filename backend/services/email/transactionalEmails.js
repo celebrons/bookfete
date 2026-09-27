@@ -197,6 +197,44 @@ async function envoyerEssai({ to }) {
   return envoyer(gabarits.essai({ destinataire: to }), to, 'essai');
 }
 
+// --- Alertes techniques internes (2026-09-27) ------------------------------
+//
+// Reutilise ADMIN_EMAILS (middleware/requireAdmin.js) : une seule variable
+// d'environnement designe deja qui gere ce projet, pas une deuxieme a poser
+// et a tenir a jour en double. Plusieurs adresses possibles (separees par
+// des virgules), un email chacune : sendEmail() n'accepte qu'un destinataire
+// a la fois (voir resendClient.js), et melanger plusieurs adresses dans un
+// meme envoi les exposerait les unes aux autres.
+function adressesAdmin() {
+  return String(process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((adresse) => adresse.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Alerte un administrateur d'un incident technique (paiement Stripe
+ * echoue/expire, generation PDF definitivement echouee, etc.) — JAMAIS
+ * bloquant pour l'action qui l'a declenchee (meme regle absolue que le
+ * reste de ce fichier, voir l'entete).
+ *
+ * Sans ADMIN_EMAILS configuree, rien ne part et c'est journalise : mieux
+ * vaut un silence explicite dans les logs qu'une erreur qui remonterait
+ * jusqu'a l'utilisateur pour un probleme qui ne le concerne pas.
+ */
+async function envoyerAlerteAdmin({ sujet, lignes, details }) {
+  const destinataires = adressesAdmin();
+  if (destinataires.length === 0) {
+    console.log(`[email] alerte admin non envoyee (ADMIN_EMAILS absente) : ${sujet}`);
+    return { sent: false, skipped: 'admin_emails_absente' };
+  }
+  const gabarit = gabarits.alerteAdmin({ sujet, lignes, details });
+  const resultats = await Promise.all(
+    destinataires.map((to) => envoyer(gabarit, to, `alerte admin : ${sujet}`))
+  );
+  return { sent: resultats.some((r) => r.sent), resultats };
+}
+
 module.exports = {
   envoyerInvitationParticipant,
   envoyerRelanceParticipant,
@@ -207,6 +245,7 @@ module.exports = {
   envoyerPdfPret,
   envoyerEtapeFabrication,
   envoyerEssai,
+  envoyerAlerteAdmin,
   isEmailEnabled,
   destinataireDe,
   formatLisible,

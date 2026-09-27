@@ -48,6 +48,25 @@ jest.mock('../services/printing/gelatoClient', () => ({
   createOrder: jest.fn(async () => ({}))
 }));
 
+// SANS CE MOCK, UN TEST ENVOIE UN VRAI EMAIL.
+//
+// Constate le 2026-09-27 : ce fichier n'avait jamais mocke transactionalEmails
+// (le chemin "paiement recu" existant restait silencieux par accident, faute
+// de destinataire connu sur la commande) — le nouveau chemin d'alerte, lui,
+// lit ADMIN_EMAILS directement depuis backend/.env, une vraie adresse. Deux
+// emails d'alerte reels sont partis pendant l'ecriture des tests ci-dessous
+// avant que ce mock ne soit ajoute. Aucun test ne doit jamais pouvoir
+// atteindre resendClient.js — c'est la seule garantie qui compte ici.
+jest.mock('../services/email/transactionalEmails', () => ({
+  envoyerPaiementRecu: jest.fn(async () => ({ sent: false, skipped: 'test' })),
+  envoyerAlerteAdmin: jest.fn(async () => ({ sent: false, skipped: 'test' })),
+  envoyerCommandeConfirmee: jest.fn(async () => ({ sent: false, skipped: 'test' })),
+  envoyerPdfPret: jest.fn(async () => ({ sent: false, skipped: 'test' })),
+  envoyerEtapeFabrication: jest.fn(async () => ({ sent: false, skipped: 'test' })),
+  envoyerLienLivre: jest.fn(async () => ({ sent: false, skipped: 'test' })),
+  isEmailEnabled: jest.fn(() => false)
+}));
+
 const express = require('express');
 const request = require('supertest');
 
@@ -147,5 +166,90 @@ describe('Webhook Stripe', () => {
 
     expect(reponse.status).toBe(200);
     expect(reponse.body.ignored).toBe('customer.created');
+  });
+});
+
+// Retour utilisateur (2026-09-27) : "une commande dont le paiement echoue ne
+// doit jamais etre envoyee a Gelato, et doit rester dans un etat coherent
+// plutot que bloquee entre deux statuts." Avant ce correctif, ces deux
+// evenements etaient simplement ignores (branche isCheckoutCompleted,
+// jamais atteinte) : aucune trace, aucune alerte.
+describe('Webhook Stripe — paiement echoue/expire', () => {
+  beforeEach(() => {
+    // Le magasin mock est PARTAGE avec le describe precedent, qui a deja
+    // fait passer la commande a "paid" (voir son premier test) : on la
+    // remet a "awaiting_payment", metadata propre, pour que ce bloc parte
+    // d'un etat connu quel que soit l'ordre d'execution.
+    const commande = enBase();
+    commande.status = 'awaiting_payment';
+    commande.metadata = { stripeCheckoutSessionId: SESSION_ID };
+  });
+
+  it('checkout.session.expired : la commande RESTE awaiting_payment (deja coherente/relancable), avec un historique + une alerte admin', async () => {
+    const emails = require('../services/email/transactionalEmails');
+    emails.envoyerAlerteAdmin.mockClear();
+
+    const reponse = await envoyer(evenement('checkout.session.expired', 'unpaid'));
+
+    expect(reponse.status).toBe(200);
+    expect(reponse.body.status).toBe('payment_failure_recorded');
+
+    const commande = enBase();
+    // Statut INCHANGE : deja l'etat coherent, deja resumable (bouton "Payer
+    // la commande en attente"), jamais touche par un echec de paiement.
+    expect(commande.status).toBe('awaiting_payment');
+    expect(commande.metadata.paymentFailures).toHaveLength(1);
+    expect(commande.metadata.paymentFailures[0]).toEqual(expect.objectContaining({
+      sessionId: SESSION_ID,
+      reason: 'expired'
+    }));
+    expect(emails.envoyerAlerteAdmin).toHaveBeenCalledTimes(1);
+    const alerte = emails.envoyerAlerteAdmin.mock.calls[0][0];
+    expect(alerte.sujet).toMatch(/Paiement Stripe echoue/);
+    expect(alerte.details).toEqual(expect.arrayContaining([['Raison', 'expired']]));
+  });
+
+  it('checkout.session.async_payment_failed : meme traitement, raison differente, s\'accumule a un historique existant', async () => {
+    // Une premiere tentative echouee est deja enregistree (independant de
+    // l'ordre d'execution des tests, jamais suppose depuis un test voisin).
+    const commande = enBase();
+    commande.metadata = {
+      ...commande.metadata,
+      paymentFailures: [{ at: '2026-09-27T10:00:00.000Z', sessionId: SESSION_ID, reason: 'expired' }]
+    };
+
+    const reponse = await envoyer(evenement('checkout.session.async_payment_failed', 'unpaid'));
+
+    expect(reponse.status).toBe(200);
+    const apres = enBase();
+    expect(apres.status).toBe('awaiting_payment');
+    // Deuxieme tentative echouee ajoutee (la precedente n'est pas ecrasee) :
+    // 2 entrees au total sur cette commande.
+    expect(apres.metadata.paymentFailures).toHaveLength(2);
+    expect(apres.metadata.paymentFailures[1].reason).toBe('async_payment_failed');
+  });
+
+  it('ne touche JAMAIS une commande deja payee (evenement d\'echec arrive en retard)', async () => {
+    // La commande est passee "paid" entre-temps (paiement reellement reussi,
+    // webhook de succes deja traite) : un evenement d'echec qui arrive
+    // APRES ne doit surtout pas la faire "reculer" ni y ajouter un historique
+    // d'echec qui n'a plus de sens.
+    const orders = global.__supabaseMock.__store.get('orders');
+    const commandeAvant = orders.find((o) => o.id === ORDER_ID);
+    commandeAvant.status = 'paid';
+    commandeAvant.metadata = { ...commandeAvant.metadata, paymentFailures: undefined };
+
+    const emails = require('../services/email/transactionalEmails');
+    emails.envoyerAlerteAdmin.mockClear();
+
+    const reponse = await envoyer(evenement('checkout.session.expired', 'unpaid'));
+
+    expect(reponse.status).toBe(200);
+    const commandeApres = enBase();
+    expect(commandeApres.status).toBe('paid');
+    expect(commandeApres.metadata.paymentFailures).toBeUndefined();
+    // Aucune alerte non plus : rien d'anormal a signaler sur une commande
+    // deja payee.
+    expect(emails.envoyerAlerteAdmin).not.toHaveBeenCalled();
   });
 });

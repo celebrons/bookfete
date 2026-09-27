@@ -100,6 +100,7 @@ jest.mock('../services/email/transactionalEmails', () => ({
   envoyerPaiementRecu: jest.fn(async () => ({ sent: true })),
   envoyerEtapeFabrication: jest.fn(async () => ({ sent: true })),
   envoyerLienLivre: jest.fn(async () => ({ sent: true })),
+  envoyerAlerteAdmin: jest.fn(async () => ({ sent: true })),
   isEmailEnabled: jest.fn(() => true)
 }));
 
@@ -309,5 +310,103 @@ describe('Suivi de la fabrication du PDF', () => {
 
     expect(relance.status).toBe(202);
     expect(relance.body.jobId).not.toBe(jobId);
+  });
+});
+
+// Retour utilisateur (2026-09-27) : "une commande n'est jamais prete si le
+// PDF est invalide/incomplet ; il faut une nouvelle tentative automatique,
+// un statut d'erreur explicite, et une alerte, pas un echec silencieux."
+describe('Fiabilite : nouvelle tentative automatique + alerte sur echec definitif', () => {
+  let app;
+
+  beforeAll(() => {
+    app = buildApp();
+  });
+
+  beforeEach(() => {
+    // Le magasin mock est PARTAGE entre tous les tests de ce fichier (voir
+    // le meme piege documente dans tests/orders.route.test.js) : un test
+    // precedent de ce meme bloc peut avoir deja fait avancer order-paid-1
+    // jusqu'a "pdf_ready". On la remet a "paid", metadata propre, pour que
+    // chaque test parte du meme etat quel que soit l'ordre d'execution.
+    const commande = supabaseMock.__table('orders').find((o) => o.id === 'order-paid-1');
+    if (commande) {
+      commande.status = 'paid';
+      commande.metadata = {};
+    }
+  });
+
+  afterEach(() => {
+    // Remet le mock a son comportement par defaut (succes) pour ne pas
+    // affecter les tests suivants, meme si un test de ce bloc echoue.
+    const pdfService = require('../services/composition/pdfService');
+    pdfService.renderPdfByPrinting.mockReset();
+    pdfService.renderPdfByPrinting.mockImplementation(async ({ onProgress }) => {
+      if (typeof onProgress === 'function') onProgress({ phase: 'photos', done: 3, total: 12 });
+      return require('path').join(__dirname, 'fixtures', 'fake.pdf');
+    });
+  });
+
+  const lancerJob = async () => {
+    const reponse = await request(app)
+      .post(`/api/books/${BOOK_ID}/export-final-pdf`)
+      .set('Authorization', 'Bearer valid-token')
+      .send({ forceRegenerate: true });
+    expect(reponse.status).toBe(202);
+    return reponse.body.jobId;
+  };
+
+  const lireStatut = (jobId) => request(app)
+    .get(`/api/books/${BOOK_ID}/export-final-pdf/${jobId}/status`)
+    .set('Authorization', 'Bearer valid-token');
+
+  it('un premier echec est rattrape par une deuxieme tentative automatique : le job finit "ready"', async () => {
+    const pdfService = require('../services/composition/pdfService');
+    pdfService.renderPdfByPrinting
+      .mockRejectedValueOnce(new Error('Navigateur headless indisponible (transitoire)'))
+      .mockImplementationOnce(async ({ onProgress }) => {
+        if (typeof onProgress === 'function') onProgress({ phase: 'photos', done: 12, total: 12 });
+        return require('path').join(__dirname, 'fixtures', 'fake.pdf');
+      });
+
+    const jobId = await lancerJob();
+    await flushAsync();
+    await flushAsync();
+    await flushAsync();
+
+    const statut = await lireStatut(jobId);
+    expect(statut.body.status).toBe('ready');
+    expect(pdfService.renderPdfByPrinting).toHaveBeenCalledTimes(2);
+  });
+
+  it('un echec qui persiste sur les DEUX tentatives : statut "failed" explicite, commande revenue a "paid", alerte admin envoyee', async () => {
+    const pdfService = require('../services/composition/pdfService');
+    const emails = require('../services/email/transactionalEmails');
+    emails.envoyerAlerteAdmin.mockClear();
+    pdfService.renderPdfByPrinting.mockRejectedValue(new Error('Photo source introuvable'));
+
+    const jobId = await lancerJob();
+    await flushAsync();
+    await flushAsync();
+    await flushAsync();
+    await flushAsync();
+
+    const statut = await lireStatut(jobId);
+    expect(statut.body.status).toBe('failed');
+    expect(statut.body.error).toMatch(/Photo source introuvable/);
+    // Jamais laisse silencieusement en "rendering"/"pdf_generating" : la
+    // commande liee (order-paid-1) redevient explicitement "paid".
+    const commande = supabaseMock.__table('orders').find((o) => o.id === 'order-paid-1');
+    expect(commande.status).toBe('paid');
+    expect(commande.metadata.pdfReady).toBe(false);
+    expect(commande.metadata.pdfError).toMatch(/Photo source introuvable/);
+    // Deux tentatives reellement essayees, pas une seule.
+    expect(pdfService.renderPdfByPrinting).toHaveBeenCalledTimes(2);
+    // Alerte envoyee UNE fois (pas une par tentative) une fois les deux
+    // tentatives epuisees.
+    expect(emails.envoyerAlerteAdmin).toHaveBeenCalledTimes(1);
+    const alerte = emails.envoyerAlerteAdmin.mock.calls[0][0];
+    expect(alerte.sujet).toMatch(/Generation PDF echouee/);
+    expect(alerte.details).toEqual(expect.arrayContaining([['orderId', 'order-paid-1']]));
   });
 });

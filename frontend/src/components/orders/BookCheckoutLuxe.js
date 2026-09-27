@@ -1063,14 +1063,25 @@ const BookCheckoutLuxe = () => {
                 message: 'Paiement valide. Le PDF final est genere et telechargeable.'
               };
             } catch (_pollError) {
-              finalNotice = {
-                type: 'warning',
-                message: MESSAGE_PDF_EN_COURS
-              };
+              // Retour utilisateur (2026-09-27) : "pas un echec silencieux".
+              // pollPdfJobUntilReady() leve pour DEUX raisons tres
+              // differentes — un rendu genuinement ECHOUE (le serveur a deja
+              // essaye deux fois, voir routes/books.js processPdfExportJob),
+              // ou un rendu simplement LENT qui continue de son cote. Le
+              // message rassurant "sera disponible sous peu" etait affiche
+              // dans les DEUX cas — y compris quand la fabrication avait deja
+              // definitivement echoue et ne repartirait jamais toute seule.
+              // metadata.pdfError, ecrit par le serveur UNIQUEMENT en cas
+              // d'echec reel (jamais pour une simple lenteur), fait la
+              // difference de facon fiable.
               const refreshedOrder = await getOrderById(currentOrder.id).catch(() => null);
               if (refreshedOrder) {
                 setLatestOrder(refreshedOrder);
               }
+              const echecReel = refreshedOrder?.metadata?.pdfError;
+              finalNotice = echecReel
+                ? { type: 'error', message: `La generation du PDF a echoue : ${echecReel}` }
+                : { type: 'warning', message: MESSAGE_PDF_EN_COURS };
             }
           } else {
             finalNotice = {
@@ -1204,16 +1215,26 @@ const BookCheckoutLuxe = () => {
       } catch (error) {
         if (!active) return;
         if (!isMissingPdfJobError(error)) {
-          // Le SUIVI s arrete, pas la fabrication : elle vit dans le serveur,
-          // pas dans cet onglet. Sans ce message, la barre restait figee sur
-          // sa derniere valeur sans rien dire (2026-09-16 : « bloque sur
-          // 15 / 32 pages » alors que le PDF etait deja pret et l email
-          // parti). L etat de la commande est relu toutes les 5 s par
-          // ailleurs : c est lui qui fera disparaitre la barre.
-          setNotice({
-            type: 'warning',
-            message: MESSAGE_PDF_EN_COURS
-          });
+          // Le SUIVI s arrete, pas forcement la fabrication : elle vit dans
+          // le serveur, pas dans cet onglet. Sans message, la barre restait
+          // figee sur sa derniere valeur sans rien dire (2026-09-16 : «
+          // bloque sur 15 / 32 pages » alors que le PDF etait deja pret et
+          // l email parti).
+          //
+          // MAIS (retour utilisateur, 2026-09-27, "pas un echec silencieux") :
+          // pollPdfJobUntilReady() leve aussi bien pour un rendu simplement
+          // LENT que pour un rendu qui a DEFINITIVEMENT echoue (deux
+          // tentatives automatiques deja epuisees cote serveur, voir
+          // routes/books.js). Le message rassurant ne doit s'afficher que
+          // dans le premier cas — metadata.pdfError (ecrit par le serveur
+          // uniquement sur un echec reel) fait la difference de facon fiable.
+          const refreshedOrder = await getOrderById(latestOrder.id).catch(() => null);
+          if (!active) return;
+          if (refreshedOrder) setLatestOrder(refreshedOrder);
+          const echecReel = refreshedOrder?.metadata?.pdfError;
+          setNotice(echecReel
+            ? { type: 'error', message: `La generation du PDF a echoue : ${echecReel}` }
+            : { type: 'warning', message: MESSAGE_PDF_EN_COURS });
           return;
         }
       }

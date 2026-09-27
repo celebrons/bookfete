@@ -2172,122 +2172,173 @@ async function recoverMissingPdfExportJob({
   return recoveredJob;
 }
 
+// Une seule nouvelle tentative automatique (retour utilisateur, 2026-09-27 —
+// "il faut une nouvelle tentative automatique, un statut d'erreur explicite,
+// et une alerte, pas un echec silencieux"). Pas davantage : un rendu deja
+// couteux (plusieurs minutes, l unique rendu autorise en parallele sur ce
+// serveur — voir la note capacite du meme chantier) ne doit pas s acharner
+// indefiniment sur une cause structurelle (navigateur headless absent,
+// photo corrompue) qu une deuxieme tentative identique ne resoudra pas non
+// plus. Une cause transitoire (reseau, chargement d une photo), elle, a de
+// bonnes chances de passer au deuxieme essai.
+const PDF_EXPORT_MAX_ATTEMPTS = 2;
+
 async function processPdfExportJob({
   jobId,
   book
 }) {
-  const queuedJob = pdfExportJobs.get(jobId);
-  if (!queuedJob) {
+  let dernierEchec = null;
+
+  for (let tentative = 1; tentative <= PDF_EXPORT_MAX_ATTEMPTS; tentative += 1) {
+    const enCours = pdfExportJobs.get(jobId);
+    if (!enCours) {
+      return;
+    }
+
+    enCours.status = 'rendering';
+    enCours.startedAt = enCours.startedAt || new Date().toISOString();
+    enCours.error = null;
+    enCours.attempt = tentative;
+    pdfExportJobs.set(jobId, enCours);
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const files = await generateFinalBookPdfFiles({
+        book,
+        jobId,
+        // Jamais bloquant : un rapport d'avancement qui echoue ne doit pas
+        // faire echouer un rendu de plusieurs minutes.
+        onProgress: ({ phase, done, total }) => {
+          const progressCible = pdfExportJobs.get(jobId);
+          if (!progressCible) return;
+          progressCible.progress = {
+            // La capture des pages ne se nomme pas elle-meme : c'est
+            // l'appelant qui sait de quelle phase il s'agit (meme convention
+            // que services/printing/gelatoPrintFile.js).
+            phase: phase || 'pages',
+            done,
+            total,
+            updatedAt: new Date().toISOString()
+          };
+          pdfExportJobs.set(jobId, progressCible);
+        }
+      });
+      const readyJob = pdfExportJobs.get(jobId);
+      if (!readyJob) {
+        return;
+      }
+
+      readyJob.status = 'ready';
+      readyJob.completedAt = new Date().toISOString();
+      readyJob.error = null;
+      readyJob.files = files;
+      pdfExportJobs.set(jobId, readyJob);
+
+      logEvent({
+        type: 'pdf.ready',
+        actor: readyJob.ownerEmail,
+        bookId: readyJob.bookId,
+        orderId: readyJob.orderId,
+        ownerId: readyJob.ownerId,
+        message: 'PDF final genere',
+        metadata: {
+          jobId,
+          tentative,
+          // progress.total compte desormais des PHOTOS chargees : l impression
+          // n a plus de boucle page par page. Le champ s appelait « pages » et
+          // disait donc autre chose que son nom.
+          photos: readyJob.progress?.total || null,
+          secondes: readyJob.startedAt
+            ? Math.round((Date.parse(readyJob.completedAt) - Date.parse(readyJob.startedAt)) / 1000)
+            : null,
+          // Duree et poids de CHAQUE rendu reel, sur CHAQUE environnement.
+          // C est la seule mesure comparable entre local, Render et Scaleway :
+          // on ne peut pas ouvrir un terminal sur l offre gratuite de Render,
+          // mais le journal, lui, s y remplit comme ailleurs.
+          poidsMo: poidsDuPdf(files)
+        }
+      });
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await syncOrderWithPdfJobResult({
+          job: readyJob,
+          outcome: 'ready'
+        });
+      } catch (syncError) {
+        console.error('Erreur sync commande PDF ready:', syncError);
+      }
+
+      // L'interface invite l'utilisateur a fermer la page pendant la
+      // fabrication : cet email est la contrepartie de cette invitation.
+      // Jamais bloquant — un PDF pret le reste meme si l'email ne part pas.
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await notifierPdfPret(readyJob);
+      } catch (emailError) {
+        console.error('Erreur email PDF pret:', emailError);
+      }
+
+      return; // Succes : on s'arrete la, pas de deuxieme tentative a lancer.
+    } catch (error) {
+      dernierEchec = error;
+      console.error(`Erreur pipeline export PDF (tentative ${tentative}/${PDF_EXPORT_MAX_ATTEMPTS}):`, error);
+    }
+  }
+
+  // Les PDF_EXPORT_MAX_ATTEMPTS tentatives ont toutes echoue : statut
+  // d'erreur EXPLICITE (jamais laisse sur "rendering" indefiniment) + alerte.
+  const failedJob = pdfExportJobs.get(jobId);
+  if (!failedJob) {
     return;
   }
 
-  queuedJob.status = 'rendering';
-  queuedJob.startedAt = new Date().toISOString();
-  queuedJob.error = null;
-  pdfExportJobs.set(jobId, queuedJob);
+  failedJob.status = 'failed';
+  failedJob.completedAt = new Date().toISOString();
+  failedJob.error = cleanText(dernierEchec?.message || 'Generation PDF impossible', 260);
+  pdfExportJobs.set(jobId, failedJob);
 
+  logEvent({
+    type: 'pdf.failed',
+    level: 'error',
+    actor: failedJob.ownerEmail,
+    bookId: failedJob.bookId,
+    orderId: failedJob.orderId,
+    ownerId: failedJob.ownerId,
+    message: 'Generation du PDF echouee',
+    metadata: { jobId, erreur: failedJob.error, tentatives: PDF_EXPORT_MAX_ATTEMPTS }
+  });
   try {
-    const files = await generateFinalBookPdfFiles({
-      book,
-      jobId,
-      // Jamais bloquant : un rapport d'avancement qui echoue ne doit pas
-      // faire echouer un rendu de plusieurs minutes.
-      onProgress: ({ phase, done, total }) => {
-        const enCours = pdfExportJobs.get(jobId);
-        if (!enCours) return;
-        enCours.progress = {
-          // La capture des pages ne se nomme pas elle-meme : c'est
-          // l'appelant qui sait de quelle phase il s'agit (meme convention
-          // que services/printing/gelatoPrintFile.js).
-          phase: phase || 'pages',
-          done,
-          total,
-          updatedAt: new Date().toISOString()
-        };
-        pdfExportJobs.set(jobId, enCours);
-      }
+    await syncOrderWithPdfJobResult({
+      job: failedJob,
+      outcome: 'failed',
+      errorMessage: failedJob.error
     });
-    const readyJob = pdfExportJobs.get(jobId);
-    if (!readyJob) {
-      return;
-    }
+  } catch (syncError) {
+    console.error('Erreur sync commande PDF failed:', syncError);
+  }
 
-    readyJob.status = 'ready';
-    readyJob.completedAt = new Date().toISOString();
-    readyJob.error = null;
-    readyJob.files = files;
-    pdfExportJobs.set(jobId, readyJob);
-
-    logEvent({
-      type: 'pdf.ready',
-      actor: readyJob.ownerEmail,
-      bookId: readyJob.bookId,
-      orderId: readyJob.orderId,
-      ownerId: readyJob.ownerId,
-      message: 'PDF final genere',
-      metadata: {
-        jobId,
-        // progress.total compte desormais des PHOTOS chargees : l impression
-        // n a plus de boucle page par page. Le champ s appelait « pages » et
-        // disait donc autre chose que son nom.
-        photos: readyJob.progress?.total || null,
-        secondes: readyJob.startedAt
-          ? Math.round((Date.parse(readyJob.completedAt) - Date.parse(readyJob.startedAt)) / 1000)
-          : null,
-        // Duree et poids de CHAQUE rendu reel, sur CHAQUE environnement.
-        // C est la seule mesure comparable entre local, Render et Scaleway :
-        // on ne peut pas ouvrir un terminal sur l offre gratuite de Render,
-        // mais le journal, lui, s y remplit comme ailleurs.
-        poidsMo: poidsDuPdf(files)
-      }
+  // Alerte admin (retour utilisateur, 2026-09-27) : jamais bloquante, un
+  // echec d'envoi ne doit pas empecher le reste (voir REGLE ABSOLUE en tete
+  // de transactionalEmails.js). Sans ADMIN_EMAILS configuree, journalise
+  // seulement — voir envoyerAlerteAdmin.
+  try {
+    await emailsTransactionnels.envoyerAlerteAdmin({
+      sujet: `Generation PDF echouee - ${book?.title || failedJob.bookId}`,
+      lignes: [
+        `Le PDF final n'a pas pu etre genere apres ${PDF_EXPORT_MAX_ATTEMPTS} tentative(s).`,
+        failedJob.orderId
+          ? 'Une commande est liee a ce livre : elle est revenue au statut "paid", sans PDF pret.'
+          : 'Aucune commande n\'est liee a ce job (generation manuelle).'
+      ],
+      details: [
+        ['Livre', book?.title || failedJob.bookId],
+        ['bookId', failedJob.bookId],
+        ['orderId', failedJob.orderId || '—'],
+        ['Erreur', failedJob.error]
+      ]
     });
-    try {
-      await syncOrderWithPdfJobResult({
-        job: readyJob,
-        outcome: 'ready'
-      });
-    } catch (syncError) {
-      console.error('Erreur sync commande PDF ready:', syncError);
-    }
-
-    // L'interface invite l'utilisateur a fermer la page pendant la
-    // fabrication : cet email est la contrepartie de cette invitation.
-    // Jamais bloquant — un PDF pret le reste meme si l'email ne part pas.
-    try {
-      await notifierPdfPret(readyJob);
-    } catch (emailError) {
-      console.error('Erreur email PDF pret:', emailError);
-    }
-  } catch (error) {
-    const failedJob = pdfExportJobs.get(jobId);
-    if (!failedJob) {
-      return;
-    }
-
-    failedJob.status = 'failed';
-    failedJob.completedAt = new Date().toISOString();
-    failedJob.error = cleanText(error?.message || 'Generation PDF impossible', 260);
-    pdfExportJobs.set(jobId, failedJob);
-
-    logEvent({
-      type: 'pdf.failed',
-      level: 'error',
-      actor: failedJob.ownerEmail,
-      bookId: failedJob.bookId,
-      orderId: failedJob.orderId,
-      ownerId: failedJob.ownerId,
-      message: 'Generation du PDF echouee',
-      metadata: { jobId, erreur: failedJob.error }
-    });
-    try {
-      await syncOrderWithPdfJobResult({
-        job: failedJob,
-        outcome: 'failed',
-        errorMessage: failedJob.error
-      });
-    } catch (syncError) {
-      console.error('Erreur sync commande PDF failed:', syncError);
-    }
+  } catch (alertError) {
+    console.error('Erreur alerte admin PDF echoue:', alertError);
   }
 }
 

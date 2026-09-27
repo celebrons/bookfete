@@ -1162,6 +1162,61 @@ const buildStripeWebhookEvent = (req) => {
   return parseUnsignedWebhookEvent(req.body);
 };
 
+// Enregistre une tentative de paiement Stripe echouee/abandonnee — jamais
+// de changement de statut (voir le commentaire au point d'appel), seulement
+// un historique sur la commande + une alerte admin. Jamais bloquant pour la
+// reponse au webhook : Stripe reessaie un 5xx pendant trois jours, un
+// probleme d'enregistrement local ne doit pas provoquer ces relances.
+const recordFailedCheckoutSession = async ({ db, session, eventType }) => {
+  try {
+    if (!session) return;
+
+    const order = await resolveOrderByStripeSession({ db, session });
+    if (!order) return; // Aucune commande associee (session de test, etc.) : rien a faire.
+
+    // Une commande DEJA payee ne doit jamais etre re-ouverte par un
+    // evenement d'echec arrivant en retard (ex. la session a fini par
+    // expirer cote Stripe APRES qu'un paiement reussi ait deja ete traite
+    // par un autre evenement) — la tentative qu'on enregistre ici est
+    // forcement anterieure a ce paiement reussi.
+    if (ORDER_STATUS_PAID_OR_AFTER.has(String(order.status || '').toLowerCase())) {
+      return;
+    }
+
+    const nowIso = getNowIso();
+    const raison = eventType === 'checkout.session.expired' ? 'expired' : 'async_payment_failed';
+    const historique = Array.isArray(order.metadata?.paymentFailures) ? order.metadata.paymentFailures : [];
+    const nextMetadata = mergeMetadata(order.metadata, {
+      // Borne a 10 : une commande jamais finalisee ne doit pas faire
+      // grossir cette liste indefiniment si le client re-essaie souvent.
+      paymentFailures: [...historique, { at: nowIso, sessionId: session.id || '', reason: raison }].slice(-10)
+    });
+
+    await db
+      .from('orders')
+      .update({ metadata: nextMetadata, updated_at: nowIso })
+      .eq('id', order.id);
+
+    await emails.envoyerAlerteAdmin({
+      sujet: `Paiement Stripe echoue - commande ${order.order_number || order.id}`,
+      lignes: [
+        raison === 'expired'
+          ? "Le client n'a pas termine son paiement avant l'expiration de la session Stripe (session Checkout non finalisee)."
+          : 'Le paiement (methode de paiement asynchrone) a ete refuse par Stripe apres coup.',
+        'La commande reste "en attente de paiement" : elle n\'a ete transmise ni au PDF ni a Gelato, et peut etre relancee normalement depuis le compte du client.'
+      ],
+      details: [
+        ['Commande', order.order_number || order.id],
+        ['Session Stripe', session.id || '—'],
+        ['Raison', raison],
+        ['Tentatives echouees enregistrees', String(nextMetadata.paymentFailures.length)]
+      ]
+    });
+  } catch (error) {
+    console.error('Erreur enregistrement paiement Stripe echoue:', error);
+  }
+};
+
 const handleStripeWebhook = async (req, res) => {
   try {
     const event = buildStripeWebhookEvent(req);
@@ -1169,6 +1224,36 @@ const handleStripeWebhook = async (req, res) => {
 
     if (!eventType) {
       return res.status(400).json({ error: 'Evenement Stripe invalide' });
+    }
+
+    // Echec/abandon de paiement (retour utilisateur, 2026-09-27 — "une
+    // commande dont le paiement echoue ne doit jamais etre envoyee a
+    // Gelato, et doit rester dans un etat coherent plutot que bloquee entre
+    // deux statuts"). AVANT ce correctif, ces deux evenements etaient
+    // simplement ignores (branche isCheckoutCompleted ci-dessous, jamais
+    // atteinte pour eux) : la tentative echouee ne laissait aucune trace,
+    // ni pour le client ni pour l'equipe.
+    //
+    // Le statut de la commande, lui, NE CHANGE PAS ICI : elle reste
+    // 'awaiting_payment' (ou 'draft'), deja l'etat coherent et deja
+    // resumable ('Payer la commande en attente' existe des l'ecran de
+    // paiement) — Gelato/le PDF ne sont declenches nulle part avant que
+    // payment_status soit reellement 'paid' (voir persistStripePaymentForOrder
+    // ci-dessus, et le controle equivalent de la route de confirmation), donc
+    // rien de cote n'a jamais pu partir pour une tentative qui echoue. Ce qui
+    // manquait etait la VISIBILITE : un historique sur la commande + une
+    // alerte, pas un silence qui ressemble a "jamais essaye".
+    const isCheckoutFailed = (
+      eventType === 'checkout.session.expired'
+      || eventType === 'checkout.session.async_payment_failed'
+    );
+    if (isCheckoutFailed) {
+      await recordFailedCheckoutSession({
+        db: supabase,
+        session: event?.data?.object,
+        eventType
+      });
+      return res.json({ received: true, status: 'payment_failure_recorded' });
     }
 
     const isCheckoutCompleted = (

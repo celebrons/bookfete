@@ -56,8 +56,13 @@ function buildPrintTimeline(currentStatus) {
 // Un « Pack » n'a pas un etat, il en a deux : le fichier peut etre pret
 // pendant que le livre est encore sous presse. Un statut unique en haut de
 // page devait donc choisir lequel mentir.
-const statutDuPdf = ({ pret, enCours }) => {
+const statutDuPdf = ({ pret, enCours, echec }) => {
   if (pret) return { label: 'Disponible', tone: 'is-ready' };
+  // AVANT le statut "en fabrication" : un echec definitif (deux tentatives
+  // automatiques deja epuisees cote serveur) ne doit jamais continuer a
+  // s'afficher comme si la fabrication etait toujours en cours (retour
+  // utilisateur, 2026-09-27 - "pas un echec silencieux").
+  if (echec) return { label: 'Échec', tone: 'is-error' };
   if (enCours) return { label: 'En fabrication', tone: 'is-progress' };
   return { label: 'En attente', tone: 'is-muted' };
 };
@@ -193,7 +198,16 @@ function StepTracking({
   // de page, `pdfJob` est vide tant que le sondage n'a pas repondu, et
   // l'ecran affichait alors « la fabrication demarre » sur un PDF deja en
   // cours de fabrication.
-  const pdfEnCours = pdfAchete && !pdfReady && (
+  // Echec DEFINITIF (retour utilisateur, 2026-09-27) : le serveur a deja
+  // essaye deux fois (voir routes/books.js processPdfExportJob) et ecrit
+  // metadata.pdfError. pdfJobId, lui, RESTE pose sur la commande apres un
+  // echec (il identifie le dernier essai, pas un essai en cours) — sans
+  // cette distinction explicite, pdfEnCours resterait vrai indefiniment
+  // (Boolean(pdfJobIdOf(order)) ne redevient jamais faux tout seul) et la
+  // barre de progression s'afficherait pour toujours sur un rendu deja mort.
+  const pdfFailed = pdfAchete && !pdfReady && Boolean(order?.metadata?.pdfError);
+
+  const pdfEnCours = pdfAchete && !pdfReady && !pdfFailed && (
     regeneratingPdf
     || status === 'pdf_generating'
     || Boolean(pdfJobIdOf(order))
@@ -209,7 +223,7 @@ function StepTracking({
   const verifieLe = formaterDate(tracking?.updatedAt);
   const deuxVolets = pdfAchete && isPrint;
 
-  const infoPdf = statutDuPdf({ pret: pdfReady, enCours: pdfEnCours });
+  const infoPdf = statutDuPdf({ pret: pdfReady, enCours: pdfEnCours, echec: pdfFailed });
   const infoImpression = statutDeLImpression({ statut: status, gelatoOrderId, echec: echecEnvoi });
 
   return (
@@ -253,6 +267,33 @@ function StepTracking({
         {pdfAchete && (
           <section className="tracking-pane">
             <h3 className="tracking-pane-title">Votre PDF</h3>
+
+            {/* Echec DEFINITIF (retour utilisateur, 2026-09-27) : le serveur
+                a deja tente deux fois automatiquement (voir routes/books.js)
+                avant d'abandonner — cet ecran ne doit donc jamais laisser
+                croire que "ça continue tout seul" a ce stade. Meme famille
+                visuelle que l'echec d'envoi a l'imprimeur plus bas
+                (.tracking-sent.is-failed), pour rester le MEME langage
+                d'erreur partout sur cette page. */}
+            {pdfFailed && (
+              <>
+                <p className="tracking-sent is-failed">
+                  La fabrication du PDF a échoué : {order.metadata.pdfError}. Vous pouvez relancer
+                  une nouvelle tentative ci-dessous — votre commande n’est pas perdue.
+                </p>
+                {onRegeneratePdf && (
+                  <button
+                    type="button"
+                    className="btn btn-outline pdf-build-relaunch"
+                    onClick={onRegeneratePdf}
+                    disabled={regeneratingPdf}
+                  >
+                    <IconeRegenerer />
+                    {regeneratingPdf ? 'Relance…' : 'Relancer la fabrication'}
+                  </button>
+                )}
+              </>
+            )}
 
             {pdfEnCours && (
               <>
@@ -314,7 +355,7 @@ function StepTracking({
               </>
             )}
 
-            {!pdfEnCours && !pdfReady && (
+            {!pdfEnCours && !pdfReady && !pdfFailed && (
               <p className="orders-disclaimer">
                 La fabrication démarre dès le paiement validé.
               </p>
