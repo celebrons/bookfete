@@ -58,12 +58,22 @@ function StepProduct({
 }) {
   // Economie du pack : calculee a partir des VRAIS prix renvoyes par le
   // serveur, jamais d'un chiffre ecrit en dur qui finirait par mentir le
-  // jour ou la grille tarifaire bouge.
+  // jour ou la grille tarifaire bouge. Le pourcentage aussi est DEDUIT de
+  // ces prix (jamais un "10%" recopie ici) — la remise reelle vit dans
+  // PACK_DISCOUNT_PERCENT cote serveur (pricingConfig.js), ce calcul ne
+  // fait que la lire en retour.
   const prixPdf = pricesByType.pdf;
   const prixPrint = pricesByType.print;
   const prixPack = pricesByType.pack;
-  const economiePack = [prixPdf, prixPrint, prixPack].every((valeur) => Number.isFinite(valeur))
-    ? prixPdf + prixPrint - prixPack
+  const prixSepares = Number.isFinite(prixPdf) && Number.isFinite(prixPrint) ? prixPdf + prixPrint : null;
+  const economiePack = prixSepares != null && Number.isFinite(prixPack) ? prixSepares - prixPack : 0;
+  // Retour utilisateur 2026-09-27 : "on les voit pas vraiement" — la remise
+  // etait une simple ligne de detail, meme poids visuel que "Le fichier PDF
+  // n'est pas inclus". Elle a maintenant SA PROPRE presentation : un badge
+  // "-10%" sur la carte, l'ancien prix barre au-dessus du nouveau, et le
+  // gain en euros mis en avant (pas noye dans la liste de details).
+  const pourcentageEconomie = economiePack > 0 && prixSepares > 0
+    ? Math.round((economiePack / prixSepares) * 100)
     : 0;
 
   return (
@@ -73,9 +83,8 @@ function StepProduct({
       <div className="product-choice-grid">
         {PRODUCT_CHOICES.map((choice) => {
           const prix = pricesByType[choice.key];
-          const details = choice.key === 'pack' && economiePack > 0
-            ? [...choice.details, `Soit ${formatPriceCents(economiePack)} de moins que les deux achetés séparément`]
-            : choice.details;
+          const estLePack = choice.key === 'pack';
+          const montrerRemise = estLePack && pourcentageEconomie > 0;
 
           return (
             <button
@@ -86,7 +95,13 @@ function StepProduct({
               disabled={locked}
               aria-pressed={orderType === choice.key}
             >
+              {montrerRemise && (
+                <span className="product-choice-badge">− {pourcentageEconomie} %</span>
+              )}
               <span className="product-choice-price">
+                {montrerRemise && (
+                  <span className="product-choice-price-was">{formatPriceCents(prixSepares)}</span>
+                )}
                 {Number.isFinite(prix) ? formatPriceCents(prix) : '—'}
                 <span className="product-choice-price-unit">par exemplaire</span>
               </span>
@@ -94,10 +109,15 @@ function StepProduct({
                 <strong>{choice.title}</strong>
                 <span className="product-choice-note">{choice.note}</span>
                 <span className="product-choice-details">
-                  {details.map((ligne) => (
+                  {choice.details.map((ligne) => (
                     <span key={ligne} className="product-choice-detail">{ligne}</span>
                   ))}
                 </span>
+                {montrerRemise && (
+                  <span className="product-choice-savings">
+                    Vous économisez {formatPriceCents(economiePack)} par rapport aux deux achetés séparément
+                  </span>
+                )}
               </span>
             </button>
           );
