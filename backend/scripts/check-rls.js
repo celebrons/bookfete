@@ -12,6 +12,18 @@
 // protection etait absente, il ne modifierait rien.
 //
 // A relancer apres toute migration touchant aux politiques.
+//
+// 2026-09-27 : couverture etendue a toutes les tables reellement lues par le
+// backend (books/profiles/orders n'etaient qu'un sous-ensemble), suite a
+// une alerte Supabase Security Advisor ("Table publicly accessible" /
+// "Sensitive data publicly accessible", datee du 19/09 — soit AVANT
+// phase22/phase23 du 20/09). Rejoue ici en direct contre la base reelle :
+// aucune table proprietaire-livre n'est lisible sans compte ; les 3
+// catalogues volontairement publics (book_templates/layout_definitions/
+// event_types, phase03) ne montrent que leurs lignes actives, exactement
+// comme concu. L'alerte semble donc deja resolue (le tableau de bord
+// Supabase peut mettre du temps a se rafraichir) — reverifier depuis le
+// dashboard apres relance du scanner.
 
 require('dotenv').config();
 const fs = require('fs');
@@ -48,7 +60,16 @@ async function main() {
   console.log('\nAcces avec la cle publique du navigateur, sans aucun compte :\n');
 
   // --- Lectures qui doivent etre vides -----------------------------------
-  for (const table of ['books', 'profiles', 'book_content_items', 'book_pages', 'orders', 'app_events']) {
+  //
+  // Liste completee le 2026-09-27 (alerte Supabase "rls_disabled_in_public")
+  // en enumerant TOUS les `.from('...')` du backend (routes/services/scripts)
+  // — le controle initial (2026-09-20) n'en couvrait qu'une partie et aurait
+  // laisse passer une regression sur les autres tables proprietaire-livre.
+  for (const table of [
+    'books', 'profiles', 'book_content_items', 'book_pages', 'orders', 'app_events',
+    'book_participants', 'book_configs', 'book_snapshots', 'book_contributors',
+    'chapters', 'chapter_invites', 'contributions', 'book_products'
+  ]) {
     // eslint-disable-next-line no-await-in-loop
     const { data, error } = await anon.from(table).select('*').limit(5);
     // Deux formes de protection acceptables : un refus explicite, ou zero
@@ -58,6 +79,40 @@ async function main() {
       `${table} : aucune ligne lisible`,
       protege,
       error ? `refus ${error.code || ''}` : `${(data || []).length} ligne(s)`
+    );
+  }
+
+  // --- Catalogues PUBLICS PAR CONCEPTION (phase03/book_creation_refactor) -
+  //
+  // book_templates/layout_definitions portent volontairement une politique
+  // `..._read_all` (using (active = true)) : ce sont les styles/mises en
+  // page affiches AVANT connexion (accueil, choix de format) — zero donnee
+  // personnelle. Une ligne visible ici n'est PAS une faille ; le test
+  // verifie seulement que la politique existe et fait son travail (elle ne
+  // doit jamais montrer une ligne desactivee — RLS *absent* rendrait
+  // active/inactive indiscernables).
+  for (const table of ['book_templates', 'layout_definitions']) {
+    // eslint-disable-next-line no-await-in-loop
+    const { data } = await anon.from(table).select('active').limit(50);
+    const toutesActives = (data || []).length > 0 && (data || []).every((row) => row.active === true);
+    verifier(
+      `${table} : catalogue public, mais SEULEMENT les lignes actives`,
+      toutesActives,
+      `${(data || []).length} ligne(s) visible(s)`
+    );
+  }
+
+  // event_types : meme famille (phase03/book_creation_refactor), mais sa
+  // politique est `using (true)` sans filtre `active` (la table n'a pas
+  // cette colonne — ce sont juste les libelles d'occasion de la grille
+  // d'accueil, "mariage"/"anniversaire"...). On verifie seulement qu'elle
+  // reste lisible sans erreur, pas un filtrage qui n'existe pas par design.
+  {
+    const { data, error } = await anon.from('event_types').select('type_slug').limit(50);
+    verifier(
+      'event_types : catalogue public (using(true) par design, sans donnee personnelle)',
+      !error && (data || []).length > 0,
+      error ? `refus ${error.code || error.message}` : `${(data || []).length} ligne(s) visible(s)`
     );
   }
 
