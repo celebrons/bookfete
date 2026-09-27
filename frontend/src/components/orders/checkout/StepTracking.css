@@ -1,3 +1,40 @@
+/* Remerciement apres paiement (retour utilisateur, 2026-09-27) : UNE SEULE
+   FOIS (voir justPaid, StepTracking.js/BookCheckoutLuxe.js), au-dessus du
+   reste de l'ecran. Meme teinte doree que .pdf-build-block (coherence avec
+   le reste de cet ecran) mais plus presente — c'est le seul moment du
+   parcours qui merite de se sentir celebre plutot qu'informatif. */
+.tracking-thanks {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
+  border: 1px solid rgba(201, 163, 95, 0.45);
+  border-radius: 14px;
+  background: rgba(201, 163, 95, 0.1);
+  text-align: center;
+}
+
+.tracking-thanks-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tracking-thanks-text {
+  margin: 0 auto;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-light);
+}
+
+.tracking-thanks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: var(--space-md);
+}
+
 /* Frise de suivi de production (voir StepTracking.js). */
 .tracking-timeline {
   list-style: none;

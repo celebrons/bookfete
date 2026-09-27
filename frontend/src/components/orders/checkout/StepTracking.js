@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPdf, includesPrint, isPdfReady, pdfJobIdOf } from '../../../utils/orderWorkflow';
 import GenerationProgress from './GenerationProgress';
 import './StepTracking.css';
@@ -114,8 +115,30 @@ function formaterJour(valeur) {
   return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 }
 
+// Ce qui se passe ensuite, adapte a ce qui a reellement ete achete — jamais
+// une phrase generique qui mentionnerait une expedition pour un PDF seul,
+// ou resterait muette sur le PDF d'un pack.
+function messageApresCommande({ pdfAchete, isPrint }) {
+  if (pdfAchete && isPrint) {
+    return "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande. "
+      + "Votre PDF est en cours de fabrication et votre livre part en production chez notre imprimeur — "
+      + 'vous pouvez suivre chaque étape juste en dessous.';
+  }
+  if (pdfAchete) {
+    return "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande, "
+      + 'puis un second e-mail dès que votre PDF sera prêt à télécharger.';
+  }
+  return "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande. "
+    + 'Votre livre part en fabrication chez notre imprimeur, puis vous sera expédié — '
+    + 'vous pouvez suivre chaque étape juste en dessous.';
+}
+
 function StepTracking({
   order,
+  // Vrai UNE SEULE FOIS, juste apres le retour de Stripe (voir
+  // BookCheckoutLuxe.js) : jamais reaffiche si l'utilisateur revient
+  // consulter le suivi plus tard dans la meme session ou apres rechargement.
+  justPaid,
   tracking,
   loadingTracking,
   onRefreshTracking,
@@ -191,6 +214,19 @@ function StepTracking({
 
   return (
     <article className="orders-panel">
+      {/* Remerciement (retour utilisateur, 2026-09-27) : UNE SEULE FOIS,
+          juste apres le paiement — pas a chaque consultation du suivi. */}
+      {justPaid && (
+        <div className="tracking-thanks">
+          <p className="tracking-thanks-title">Merci pour votre commande&nbsp;! 💛</p>
+          <p className="tracking-thanks-text">{messageApresCommande({ pdfAchete, isPrint })}</p>
+          <div className="tracking-thanks-actions">
+            <Link to="/dashboard" className="btn btn-outline">Continuer mes achats</Link>
+            <Link to="/orders" className="btn btn-outline">Mes commandes</Link>
+          </div>
+        </div>
+      )}
+
       <h2>Votre commande</h2>
 
       <div className="orders-result-grid">

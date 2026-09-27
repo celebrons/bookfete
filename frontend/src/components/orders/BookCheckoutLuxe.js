@@ -138,6 +138,12 @@ const BookCheckoutLuxe = () => {
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState(null);
   const [latestOrder, setLatestOrder] = useState(null);
+  // Message de remerciement (retour utilisateur, 2026-09-27) : UNE SEULE
+  // FOIS, juste apres le retour de Stripe — jamais a chaque fois qu'on
+  // revient consulter le suivi plus tard. Volontairement un simple etat
+  // memoire (pas persiste) : un rechargement de page perd le signal "on
+  // vient de payer", ce qui est exactement le comportement voulu.
+  const [justPaid, setJustPaid] = useState(false);
   // Envoi de test a l'imprimeur (Gelato), sans paiement — n'apparait que si
   // le serveur dit que c'est reellement possible (cle API configuree ET
   // mode production desactive). Voir backend/routes/orders.js.
@@ -1006,6 +1012,10 @@ const BookCheckoutLuxe = () => {
 
         let currentOrder = await confirmStripePayment(orderId, sessionId);
         setLatestOrder(currentOrder);
+        // Le paiement est confirme des ici : le message de remerciement ne
+        // doit pas attendre la fabrication du PDF/l'envoi a l'imprimeur
+        // (qui peuvent echouer/prendre du temps) pour s'afficher.
+        setJustPaid(true);
         let finalNotice = { type: 'success', message: 'Paiement confirme. Commande mise a jour.' };
 
         if (includesPdf(currentOrder.type) && ['paid', 'pdf_generating'].includes(currentOrder.status)) {
@@ -1439,6 +1449,7 @@ const BookCheckoutLuxe = () => {
           {currentStepKey === 'tracking' && (
             <StepTracking
               order={latestOrder}
+              justPaid={justPaid}
               tracking={tracking}
               loadingTracking={loadingTracking}
               onRefreshTracking={() => refreshTracking(latestOrder?.id)}
