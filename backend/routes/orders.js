@@ -1422,10 +1422,12 @@ router.get('/formats', (req, res) => {
   const { COVER_FORMATS } = require('../services/composition/coverFormat');
   const { resolveShippingCents, DEFAULT_COUNTRY } = require('../services/pricing/pricingConfig');
 
+  // reliure : matiere reelle de la couverture (voir coverFormat.js — Standard
+  // et Luxe partagent le MEME format papier, seule la matiere les distingue).
   const LIBELLES = {
-    livret: { nom: 'Livret', accroche: 'Simple & élégant' },
-    standard: { nom: 'Standard', accroche: 'Le meilleur équilibre entre élégance, qualité et prix', recommande: true },
-    luxe: { nom: 'Luxe', accroche: 'Premium & intemporel' }
+    livret: { nom: 'Livret', accroche: 'Simple & élégant', reliure: 'souple' },
+    standard: { nom: 'Standard', accroche: 'Le meilleur équilibre entre élégance, qualité et prix', recommande: true, reliure: 'souple' },
+    luxe: { nom: 'Luxe', accroche: 'Premium & intemporel', reliure: 'rigide' }
   };
 
   const requestedPageCount = Number(req.query.page_count);

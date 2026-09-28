@@ -53,7 +53,9 @@ export default function TarifsLuxe() {
               {format.recommande && <span className="tarifs-badge">★ Recommandé</span>}
               <h2>{format.nom}</h2>
               <p className="tarifs-accroche">{format.accroche}</p>
-              <p className="tarifs-dims">{Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm</p>
+              <p className="tarifs-dims">
+                {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm · Couverture {format.reliure === 'rigide' ? 'rigide' : 'souple'}
+              </p>
               <p className="tarifs-prix">
                 {formatEuros(format.startingPriceCents)}
                 <span className="tarifs-prix-note">à partir de {format.minPages} pages</span>

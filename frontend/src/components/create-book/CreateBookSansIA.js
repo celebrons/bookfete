@@ -262,10 +262,10 @@ export default function CreateBookSansIA() {
                     aria-pressed={printFormat === format.formatId}
                   >
                     {format.recommande && <span className="format-choice-badge">★ Recommandé</span>}
-                    <FormatMockup widthMm={format.widthMm} heightMm={format.heightMm} />
+                    <FormatMockup widthMm={format.widthMm} heightMm={format.heightMm} reliure={format.reliure} />
                     <span className="format-choice-name">{format.nom}</span>
                     <span className="format-choice-size">
-                      {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm
+                      {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm · Couverture {format.reliure === 'rigide' ? 'rigide' : 'souple'}
                     </span>
                     <span className="format-choice-pitch">{format.accroche}</span>
                     <span className="format-choice-price">

@@ -12,15 +12,22 @@ import React from 'react';
 // Standard/Luxe (portrait, 21x28) — la silhouette EST l'information, pas
 // une decoration à cote d'elle.
 //
-// Volontairement minimal : couverture unie + tranche doree, rien de plus.
-// Une texture ou un degrade tenterait d'imiter une vraie photo de produit
-// et ferait paraitre les deux autres cartes injustement nues.
+// Standard et Luxe, eux, partagent EXACTEMENT le meme format papier
+// (coverFormat.js : la distinction Luxe est la matiere — couverture rigide —
+// pas la taille), donc leurs silhouettes etaient auparavant identiques
+// (retour utilisateur 2026-09-28 : "les photos des livres se ressemblent").
+// La prop `reliure` ('souple' | 'rigide') dessine desormais un carton qui
+// deborde legerement des pages pour le rigide — la meme signature visuelle
+// qu'un vrai livre relie — au lieu d'une texture ou d'un degrade qui
+// tenterait d'imiter une vraie photo de produit.
 const HAUTEUR_VUE = 84;
 
-function FormatMockup({ widthMm, heightMm }) {
+function FormatMockup({ widthMm, heightMm, reliure = 'souple' }) {
   const ratio = Number(widthMm) > 0 && Number(heightMm) > 0 ? widthMm / heightMm : 210 / 280;
   const largeurVue = Math.round(HAUTEUR_VUE * ratio);
-  const tranche = Math.max(3, Math.round(largeurVue * 0.055));
+  const estRigide = reliure === 'rigide';
+  const tranche = Math.max(3, Math.round(largeurVue * (estRigide ? 0.075 : 0.055)));
+  const margeCarton = estRigide ? 2.5 : 0;
 
   return (
     <svg
@@ -34,10 +41,21 @@ function FormatMockup({ widthMm, heightMm }) {
       <rect
         x="0.5" y="0.5"
         width={largeurVue - 1} height={HAUTEUR_VUE - 1}
-        rx="2.5"
-        fill="#fffdf8"
+        rx={estRigide ? 3 : 2.5}
+        fill={estRigide ? '#f1e6cc' : '#fffdf8'}
         stroke="rgba(36, 31, 24, 0.22)"
       />
+      {estRigide && (
+        // Bloc de pages en retrait : le carton d'une couverture rigide
+        // deborde toujours un peu des pages qu'il protege.
+        <rect
+          x={margeCarton} y={margeCarton}
+          width={largeurVue - 2 * margeCarton} height={HAUTEUR_VUE - 2 * margeCarton}
+          rx="1"
+          fill="#fffdf8"
+          stroke="rgba(36, 31, 24, 0.14)"
+        />
+      )}
       <path
         d={`M0.5 2.5 A2 2 0 0 1 2.5 0.5 H${tranche} V${HAUTEUR_VUE - 0.5} H2.5 A2 2 0 0 1 0.5 ${HAUTEUR_VUE - 2.5} Z`}
         fill="var(--gold, #b8924a)"
