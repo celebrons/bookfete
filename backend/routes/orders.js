@@ -35,6 +35,7 @@ const gelatoSubmissionsEnCours = new Map();
 const gelatoTracking = require('../services/printing/gelatoTracking');
 const emails = require('../services/email/transactionalEmails');
 const { emailValide } = require('../services/email/brevoClient');
+const { generateInvoiceForOrder, signedInvoiceUrl } = require('../services/invoicing/invoiceService');
 let Stripe = null;
 
 try {
@@ -665,6 +666,53 @@ const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
   })();
 };
 
+// Emet la facture d'une commande qui vient d'etre payee et l'envoie par
+// email (PDF en piece jointe) — jamais bloquant pour la reponse HTTP (meme
+// principe que triggerGelatoSubmissionIfNeeded juste au-dessus). Sans verrou
+// en memoire ici : generateInvoiceForOrder est deja idempotente par
+// elle-meme (verification + contrainte UNIQUE en base sur invoices.order_id,
+// voir invoiceService.js) — appelable sans risque depuis le webhook Stripe
+// ET la route de confirmation navigateur, qui peuvent toutes deux declencher
+// ce chemin pour la meme commande.
+const triggerInvoiceIfNeeded = ({ order, ownerEmail }) => {
+  if (!order?.id) return;
+
+  (async () => {
+    try {
+      const invoice = await generateInvoiceForOrder(order);
+      // invoice._pdfBuffer n'existe que lorsque CET appel vient d'emettre la
+      // facture (voir invoiceService.js) : une facture deja existante
+      // (relecture idempotente) n'a pas de buffer joint, et on n'a alors
+      // rien de plus a envoyer — l'email est deja parti lors de l'emission
+      // d'origine.
+      if (!invoice?._pdfBuffer) return;
+
+      const resultat = await emails.envoyerFacture({ order, invoice, pdfBuffer: invoice._pdfBuffer, ownerEmail });
+      if (!resultat.sent && resultat.skipped !== 'destinataire_inconnu') {
+        console.error(`Envoi de la facture ${invoice.invoice_number} echoue pour la commande ${order.id} :`, resultat.error || resultat.skipped);
+        logEvent({
+          type: 'invoice.email.failed',
+          level: 'error',
+          actor: ownerEmail,
+          orderId: order.id,
+          message: `Facture ${invoice.invoice_number} generee mais non envoyee par email`,
+          metadata: { erreur: String(resultat.error || resultat.skipped).slice(0, 300) }
+        });
+      }
+    } catch (error) {
+      console.error('Emission de facture impossible pour la commande', order.id, ':', error.message);
+      logEvent({
+        type: 'invoice.failed',
+        level: 'error',
+        actor: ownerEmail,
+        orderId: order.id,
+        message: 'Emission de facture impossible',
+        metadata: { erreur: String(error.message).slice(0, 300) }
+      });
+    }
+  })();
+};
+
 // POST /api/orders/:orderId/gelato-test
 // Envoi MANUEL d'une commande a Gelato en mode test, SANS paiement
 // prealable (2026-09-11, demande utilisateur : pouvoir tester en ligne sur
@@ -1089,6 +1137,49 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/orders/:orderId/invoice
+// URL signee (courte duree) de la facture, si elle existe deja — jamais
+// generee ici (la generation part uniquement du paiement, voir
+// triggerInvoiceIfNeeded). 404 explicite tant qu'aucune facture n'existe :
+// laisse au frontend le choix d'afficher "pas encore disponible" plutot que
+// d'echouer silencieusement.
+router.get('/:orderId/invoice', authenticate, async (req, res) => {
+  try {
+    const db = createUserScopedClient(req);
+    const { data: order, error: orderError } = await db
+      .from('orders')
+      .select('id')
+      .eq('id', req.params.orderId)
+      .eq('owner_id', req.user.id)
+      .single();
+    if (orderError || !order) {
+      return res.status(404).json({ error: 'Commande introuvable' });
+    }
+
+    // RLS (invoices_owner_select) garantit deja qu'on ne peut lire QUE ses
+    // propres factures ; la verification de commande ci-dessus reste la
+    // premiere ligne de defense, la plus lisible.
+    const { data: invoice, error: invoiceError } = await db
+      .from('invoices')
+      .select('invoice_number, issued_at, storage_path, totals')
+      .eq('order_id', order.id)
+      .maybeSingle();
+    if (invoiceError || !invoice || !invoice.storage_path) {
+      return res.status(404).json({ error: 'Aucune facture disponible pour cette commande.' });
+    }
+
+    const url = await signedInvoiceUrl(invoice.storage_path);
+    return res.json({
+      invoiceNumber: invoice.invoice_number,
+      issuedAt: invoice.issued_at,
+      totalCents: invoice.totals?.totalCents ?? null,
+      url
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/orders/gelato/status
 // Le frontend a besoin de savoir si l'envoi de test est possible (cle API
 // configuree, mode production desactive) pour n'afficher le bouton que
@@ -1327,6 +1418,13 @@ const handleStripeWebhook = async (req, res) => {
     // soumission Gelato (independant du navigateur du client, contrairement
     // a la route de confirmation ci-dessous) — voir triggerGelatoSubmissionIfNeeded.
     triggerGelatoSubmissionIfNeeded({ db: supabase, order: updatedOrder });
+
+    // Contrairement a envoyerPaiementRecu juste en dessous, appeler ce
+    // chemin depuis les DEUX endroits (ici et la route de confirmation
+    // navigateur) est volontaire et sans risque : generateInvoiceForOrder
+    // est idempotente par elle-meme (voir triggerInvoiceIfNeeded), donc la
+    // facture n'est jamais emise ni envoyee deux fois.
+    triggerInvoiceIfNeeded({ order: updatedOrder });
 
     // Confirmation de paiement, envoyee ICI et nulle part ailleurs.
     //
@@ -1605,6 +1703,7 @@ const rattraperLePaiementStripe = async ({ db, order, ownerEmail }) => {
     });
 
     triggerGelatoSubmissionIfNeeded({ db, order: rattrapee, ownerEmail });
+    triggerInvoiceIfNeeded({ order: rattrapee, ownerEmail });
     return rattrapee;
   } catch (error) {
     console.error('Rattrapage du paiement Stripe impossible:', error.message);
@@ -2140,6 +2239,8 @@ router.post('/:orderId/stripe/confirm', authenticate, async (req, res) => {
     // configure en local) — idempotent cote gelatoOrderService, donc sans
     // risque de doublon si le webhook la declenche aussi.
     triggerGelatoSubmissionIfNeeded({ db, order: updatedOrder, ownerEmail: req.user.email });
+    // Filet identique pour la facture (idempotente, voir triggerInvoiceIfNeeded).
+    triggerInvoiceIfNeeded({ order: updatedOrder, ownerEmail: req.user.email });
 
     return res.json(getApiSafeOrder(updatedOrder));
   } catch (error) {

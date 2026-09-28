@@ -99,6 +99,34 @@ async function envoyerPaiementRecu({ order, ownerEmail }) {
 }
 
 /**
+ * Facture emise — PDF en piece jointe (voir invoiceService.js). Contrairement
+ * aux autres emails de ce fichier, celui-ci porte une piece jointe : le
+ * `pdfBuffer` est fourni par l'appelant (jamais relu depuis le stockage ici,
+ * le fichier vient d'etre genere dans le meme appel).
+ */
+async function envoyerFacture({ order, invoice, pdfBuffer, ownerEmail }) {
+  // invoice.buyer.email : deja resolu par invoiceService.js (adresse de
+  // facturation -> livraison -> compte reel) — plus complet que
+  // destinataireDe(), qui ne connait pas la facturation ni le compte.
+  const destinataire = invoice?.buyer?.email || destinataireDe({ order, ownerEmail });
+  if (!destinataire) {
+    console.log('[email] aucun destinataire connu (facture) — rien envoye');
+    return { sent: false, skipped: 'destinataire_inconnu' };
+  }
+  const gabarit = gabarits.factureEmise({
+    numeroFacture: invoice?.invoice_number,
+    numeroCommande: order?.order_number || order?.id,
+    totalCents: order?.total_cents,
+    lien: lienCommande(order?.id)
+  });
+  return sendEmail({
+    to: destinataire,
+    ...gabarit,
+    attachment: pdfBuffer ? [{ name: `${invoice?.invoice_number || 'facture'}.pdf`, content: pdfBuffer }] : undefined
+  });
+}
+
+/**
  * PDF pret.
  *
  * Le rendu dure plusieurs minutes : l'interface invite l'utilisateur a
@@ -243,6 +271,7 @@ module.exports = {
   envoyerLienLivre,
   envoyerCommandeConfirmee,
   envoyerPaiementRecu,
+  envoyerFacture,
   envoyerPdfPret,
   envoyerEtapeFabrication,
   envoyerEssai,

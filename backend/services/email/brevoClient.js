@@ -64,10 +64,14 @@ function parseExpediteur(brut) {
 /**
  * Envoie UN email. Ne leve jamais.
  *
- * @param {object} input - { to, subject, html, text, replyTo }
+ * @param {object} input - { to, subject, html, text, replyTo, attachment }
+ * @param {Array<{name:string, content:Buffer|string}>} [input.attachment] -
+ *   `content` accepte un Buffer (converti ici en base64) ou une chaine deja
+ *   en base64 — pour une facture PDF (voir invoiceService.js), toujours un
+ *   Buffer.
  * @returns {Promise<{sent:boolean, skipped?:string, id?:string, error?:string}>}
  */
-async function sendEmail({ to, subject, html, text, replyTo }) {
+async function sendEmail({ to, subject, html, text, replyTo, attachment }) {
   if (!emailValide(to)) {
     return { sent: false, skipped: 'destinataire_invalide' };
   }
@@ -101,7 +105,13 @@ async function sendEmail({ to, subject, html, text, replyTo }) {
         subject,
         ...(html ? { htmlContent: html } : {}),
         ...(text ? { textContent: text } : {}),
-        ...(replyTo ? { replyTo: { email: replyTo } } : {})
+        ...(replyTo ? { replyTo: { email: replyTo } } : {}),
+        ...(Array.isArray(attachment) && attachment.length > 0 ? {
+          attachment: attachment.map((piece) => ({
+            name: piece.name,
+            content: Buffer.isBuffer(piece.content) ? piece.content.toString('base64') : piece.content
+          }))
+        } : {})
       })
     });
 

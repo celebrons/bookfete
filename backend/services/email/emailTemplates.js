@@ -175,6 +175,26 @@ function paiementRecu({ numero, totalCents, lien }) {
   };
 }
 
+/** Facture emise (PDF en piece jointe, voir invoiceService.js/brevoClient.js). */
+function factureEmise({ numeroFacture, numeroCommande, totalCents, lien }) {
+  const titre = 'Votre facture';
+  const lignes = [
+    'Voici la facture de votre commande, en pièce jointe (PDF).',
+    'Conservez-la précieusement : elle vous sera utile en cas de besoin.'
+  ];
+  const details = [
+    ['Facture', numeroFacture],
+    ['Commande', numeroCommande],
+    totalCents != null ? ['Montant', prix(totalCents)] : null
+  ];
+  const bouton = lien ? { libelle: 'Voir ma commande', url: lien } : null;
+  return {
+    subject: `Votre facture ${numeroFacture} — commande ${numeroCommande}`,
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details }),
+    text: texteDe({ titre, lignes, bouton, details })
+  };
+}
+
 // Une seule fonction pour les etapes de fabrication : elles racontent la meme
 // chose a des moments differents, et trois gabarits presque identiques
 // auraient diverge au premier changement de ton.
@@ -334,6 +354,7 @@ module.exports = {
   retrouverSonLivre,
   commandeConfirmee,
   paiementRecu,
+  factureEmise,
   pdfPret,
   etapeDeFabrication,
   alerteAdmin,

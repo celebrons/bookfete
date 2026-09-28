@@ -147,6 +147,13 @@ export const sendOrderToGelatoTest = (orderId) => request(`/orders/${orderId}/ge
 // quelque chose d'affichable, meme si Gelato est injoignable (`stale`).
 export const getOrderTracking = (orderId) => request(`/orders/${orderId}/tracking`);
 
+// Facture (voir backend/services/invoicing/invoiceService.js) : URL signee
+// de courte duree, si elle existe deja. La generation part uniquement du
+// paiement (jamais declenchee depuis le frontend) — 404 tant qu'elle n'est
+// pas encore prete, a l'appelant de le distinguer d'une vraie erreur
+// (voir InvoiceDownloadLink.js, error.status === 404).
+export const getOrderInvoice = (orderId) => request(`/orders/${orderId}/invoice`);
+
 export const getApiBaseUrl = buildApiBaseUrl;
 
 // Catalogue des formats d'impression : dimensions reelles et prix de depart.

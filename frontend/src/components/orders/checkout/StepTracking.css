@@ -349,3 +349,20 @@
   color: var(--text-light);
 }
 .tracking-delais strong { color: var(--ink); }
+
+/* Lien de telechargement de la facture (voir InvoiceDownloadLink.js) :
+   simple ligne dorée entre le récapitulatif et les volets de suivi, dans le
+   même esprit que .tracking-refresh (texte souligné, pas un bouton). */
+.tracking-invoice {
+  margin: var(--space-sm) 0 var(--space-md);
+}
+.tracking-invoice-link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tracking-invoice-link:hover {
+  color: var(--ink);
+}

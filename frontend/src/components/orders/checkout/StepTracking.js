@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPdf, includesPrint, isPdfReady, pdfJobIdOf } from '../../../utils/orderWorkflow';
+import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPdf, includesPrint, isOrderPaid, isPdfReady, pdfJobIdOf } from '../../../utils/orderWorkflow';
 import GenerationProgress from './GenerationProgress';
+import InvoiceDownloadLink from './InvoiceDownloadLink';
 import './StepTracking.css';
 
 // Ecran 4 : suivi REEL de production (2026-09-11). Jusqu'ici la page se
@@ -261,6 +262,8 @@ function StepTracking({
           </div>
         )}
       </div>
+
+      {isOrderPaid(status) && <InvoiceDownloadLink orderId={order.id} />}
 
       <div className={`tracking-panes ${deuxVolets ? 'is-double' : ''}`}>
         {/* ----------------------------- VOLET PDF ----------------------- */}

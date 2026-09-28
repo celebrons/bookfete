@@ -171,6 +171,30 @@ describe('brevoClient — rien ne part sans cle', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it('une piece jointe (Buffer) part en base64, avec son nom — pour la facture PDF (invoiceService.js)', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
+    global.fetch = jest.fn(async () => ({ ok: true, status: 201, json: async () => ({ messageId: 'email-2' }) }));
+    const { sendEmail } = charger();
+
+    const r = await sendEmail({
+      to: 'jean@example.com', subject: 'Votre facture', html: '<p>x</p>',
+      attachment: [{ name: 'F-2026-000001.pdf', content: Buffer.from('%PDF-fake') }]
+    });
+    expect(r.sent).toBe(true);
+    const corps = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(corps.attachment).toEqual([{ name: 'F-2026-000001.pdf', content: Buffer.from('%PDF-fake').toString('base64') }]);
+  });
+
+  it('sans piece jointe : le champ attachment n apparait pas du tout dans le corps envoye', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
+    global.fetch = jest.fn(async () => ({ ok: true, status: 201, json: async () => ({ messageId: 'email-3' }) }));
+    const { sendEmail } = charger();
+
+    await sendEmail({ to: 'jean@example.com', subject: 'x', html: '<p>x</p>' });
+    const corps = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(corps.attachment).toBeUndefined();
+  });
+
   it('avec une cle et un expediteur valides : un seul POST, avec le bon destinataire et le bon sujet', async () => {
     process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
     global.fetch = jest.fn(async () => ({ ok: true, status: 201, json: async () => ({ messageId: 'email-1' }) }));
