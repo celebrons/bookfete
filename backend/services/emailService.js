@@ -22,7 +22,7 @@
 // chantier, et rien n'oblige a le faire maintenant. Mais s'il tourne encore,
 // il passe desormais par le bon canal.
 
-const { sendEmail } = require('./email/resendClient');
+const { sendEmail } = require('./email/brevoClient');
 const gabarits = require('./email/emailTemplates');
 
 /**

@@ -260,8 +260,8 @@ router.post('/api/books/:bookId/collective/participants', authenticate, requireO
     // echoue ne doit pas annuler l'ajout du participant, qui garde de toute
     // facon son lien individuel, recopiable a la main.
     //
-    // Rien ne part tant qu'aucune cle Resend n'est posee (voir
-    // resendClient) : le lien reste alors le seul canal, exactement comme
+    // Rien ne part tant qu'aucune cle Brevo n'est posee (voir
+    // brevoClient) : le lien reste alors le seul canal, exactement comme
     // avant.
     (data || []).forEach((participant) => {
       emailsTransactionnels.envoyerInvitationParticipant({ participant, book: req.book }).catch(() => {});

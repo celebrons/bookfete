@@ -470,17 +470,18 @@ const AccountSpaceLuxe = () => {
                   retrouver un livre ne partent donc pas.
                 </p>
                 <ol className="account-email-setup">
-                  <li>Créez un compte gratuit sur <strong>resend.com</strong> (aucune carte bancaire demandée).</li>
-                  <li>Générez une clé API (elle commence par <code>re_</code>).</li>
+                  <li>Créez un compte gratuit sur <strong>brevo.com</strong> (aucune carte bancaire demandée, 300 emails/jour).</li>
+                  <li>Vérifiez un expéditeur : menu <strong>Expéditeurs, domaines et IP dédiée</strong> → Expéditeurs → ajoutez votre adresse et confirmez le lien reçu par email.</li>
+                  <li>Générez une clé API : menu <strong>Paramètres</strong> → <strong>SMTP &amp; API</strong> → Clés API (elle commence par <code>xkeysib-</code>).</li>
                   <li>
-                    Posez-la dans <code>backend/.env</code> : <code>RESEND_API_KEY=re_…</code>, puis redémarrez le
-                    backend.
+                    Posez-la dans <code>backend/.env</code> : <code>BREVO_API_KEY=xkeysib-…</code> et
+                    <code>EMAIL_FROM=Célébrons &lt;votre-adresse-vérifiée&gt;</code>, puis redémarrez le backend.
                   </li>
                 </ol>
                 <p className="account-address-saved-hint">
-                  Sans domaine vérifié, Resend n'autorise l'envoi que vers l'adresse de votre compte Resend — ce qui
-                  suffit pour tester. Pour écrire à de vrais clients, vérifiez un domaine (gratuit) et renseignez
-                  <code>EMAIL_FROM</code>.
+                  Contrairement à d'autres offres gratuites, Brevo n'exige pas de domaine vérifié pour écrire à de
+                  vraies adresses — un expéditeur vérifié suffit. Ce bouton n'envoie qu'à vous-même ; pour tester
+                  plusieurs adresses réelles à la fois, demandez-le.
                 </p>
               </>
             )}

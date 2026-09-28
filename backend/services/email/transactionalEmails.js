@@ -2,7 +2,8 @@
 // QUAND.
 //
 // Separe volontairement en trois fichiers :
-//   resendClient.js      — comment on envoie (transport)
+//   brevoClient.js       — comment on envoie (transport ; resendClient.js
+//                          garde la meme interface si besoin d'y revenir)
 //   emailTemplates.js    — ce qu'on ecrit (redaction, fonctions pures)
 //   transactionalEmails.js (ici) — a quel moment, et a qui
 //
@@ -14,7 +15,7 @@
 // l'action qui l'a declenchee. Une commande payee reste payee meme si
 // l'email ne part pas. Un email perdu se renvoie ; une commande perdue, non.
 
-const { sendEmail, isEmailEnabled } = require('./resendClient');
+const { sendEmail, isEmailEnabled } = require('./brevoClient');
 const gabarits = require('./emailTemplates');
 
 // URL publique du site, pour les liens des emails. Sans elle, on n'ajoute

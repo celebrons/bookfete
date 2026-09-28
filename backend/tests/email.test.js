@@ -101,6 +101,117 @@ describe('resendClient — rien ne part sans cle', () => {
   });
 });
 
+describe('brevoClient — rien ne part sans cle', () => {
+  const CLE = process.env.BREVO_API_KEY;
+  const FROM = process.env.EMAIL_FROM;
+  let fetchOrigine;
+
+  beforeEach(() => {
+    jest.resetModules();
+    fetchOrigine = global.fetch;
+    process.env.EMAIL_FROM = 'Celebrons <bonjour@celebrons.test>';
+  });
+  afterEach(() => {
+    global.fetch = fetchOrigine;
+    if (CLE === undefined) delete process.env.BREVO_API_KEY; else process.env.BREVO_API_KEY = CLE;
+    if (FROM === undefined) delete process.env.EMAIL_FROM; else process.env.EMAIL_FROM = FROM;
+  });
+
+  const charger = () => require('../services/email/brevoClient');
+
+  it('sans cle : aucun appel reseau, et l envoi se declare non effectue', async () => {
+    delete process.env.BREVO_API_KEY;
+    global.fetch = jest.fn();
+    const { sendEmail, isEmailEnabled } = charger();
+
+    expect(isEmailEnabled()).toBe(false);
+    const r = await sendEmail({ to: 'test@example.com', subject: 'Bonjour', html: '<p>Bonjour</p>' });
+    expect(r.sent).toBe(false);
+    expect(r.skipped).toBe('cle_absente');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  // Le .env d'exemple contient un marqueur (« xkeysib-xxx ») : sans ce
+  // controle, on enverrait une requete authentifiee avec un texte de
+  // remplacement et on croirait a une panne du service.
+  it('une cle qui ne commence pas par xkeysib- compte comme absente', async () => {
+    process.env.BREVO_API_KEY = 'pas-une-cle-brevo';
+    global.fetch = jest.fn();
+    const { sendEmail, isEmailEnabled } = charger();
+
+    expect(isEmailEnabled()).toBe(false);
+    const r = await sendEmail({ to: 'test@example.com', subject: 'Bonjour', html: '<p>x</p>' });
+    expect(r.skipped).toBe('cle_absente');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('sans EMAIL_FROM (expediteur verifie), aucun appel reseau', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
+    delete process.env.EMAIL_FROM;
+    global.fetch = jest.fn();
+    const { sendEmail } = charger();
+
+    const r = await sendEmail({ to: 'jean@example.com', subject: 'x', html: '<p>x</p>' });
+    expect(r.sent).toBe(false);
+    expect(r.skipped).toBe('expediteur_absent');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('une adresse invalide n entraine aucun appel (ni quota ni reputation brules)', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
+    global.fetch = jest.fn();
+    const { sendEmail } = charger();
+
+    for (const mauvaise of ['', 'pas-une-adresse', 'a@b', null, undefined]) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await sendEmail({ to: mauvaise, subject: 'x', html: '<p>x</p>' });
+      expect(r.sent).toBe(false);
+      expect(r.skipped).toBe('destinataire_invalide');
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('avec une cle et un expediteur valides : un seul POST, avec le bon destinataire et le bon sujet', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
+    global.fetch = jest.fn(async () => ({ ok: true, status: 201, json: async () => ({ messageId: 'email-1' }) }));
+    const { sendEmail } = charger();
+
+    const r = await sendEmail({ to: 'jean@example.com', subject: 'Votre livre', html: '<p>Bonjour</p>' });
+    expect(r.sent).toBe(true);
+    expect(r.id).toBe('email-1');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toBe('https://api.brevo.com/v3/smtp/email');
+    expect(options.headers['api-key']).toBe('xkeysib-vraie-cle');
+    const corps = JSON.parse(options.body);
+    expect(corps.sender).toEqual({ name: 'Celebrons', email: 'bonjour@celebrons.test' });
+    expect(corps.to).toEqual([{ email: 'jean@example.com' }]);
+    expect(corps.subject).toBe('Votre livre');
+  });
+
+  // JAMAIS BLOQUANT : une commande payee reste payee meme si l'email echoue.
+  it('un echec du service ne leve jamais — il est rapporte, pas propage', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
+    global.fetch = jest.fn(async () => ({ ok: false, status: 403, json: async () => ({ message: 'Sender not registered' }) }));
+    const { sendEmail } = charger();
+
+    const r = await sendEmail({ to: 'jean@example.com', subject: 'x', html: '<p>x</p>' });
+    expect(r.sent).toBe(false);
+    expect(r.error).toBe('Sender not registered');
+  });
+
+  it('une panne reseau ne leve jamais non plus', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
+    global.fetch = jest.fn(async () => { throw new Error('ECONNREFUSED'); });
+    const { sendEmail } = charger();
+
+    const r = await sendEmail({ to: 'jean@example.com', subject: 'x', html: '<p>x</p>' });
+    expect(r.sent).toBe(false);
+    expect(r.error).toBe('ECONNREFUSED');
+  });
+});
+
 describe('emailTemplates — redaction', () => {
   const gabarits = require('../services/email/emailTemplates');
 
@@ -152,15 +263,20 @@ describe('emailTemplates — redaction', () => {
   });
 });
 
-describe('emailService (ancien flux chapitres) — delegue a Resend', () => {
-  const CLE = process.env.RESEND_API_KEY;
+describe('emailService (ancien flux chapitres) — delegue a Brevo', () => {
+  const CLE = process.env.BREVO_API_KEY;
+  const FROM = process.env.EMAIL_FROM;
   let fetchOrigine;
 
-  beforeEach(() => { jest.resetModules(); fetchOrigine = global.fetch; });
+  beforeEach(() => {
+    jest.resetModules();
+    fetchOrigine = global.fetch;
+    process.env.EMAIL_FROM = 'Celebrons <bonjour@celebrons.test>';
+  });
   afterEach(() => {
     global.fetch = fetchOrigine;
-    if (CLE === undefined) delete process.env.RESEND_API_KEY;
-    else process.env.RESEND_API_KEY = CLE;
+    if (CLE === undefined) delete process.env.BREVO_API_KEY; else process.env.BREVO_API_KEY = CLE;
+    if (FROM === undefined) delete process.env.EMAIL_FROM; else process.env.EMAIL_FROM = FROM;
   });
 
   // Le transport nodemailer a ete retire : deux systemes d'envoi paralleles
@@ -171,9 +287,9 @@ describe('emailService (ancien flux chapitres) — delegue a Resend', () => {
     expect(source).not.toMatch(/require\(['"]nodemailer['"]\)/);
   });
 
-  it('passe bien par Resend, avec la signature d origine inchangee', async () => {
-    process.env.RESEND_API_KEY = 're_vraie_cle';
-    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ id: 'e-1' }) }));
+  it('passe bien par Brevo, avec la signature d origine inchangee', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib-vraie-cle';
+    global.fetch = jest.fn(async () => ({ ok: true, status: 201, json: async () => ({ messageId: 'e-1' }) }));
     const { sendInviteEmail } = require('../services/emailService');
 
     const r = await sendInviteEmail({
@@ -186,13 +302,13 @@ describe('emailService (ancien flux chapitres) — delegue a Resend', () => {
 
     expect(r.sent).toBe(true);
     const corps = JSON.parse(global.fetch.mock.calls[0][1].body);
-    expect(corps.to).toEqual(['proche@example.com']);
-    expect(corps.html).toContain('https://x.test/invite/abc');
-    expect(corps.html).toContain('Merci de participer');
+    expect(corps.to).toEqual([{ email: 'proche@example.com' }]);
+    expect(corps.htmlContent).toContain('https://x.test/invite/abc');
+    expect(corps.htmlContent).toContain('Merci de participer');
   });
 
   it('respecte le meme garde-fou : sans cle, aucun appel reseau', async () => {
-    delete process.env.RESEND_API_KEY;
+    delete process.env.BREVO_API_KEY;
     global.fetch = jest.fn();
     const { sendNewContributionEmail } = require('../services/emailService');
 

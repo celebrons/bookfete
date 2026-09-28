@@ -56,7 +56,7 @@ jest.mock('../services/printing/gelatoClient', () => ({
 // lit ADMIN_EMAILS directement depuis backend/.env, une vraie adresse. Deux
 // emails d'alerte reels sont partis pendant l'ecriture des tests ci-dessous
 // avant que ce mock ne soit ajoute. Aucun test ne doit jamais pouvoir
-// atteindre resendClient.js — c'est la seule garantie qui compte ici.
+// atteindre brevoClient.js — c'est la seule garantie qui compte ici.
 jest.mock('../services/email/transactionalEmails', () => ({
   envoyerPaiementRecu: jest.fn(async () => ({ sent: false, skipped: 'test' })),
   envoyerAlerteAdmin: jest.fn(async () => ({ sent: false, skipped: 'test' })),

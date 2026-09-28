@@ -34,7 +34,7 @@ const { PDF_PRICE_CENTS, PACK_DISCOUNT_PERCENT } = require('../services/pricing/
 const gelatoSubmissionsEnCours = new Map();
 const gelatoTracking = require('../services/printing/gelatoTracking');
 const emails = require('../services/email/transactionalEmails');
-const { emailValide } = require('../services/email/resendClient');
+const { emailValide } = require('../services/email/brevoClient');
 let Stripe = null;
 
 try {
@@ -1361,8 +1361,9 @@ router.get('/email/status', authenticate, (req, res) => {
     enabled: emails.isEmailEnabled(),
     from: (process.env.EMAIL_FROM || "").trim() || null,
     siteUrl: emails.siteUrl(),
-    // Adresse du compte : en offre gratuite Resend, c'est la SEULE vers
-    // laquelle on peut ecrire tant qu'aucun domaine n'est verifie.
+    // Adresse du compte : ce bouton de test reste volontairement limite a
+    // elle (voir la route ci-dessous) — tester plusieurs adresses reelles se
+    // fait avec scripts/tester-emails.js, pas depuis l'interface.
     suggestedTo: req.user?.email || null
   });
 });
@@ -1373,7 +1374,9 @@ router.get('/email/status', authenticate, (req, res) => {
 //
 // Destinataire : l'adresse du compte connecte, et elle seule. Accepter une
 // adresse libre ferait de cette route un relais ouvert — on pourrait
-// envoyer du courrier a n'importe qui depuis notre domaine.
+// envoyer du courrier a n'importe qui depuis notre domaine. Pour tester
+// avec plusieurs vraies adresses (factures/commandes/inscriptions...), voir
+// scripts/tester-emails.js --a a@x.fr,b@x.fr,c@x.fr (SSH, pas expose ici).
 router.post('/email/test', authenticate, async (req, res) => {
   try {
     const destinataire = req.user?.email;
@@ -1382,7 +1385,7 @@ router.post('/email/test', authenticate, async (req, res) => {
     }
     if (!emails.isEmailEnabled()) {
       return res.status(422).json({
-        error: "L'envoi d'emails n'est pas configure : posez RESEND_API_KEY dans le fichier .env du backend, puis redemarrez-le.",
+        error: "L'envoi d'emails n'est pas configure : posez BREVO_API_KEY dans le fichier .env du backend, puis redemarrez-le.",
         enabled: false
       });
     }
