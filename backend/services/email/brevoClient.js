@@ -20,6 +20,17 @@
 //
 // PAS DE SDK : un seul POST JSON (`fetch`, natif depuis Node 18), meme choix
 // que pour Resend.
+//
+// IPV4 FORCE : Brevo exige d'autoriser l'IP source de chaque cle API. Le
+// serveur a les deux piles (IPv4 ET IPv6), et Node/undici prefere IPv6 des
+// qu'elle est disponible (Happy Eyeballs) — Brevo voyait alors une adresse
+// IPv6 differente de l'IPv4 autorisee, et refusait tout (retour utilisateur
+// 2026-09-28, message Brevo : "unrecognised IP address 2001:..."). Autoriser
+// aussi l'IPv6 aurait ete un correctif fragile : avec les extensions de vie
+// privee (RFC 4941), une IPv6 SLAAC change avec le temps. On force plutot
+// TOUT le processus a resoudre les DNS en IPv4 d'abord — l'IPv4 du serveur,
+// elle, est fixe (voir memoire "scaleway-test-server").
+require('dns').setDefaultResultOrder('ipv4first');
 
 const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
