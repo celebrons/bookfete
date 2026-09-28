@@ -23,6 +23,20 @@ const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const storageService = require('../services/storageService');
+
+// Anti-doublon pour la relance (retour utilisateur, 2026-09-28 : "un rappel
+// a ete envoye en double") — meme principe que pdfReadyEmailSentAt
+// (routes/books.js) : PUT .../participants/:id (correction d'email/nom) ET
+// POST .../remind appellent toutes deux envoyerRelanceParticipant, sans
+// aucun garde-fou contre un double-clic ou une double requete rapprochee.
+// Une VRAIE relance plus tard (jours suivants) doit rester possible — donc
+// un DELAI, pas un verrou definitif comme pour "PDF pret" (qui ne doit
+// jamais se reproduire, meme des mois plus tard).
+const RELANCE_DELAI_MIN_MS = 2 * 60 * 1000;
+function relanceTropRecente(participant) {
+  if (!participant?.last_reminder_sent_at) return false;
+  return Date.now() - new Date(participant.last_reminder_sent_at).getTime() < RELANCE_DELAI_MIN_MS;
+}
 const bookContentService = require('../services/composition/bookContentService');
 
 const PHOTO_BUCKET = 'contribution-photos';
@@ -298,6 +312,13 @@ router.put('/api/books/:bookId/collective/participants/:participantId', authenti
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Participant introuvable.' });
 
+    // Anti-doublon (retour utilisateur, 2026-09-28 : voir relanceTropRecente
+    // en entete de fichier) : une double requete rapprochee (double-clic,
+    // retry reseau) ne doit pas envoyer deux emails.
+    if (relanceTropRecente(data)) {
+      return res.json({ ...data, emailSent: false, emailSkipped: 'trop_recent' });
+    }
+
     const envoi = await emailsTransactionnels.envoyerRelanceParticipant({ participant: data, book: req.book });
     res.json({ ...data, emailSent: envoi.sent === true, emailSkipped: envoi.skipped || null });
   } catch (error) {
@@ -338,6 +359,23 @@ router.delete('/api/books/:bookId/collective/participants/:participantId', authe
 // l'email est parti (`emailSent`) plutot que de le laisser deviner.
 router.post('/api/books/:bookId/collective/participants/:participantId/remind', authenticate, requireOwnedBook, async (req, res) => {
   try {
+    // Etat AVANT ecriture : c'est lui qui dit si la derniere relance date de
+    // moins de RELANCE_DELAI_MIN_MS (voir entete de fichier) — une fois
+    // last_reminder_sent_at ecrase par la mise a jour ci-dessous, on ne
+    // pourrait plus le savoir.
+    const { data: actuel, error: erreurLecture } = await supabase
+      .from('book_participants')
+      .select('*')
+      .eq('id', req.params.participantId)
+      .eq('book_id', req.params.bookId)
+      .maybeSingle();
+    if (erreurLecture) throw erreurLecture;
+    if (!actuel) return res.status(404).json({ error: 'Participant introuvable.' });
+
+    if (relanceTropRecente(actuel)) {
+      return res.json({ ...actuel, emailSent: false, emailSkipped: 'trop_recent' });
+    }
+
     const { data, error } = await supabase
       .from('book_participants')
       .update({ last_reminder_sent_at: new Date().toISOString() })

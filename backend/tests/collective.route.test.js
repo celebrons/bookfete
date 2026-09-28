@@ -261,6 +261,12 @@ describe('routes/collective', () => {
     it('POST .../remind appelle reellement envoyerRelanceParticipant (pas seulement PUT)', async () => {
       const emails = require('../services/email/transactionalEmails');
       emails.envoyerRelanceParticipant.mockClear();
+      // Fixture PARTAGEE : le test precedent vient de poser
+      // last_reminder_sent_at sur ce meme participant — sans remise a zero,
+      // le garde-fou anti-doublon ajoute juste en dessous bloquerait CE
+      // test la aussi.
+      const p = global.__supabaseMock.__table('book_participants').find((x) => x.id === 'participant-invited');
+      if (p) p.last_reminder_sent_at = null;
 
       const response = await request(app)
         .post(`/api/books/${ACTIVATED_BOOK_ID}/collective/participants/participant-invited/remind`)
@@ -270,6 +276,30 @@ describe('routes/collective', () => {
       expect(emails.envoyerRelanceParticipant).toHaveBeenCalledTimes(1);
       expect(emails.envoyerRelanceParticipant.mock.calls[0][0].participant.id).toBe('participant-invited');
       expect(response.body.emailSent).toBe(false); // mock renvoie {sent:false} : le champ le reflete fidelement.
+    });
+
+    // Regression directe (retour utilisateur, 2026-09-28 : "un rappel a ete
+    // envoye en double pour ... a 22h50"). Deux appels rapproches (double-
+    // clic, retry reseau) ne doivent declencher qu'UN SEUL envoi.
+    it('un DEUXIEME appel rapproche ne renvoie PAS l email (anti-doublon)', async () => {
+      const emails = require('../services/email/transactionalEmails');
+      emails.envoyerRelanceParticipant.mockClear();
+      const p = global.__supabaseMock.__table('book_participants').find((x) => x.id === 'participant-invited');
+      if (p) p.last_reminder_sent_at = null;
+
+      const premier = await request(app)
+        .post(`/api/books/${ACTIVATED_BOOK_ID}/collective/participants/participant-invited/remind`)
+        .set('Authorization', 'Bearer valid-token');
+      expect(premier.status).toBe(200);
+      expect(emails.envoyerRelanceParticipant).toHaveBeenCalledTimes(1);
+
+      const second = await request(app)
+        .post(`/api/books/${ACTIVATED_BOOK_ID}/collective/participants/participant-invited/remind`)
+        .set('Authorization', 'Bearer valid-token');
+      expect(second.status).toBe(200);
+      expect(second.body.emailSkipped).toBe('trop_recent');
+      // Toujours 1, pas 2 : le deuxieme appel n'a pas declenche de nouvel envoi.
+      expect(emails.envoyerRelanceParticipant).toHaveBeenCalledTimes(1);
     });
   });
 
