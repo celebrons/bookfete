@@ -5,10 +5,7 @@ import BookCardLuxe from './BookCardLuxe';
 import Loading from '../common/Loading';
 import {
   IconBook,
-  IconCheckCircle,
   IconArchive,
-  IconPhoto,
-  IconContribution,
   IconPlus
 } from './DashboardIcons';
 import {
@@ -428,11 +425,11 @@ const DashboardGeneralLuxe = () => {
   return (
     <div className="dashboard-container">
       <div className="dashboard-content">
-        <div className="dashboard-hero">
+        <div className="dashboard-toolbar">
           <div className="dashboard-header">
             <div className="dashboard-eyebrow">Bibliotheque personnelle</div>
-            <h1>Bonjour {user?.user_metadata?.full_name || user?.email}</h1>
-            <p>Gerez vos livres, suivez leur avancement et pilotez les actions prioritaires.</p>
+            <h1>Bonjour, {user?.user_metadata?.full_name || user?.email}</h1>
+            <p>Vos livres, leur avancement, et ce qu'il reste a faire.</p>
           </div>
 
           <div className="quick-actions dashboard-header-actions">
@@ -443,11 +440,11 @@ const DashboardGeneralLuxe = () => {
 
             {stats.archives.count > 0 && (
               <button
+                type="button"
                 onClick={() => setShowArchived(!showArchived)}
                 className={`btn-archive-toggle ${showArchived ? 'active' : ''}`}
               >
-                <IconArchive />
-                {showArchived ? 'Masquer archives' : `Archives (${stats.archives.count})`}
+                {showArchived ? 'Masquer les archives' : `Archives (${stats.archives.count})`}
               </button>
             )}
           </div>
@@ -467,28 +464,17 @@ const DashboardGeneralLuxe = () => {
           </div>
         )}
 
-        {/* Bandeau compact : trois compteurs sur UNE ligne chacun, au lieu
-            de trois blocs empiles (icone / grand nombre / details). Meme
-            information exactement — rien n a ete retire — mais la hauteur
-            passe de trois pavés a trois lignes, et la liste des livres, elle,
-            remonte au-dessus de la ligne de flottaison (retour utilisateur
-            2026-09-14 : "les cartes prennent bcp d espace pour rien"). */}
-        <div className="stats-grid">
-          {[
-            { cle: 'enCours', titre: 'En cours', icone: <IconBook />, valeurs: stats.enCours },
-            { cle: 'termines', titre: 'Termines', icone: <IconCheckCircle />, valeurs: stats.termines },
-            { cle: 'archives', titre: 'Archives', icone: <IconArchive />, valeurs: stats.archives }
-          ].map((carte) => (
-            <div className="stat-card" key={carte.cle}>
-              <span className="stat-icon">{carte.icone}</span>
-              <span className="stat-number">{carte.valeurs.count}</span>
-              <span className="stat-title">{carte.titre}</span>
-              <span className="stat-details">
-                <span className="stat-detail-item" title="Photos ajoutees"><IconPhoto />{carte.valeurs.photos}</span>
-                <span className="stat-detail-item" title="Contributions"><IconContribution />{carte.valeurs.contributions}</span>
-              </span>
-            </div>
-          ))}
+        {/* Une seule ligne de chiffres, au lieu de trois cartes avec icone +
+            grand nombre + compteurs secondaires. Meme information de premier
+            niveau (compte de livres par etat) ; le detail photos/contributions
+            reste visible dans chaque carte livre, pas duplique ici (retour
+            utilisateur 2026-09-28 : "des carres et des chiffres partout"). */}
+        <div className="stats-line">
+          <span className="stats-line-item"><strong>{stats.enCours.count}</strong> en cours</span>
+          <span className="stats-line-sep">·</span>
+          <span className="stats-line-item"><strong>{stats.termines.count}</strong> {stats.termines.count > 1 ? 'termines' : 'termine'}</span>
+          <span className="stats-line-sep">·</span>
+          <span className="stats-line-item"><strong>{stats.archives.count}</strong> {stats.archives.count > 1 ? 'archives' : 'archive'}</span>
         </div>
 
         {!showArchived && (

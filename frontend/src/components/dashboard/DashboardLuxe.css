@@ -16,19 +16,19 @@
   gap: var(--space-lg);
 }
 
-.dashboard-hero {
-  background:
-    radial-gradient(circle at top right, rgba(184, 146, 74, 0.12), transparent 26%),
-    linear-gradient(135deg, #fbfaf7 0%, #ecebe7 100%);
-  border: 1px solid rgba(218, 207, 186, 0.7);
-  border-radius: 18px;
-  padding: var(--space-xl);
-  box-shadow: 0 24px 40px -34px rgba(70, 54, 24, 0.28);
+.dashboard-toolbar {
+  /* Plus de bandeau encadre (fond degrade, bordure, ombre) : l'en-tete
+     redevient un simple bloc de texte pose sur le fond de la page, comme
+     partout ailleurs dans l'appli, separe du contenu par un seul filet
+     (retour utilisateur 2026-09-28 : "Bonjour ... très grand, mise en page
+     différente"). */
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-lg);
   flex-wrap: wrap;
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(223, 216, 201, 0.9);
 }
 
 .dashboard-header {
@@ -48,9 +48,9 @@
 
 .dashboard-header h1 {
   margin: 0;
-  font-size: clamp(30px, 4vw, 42px);
+  font-size: clamp(24px, 2.6vw, 30px);
   font-weight: 600;
-  line-height: 1.08;
+  line-height: 1.15;
   color: var(--ink);
 }
 
@@ -105,90 +105,29 @@
   padding: 2px;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-md);
-}
-
-.stat-card {
-  /* UNE LIGNE, pas un pave. Auparavant chaque compteur empilait un en-tete,
-     un nombre en 34 px et une ligne de details : trois cartes occupaient
-     presque tout le premier ecran avant la liste des livres. Meme contenu,
-     dispose horizontalement. */
+.stats-line {
+  /* Une seule ligne de texte, pas trois cartes : le detail photos/
+     contributions par etat n'est plus duplique ici, il reste visible dans
+     chaque carte livre (retour utilisateur 2026-09-28 : "des carres et des
+     chiffres partout"). */
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(223, 216, 201, 0.9);
-  border-radius: 12px;
-  padding: 10px 14px;
-  box-shadow: 0 10px 18px -18px rgba(58, 44, 20, 0.22);
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
+  font-size: 13px;
+  color: var(--text-light);
 }
 
-.stat-card:hover {
-  border-color: rgba(184, 146, 74, 0.35);
-  box-shadow: 0 14px 22px -20px rgba(58, 44, 20, 0.26);
-}
-
-.stat-icon {
-  color: var(--gold);
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-}
-
-.stat-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.stat-number {
-  font-size: 22px;
+.stats-line-item strong {
+  font-size: 18px;
   font-weight: 700;
   color: var(--ink);
-  line-height: 1;
-  /* Les trois compteurs s'alignent verticalement d'une carte a l'autre meme
-     quand l'un passe a deux chiffres. */
   font-variant-numeric: tabular-nums;
+  margin-right: 4px;
 }
 
-.stat-title {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-light);
-  white-space: nowrap;
-}
-
-.stat-details {
-  /* Pousses a droite : le regard lit d'abord le compteur principal, le detail
-     reste disponible sans le concurrencer. Plus de filet superieur — il
-     separait deux etages qui n'existent plus. */
-  display: inline-flex;
-  gap: 10px;
-  margin-left: auto;
-  padding-left: 10px;
-  border-left: 1px solid rgba(223, 216, 201, 0.72);
-}
-
-.stat-detail-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-light);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.stat-detail-item svg {
-  width: 13px;
-  height: 13px;
-  color: var(--gold);
+.stats-line-sep {
+  color: rgba(184, 146, 74, 0.5);
 }
 
 .quick-actions {
@@ -223,30 +162,48 @@
 }
 
 .btn-new {
-  background: linear-gradient(135deg, rgba(184, 146, 74, 0.14) 0%, rgba(255, 255, 255, 0.9) 100%);
-  color: var(--ink);
+  background: transparent;
+  border-color: rgba(184, 146, 74, 0.45);
+  color: #8b5e11;
 }
 
 .btn-admin {
-  background: rgba(255, 255, 255, 0.78);
-  color: var(--ink);
-}
-
-.btn-archive-toggle {
-  background: rgba(255, 255, 255, 0.72);
+  background: transparent;
   color: var(--ink);
 }
 
 .btn-new:hover,
-.btn-admin:hover,
-.btn-archive-toggle:hover {
+.btn-admin:hover {
   transform: translateY(-1px);
-  border-color: rgba(184, 146, 74, 0.38);
-  box-shadow: 0 20px 30px -24px rgba(58, 44, 20, 0.26);
+  border-color: rgba(184, 146, 74, 0.55);
+  background: var(--gold-light);
+}
+
+/* Bascule "Voir les archives" : simple lien souligne, pas un bouton borde —
+   c'est une bascule d'affichage secondaire, pas une action au meme niveau
+   que "Nouveau livre". */
+.btn-archive-toggle {
+  border: none;
+  background: none;
+  min-height: auto;
+  padding: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-light);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.btn-archive-toggle:hover {
+  transform: none;
+  box-shadow: none;
+  color: var(--ink);
 }
 
 .btn-archive-toggle.active {
-  background: rgba(184, 146, 74, 0.14);
+  color: #8b5e11;
 }
 
 .btn-new svg,
@@ -357,13 +314,6 @@
   margin-bottom: 10px;
 }
 
-.dashboard-book-top-badges {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
 .dashboard-book-status {
   display: inline-flex;
   align-items: center;
@@ -378,32 +328,9 @@
   border: 1px solid transparent;
 }
 
-/* Solo / Groupe : mode de collecte du projet (book.collection_mode). */
-.dashboard-book-mode-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 1px solid transparent;
-  cursor: help;
-}
-
-.dashboard-book-mode-badge.is-solo {
-  color: #4f6478;
-  background: #edf2f7;
-  border-color: #c9d4df;
-}
-
-.dashboard-book-mode-badge.is-groupe {
-  color: #8b5e11;
-  background: rgba(184, 146, 74, 0.14);
-  border-color: rgba(184, 146, 74, 0.34);
-}
+/* Solo / Groupe (book.collection_mode) : deplace en texte simple dans
+   dashboard-book-date (BookCardLuxe.js) — plus de second badge colore a
+   cote du statut (retour utilisateur 2026-09-28). */
 
 .dashboard-book-status::before {
   content: '';
@@ -559,6 +486,73 @@
   border-color: rgba(180, 35, 24, 0.5);
 }
 
+/* Menu "autres actions" (archiver / restaurer / supprimer) : un seul bouton
+   toujours visible, le panneau ne s'affiche qu'au clic — remplace les 1 a 2
+   boutons icones auparavant toujours presents a cote du statut. */
+.dashboard-book-menu {
+  position: relative;
+}
+
+.dashboard-book-menu-btn.is-open {
+  border-color: rgba(184, 146, 74, 0.4);
+  background: rgba(184, 146, 74, 0.08);
+}
+
+.dashboard-book-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  padding: 6px;
+  background: var(--white);
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 20px 32px -20px rgba(58, 44, 20, 0.32);
+}
+
+.dashboard-book-menu-panel button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.dashboard-book-menu-panel button svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--gold);
+}
+
+.dashboard-book-menu-panel button:hover {
+  background: rgba(184, 146, 74, 0.1);
+}
+
+.dashboard-book-menu-panel button.is-danger {
+  color: #b42318;
+}
+
+.dashboard-book-menu-panel button.is-danger svg {
+  color: #b42318;
+}
+
+.dashboard-book-menu-panel button.is-danger:hover {
+  background: rgba(180, 35, 24, 0.1);
+}
+
 .dashboard-book-link {
   text-decoration: none;
   color: inherit;
@@ -668,16 +662,16 @@
   margin-top: 10px;
   min-height: 42px;
   border-radius: 10px;
-  border: 1px solid var(--gold);
-  background: var(--gold);
-  color: var(--white);
+  border: 1px solid rgba(184, 146, 74, 0.45);
+  background: transparent;
+  color: #8b5e11;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.dashboard-book-share-btn:hover { background: var(--gold-dark, var(--gold)); opacity: 0.92; }
+.dashboard-book-share-btn:hover { background: var(--gold-light); border-color: rgba(184, 146, 74, 0.65); }
 
 /* Mode collectif — couche additive sous "Partager le lien", jamais un
    remplacement (voir BookCardLuxe.js). Sobre (fond neutre, pas de dorure
@@ -856,23 +850,9 @@
 }
 .modal-checkbox-field input { margin-top: 2px; accent-color: var(--gold); }
 
-@media (max-width: 1024px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 768px) {
   .dashboard-container {
     padding: var(--space-lg);
-  }
-
-  .dashboard-hero {
-    padding: var(--space-lg);
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
   }
 
   .books-grid {
@@ -884,8 +864,7 @@
   }
 
   .btn-new,
-  .btn-admin,
-  .btn-archive-toggle {
+  .btn-admin {
     width: 100%;
     justify-content: center;
   }
@@ -898,11 +877,6 @@
 
   .dashboard-section-panel {
     padding: var(--space-md);
-  }
-
-  .stat-details {
-    flex-wrap: wrap;
-    gap: var(--space-xs);
   }
 
   .modal-actions {

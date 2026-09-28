@@ -53,6 +53,14 @@ export const IconRestore = ({ className, style }) => (
   </svg>
 );
 
+export const IconMore = ({ className, style }) => (
+  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" className={className} style={style}>
+    <circle cx="4" cy="10" r="1.6"/>
+    <circle cx="10" cy="10" r="1.6"/>
+    <circle cx="16" cy="10" r="1.6"/>
+  </svg>
+);
+
 export const IconDelete = ({ className, style }) => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className={className} style={style}>
     <path d="M2.5 5H17.5" strokeLinecap="round"/>

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Tooltip from '../ui/Tooltip';
 import {
   IconArchive,
   IconRestore,
-  IconDelete
+  IconDelete,
+  IconMore
 } from './DashboardIcons';
 import {
   getBookLifecycleConfig,
@@ -53,6 +54,21 @@ const BookCardLuxe = ({
   const primaryAction = getJourneyPrimaryAction(journeyStatus, latestOrder);
   const [shareCopied, setShareCopied] = useState(false);
   const [showActivateModal, setShowActivateModal] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Ferme le menu "autres actions" au clic en dehors — evite d'avoir a
+  // rajouter un overlay plein ecran juste pour ce petit panneau.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   // book.participants : embed leger (status uniquement, voir
   // DashboardGeneralLuxe.js) — juste de quoi afficher le resume "N/M
@@ -119,20 +135,12 @@ const BookCardLuxe = ({
   return (
     <article className="card dashboard-book-card">
       <div className="dashboard-book-top">
-        <div className="dashboard-book-top-badges">
-          <span
-            className={`dashboard-book-status ${journeyConfig.tone || lifecycleConfig.tone}`}
-            title={lifecycleConfig.label}
-          >
-            {journeyConfig.label || lifecycleConfig.label}
-          </span>
-
-          <Tooltip text={isSoloProject ? 'Projet solo : vous ajoutez vous-meme photos et textes' : 'Projet groupe : vos proches contribuent via un lien'}>
-            <span className={`dashboard-book-mode-badge ${isSoloProject ? 'is-solo' : 'is-groupe'}`}>
-              {isSoloProject ? 'Solo' : 'Groupe'}
-            </span>
-          </Tooltip>
-        </div>
+        <span
+          className={`dashboard-book-status ${journeyConfig.tone || lifecycleConfig.tone}`}
+          title={lifecycleConfig.label}
+        >
+          {journeyConfig.label || lifecycleConfig.label}
+        </span>
 
         <div className="dashboard-book-tools">
           {autoDeleteDate && (
@@ -141,54 +149,69 @@ const BookCardLuxe = ({
             </Tooltip>
           )}
 
-          {showArchive && (
-            <Tooltip text="Archiver ce livre">
-              <button
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onArchive();
-                }}
-                className="dashboard-mini-action is-icon"
-                type="button"
-                aria-label="Archiver ce livre"
-              >
-                <IconArchive />
-              </button>
-            </Tooltip>
-          )}
-
-          {showRestore && (
-            <Tooltip text="Restaurer ce livre">
-              <button
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onRestore();
-                }}
-                className="dashboard-mini-action is-icon"
-                type="button"
-                aria-label="Restaurer ce livre"
-              >
-                <IconRestore />
-              </button>
-            </Tooltip>
-          )}
-
-          <Tooltip text="Supprimer definitivement">
+          {/* Une seule action toujours visible (le statut) ; archiver,
+              restaurer et supprimer — les actions occasionnelles — passent
+              dans ce menu plutot que d'etre affichees en permanence sous
+              forme de boutons icones (retour utilisateur 2026-09-28 : "des
+              carres et des chiffres partout"). */}
+          <div className="dashboard-book-menu" ref={menuRef}>
             <button
+              type="button"
+              className={`dashboard-mini-action is-icon dashboard-book-menu-btn ${menuOpen ? 'is-open' : ''}`}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                onDelete();
+                setMenuOpen((open) => !open);
               }}
-              className="dashboard-mini-action is-icon is-danger"
-              type="button"
-              aria-label="Supprimer ce livre"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              aria-label="Autres actions"
             >
-              <IconDelete />
+              <IconMore />
             </button>
-          </Tooltip>
+
+            {menuOpen && (
+              <div className="dashboard-book-menu-panel" onClick={(event) => event.stopPropagation()}>
+                {showArchive && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setMenuOpen(false);
+                      onArchive();
+                    }}
+                  >
+                    <IconArchive /> Archiver
+                  </button>
+                )}
+
+                {showRestore && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setMenuOpen(false);
+                      onRestore();
+                    }}
+                  >
+                    <IconRestore /> Restaurer
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="is-danger"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                >
+                  <IconDelete /> Supprimer
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -201,7 +224,12 @@ const BookCardLuxe = ({
             {/* Repli : un livre peut legitimement n'avoir pas encore de titre
                 — il ne se saisit plus qu'a l'etape couverture (2026-09-15). */}
             <h3 className="dashboard-book-title">{book.title || 'Livre sans titre'}</h3>
-            <p className="dashboard-book-date">Cree le {formatDate(book.created_at)}</p>
+            <p className="dashboard-book-date">
+              <span title={isSoloProject ? 'Projet solo : vous ajoutez vous-meme photos et textes' : 'Projet groupe : vos proches contribuent via un lien'}>
+                {isSoloProject ? 'Solo' : 'Groupe'}
+              </span>
+              {' · Cree le '}{formatDate(book.created_at)}
+            </p>
           </div>
         </div>
 
