@@ -30,7 +30,7 @@ const HowItWorksLuxe = () => {
     {
       number: '4️⃣',
       title: 'Choisissez le format et commandez',
-      description: 'Comparez les 3 formats (Livret, Standard, Luxe) avec un aperçu réel et le prix affiché en direct, validez votre commande, et recevez votre livre chez vous en 2 semaines.',
+      description: 'Comparez les 3 formats (Livret, Standard, Luxe) avec un aperçu réel et le prix affiché en direct, validez votre commande, et recevez votre livre chez vous (délai indicatif de 1 à 2 semaines selon la charge de production).',
       time: '5 minutes',
       highlight: 'Prix affiché immédiatement, sans surprise'
     }
@@ -69,31 +69,10 @@ const HowItWorksLuxe = () => {
     }
   ];
 
-  const testimonials = [
-    {
-      text: "J'ai créé un livre pour les 60 ans de mon mari en seulement 20 minutes. J'ai ajouté mes photos et mes textes, et le résultat est magnifique !",
-      name: "Sophie",
-      role: "Les 60 ans de Gégé",
-      image: "https://images.unsplash.com/photo-1494790108777-296ef5a2ec48?w=100&h=100&fit=crop"
-    },
-    {
-      text: "Pour le départ de notre collègue, j'ai rassemblé nos photos et nos mots en une soirée. La mise en page automatique a fait un travail incroyable. Le livre est splendide !",
-      name: "Thomas",
-      role: "Pot de départ",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop"
-    },
-    {
-      text: "Notre livre de mariage est unique. J'ai pu tout composer moi-même, et les photos sont magnifiques. Merci pour cette pépite !",
-      name: "Marie & Pierre",
-      role: "Mariage",
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop"
-    }
-  ];
-
   const faqs = [
     {
       question: "📦 Combien de temps pour recevoir le livre ?",
-      answer: "Comptez 2 semaines entre votre commande et la réception. L'impression est réalisée en France avec des partenaires de confiance."
+      answer: "Comptez généralement 1 à 2 semaines entre la commande et la réception (fabrication puis expédition). Ce délai est donné à titre indicatif, pas contractuel : il dépend de la charge de production du moment. Le suivi de fabrication et d'expédition est visible à tout moment depuis votre espace de commande."
     },
     {
       question: "📸 Peut-on ajouter des photos ?",
@@ -101,7 +80,7 @@ const HowItWorksLuxe = () => {
     },
     {
       question: "👥 Comment mes proches peuvent-ils contribuer ?",
-      answer: "Activez le mode collectif : invitez vos proches par email, chacun reçoit un lien personnel pour ajouter ses photos et ses souvenirs, sans créer de compte. Vous suivez qui a contribué, relancez les retardataires, et pouvez fixer une date limite de participation."
+      answer: "Activez le mode collectif : un lien personnel est généré pour chacun de vos proches, à partager vous-même comme vous le souhaitez (message, e-mail, SMS...). Avec ce lien, chacun ajoute ses photos et ses souvenirs sans créer de compte. Vous suivez qui a contribué, relancez les retardataires, et pouvez fixer une date limite de participation."
     },
     {
       question: "🖊️ Qui écrit les textes du livre ?",
@@ -113,11 +92,7 @@ const HowItWorksLuxe = () => {
     },
     {
       question: "📝 Peut-on modifier après validation ?",
-      answer: "Oui, vous pouvez ajuster vos photos, vos textes et le style tant que vous n'avez pas validé définitivement votre livre."
-    },
-    {
-      question: "🎁 Y a-t-il une version coffret ?",
-      answer: "Bientôt ! Nous travaillons sur des éditions encore plus luxueuses avec coffret et jaquette personnalisée."
+      answer: "Oui, librement, tant que la commande n'est pas payée : photos, textes, mise en page et format restent modifiables à tout moment. Une fois la commande payée, le livre est verrouillé — c'est ce qui garantit que la version imprimée correspond exactement à celle que vous avez validée."
     },
     {
       question: "↩️ Puis-je me rétracter après ma commande ?",
@@ -139,21 +114,6 @@ const HowItWorksLuxe = () => {
           <p className="hero-description">
             Créez un livre unique en 4 étapes simples, seul ou à plusieurs, sans aucune compétence technique. Vos photos, vos textes, votre format.
           </p>
-          
-          <div className="hero-stats">
-            <div className="stat-item">
-              <span className="stat-number">1500+</span>
-              <span className="stat-label">Livres créés</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-number">45 min</span>
-              <span className="stat-label">Temps actif</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-number">24h</span>
-              <span className="stat-label">Premières contributions</span>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -206,30 +166,21 @@ const HowItWorksLuxe = () => {
         </div>
       </section>
 
-      {/* Témoignages */}
+      {/* Pas de temoignages fabriques : voir ExemplesLuxe.js, meme principe
+          (retour utilisateur — "des livres reels valent mieux que n'importe
+          quel argumentaire"). Renvoie vers /exemples plutot que de dupliquer
+          un contenu honnete a deux endroits. */}
       <section className="testimonials-section">
-        <div className="container-luxe">
-          <div className="section-header">
-            <span className="label-gold">ILS NOUS ONT FAIT CONFIANCE</span>
-            <h2>💬 Ils l'ont fait, ils racontent</h2>
-            <p className="section-subtitle">Des milliers de personnes ont déjà créé leur livre</p>
-          </div>
-
-          <div className="testimonials-grid">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="testimonial-card">
-                <div className="testimonial-quote">"</div>
-                <p className="testimonial-text">"{testimonial.text}"</p>
-                <div className="testimonial-author">
-                  <img src={testimonial.image} alt={testimonial.name} className="testimonial-image" />
-                  <div className="testimonial-info">
-                    <strong>{testimonial.name}</strong>
-                    <span>{testimonial.role}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="container-luxe testimonials-honest">
+          <span className="label-gold">DE VRAIS LIVRES, BIENTÔT</span>
+          <h2>💬 Vous serez parmi les premiers</h2>
+          <p className="section-subtitle">
+            Célébrons vient de démarrer : nous préférons vous montrer de vrais livres et de vrais
+            retours plutôt que d'inventer des chiffres ou des témoignages. La meilleure façon de
+            juger, en attendant, reste de composer le vôtre — l'aperçu est à l'échelle réelle dès
+            le début.
+          </p>
+          <Link to="/exemples" className="btn btn-outline">Voir la page Exemples</Link>
         </div>
       </section>
 
@@ -257,7 +208,6 @@ const HowItWorksLuxe = () => {
       <section className="how-cta">
         <div className="container-luxe">
           <h2>Prêt à créer des souvenirs inoubliables ?</h2>
-          <p className="cta-description">Rejoignez les 1500+ personnes qui ont déjà créé leur livre</p>
           <Link to="/create-book" className="cta-button">
             <button className="btn btn-primary" style={{ padding: '16px 48px' }}>
               ✨ Créer mon livre gratuitement
