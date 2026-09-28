@@ -76,9 +76,14 @@ const CollectiveParticipateLuxe = () => {
     setError('');
     try {
       for (const file of files) {
+        // Apercu IMMEDIAT (retour utilisateur, 2026-09-28 : "permettre un
+        // apercu de ce qu'il a charge") : un blob local, pas besoin d'
+        // attendre la reponse serveur — c'est la photo que la personne vient
+        // elle-meme de choisir, l'aperçu doit apparaitre tout de suite.
+        const previewUrl = URL.createObjectURL(file);
         // eslint-disable-next-line no-await-in-loop
         await submitCollectivePhoto(token, file);
-        setSentItems((previous) => [...previous, { kind: 'photo', label: file.name }]);
+        setSentItems((previous) => [...previous, { kind: 'photo', label: file.name, previewUrl }]);
       }
     } catch (err) {
       setError(err.message || "L'envoi a echoue.");
@@ -133,6 +138,8 @@ const CollectiveParticipateLuxe = () => {
   }
 
   const eventTitle = invite?.eventTitle || invite?.bookTitle;
+  const sentPhotos = sentItems.filter((item) => item.kind === 'photo');
+  const sentTexts = sentItems.filter((item) => item.kind === 'texte');
 
   return (
     <div className="invitation-container">
@@ -157,6 +164,32 @@ const CollectiveParticipateLuxe = () => {
           <>
             {error && <div className="wizard-error">{error}</div>}
 
+            {/* Photos EN PREMIER (retour utilisateur, 2026-09-28) : c'est le
+                souvenir le plus simple a donner en arrivant sur ce lien,
+                avant de demander un texte. */}
+            <div className="form-group">
+              <label htmlFor="collective-photos">Une ou plusieurs photos</label>
+              <input
+                id="collective-photos"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleAddPhotos}
+                disabled={uploadingPhotos}
+              />
+              {uploadingPhotos && <p className="body-text" style={{ color: 'var(--text-light)' }}>Envoi en cours...</p>}
+
+              {sentPhotos.length > 0 && (
+                <ul className="collective-photo-grid">
+                  {sentPhotos.map((item, index) => (
+                    <li key={index} className="collective-photo-thumb">
+                      <img src={item.previewUrl} alt={item.label} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             <div className="form-group">
               <label htmlFor="collective-message">Un souvenir à raconter</label>
               <textarea
@@ -176,31 +209,15 @@ const CollectiveParticipateLuxe = () => {
               >
                 {sendingText ? 'Envoi...' : 'Ajouter ce souvenir'}
               </button>
-            </div>
 
-            <div className="form-group">
-              <label htmlFor="collective-photos">Une ou plusieurs photos</label>
-              <input
-                id="collective-photos"
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleAddPhotos}
-                disabled={uploadingPhotos}
-              />
-              {uploadingPhotos && <p className="body-text" style={{ color: 'var(--text-light)' }}>Envoi en cours...</p>}
-            </div>
-
-            {sentItems.length > 0 && (
-              <div className="form-group">
-                <label>Déjà envoyé</label>
-                <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-light)', fontSize: 13 }}>
-                  {sentItems.map((item, index) => (
-                    <li key={index}>{item.kind === 'photo' ? '📷 ' : '✎ '}{item.label}</li>
+              {sentTexts.length > 0 && (
+                <ul style={{ margin: '10px 0 0', paddingLeft: 18, color: 'var(--text-light)', fontSize: 13 }}>
+                  {sentTexts.map((item, index) => (
+                    <li key={index}>✎ {item.label}</li>
                   ))}
                 </ul>
-              </div>
-            )}
+              )}
+            </div>
 
             <button
               type="button"

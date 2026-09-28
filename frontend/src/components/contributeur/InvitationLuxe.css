@@ -18,8 +18,12 @@
   padding: var(--space-xl);
   box-shadow: var(--shadow-elevated);
   animation: fadeIn 0.6s ease;
-  max-height: 90vh;
-  overflow-y: auto;
+  /* Pas de max-height/overflow ici (retour utilisateur, 2026-09-28 : "deux
+     scroll dans la fenetre des invites") : cette carte imposait sa propre
+     limite de hauteur avec defilement interne, EN PLUS du defilement normal
+     de la page (en-tete du site + .invitation-container au-dessus/en
+     dessous). La carte grandit desormais avec son contenu — un seul
+     defilement, celui de la page, jamais deux imbriques. */
 }
 
 /* Scrollbar stylée */
@@ -164,4 +168,31 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Grille d'apercu des photos deja envoyees (CollectiveParticipateLuxe.js,
+   retour utilisateur 2026-09-28 : "permettre un apercu de ce qu'il a
+   charge"). */
+.collective-photo-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.collective-photo-thumb {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(184, 146, 74, 0.25);
+  background: var(--silk);
+}
+
+.collective-photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
