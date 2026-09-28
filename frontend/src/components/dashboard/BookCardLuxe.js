@@ -19,24 +19,6 @@ import {
 import CollectiveActivateModal from './CollectiveActivateModal';
 import './DashboardLuxe.css';
 
-// Libelles humains des occasions (event_type) : book.event_type stocke le
-// slug technique choisi a la creation (ex. "projet"), pas le libelle affiche
-// dans ce meme formulaire (ex. "Fin de projet") — voir EVENT_TYPE_LABELS,
-// backend/utils/bookCreationSchema.js (meme mapping, garder les deux
-// synchronises). Slug inconnu -> affiche tel quel plutot que de disparaitre.
-const EVENT_TYPE_LABELS = {
-  anniversaire: 'Anniversaire',
-  retraite: 'Retraite',
-  depart: 'Depart',
-  mariage: 'Mariage / Union',
-  naissance: 'Naissance',
-  voyage: 'Voyage / Vacances',
-  projet: 'Fin de projet',
-  famille: 'Reunion de famille',
-  custom: 'Choix libre'
-};
-const resolveEventTypeLabel = (eventType) => (eventType ? (EVENT_TYPE_LABELS[eventType] || eventType) : 'Generique');
-
 const BookCardLuxe = ({
   book,
   onArchive,
@@ -77,9 +59,6 @@ const BookCardLuxe = ({
   const isCollectiveActivated = Boolean(book.collective_activated_at);
   const collectiveCompletedCount = collectiveParticipants.filter((p) => p.status === 'completed').length;
   const collectiveTotalCount = collectiveParticipants.length;
-  const collectiveDaysRemaining = book.collective_deadline
-    ? Math.ceil((new Date(`${book.collective_deadline}T23:59:59`) - new Date()) / (1000 * 60 * 60 * 24))
-    : null;
 
   // book_content_items (photos + textes), pas les anciens
   // chapters/contributions IA — voir DashboardGeneralLuxe.js.
@@ -109,6 +88,13 @@ const BookCardLuxe = ({
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('fr-FR');
+  };
+  // Jour/mois seulement (ex. "22/09"), pour la ligne meta unique de la carte
+  // — la maquette de reference n'y affiche jamais l'annee.
+  const formatShortDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
   };
   const resolvePrimaryActionPath = () => {
     if (primaryAction.key === 'follow_order' || primaryAction.key === 'open_orders') {
@@ -172,6 +158,32 @@ const BookCardLuxe = ({
 
             {menuOpen && (
               <div className="dashboard-book-menu-panel" onClick={(event) => event.stopPropagation()}>
+                {!showRestore && !isSoloProject && (
+                  isCollectiveActivated ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setMenuOpen(false);
+                        navigate(`/book/${book.id}/collectif`);
+                      }}
+                    >
+                      Gérer le collectif ({collectiveCompletedCount}/{collectiveTotalCount})
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setMenuOpen(false);
+                        setShowActivateModal(true);
+                      }}
+                    >
+                      Activer le mode collectif
+                    </button>
+                  )
+                )}
+
                 {showArchive && (
                   <button
                     type="button"
@@ -224,75 +236,23 @@ const BookCardLuxe = ({
             {/* Repli : un livre peut legitimement n'avoir pas encore de titre
                 — il ne se saisit plus qu'a l'etape couverture (2026-09-15). */}
             <h3 className="dashboard-book-title">{book.title || 'Livre sans titre'}</h3>
-            <p className="dashboard-book-date">
-              <span title={isSoloProject ? 'Projet solo : vous ajoutez vous-meme photos et textes' : 'Projet groupe : vos proches contribuent via un lien'}>
-                {isSoloProject ? 'Solo' : 'Groupe'}
-              </span>
-              {' · Cree le '}{formatDate(book.created_at)}
+            <p
+              className="dashboard-book-date"
+              title={isSoloProject ? 'Projet solo : vous ajoutez vous-meme photos et textes' : 'Projet groupe : vos proches contribuent via un lien'}
+            >
+              {isSoloProject ? 'Solo' : 'Groupe'}
             </p>
           </div>
         </div>
 
         <p className="dashboard-book-summary">
-          {souvenirsCount} souvenir{souvenirsCount > 1 ? 's' : ''} · {photosCount} photo{photosCount > 1 ? 's' : ''}
+          {souvenirsCount > 0 && <>{souvenirsCount} souvenir{souvenirsCount > 1 ? 's' : ''} · </>}
+          {photosCount} photo{photosCount > 1 ? 's' : ''}
           {!isSoloProject ? ' reçue' + (photosCount > 1 ? 's' : '') : ''}
           {book.page_count ? ` · ${book.page_count} pages` : ''}
+          {book.updated_at ? ` · modifié le ${formatShortDate(book.updated_at)}` : ''}
         </p>
-
-        <div className="dashboard-book-meta-inline">
-          <span>{resolveEventTypeLabel(book.event_type)}</span>
-          {book.updated_at && <span>Modifié le {formatDate(book.updated_at)}</span>}
-        </div>
       </Link>
-
-      {!showRestore && !isSoloProject && book.share_token && (
-        <button type="button" className="dashboard-book-share-btn" onClick={handleShareLink}>
-          {shareCopied ? 'Lien copié !' : '🔗 Partager le lien'}
-        </button>
-      )}
-
-      {/* Mode collectif : couche additive au-dessus du lien de partage
-          ci-dessus (jamais un remplacement) — invitations nominatives avec
-          suivi, voir BookCollectiveLuxe.js/CollectiveActivateModal.js. */}
-      {!showRestore && !isSoloProject && (
-        <div className="dashboard-book-collective">
-          {isCollectiveActivated ? (
-            <>
-              <div className="dashboard-book-collective-summary">
-                <span>👥 {collectiveCompletedCount} / {collectiveTotalCount} participant{collectiveTotalCount > 1 ? 's' : ''}</span>
-                {collectiveDaysRemaining != null && (
-                  <span>{collectiveDaysRemaining >= 0
-                    ? `⏳ ${collectiveDaysRemaining} jour${collectiveDaysRemaining > 1 ? 's' : ''} restant${collectiveDaysRemaining > 1 ? 's' : ''}`
-                    : 'Collecte terminée'}
-                  </span>
-                )}
-              </div>
-              <Link
-                to={`/book/${book.id}/collectif`}
-                className="btn btn-outline dashboard-book-collective-btn"
-                onClick={(event) => event.stopPropagation()}
-              >
-                Gérer le collectif
-              </Link>
-            </>
-          ) : (
-            <>
-              <span className="dashboard-book-collective-label">👥 Mode collectif</span>
-              <button
-                type="button"
-                className="btn btn-outline dashboard-book-collective-btn"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setShowActivateModal(true);
-                }}
-              >
-                Activer le mode collectif
-              </button>
-            </>
-          )}
-        </div>
-      )}
 
       {showActivateModal && (
         <CollectiveActivateModal
@@ -303,11 +263,15 @@ const BookCardLuxe = ({
       )}
 
       {!showRestore && (
-        <div className="dashboard-book-primary">
+        <div className="dashboard-book-footer">
           <Link to={resolvePrimaryActionPath()} className="dashboard-book-primary-btn">
-            <span className="dashboard-book-primary-label">{primaryAction.label}</span>
-            <span className="dashboard-book-primary-note">{primaryAction.note}</span>
+            {primaryAction.label}
           </Link>
+          {!isSoloProject && book.share_token && (
+            <button type="button" className="dashboard-book-share-link" onClick={handleShareLink}>
+              {shareCopied ? 'Lien copié !' : 'Partager'}
+            </button>
+          )}
         </div>
       )}
 
