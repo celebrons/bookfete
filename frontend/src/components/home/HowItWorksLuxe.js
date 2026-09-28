@@ -16,7 +16,7 @@ const HowItWorksLuxe = () => {
     {
       number: '2️⃣',
       title: 'Réunissez vos souvenirs',
-      description: 'Importez vos photos et écrivez vos textes directement dans l\'atelier. En mode collectif, invitez vos proches par un lien individuel : chacun ajoute ses souvenirs, sans créer de compte.',
+      description: 'Importez vos photos et écrivez vos textes directement dans l\'atelier. En mode collectif, invitez vos proches par email : chacun reçoit un lien individuel pour ajouter ses souvenirs, sans créer de compte.',
       time: '10 minutes',
       highlight: 'Vous gardez la main sur chaque mot et chaque image'
     },
@@ -40,7 +40,7 @@ const HowItWorksLuxe = () => {
     {
       icon: '👥',
       title: 'Créez à plusieurs',
-      description: 'Invitez vos proches par un lien individuel : chacun ajoute ses photos et ses souvenirs sans créer de compte, et vous suivez qui a contribué.'
+      description: 'Invitez vos proches par email : chacun reçoit un lien individuel pour ajouter ses photos et ses souvenirs sans créer de compte, et vous suivez qui a contribué.'
     },
     {
       icon: '📸',
@@ -80,7 +80,7 @@ const HowItWorksLuxe = () => {
     },
     {
       question: "👥 Comment mes proches peuvent-ils contribuer ?",
-      answer: "Activez le mode collectif : un lien personnel est généré pour chacun de vos proches, à partager vous-même comme vous le souhaitez (message, e-mail, SMS...). Avec ce lien, chacun ajoute ses photos et ses souvenirs sans créer de compte. Vous suivez qui a contribué, relancez les retardataires, et pouvez fixer une date limite de participation."
+      answer: "Activez le mode collectif : indiquez les adresses email de vos proches, chacun reçoit automatiquement une invitation avec son lien personnel pour ajouter ses photos et ses souvenirs, sans créer de compte. Vous pouvez aussi copier le lien vous-même pour le transmettre autrement. Vous suivez qui a contribué, relancez les retardataires, et pouvez fixer une date limite de participation."
     },
     {
       question: "🖊️ Qui écrit les textes du livre ?",

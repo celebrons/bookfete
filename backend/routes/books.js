@@ -576,6 +576,27 @@ async function notifierPdfPret(job) {
     order = data || null;
   }
 
+  // IDEMPOTENT (retour utilisateur, 2026-09-28 : "le mail Votre PDF est pret
+  // est parti 3 fois"). processPdfExportJob() peut reussir plusieurs fois
+  // pour la MEME commande — l'etat d'avancement du rendu vit uniquement en
+  // memoire (pdfExportJobs), donc un redemarrage du serveur pendant un rendu
+  // (ou juste apres) lui fait perdre la trace, et la recuperation relance
+  // parfois un rendu complet plutot que de retrouver le fichier deja pret.
+  // Chaque succes appelait ce point sans se demander si un email etait deja
+  // parti pour CETTE commande. `pdfReadyEmailSentAt`, ecrit ici une seule
+  // fois, empeche tout renvoi ulterieur.
+  if (order) {
+    if (order.metadata?.pdfReadyEmailSentAt) {
+      console.log(`Email "PDF pret" deja envoye pour la commande ${order.id} (le ${order.metadata.pdfReadyEmailSentAt}) — pas de renvoi.`);
+      return;
+    }
+    await supabase
+      .from('orders')
+      .update({ metadata: { ...(order.metadata || {}), pdfReadyEmailSentAt: new Date().toISOString() } })
+      .eq('id', order.id)
+      .eq('owner_id', job.ownerId);
+  }
+
   await emailsTransactionnels.envoyerPdfPret({
     order,
     book: book || { id: bookId },

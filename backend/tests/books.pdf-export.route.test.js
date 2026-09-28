@@ -253,6 +253,13 @@ describe('Suivi de la fabrication du PDF', () => {
   it('previent par email quand le PDF est pret', async () => {
     const emails = require('../services/email/transactionalEmails');
     emails.envoyerPdfPret.mockClear();
+    // Fixture PARTAGEE entre les `it()` de ce fichier (meme order-paid-1) :
+    // un test precedent a deja marque pdfReadyEmailSentAt en reussissant son
+    // propre job (voir le garde-fou anti-doublon, routes/books.js
+    // notifierPdfPret) — sans cette remise a zero, CE test verifierait
+    // justement le comportement que le garde-fou est cense empecher.
+    const commande = global.__supabaseMock.__table('orders').find((o) => o.id === 'order-paid-1');
+    if (commande) delete commande.metadata.pdfReadyEmailSentAt;
 
     const jobId = await lancerJob();
     await flushAsync();
@@ -268,6 +275,29 @@ describe('Suivi de la fabrication du PDF', () => {
     // un onglet ferme ne recevrait jamais rien.
     expect(argument.ownerEmail).toBe('organisateur@test.local');
     expect(argument.book.id).toBe(BOOK_ID);
+  });
+
+  // Regression directe (retour utilisateur, 2026-09-28 : "le mail Votre PDF
+  // est pret est parti 3 fois"). Reproduit exactement le scenario reel :
+  // processPdfExportJob() reussit deux fois pour la MEME commande (rendu
+  // regenere apres une recuperation de job qui n'a pas retrouve le fichier
+  // deja pret) — le second succes ne doit PAS renvoyer l'email.
+  it('un DEUXIEME succes sur la meme commande ne renvoie PAS l email (retour utilisateur 2026-09-28)', async () => {
+    const emails = require('../services/email/transactionalEmails');
+    emails.envoyerPdfPret.mockClear();
+    const commande = global.__supabaseMock.__table('orders').find((o) => o.id === 'order-paid-1');
+    if (commande) delete commande.metadata.pdfReadyEmailSentAt;
+
+    const premierJobId = await lancerJob();
+    await flushAsync(); await flushAsync(); await flushAsync();
+    expect((await lireStatut(premierJobId)).body.status).toBe('ready');
+    expect(emails.envoyerPdfPret).toHaveBeenCalledTimes(1);
+
+    const deuxiemeJobId = await lancerJob();
+    await flushAsync(); await flushAsync(); await flushAsync();
+    expect((await lireStatut(deuxiemeJobId)).body.status).toBe('ready');
+    // Toujours 1, pas 2 : le deuxieme succes n'a pas declenche de nouvel envoi.
+    expect(emails.envoyerPdfPret).toHaveBeenCalledTimes(1);
   });
 
   it('un rendu qui n avance plus est declare echoue, pas laisse en cours', async () => {
