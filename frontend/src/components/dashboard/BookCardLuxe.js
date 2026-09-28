@@ -158,30 +158,17 @@ const BookCardLuxe = ({
 
             {menuOpen && (
               <div className="dashboard-book-menu-panel" onClick={(event) => event.stopPropagation()}>
-                {!showRestore && !isSoloProject && (
-                  isCollectiveActivated ? (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        setMenuOpen(false);
-                        navigate(`/book/${book.id}/collectif`);
-                      }}
-                    >
-                      Gérer le collectif ({collectiveCompletedCount}/{collectiveTotalCount})
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        setMenuOpen(false);
-                        setShowActivateModal(true);
-                      }}
-                    >
-                      Activer le mode collectif
-                    </button>
-                  )
+                {/* "Partager le lien" garde une place ici, pour les tests
+                    uniquement (retour utilisateur 2026-09-28) : l'invitation
+                    par email reelle (voir "Inviter"/"Gerer le collectif" en
+                    pied de carte) est desormais l'action mise en avant, le
+                    lien anonyme reste disponible en repli. Menu laisse
+                    OUVERT apres le clic (pas de setMenuOpen(false)) pour que
+                    la confirmation "Lien copie !" reste visible. */}
+                {!showRestore && !isSoloProject && book.share_token && (
+                  <button type="button" onClick={handleShareLink}>
+                    {shareCopied ? 'Lien copié !' : 'Partager le lien'}
+                  </button>
                 )}
 
                 {showArchive && (
@@ -267,10 +254,35 @@ const BookCardLuxe = ({
           <Link to={resolvePrimaryActionPath()} className="dashboard-book-primary-btn">
             {primaryAction.label}
           </Link>
-          {!isSoloProject && book.share_token && (
-            <button type="button" className="dashboard-book-share-link" onClick={handleShareLink}>
-              {shareCopied ? 'Lien copié !' : 'Partager'}
-            </button>
+          {/* Invitation reelle (email Brevo) mise en avant a la place de
+              "Partager" (retour utilisateur 2026-09-28) — le lien anonyme
+              reste disponible dans le menu "..." pour les tests. */}
+          {!isSoloProject && (
+            isCollectiveActivated ? (
+              <button
+                type="button"
+                className="dashboard-book-share-link"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  navigate(`/book/${book.id}/collectif`);
+                }}
+              >
+                Gérer le collectif ({collectiveCompletedCount}/{collectiveTotalCount})
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="dashboard-book-share-link"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setShowActivateModal(true);
+                }}
+              >
+                Inviter
+              </button>
+            )
           )}
         </div>
       )}
