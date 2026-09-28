@@ -537,6 +537,23 @@ const persistStripePaymentForOrder = async ({
     throw updateError || new Error('Impossible de mettre a jour la commande');
   }
 
+  // Verrouille le livre des le TOUT PREMIER paiement reussi (retour
+  // utilisateur, 2026-09-28 — voir sql/phase24_book_payment_lock.sql) :
+  // rien n'empechait avant ca d'ajouter des pages apres coup, alors que le
+  // fichier d'impression suit le livre au moment de l'envoi a Gelato, pas
+  // au moment du paiement. `.is('locked_at', null)` rend l'ecriture
+  // idempotente (n'ecrase jamais une date de verrouillage deja posee par un
+  // paiement precedent) et jamais bloquante pour la reponse au paiement.
+  if (updatePayload.status === 'paid' && updatedOrder.book_id) {
+    db.from('books')
+      .update({ locked_at: nowIso })
+      .eq('id', updatedOrder.book_id)
+      .is('locked_at', null)
+      .then(() => {}, (error) => {
+        console.error('Verrouillage du livre apres paiement impossible :', error?.message || error);
+      });
+  }
+
   return updatedOrder;
 };
 
@@ -766,6 +783,17 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
       quantity: order.quantity || 1
     });
 
+    // JAMAIS pour une commande DEJA PAYEE (retour utilisateur, 2026-09-28) :
+    // ce recalcul a ete pense pour un BROUILLON qu'on peut retester
+    // librement, pas pour reecrire ce que Stripe a reellement encaisse. Sans
+    // ce garde-fou, unit_cents/total_cents (et le snapshot fige a la
+    // commande) divergeaient silencieusement du montant paye des le premier
+    // envoi de test suivant un paiement — une facture qui en decoulerait
+    // aurait alors ete fausse. Le prix stocke reste donc intact pour une
+    // commande payee ; seules les metadonnees liees a l'envoi Gelato
+    // (gelatoOrderId, progression...) continuent d'etre mises a jour.
+    const estDejaPayee = ORDER_STATUS_PAID_OR_AFTER.has(String(order.status || '').toLowerCase());
+
     // Metadonnees remises a zero pour ce nouvel essai : sans effacer
     // gelatoOrderId, le garde-fou d'idempotence de gelatoOrderService
     // court-circuiterait immediatement la soumission. L'ancien brouillon est
@@ -794,19 +822,22 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
     await supabase
       .from('orders')
       .update({
-        // Le prix et l'instantane suivent le livre reellement envoye.
-        unit_cents: refreshedPricing.unitCents,
-        total_cents: refreshedPricing.totalCents,
-        quantity: refreshedPricing.quantity,
-        snapshot: {
-          ...(order.snapshot || {}),
-          printFormat: book.print_format || 'standard',
-          pages: Number(book.page_count || 0) || null,
-          repricedAt: startedAt
-        },
+        // Le prix et l'instantane suivent le livre reellement envoye — mais
+        // UNIQUEMENT tant que rien n'a ete paye (voir estDejaPayee ci-dessus).
+        ...(estDejaPayee ? {} : {
+          unit_cents: refreshedPricing.unitCents,
+          total_cents: refreshedPricing.totalCents,
+          quantity: refreshedPricing.quantity,
+          snapshot: {
+            ...(order.snapshot || {}),
+            printFormat: book.print_format || 'standard',
+            pages: Number(book.page_count || 0) || null,
+            repricedAt: startedAt
+          }
+        }),
         metadata: {
           ...baseMetadata,
-          pricing: refreshedPricing.breakdown,
+          ...(estDejaPayee ? {} : { pricing: refreshedPricing.breakdown }),
           gelatoProgress: initialProgress
         },
         updated_at: startedAt
@@ -827,7 +858,11 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
       supabase
         .from('orders')
         .update({
-          metadata: { ...baseMetadata, pricing: refreshedPricing.breakdown, gelatoProgress: { ...progress, updatedAt: getNowIso() } }
+          metadata: {
+            ...baseMetadata,
+            ...(estDejaPayee ? {} : { pricing: refreshedPricing.breakdown }),
+            gelatoProgress: { ...progress, updatedAt: getNowIso() }
+          }
         })
         .eq('id', order.id)
         .then(() => {}, () => {});
@@ -1808,9 +1843,21 @@ router.post('/', authenticate, async (req, res) => {
     const billingAddress = billingSameAsShipping
       ? shippingAddress
       : sanitizeAddress(req.body.billingAddress);
+    // Acceptation des CGV (retour utilisateur, 2026-09-28) : c'est elle qui
+    // rend opposable l'exclusion du droit de retractation (art. L221-28 du
+    // Code de la consommation, voir frontend CGVLuxe.js §5) — elle doit donc
+    // etre ECRITE et ANTERIEURE au paiement. Le bouton "Payer" cote client
+    // est deja desactive sans elle (defense en profondeur, pas la seule
+    // barriere) : verifiee ici aussi, cote serveur, avant toute creation de
+    // commande.
+    const cgvAccepted = req.body?.cgvAccepted === true;
 
     if (!ORDER_TYPES.has(type)) {
       return res.status(400).json({ error: 'Type de commande invalide' });
+    }
+
+    if (!cgvAccepted) {
+      return res.status(400).json({ error: "L'acceptation des conditions générales de vente est requise." });
     }
 
     if ((type === 'print' || type === 'pack') && !isAddressValid(shippingAddress)) {
@@ -1911,7 +1958,13 @@ router.post('/', authenticate, async (req, res) => {
       metadata: {
         notes,
         pricing: pricing.breakdown,
-        ...(type === 'pdf' ? {} : { billingAddress, billingSameAsShipping })
+        ...(type === 'pdf' ? {} : { billingAddress, billingSameAsShipping }),
+        // Preuve d'acceptation des CGV : deja verifiee obligatoire plus
+        // haut (400 sinon), donc toujours vraie ici — horodatee au moment
+        // de la creation de la commande, qui est aussi le moment le plus
+        // proche du paiement effectif.
+        cgvAccepted,
+        cgvAcceptedAt: nowIso
       },
       snapshot,
       created_at: nowIso,

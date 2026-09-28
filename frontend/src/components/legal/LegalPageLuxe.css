@@ -1,0 +1,68 @@
+.legal-page {
+  padding: var(--space-xxl) 0 var(--space-xl);
+  background: var(--white);
+}
+
+.legal-page-inner {
+  max-width: 720px;
+}
+
+.legal-page-inner h1 {
+  margin-top: var(--space-xs);
+  font-family: var(--font-editorial);
+  font-weight: 600;
+}
+
+.legal-updated {
+  margin-top: var(--space-xs);
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.legal-intro {
+  margin-top: var(--space-md);
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--text-light);
+}
+
+.legal-section {
+  margin-top: var(--space-xl);
+}
+
+.legal-section h2 {
+  font-size: 20px;
+  margin-bottom: var(--space-sm);
+}
+
+.legal-section p {
+  margin-bottom: var(--space-sm);
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.legal-section ul {
+  margin: 0 0 var(--space-sm);
+  padding-left: 22px;
+  line-height: 1.7;
+}
+
+.legal-section li {
+  margin-bottom: 6px;
+}
+
+.legal-section a {
+  color: var(--gold);
+}
+
+/* Champ pas encore renseigne (SIRET, adresse...) : visible comme un
+   brouillon assume, jamais fondu dans le texte comme s'il etait definitif. */
+.legal-a-completer {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--gold-light);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 600;
+}

@@ -10,6 +10,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { requireBookNotLocked } = require('../middleware/bookEditLock');
 const storageService = require('../services/storageService');
 const templateCatalog = require('../services/composition/templateCatalog');
 const bookContentService = require('../services/composition/bookContentService');
@@ -303,7 +304,7 @@ function sanitizeItemOrigin(raw) {
 }
 
 // POST /api/books/:bookId/content-items
-router.post('/api/books/:bookId/content-items', authenticate, requireOwnedBook, async (req, res) => {
+router.post('/api/books/:bookId/content-items', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const payload = {
       ...req.body,
@@ -325,6 +326,7 @@ router.post(
   '/api/books/:bookId/content-items/photo',
   authenticate,
   requireOwnedBook,
+  requireBookNotLocked,
   upload.uploadSinglePhoto('photo'),
   async (req, res) => {
     try {
@@ -391,7 +393,7 @@ router.post(
 );
 
 // PUT /api/books/:bookId/content-items/:itemId
-router.put('/api/books/:bookId/content-items/:itemId', authenticate, requireOwnedBook, async (req, res) => {
+router.put('/api/books/:bookId/content-items/:itemId', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const data = await bookContentService.updateContentItem(req.params.bookId, req.params.itemId, req.body);
     res.json(data);
@@ -408,7 +410,7 @@ router.put('/api/books/:bookId/content-items/:itemId', authenticate, requireOwne
 //
 // Declaree AVANT la route /:itemId ci-dessous : sinon Express ferait
 // correspondre cette URL a un itemId vide.
-router.delete('/api/books/:bookId/content-items', authenticate, requireOwnedBook, async (req, res) => {
+router.delete('/api/books/:bookId/content-items', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const kind = String(req.query.kind || '').trim().toLowerCase();
     if (kind !== 'photo' && kind !== 'texte') {
@@ -443,7 +445,7 @@ router.delete('/api/books/:bookId/content-items', authenticate, requireOwnedBook
 });
 
 // DELETE /api/books/:bookId/content-items/:itemId
-router.delete('/api/books/:bookId/content-items/:itemId', authenticate, requireOwnedBook, async (req, res) => {
+router.delete('/api/books/:bookId/content-items/:itemId', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     await bookContentService.deleteContentItem(req.params.bookId, req.params.itemId);
     res.status(204).end();
@@ -595,7 +597,7 @@ router.get('/api/books/:bookId/recommended-page-count', authenticate, requireOwn
 // Recalcule la mise en page complete du livre a partir de son contenu
 // (book_content_items), de son template et du catalogue de layouts, puis
 // persiste le resultat dans book_pages. Body optionnel : { variant }.
-router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, async (req, res) => {
+router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const { book } = req;
 
@@ -772,7 +774,7 @@ router.get('/api/books/:bookId/snapshot', authenticate, requireOwnedBook, async 
 // Retablit le livre tel qu il etait avant la derniere generation automatique.
 // Le point est CONSOMME au passage (voir restoreSnapshot) : on ne revient pas
 // deux fois au meme endroit.
-router.post('/api/books/:bookId/snapshot/restore', authenticate, requireOwnedBook, async (req, res) => {
+router.post('/api/books/:bookId/snapshot/restore', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const restored = await bookContentService.restoreSnapshot(req.book.id);
     if (!restored) {
@@ -790,7 +792,7 @@ router.post('/api/books/:bookId/snapshot/restore', authenticate, requireOwnedBoo
 // DELETE /api/books/:bookId/snapshot
 // « Je garde cette version » : abandonne le retour en arriere. Geste explicite
 // de l utilisateur, pour que la proposition cesse de s afficher.
-router.delete('/api/books/:bookId/snapshot', authenticate, requireOwnedBook, async (req, res) => {
+router.delete('/api/books/:bookId/snapshot', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     await bookContentService.discardSnapshot(req.book.id);
     res.json({ discarded: true });
@@ -847,7 +849,7 @@ router.get('/api/books/:bookId/format-options', authenticate, requireOwnedBook, 
 // pages verrouillees) puis met a jour books.print_format/books.page_count —
 // ce que "Commander mon livre" imprimera correspond donc toujours a ce qui
 // vient d'etre recompose ici. Body : { formatId }.
-router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, async (req, res) => {
+router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const { book } = req;
     const formatId = req.body?.formatId;
@@ -944,7 +946,7 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, async (
 // ci-dessus (POST /format, qui recompose via formatComposer.js) : cette
 // derniere reste en place pour qui en aurait besoin, mais l'ecran "Votre
 // livre est pret" appelle desormais celle-ci. Body : { formatId }.
-router.post('/api/books/:bookId/format-only', authenticate, requireOwnedBook, async (req, res) => {
+router.post('/api/books/:bookId/format-only', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const { book } = req;
     const formatId = req.body?.formatId;
@@ -1087,7 +1089,7 @@ router.get('/api/books/:bookId/preview.pdf', authenticate, requireOwnedBook, asy
 // /format ci-dessus (qui bloquent plutot que de padder — voir leurs
 // commentaires) : agrandir son livre volontairement n'est pas le "remplissage
 // artificiel" que ces routes refusent.
-router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, async (req, res) => {
+router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const { book } = req;
     const requestedCount = Number(req.body?.count);
@@ -1126,7 +1128,7 @@ router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, a
 //   3. une page non vide ou verrouillee ne part pas sans un `confirm: true`
 //      explicite : la reponse 409 dit precisement ce qui serait perdu, pour
 //      que le client puisse poser la question au lieu de deviner.
-router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, async (req, res) => {
+router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const { book } = req;
     const requestedCount = Number(req.body?.count);
@@ -1193,7 +1195,7 @@ router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, a
 //
 // Les pages VERROUILLEES se deplacent comme les autres : le verrou protege
 // d'une recomposition automatique, pas d'un geste deliberé de l'utilisateur.
-router.post('/api/books/:bookId/pages/move', authenticate, requireOwnedBook, async (req, res) => {
+router.post('/api/books/:bookId/pages/move', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const { book } = req;
     const fromIndex = Number(req.body?.fromIndex);
@@ -1223,7 +1225,7 @@ router.post('/api/books/:bookId/pages/move', authenticate, requireOwnedBook, asy
 // tous remplis, voir BookAtelierLuxe.js) : le statut qualite y est donc
 // annote comme sur tous les autres chemins d'ecriture (cahier des charges
 // v2, §4) — le client n'a jamais a le calculer ni a l'envoyer.
-router.put('/api/books/:bookId/pages/:pageIndex', authenticate, requireOwnedBook, async (req, res) => {
+router.put('/api/books/:bookId/pages/:pageIndex', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const { book } = req;
     const pageIndex = Number(req.params.pageIndex);
@@ -1313,7 +1315,7 @@ router.get('/api/books/:bookId/pages/:pageIndex/preview.html', authenticate, req
 // (locked=true) a la sauvegarde : une recomposition automatique
 // (POST /compose) ne l'ecrasera jamais (voir bookContentService.
 // replaceBookPages, mecanisme deja en place).
-router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOwnedBook, async (req, res) => {
+router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOwnedBook, requireBookNotLocked, async (req, res) => {
   try {
     const { book } = req;
     const pageIndex = Number(req.params.pageIndex);

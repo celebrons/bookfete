@@ -118,6 +118,14 @@ const HowItWorksLuxe = () => {
     {
       question: "🎁 Y a-t-il une version coffret ?",
       answer: "Bientôt ! Nous travaillons sur des éditions encore plus luxueuses avec coffret et jaquette personnalisée."
+    },
+    {
+      question: "↩️ Puis-je me rétracter après ma commande ?",
+      answer: "Non : votre livre étant composé à partir de vos propres photos et textes, il s'agit d'un bien personnalisé, exclu du droit de rétractation de 14 jours (article L221-28 du Code de la consommation). Vous en êtes informé et vous l'acceptez explicitement avant de payer, au moment de valider votre commande."
+    },
+    {
+      question: "📷 Une de mes photos apparaît floue, que faire ?",
+      answer: "Avant de commander, un écran récapitulatif vous signale automatiquement toute photo dont la résolution est trop faible pour une impression nette au format choisi. Vous pouvez alors la remplacer par une version plus grande, changer sa mise en page, ou choisir de commander tel quel en connaissance de cause."
     }
   ];
 
@@ -226,7 +234,7 @@ const HowItWorksLuxe = () => {
       </section>
 
       {/* Questions fréquentes */}
-      <section className="faq-section">
+      <section className="faq-section" id="faq">
         <div className="container-luxe">
           <div className="section-header">
             <span className="label-gold">QUESTIONS FRÉQUENTES</span>

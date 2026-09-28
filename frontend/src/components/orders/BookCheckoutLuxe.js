@@ -144,6 +144,11 @@ const BookCheckoutLuxe = () => {
   // memoire (pas persiste) : un rechargement de page perd le signal "on
   // vient de payer", ce qui est exactement le comportement voulu.
   const [justPaid, setJustPaid] = useState(false);
+  // Case CGV (retour utilisateur, 2026-09-28) : c'est elle qui rend
+  // opposable l'exclusion du droit de retractation (art. L221-28, voir
+  // CGVLuxe.js/§5) — l'acceptation doit etre ECRITE et ANTERIEURE au
+  // paiement, jamais deduite implicitement d'un simple clic sur "Payer".
+  const [cgvAccepted, setCgvAccepted] = useState(false);
   // Envoi de test a l'imprimeur (Gelato), sans paiement — n'apparait que si
   // le serveur dit que c'est reellement possible (cle API configuree ET
   // mode production desactive). Voir backend/routes/orders.js.
@@ -908,6 +913,12 @@ const BookCheckoutLuxe = () => {
       if (!stripeTestEnabled) {
         throw new Error('Le paiement Stripe doit etre active pour lancer la commande.');
       }
+      // Defense en profondeur : le bouton est deja desactive sans la case
+      // cochee (voir StepPayment.js), mais un appel direct a cette fonction
+      // ne doit jamais pouvoir la contourner.
+      if (!cgvAccepted) {
+        throw new Error("Veuillez accepter les conditions générales de vente avant de payer.");
+      }
 
       const createdOrder = await createOrder({
         bookId,
@@ -918,7 +929,11 @@ const BookCheckoutLuxe = () => {
         // 2026-09-27) : n'envoie une adresse de facturation DISTINCTE que si
         // la case a ete decochee — sinon le serveur la deduit lui-meme de
         // l'adresse de livraison (voir routes/orders.js).
-        billingAddress: includesPrint(orderType) && !billingSameAsShipping ? billingAddress : null
+        billingAddress: includesPrint(orderType) && !billingSameAsShipping ? billingAddress : null,
+        // Preuve d'acceptation des CGV, ECRITE et ANTERIEURE au paiement
+        // (retour utilisateur, 2026-09-28) — c'est elle qui rend opposable
+        // l'exclusion du droit de retractation (voir CGVLuxe.js §5).
+        cgvAccepted: true
       });
 
       // L'adresse d'expedition est aussi MEMORISEE sur le compte : elle
@@ -965,6 +980,9 @@ const BookCheckoutLuxe = () => {
 
       if (!stripeTestEnabled) {
         throw new Error('Le paiement Stripe doit etre active pour lancer la commande.');
+      }
+      if (!cgvAccepted) {
+        throw new Error("Veuillez accepter les conditions générales de vente avant de payer.");
       }
       if (!latestOrder?.id || String(latestOrder.status || '').toLowerCase() !== 'awaiting_payment') {
         throw new Error('Aucune commande en attente de paiement.');
@@ -1464,6 +1482,8 @@ const BookCheckoutLuxe = () => {
               isAnonymous={anonymousSession}
               onAccountReady={compteVerifie}
               emailPropose={address.email}
+              cgvAccepted={cgvAccepted}
+              onToggleCgv={() => setCgvAccepted((previous) => !previous)}
             />
           )}
 

@@ -10,6 +10,7 @@ const PDFDocument = require('pdfkit');
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const { isBookEditBypassActive } = require('../middleware/bookEditLock');
 // Pipeline sans-IA (phase03/04) reutilisee pour le PDF final post-commande —
 // voir routes/composition.js (preview.pdf) pour l'implementation d'origine ;
 // generateFinalBookPdfFiles() ci-dessous route dessus au lieu du pipeline
@@ -224,6 +225,30 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
+    // Verrouillage apres paiement (retour utilisateur, 2026-09-28 — voir
+    // middleware/bookEditLock.js et sql/phase24_book_payment_lock.sql). Ce
+    // route ne passe pas par requireOwnedBook (compose.js/collective.js) —
+    // c'est la seule route de ce fichier qui modifie du contenu de livre
+    // (couverture/4e via cover_config/back_cover_config), donc le seul
+    // endroit de books.js a proteger.
+    const { data: existing, error: existingError } = await supabase
+      .from('books')
+      .select('id, owner_id, locked_at')
+      .eq('id', req.params.id)
+      .eq('owner_id', req.user.id)
+      .single();
+
+    if (existingError || !existing) {
+      return res.status(404).json({ error: 'Livre introuvable' });
+    }
+
+    if (existing.locked_at && !isBookEditBypassActive()) {
+      return res.status(423).json({
+        error: 'Ce livre ne peut plus être modifié : une commande a déjà été payée.',
+        bookLocked: true
+      });
+    }
+
     const { data, error } = await supabase
       .from('books')
       .update(req.body)
@@ -236,7 +261,7 @@ router.put('/:id', authenticate, async (req, res) => {
       throw error;
     }
 
-    res.json(data);
+    res.json({ ...data, bookEditBypassed: Boolean(existing.locked_at) && isBookEditBypassActive() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

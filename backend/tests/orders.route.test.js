@@ -651,7 +651,7 @@ describe('POST /api/orders — adresse de facturation', () => {
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', 'Bearer valid-token')
-      .send({ bookId: FINALIZED_BOOK_ID, type: 'print', quantity: 1, shippingAddress: adresseLivraison });
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'print', quantity: 1, shippingAddress: adresseLivraison, cgvAccepted: true });
 
     expect(response.status).toBe(201);
     expect(response.body.metadata.billingSameAsShipping).toBe(true);
@@ -677,7 +677,8 @@ describe('POST /api/orders — adresse de facturation', () => {
         type: 'print',
         quantity: 1,
         shippingAddress: adresseLivraison,
-        billingAddress: adresseFacturation
+        billingAddress: adresseFacturation,
+        cgvAccepted: true
       });
 
     expect(response.status).toBe(201);
@@ -691,10 +692,54 @@ describe('POST /api/orders — adresse de facturation', () => {
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', 'Bearer valid-token')
-      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1 });
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true });
 
     expect(response.status).toBe(201);
     expect(response.body.metadata.billingAddress).toBeUndefined();
     expect(response.body.metadata.billingSameAsShipping).toBeUndefined();
+  });
+});
+
+// Acceptation des CGV (retour utilisateur, 2026-09-28) : c'est elle qui
+// rend opposable l'exclusion du droit de retractation (art. L221-28) — elle
+// doit donc etre imposee cote SERVEUR, pas seulement empechee par un
+// bouton desactive cote client (qu'un appel direct a l'API contournerait).
+describe('POST /api/orders — acceptation des CGV', () => {
+  let app;
+  const FINALIZED_BOOK_ID = 'order-book-finalise';
+
+  beforeAll(() => {
+    app = buildApp();
+  });
+
+  it('refuse la creation de commande sans cgvAccepted', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/conditions générales de vente/i);
+  });
+
+  it('refuse aussi une valeur "truthy" mais pas litteralement true (jamais de coercion)', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: 'oui' });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('avec cgvAccepted: true, la commande est creee et l\'acceptation est horodatee', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true });
+
+    expect(response.status).toBe(201);
+    expect(response.body.metadata.cgvAccepted).toBe(true);
+    expect(response.body.metadata.cgvAcceptedAt).toEqual(expect.any(String));
+    expect(Number.isNaN(Date.parse(response.body.metadata.cgvAcceptedAt))).toBe(false);
   });
 });

@@ -33,6 +33,11 @@ import BookCollectiveLuxe from './components/book/collective/BookCollectiveLuxe'
 import AccountSpaceLuxe from './components/account/AccountSpaceLuxe';
 import BookCheckoutLuxe from './components/orders/BookCheckoutLuxe';
 import OrdersLuxe from './components/orders/OrdersLuxe';
+import MentionsLegalesLuxe from './components/legal/MentionsLegalesLuxe';
+import CGVLuxe from './components/legal/CGVLuxe';
+import ConfidentialiteLuxe from './components/legal/ConfidentialiteLuxe';
+import TarifsLuxe from './components/legal/TarifsLuxe';
+import ExemplesLuxe from './components/legal/ExemplesLuxe';
 
 
 
@@ -106,6 +111,15 @@ function App() {
           ============================================ */}
           <Route path="/" element={<HomePageLuxe />} />
           <Route path="/how-it-works" element={<HowItWorksLuxe />} />
+          {/* Pages legales/produit (2026-09-28) : les 7 liens du pied de page
+              menaient tous a une redirection silencieuse vers l accueil
+              (catch-all, voir plus bas) — voir memoire "commande-fiabilite..."
+              et FooterLuxe.js pour le detail du bug de generation d URL. */}
+          <Route path="/mentions-legales" element={<MentionsLegalesLuxe />} />
+          <Route path="/cgv" element={<CGVLuxe />} />
+          <Route path="/confidentialite" element={<ConfidentialiteLuxe />} />
+          <Route path="/tarifs" element={<TarifsLuxe />} />
+          <Route path="/exemples" element={<ExemplesLuxe />} />
           <Route path="/login" element={<LoginLuxe />} />
           <Route path="/register" element={<RegisterLuxe />} />
           {/* Retrouver ses livres depuis un autre appareil : adresse + code,

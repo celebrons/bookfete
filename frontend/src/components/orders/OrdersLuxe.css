@@ -309,6 +309,34 @@
   cursor: pointer;
 }
 
+/* Case CGV (2026-09-28) : meme style que .orders-billing-toggle, mais
+   alignee en haut (align-items: flex-start) — son texte tient sur deux
+   lignes des qu'un livre imprime ajoute la mention de retractation. */
+.orders-cgv-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(31, 31, 31, 0.8);
+  cursor: pointer;
+}
+
+.orders-cgv-toggle input[type="checkbox"] {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  accent-color: var(--gold, #b8924a);
+  cursor: pointer;
+}
+
+.orders-cgv-toggle a {
+  color: var(--gold, #b8924a);
+  text-decoration: underline;
+}
+
 .orders-billing-fields {
   margin-top: 14px;
   padding-top: 14px;

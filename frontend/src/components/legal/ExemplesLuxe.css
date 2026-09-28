@@ -1,0 +1,27 @@
+.exemples-page {
+  padding: var(--space-xxl) 0;
+  background: var(--white);
+  min-height: 50vh;
+}
+
+.exemples-inner {
+  max-width: 640px;
+}
+
+.exemples-inner h1 {
+  margin-top: var(--space-xs);
+  font-family: var(--font-editorial);
+  font-weight: 600;
+}
+
+.exemples-texte {
+  margin-top: var(--space-md);
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--text-light);
+}
+
+.exemples-cta {
+  margin-top: var(--space-lg);
+  display: inline-block;
+}

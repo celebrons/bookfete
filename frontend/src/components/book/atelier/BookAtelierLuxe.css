@@ -77,6 +77,15 @@
   letter-spacing: 0.02em;
   animation: atelierPriceDeltaIn 200ms ease;
 }
+/* Verrouillage apres paiement, mode test (retour utilisateur, 2026-09-28) :
+   texte discret, jamais un bandeau — meme philosophie que le reste de
+   l'en-tete ("le titre, le format, rien de plus en permanence"), juste une
+   teinte ambree pour se distinguer du texte informatif normal. */
+.atelier-header-lock-note {
+  color: #a86a1f;
+  font-weight: 600;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .atelier-header-price-delta { animation: none; }
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { formatPriceCents, includesPrint } from '../../../utils/orderWorkflow';
 import EmailOtpForm from '../../auth/EmailOtpForm';
 
@@ -31,7 +32,10 @@ function StepPayment({
   onAccountReady,
   // L'adresse de livraison deja saisie, proposee par defaut — une personne
   // qui vient de la taper ne devrait pas avoir a la retaper.
-  emailPropose = ''
+  emailPropose = '',
+  // Case CGV (retour utilisateur, 2026-09-28) — voir BookCheckoutLuxe.js.
+  cgvAccepted = false,
+  onToggleCgv
 }) {
   const withPrint = includesPrint(orderType);
 
@@ -114,7 +118,35 @@ function StepPayment({
         </div>
       ) : (
         <>
-          <button type="button" className="btn btn-primary" disabled={submitting || !canPay || !stripeEnabled} onClick={onPay}>
+          {/* Case CGV (retour utilisateur, 2026-09-28) : c'est elle qui rend
+              opposable l'exclusion du droit de retractation (art. L221-28,
+              CGVLuxe.js §5) — l'acceptation doit etre ECRITE et ANTERIEURE
+              au paiement, jamais deduite d'un simple clic sur "Payer". */}
+          <label className="orders-cgv-toggle">
+            <input
+              type="checkbox"
+              checked={cgvAccepted}
+              onChange={onToggleCgv}
+              disabled={submitting}
+            />
+            <span>
+              J'accepte les{' '}
+              <Link to="/cgv" target="_blank" rel="noreferrer">conditions générales de vente</Link>
+              {withPrint && (
+                <>
+                  {' '}et reconnais que mon livre, personnalisé, n'est pas soumis au droit de rétractation
+                </>
+              )}
+              .
+            </span>
+          </label>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={submitting || !canPay || !stripeEnabled || !cgvAccepted}
+            onClick={onPay}
+          >
             {submitting
               ? 'Traitement...'
               : hasPendingPaymentOrder

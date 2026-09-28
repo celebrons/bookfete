@@ -2095,6 +2095,16 @@ export default function BookAtelierLuxe() {
               {formatEurosDelta(priceDelta.priceCents)}
             </span>
           )}
+          {/* Verrouillage apres paiement (retour utilisateur, 2026-09-28) :
+              un livre paye n'est modifiable que parce que le serveur tourne
+              avec ALLOW_BOOK_EDITS_AFTER_PAYMENT=1 (mode test) — le dire
+              explicitement, plutot que de laisser croire que ce serait
+              possible en production. */}
+          {book.locked_at && (
+            <span className="atelier-header-lock-note" title="Ce livre a deja une commande payee">
+              {' '}· Mode test : modifiable malgré le paiement — en production, ce ne serait pas possible
+            </span>
+          )}
         </span>
         <span className="atelier-header-secondary">
           <button
