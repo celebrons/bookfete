@@ -264,7 +264,12 @@ export default function BookComposeLuxe() {
               <div className="photo-grid">
                 {items.filter((item) => item.kind === 'photo').map((item) => (
                   <div key={item.id} className="photo-item">
-                    <img src={item.url} alt="" />
+                    {/* Vignette, jamais l'original (retour utilisateur,
+                        2026-09-28 : egress Supabase) — un livre de 70 photos
+                        en original, c'est ~100 Mo pour afficher une grille de
+                        petites cases. Meme correctif que photoSource.js
+                        (2026-09-20). */}
+                    <img src={item.metadata?.thumbnailUrl || item.url} alt="" loading="lazy" />
                     <button type="button" className="photo-remove" onClick={() => handleDeleteItem(item.id)}>×</button>
                   </div>
                 ))}

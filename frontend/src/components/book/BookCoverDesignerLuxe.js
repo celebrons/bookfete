@@ -412,7 +412,12 @@ const BookCoverDesignerLuxe = ({ book, onUpdateBook }) => {
                             className={`coverlite-photo-option ${formState.frontPhotoId === photo.id ? 'is-selected' : ''}`}
                             onClick={() => updateField('frontPhotoId', photo.id)}
                           >
-                            <img src={photo.url} alt="" />
+                            {/* Vignette, jamais l'original (retour
+                                utilisateur, 2026-09-28 : egress Supabase) —
+                                cette grille affiche TOUTES les photos du
+                                livre, l'original de chacune coute ~1,4 Mo.
+                                Meme correctif que photoSource.js (2026-09-20). */}
+                            <img src={photo.metadata?.thumbnailUrl || photo.url} alt="" loading="lazy" />
                           </button>
                         ))}
                       </div>
