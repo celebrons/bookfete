@@ -314,18 +314,16 @@
   margin-bottom: 10px;
 }
 
+/* Un point de couleur et un mot, jamais une pastille encadree — c'est ce
+   qui manquait encore face a la maquette de reference ("pistes d'interface",
+   onglet Bibliotheque) : le statut y est du texte simple, pas un badge. */
 .dashboard-book-status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 24px;
-  padding: 0 10px 0 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 1px solid transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-light);
 }
 
 /* Solo / Groupe (book.collection_mode) : deplace en texte simple dans
@@ -339,81 +337,23 @@
   border-radius: 50%;
   background: currentColor;
   opacity: 0.9;
+  flex: none;
 }
 
-.dashboard-book-status.is-active {
-  color: #4f6478;
-  background: #edf2f7;
-  border-color: #c9d4df;
-}
-
-.dashboard-book-status.is-complete {
-  color: #1f7a3d;
-  background: #ebf8ef;
-  border-color: #bfe3c9;
-}
-
-.dashboard-book-status.is-editing {
-  color: #4f6478;
-  background: #edf2f7;
-  border-color: #c9d4df;
-}
-
-.dashboard-book-status.is-preview {
-  color: #1f6f8b;
-  background: #e8f6fb;
-  border-color: #b9dbe8;
-}
-
-.dashboard-book-status.is-finalized {
-  color: #1f7a3d;
-  background: #ebf8ef;
-  border-color: #bfe3c9;
-}
-
-.dashboard-book-status.is-printer {
-  color: #9a6617;
-  background: #fff3df;
-  border-color: #f0d2a3;
-}
-
-.dashboard-book-status.is-printed {
-  color: #7a4a2e;
-  background: #f8ece3;
-  border-color: #e5c1aa;
-}
-
-.dashboard-book-status.is-shipped {
-  color: #6a3fa1;
-  background: #f2eaff;
-  border-color: #d5c0f3;
-}
-
+.dashboard-book-status.is-active { color: #4f6478; }
+.dashboard-book-status.is-complete { color: #1f7a3d; }
+.dashboard-book-status.is-editing { color: #4f6478; }
+.dashboard-book-status.is-preview { color: #1f6f8b; }
+.dashboard-book-status.is-finalized { color: #1f7a3d; }
+.dashboard-book-status.is-printer { color: #9a6617; }
+.dashboard-book-status.is-printed { color: #7a4a2e; }
+.dashboard-book-status.is-shipped { color: #6a3fa1; }
 .dashboard-book-status.is-awaiting,
-.dashboard-book-status.is-progress {
-  color: #8b5e11;
-  background: rgba(184, 146, 74, 0.14);
-  border-color: rgba(184, 146, 74, 0.34);
-}
-
+.dashboard-book-status.is-progress { color: #8b5e11; }
 .dashboard-book-status.is-paid,
-.dashboard-book-status.is-ready {
-  color: #1f7a3d;
-  background: rgba(31, 122, 61, 0.12);
-  border-color: rgba(31, 122, 61, 0.24);
-}
-
-.dashboard-book-status.is-error {
-  color: #b42318;
-  background: rgba(180, 35, 24, 0.12);
-  border-color: rgba(180, 35, 24, 0.34);
-}
-
-.dashboard-book-status.is-muted {
-  color: #5f6770;
-  background: rgba(95, 103, 112, 0.12);
-  border-color: rgba(95, 103, 112, 0.28);
-}
+.dashboard-book-status.is-ready { color: #1f7a3d; }
+.dashboard-book-status.is-error { color: #b42318; }
+.dashboard-book-status.is-muted { color: #5f6770; }
 
 .dashboard-book-tools {
   display: inline-flex;
@@ -493,6 +433,14 @@
   position: relative;
 }
 
+/* Pas de bordure par defaut — seul le survol/l'ouverture la revele, comme
+   tb-menu-btn dans la maquette de reference (un simple "..." discret). */
+.dashboard-book-menu-btn {
+  border-color: transparent;
+  background: transparent;
+}
+
+.dashboard-book-menu-btn:hover,
 .dashboard-book-menu-btn.is-open {
   border-color: rgba(184, 146, 74, 0.4);
   background: rgba(184, 146, 74, 0.08);
@@ -579,32 +527,28 @@
 }
 
 .dashboard-book-summary {
-  margin: 0;
-  padding-top: 8px;
-  border-top: 1px solid rgba(223, 216, 201, 0.72);
+  margin: 6px 0 0;
   font-size: 13px;
   color: #38414c;
   font-weight: 500;
 }
 
+/* Texte simple separe par des points, comme la ligne meta unique de la
+   maquette de reference — plus de puces grises encadrees. */
 .dashboard-book-meta-inline {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-light);
 }
 
-.dashboard-book-meta-inline span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  border-radius: 999px;
-  padding: 0 9px;
-  background: rgba(95, 103, 112, 0.1);
-  color: #4b5460;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.dashboard-book-meta-inline span + span::before {
+  content: '·';
+  margin-right: 6px;
+  color: rgba(184, 146, 74, 0.5);
 }
 
 .dashboard-book-delete-note {
@@ -615,41 +559,35 @@
 }
 
 .dashboard-book-primary {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
+/* Un lien dore simple, sans carte ni bordure — l'or reserve a cette seule
+   action, comme dans la maquette de reference (tb-action). */
 .dashboard-book-primary-btn {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   gap: 2px;
-  min-height: 42px;
-  border-radius: 10px;
-  border: 1px solid rgba(184, 146, 74, 0.32);
-  background: linear-gradient(140deg, rgba(184, 146, 74, 0.12) 0%, rgba(255, 255, 255, 0.95) 100%);
-  padding: 8px 12px;
   text-decoration: none;
-  transition:
-    border-color var(--transition-fast),
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
 }
 
-.dashboard-book-primary-btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(184, 146, 74, 0.48);
-  box-shadow: 0 14px 20px -18px rgba(58, 44, 20, 0.34);
+.dashboard-book-primary-btn:hover .dashboard-book-primary-label {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .dashboard-book-primary-label {
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: #8b5e11;
 }
 
+.dashboard-book-primary-label::after {
+  content: ' →';
+}
+
 .dashboard-book-primary-note {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-light);
 }
 
