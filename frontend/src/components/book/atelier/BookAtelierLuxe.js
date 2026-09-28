@@ -38,6 +38,7 @@ import AtelierOnboarding from './AtelierOnboarding';
 import AtelierFinishModal from './AtelierFinishModal';
 import AtelierDuplicatePhotosModal from './AtelierDuplicatePhotosModal';
 import AtelierPartagerLien from './AtelierPartagerLien';
+import CollectiveActivateModal from '../../dashboard/CollectiveActivateModal';
 import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
 import AtelierPhotoPickerModal from './AtelierPhotoPickerModal';
@@ -50,6 +51,13 @@ import { spreadPair, spreadCount, spreadOfPage, facingPageIndex, isLeftPage } fr
 import AnonymousBanner from '../../common/AnonymousBanner';
 import '../../../styles/luxe-theme.css';
 import './BookAtelierLuxe.css';
+// CollectiveActivateModal (importee ci-dessous) utilise les classes .modal-*
+// definies dans DashboardLuxe.css (.modal-card, .modal-form-field,
+// .modal-checkbox-field...) — absentes de BookAtelierLuxe.css et
+// incompatibles avec celles de BookLuxe.css (qui utilise .modal-content, pas
+// .modal-card). Sans cet import, la modale d'activation s'afficherait sans
+// aucun style depuis l'atelier.
+import '../../dashboard/DashboardLuxe.css';
 
 // Atelier de creation personnalisee : l'utilisateur construit son livre
 // page par page, en choisissant une mise en page prealable puis en y
@@ -87,6 +95,10 @@ export default function BookAtelierLuxe() {
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem(`${ONBOARDING_SEEN_KEY_PREFIX}${bookId}`)
   );
+  // "Inviter des proches" (AtelierPartagerLien) : ouvre l'activation si le
+  // mode collectif n'est pas encore active, sinon navigue directement vers
+  // sa gestion (retour utilisateur, 2026-09-28).
+  const [showCollectiveActivateModal, setShowCollectiveActivateModal] = useState(false);
 
   const [items, setItems] = useState([]);
   const [layouts, setLayouts] = useState([]);
@@ -2284,8 +2296,15 @@ export default function BookAtelierLuxe() {
                   une liste de livres (2026-09-22). */}
               {book?.collection_mode !== 'solo' && (
                 <AtelierPartagerLien
-                  shareToken={book?.share_token}
+                  isActivated={Boolean(book?.collective_activated_at)}
                   recipientName={book?.recipient_name}
+                  onInvite={() => {
+                    if (book?.collective_activated_at) {
+                      navigate(`/book/${book.id}/collectif`);
+                    } else {
+                      setShowCollectiveActivateModal(true);
+                    }
+                  }}
                 />
               )}
 
@@ -2457,6 +2476,14 @@ export default function BookAtelierLuxe() {
         warnings={qualityWarnings}
         onRefreshQuality={refreshQualityWarnings}
       />
+
+      {showCollectiveActivateModal && book && (
+        <CollectiveActivateModal
+          book={book}
+          onClose={() => setShowCollectiveActivateModal(false)}
+          onActivated={() => navigate(`/book/${book.id}/collectif`)}
+        />
+      )}
     </div>
   );
 }

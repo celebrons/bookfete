@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import './AtelierPartagerLien.css';
 
 // Inviter des proches, DEPUIS l'atelier (2026-09-22).
@@ -7,35 +7,15 @@ import './AtelierPartagerLien.css';
 // bord. Or on ne pense pas a inviter quand on regarde une liste de livres :
 // on y pense quand on compose et qu'on voit les emplacements vides.
 //
-// Retour utilisateur : « en arrivant dans l'interface de composition, on ne
-// voit pas de bouton de partage... il faut revenir au tableau de bord. Ce
-// n'est pas un reflexe naturel. Moi-meme je cherchais ou etait le bouton. »
-//
-// Le meme lien, au meme endroit que le travail. On ne deplace rien : la
-// carte du tableau de bord garde le sien.
-//
-// Copie dans le presse-papiers, avec repli : `navigator.clipboard` n'existe
-// pas hors contexte securise, et echoue silencieusement dans certains
-// navigateurs. On affiche alors le lien en clair, selectionnable — mieux
-// vaut un lien a copier a la main qu'un bouton qui ne fait rien.
-function AtelierPartagerLien({ shareToken, recipientName }) {
-  const [copie, setCopie] = useState(false);
-  const [lienVisible, setLienVisible] = useState(false);
-
-  if (!shareToken) return null;
-
-  const lien = `${window.location.origin}/participer/${shareToken}`;
-
-  const partager = async () => {
-    try {
-      await navigator.clipboard.writeText(lien);
-      setCopie(true);
-      setTimeout(() => setCopie(false), 2500);
-    } catch (_error) {
-      setLienVisible(true);
-    }
-  };
-
+// MIS A JOUR (retour utilisateur, 2026-09-28) : renvoie desormais vers
+// l'ECRAN D'INVITATION reel (activation du mode collectif, ou sa gestion si
+// deja active) plutot que de copier un lien anonyme dans le presse-papiers —
+// meme bascule que sur la carte du tableau de bord (BookCardLuxe.js) :
+// l'invitation par email reelle (Brevo) merite desormais la place mise en
+// avant. `onInvite` est fourni par BookAtelierLuxe.js, qui decide d'ouvrir
+// la modale d'activation ou de naviguer vers /collectif selon
+// `book.collective_activated_at`.
+function AtelierPartagerLien({ isActivated, recipientName, onInvite }) {
   return (
     <div className="atelier-partage">
       <div className="atelier-partage-texte">
@@ -46,18 +26,9 @@ function AtelierPartagerLien({ shareToken, recipientName }) {
             : 'Invitez vos proches à déposer leurs photos et leurs mots.'}
         </span>
       </div>
-      <button type="button" className="btn btn-outline atelier-partage-btn" onClick={partager}>
-        {copie ? '✓ Lien copié' : '🔗 Inviter des proches'}
+      <button type="button" className="btn btn-outline atelier-partage-btn" onClick={onInvite}>
+        {isActivated ? '👥 Gérer le collectif' : '🔗 Inviter des proches'}
       </button>
-      {lienVisible && (
-        <input
-          type="text"
-          className="input-luxe atelier-partage-lien"
-          value={lien}
-          readOnly
-          onFocus={(event) => event.target.select()}
-        />
-      )}
     </div>
   );
 }

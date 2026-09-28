@@ -38,12 +38,6 @@
   font-size: 12px;
 }
 
-.atelier-partage-lien {
-  flex: 1 1 100%;
-  font-size: 12px;
-  font-family: monospace;
-}
-
 @media (max-width: 640px) {
   .atelier-partage-btn { width: 100%; }
 }
