@@ -322,10 +322,16 @@ router.delete('/api/books/:bookId/collective/participants/:participantId', authe
 
 // POST .../participants/:id/remind — relance un participant.
 //
-// L'email part REELLEMENT depuis le 2026-09-15 (via Resend, voir
-// services/email/). L'horodatage `last_reminder_sent_at` reste pose dans tous
-// les cas : il dit « une relance a ete demandee », ce qui reste vrai meme si
-// l'envoi echoue — et c'est lui qui evite d'en renvoyer trois d'affilee.
+// CORRIGE (retour utilisateur, 2026-09-28 : "il faut permettre desormais
+// l'envoi de mails reels"). Le commentaire affirmait deja que l'email
+// partait "reellement depuis le 2026-09-15", mais ce n'etait vrai que pour
+// PUT .../participants/:id (modifier un participant) juste au-dessus —
+// cette route-ci ne faisait qu'ecrire `last_reminder_sent_at`, sans jamais
+// appeler envoyerRelanceParticipant. Corrige pour de vrai cette fois,
+// meme appel que le PUT.
+//
+// `last_reminder_sent_at` reste pose dans tous les cas : il dit « une
+// relance a ete demandee », ce qui reste vrai meme si l'envoi echoue.
 //
 // Le lien individuel reste affiche cote createur : c'est le canal de repli
 // quand aucune cle d'envoi n'est configuree, et la reponse dit precisement si
@@ -341,7 +347,9 @@ router.post('/api/books/:bookId/collective/participants/:participantId/remind', 
       .maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Participant introuvable.' });
-    res.json(data);
+
+    const envoi = await emailsTransactionnels.envoyerRelanceParticipant({ participant: data, book: req.book });
+    res.json({ ...data, emailSent: envoi.sent === true, emailSkipped: envoi.skipped || null });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

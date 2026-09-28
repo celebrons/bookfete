@@ -91,6 +91,17 @@ jest.mock('../services/storageService', () => ({
   uploadFile: jest.fn(async () => ({ success: true, url: 'https://cdn.test/uploaded.jpg', fileName: 'book-test-9/uploaded.jpg' }))
 }));
 
+// SANS CE MOCK, routes/collective.js appelle le VRAI transactionalEmails.js
+// (invitation + relance) a chaque test d'ajout/relance de participant — si
+// jamais une cle Brevo reelle traine dans backend/.env pendant une execution
+// locale, ces adresses de fixture recevraient un vrai email (meme piege deja
+// rencontre sur orders.webhook-stripe.test.js, voir sa propre note).
+jest.mock('../services/email/transactionalEmails', () => ({
+  envoyerInvitationParticipant: jest.fn(async () => ({ sent: false, skipped: 'test' })),
+  envoyerRelanceParticipant: jest.fn(async () => ({ sent: false, skipped: 'test' })),
+  envoyerNouvelleContribution: jest.fn(async () => ({ sent: false, skipped: 'test' }))
+}));
+
 const express = require('express');
 const request = require('supertest');
 
@@ -240,6 +251,25 @@ describe('routes/collective', () => {
         .set('Authorization', 'Bearer valid-token');
       expect(response.status).toBe(200);
       expect(response.body.last_reminder_sent_at).toBeTruthy();
+    });
+
+    // Regression (retour utilisateur, 2026-09-28 : "il faut permettre
+    // desormais l'envoi de mails reels"). Le commentaire du code affirmait
+    // deja que cette route envoyait un email, mais son corps n'appelait
+    // jamais envoyerRelanceParticipant — seul PUT .../participants/:id le
+    // faisait. Corrige ; ce test verifie que ca reste vrai.
+    it('POST .../remind appelle reellement envoyerRelanceParticipant (pas seulement PUT)', async () => {
+      const emails = require('../services/email/transactionalEmails');
+      emails.envoyerRelanceParticipant.mockClear();
+
+      const response = await request(app)
+        .post(`/api/books/${ACTIVATED_BOOK_ID}/collective/participants/participant-invited/remind`)
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      expect(emails.envoyerRelanceParticipant).toHaveBeenCalledTimes(1);
+      expect(emails.envoyerRelanceParticipant.mock.calls[0][0].participant.id).toBe('participant-invited');
+      expect(response.body.emailSent).toBe(false); // mock renvoie {sent:false} : le champ le reflete fidelement.
     });
   });
 
