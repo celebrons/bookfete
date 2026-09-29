@@ -146,48 +146,60 @@
 }
 
 /* --- Barre d'outils contextuelle (AtelierToolsBar, refonte 2026-09-25,
-   polie 2026-09-26 §5, remontee dans .atelier-header le 2026-09-29) --------
-   Retour utilisateur : les pastilles pleines (fond/bordure/icone) faisaient
-   "trois gros boutons d'application". Devenue trois libelles textuels,
-   separes par un trait fin (meme forme que .atelier-filmstrip-sep), actifs
-   par un soulignement dore plutot qu'un remplissage — proche d'un sommaire
-   editorial, pas d'une barre d'outils logicielle. Vit desormais DANS
-   .atelier-header (element flex parmi d'autres, plus un bloc pleine largeur
-   centre) : ni justify-content ni marge basse n'ont plus de role a jouer. */
+   polie 2026-09-26 §5, remontee dans .atelier-header le 2026-09-29, recentree
+   et mise en evidence le meme jour) --------------------------------------
+   Retour utilisateur (deuxieme passe, meme jour) : une fois dans l'en-tete,
+   la barre se lisait comme un troisieme element parmi d'autres et manquait
+   de visibilite ("centre ce menu et mets le en evidence encore plus"). Deux
+   changements : `flex: 1 1 100%` la force TOUJOURS sur sa propre ligne dans
+   .atelier-header (quel que soit l'espace deja pris par le titre, puisque
+   100% de base ne peut jamais tenir a cote d'autre chose dans un conteneur
+   qui wrap), ligne alors centree et separee par un filet ; les trois
+   libelles texte deviennent des pastilles (fond leger, bordure au repos),
+   actif = fond dore plutot qu'un simple soulignement — plus proche d'une
+   vraie sous-navigation que d'un sommaire discret. Les separateurs fins
+   (utiles entre libelles nus) deviennent superflus entre des pastilles. */
 .atelier-tools-bar {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: var(--space-sm);
+  gap: 8px;
+  flex: 1 1 100%;
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(184, 146, 74, 0.18);
 }
 
 .atelier-tools-bar-sep {
-  flex: none;
-  width: 1px;
-  height: 14px;
-  background: rgba(223, 216, 201, 0.9);
+  display: none;
 }
 
 .atelier-tool-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 3px 6px;
-  border: none;
-  border-bottom: 1px solid transparent;
-  background: none;
+  padding: 7px 16px;
+  border: 1px solid rgba(184, 146, 74, 0.22);
+  border-radius: 999px;
+  background: rgba(184, 146, 74, 0.05);
   color: var(--text-light);
   font-family: var(--font-primary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 700;
   letter-spacing: 0.02em;
   white-space: nowrap;
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-tool-btn:hover { color: var(--ink); }
+.atelier-tool-btn:hover {
+  color: var(--ink);
+  border-color: rgba(184, 146, 74, 0.4);
+  background: rgba(184, 146, 74, 0.1);
+}
 .atelier-tool-btn.is-active {
-  border-bottom-color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(184, 146, 74, 0.18);
   color: var(--ink);
 }
 

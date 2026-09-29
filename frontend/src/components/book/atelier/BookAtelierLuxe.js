@@ -2335,11 +2335,7 @@ export default function BookAtelierLuxe() {
                   pense en voyant les emplacements vides, pas en regardant
                   une liste de livres (2026-09-22). */}
               {book?.collection_mode !== 'solo' && (
-                <AtelierPartagerLien
-                  isActivated={Boolean(book?.collective_activated_at)}
-                  recipientName={book?.recipient_name}
-                  onInvite={handleInvite}
-                />
+                <AtelierPartagerLien recipientName={book?.recipient_name} />
               )}
 
               {snapshotBar}
