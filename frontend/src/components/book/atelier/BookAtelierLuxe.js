@@ -98,6 +98,10 @@ export default function BookAtelierLuxe() {
   // mode collectif n'est pas encore active, sinon navigue directement vers
   // sa gestion (retour utilisateur, 2026-09-28).
   const [showCollectiveActivateModal, setShowCollectiveActivateModal] = useState(false);
+  // Bandeau "Mode test" DETACHABLE (Gabarit 2, retour utilisateur 2026-09-29) :
+  // refermable "pour de bon pendant la session" — un simple etat React suffit,
+  // pas besoin de le retenir au-dela (pas de localStorage).
+  const [showTestBanner, setShowTestBanner] = useState(true);
 
   const [items, setItems] = useState([]);
   const [layouts, setLayouts] = useState([]);
@@ -2082,18 +2086,34 @@ export default function BookAtelierLuxe() {
       {/* Rappel discret quand on travaille sans compte : c'est l'ecran ou
           l'on passe le plus de temps, donc celui ou il faut le dire. */}
       <AnonymousBanner compact />
-      {/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29).
+      {/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29, Gabarit 2
+          "bandeau test detachable" le meme jour — voir l'artefact "Célébrons
+          — pistes d'interface", onglet "Barre d'atelier").
           Remplace ce que le site affichait par-dessus l'atelier jusqu'ici
           (logo, "Comment ca marche", tableau de bord, administration,
           email, deconnexion — voir Layout.js, qui ne rend plus ce bandeau
           sur cette route) : ← Retour, le titre, le format. Porte aussi
           desormais la barre Photos/Mise en page/Pages et le raccourci
-          Inviter/Gerer le collectif (retour utilisateur 2026-09-29 :
-          "j'ai du chercher pour les retrouver") — plus de chrome permanent
-          qu'a l'origine de cette refonte, mais tout regroupe au meme
-          endroit plutot que disperse sur plusieurs lignes/sections. Le
-          mode automatique reste un lien texte, explique au survol
-          seulement (§9 de la demande initiale). */}
+          Inviter/Gerer le collectif — plus de chrome permanent qu'a
+          l'origine de cette refonte, mais tout regroupe au meme endroit
+          plutot que disperse sur plusieurs lignes/sections. Le mode
+          automatique reste un lien texte, explique au survol seulement
+          (§9 de la demande initiale). */}
+      {book.locked_at && showTestBanner && (
+        <div className="atelier-test-banner">
+          <span aria-hidden="true">🔧</span> <b>Mode test</b> — modifiable malgré le paiement, ce ne serait pas possible en production.
+          <button
+            type="button"
+            className="atelier-test-banner-close"
+            onClick={() => setShowTestBanner(false)}
+            title="Masquer"
+            aria-label="Masquer le bandeau mode test"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <header className="atelier-header">
         <div className="atelier-header-top">
           {/* Plus de lien vers /book/:bookId (l'onglet "Edition" n'existe
@@ -2123,16 +2143,10 @@ export default function BookAtelierLuxe() {
                 {formatEurosDelta(priceDelta.priceCents)}
               </span>
             )}
-            {/* Verrouillage apres paiement (retour utilisateur, 2026-09-28) :
-                un livre paye n'est modifiable que parce que le serveur tourne
-                avec ALLOW_BOOK_EDITS_AFTER_PAYMENT=1 (mode test) — le dire
-                explicitement, plutot que de laisser croire que ce serait
-                possible en production. */}
-            {book.locked_at && (
-              <span className="atelier-header-lock-note" title="Ce livre a deja une commande payee">
-                {' '}· Mode test : modifiable malgré le paiement — en production, ce ne serait pas possible
-              </span>
-            )}
+            {/* Le verrouillage apres paiement (mode test) vit desormais dans
+                le bandeau detachable ci-dessus (Gabarit 2, retour utilisateur
+                2026-09-29) — la ligne de titre ne porte plus que ce qui
+                concerne le livre lui-meme (nom, format, prix). */}
           </span>
 
           {/* "Terminer mon livre" SUR LA LIGNE DU TITRE, tout a droite
@@ -2153,56 +2167,61 @@ export default function BookAtelierLuxe() {
           ) : null}
         </div>
 
-        {/* Barre Photos/Mise en page/Pages : TOUJOURS CENTREE sur sa propre
-            ligne (retour utilisateur, 2026-09-29 : "les 3 boutons... tjrs
-            centres" — l'essai precedent l'avait ramenee a gauche pour
-            partager sa ligne avec Inviter/Composer automatiquement/?, ce
-            n'etait pas voulu). */}
+        {/* Ligne 2 : barre Photos/Mise en page/Pages VRAIMENT CENTREE (retour
+            utilisateur, 2026-09-29 : "les 3 boutons... tjrs centres") tout en
+            partageant sa ligne avec Inviter/Composer automatiquement/? —
+            memes contraintes reconciliees comme dans le Gabarit 2 : ces
+            actions sortent du flux (position:absolute, voir
+            .atelier-header-secondary) pour ne plus peser sur le centrage des
+            pastilles, qui se centrent alors sur la largeur ENTIERE de la
+            ligne plutot que sur l'espace qu'il leur restait. */}
         {book.page_count ? (
-          <AtelierToolsBar
-            activeDrawer={activeDrawer}
-            onToggle={toggleDrawer}
-            photosCount={photos.length}
-            totalPages={totalPages}
-          />
-        ) : null}
+          <div className="atelier-tools-row">
+            <AtelierToolsBar
+              activeDrawer={activeDrawer}
+              onToggle={toggleDrawer}
+              photosCount={photos.length}
+              totalPages={totalPages}
+            />
 
-        <span className="atelier-header-secondary">
-          {/* "Inviter" (retour utilisateur, 2026-09-29 : simplification de
-              l'en-tete — un seul libelle constant, plus de "Gerer le
-              collectif" une fois active). Ouvre l'activation si le mode
-              collectif n'est pas encore active, sinon la page de suivi
-              (lien, invitations, contributions) — voir handleInvite. */}
-          {book?.collection_mode !== 'solo' && (
-            <button
-              type="button"
-              className="atelier-header-link"
-              onClick={handleInvite}
-              title={book?.collective_activated_at
-                ? 'Voir le lien, inviter et suivre les contributions'
-                : 'Inviter vos proches a deposer leurs photos et leurs mots'}
-            >
-              Inviter
-            </button>
-          )}
-          <button
-            type="button"
-            className="atelier-header-link"
-            onClick={handleGenerateButtonClick}
-            title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
-          >
-            ✦ Composer automatiquement
-          </button>
-          <button
-            type="button"
-            className="atelier-help-btn"
-            onClick={() => setShowOnboarding(true)}
-            title="Revoir les explications"
-            aria-label="Revoir les explications"
-          >
-            ?
-          </button>
-        </span>
+            <span className="atelier-header-secondary">
+              {/* "Inviter" (retour utilisateur, 2026-09-29 : simplification
+                  de l'en-tete — un seul libelle constant, plus de "Gerer le
+                  collectif" une fois active). Ouvre l'activation si le mode
+                  collectif n'est pas encore active, sinon la page de suivi
+                  (lien, invitations, contributions) — voir handleInvite. */}
+              {book?.collection_mode !== 'solo' && (
+                <button
+                  type="button"
+                  className="atelier-header-link"
+                  onClick={handleInvite}
+                  title={book?.collective_activated_at
+                    ? 'Voir le lien, inviter et suivre les contributions'
+                    : 'Inviter vos proches a deposer leurs photos et leurs mots'}
+                >
+                  Inviter
+                </button>
+              )}
+              <button
+                type="button"
+                className="atelier-header-link"
+                onClick={handleGenerateButtonClick}
+                title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
+              >
+                ✦ Composer automatiquement
+              </button>
+              <button
+                type="button"
+                className="atelier-help-btn"
+                onClick={() => setShowOnboarding(true)}
+                title="Revoir les explications"
+                aria-label="Revoir les explications"
+              >
+                ?
+              </button>
+            </span>
+          </div>
+        ) : null}
       </header>
 
       <AtelierConfirmSwitchDialog

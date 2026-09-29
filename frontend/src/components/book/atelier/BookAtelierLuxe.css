@@ -19,17 +19,15 @@
   padding: var(--space-md);
 }
 
-/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29, republiee en
-   trois lignes le meme jour apres un essai de fusion qui ne convenait pas :
-   "terminer mon livre je le voyais plus haut, en face de [titre]... tout a
-   droite" + "les 3 boutons photos/mise en page/pages tjrs centres"). Trois
-   lignes empilees : .atelier-header-top (retour, titre, format+pagination,
-   et "Terminer mon livre" pousse a droite par la meme occasion) ; la barre
-   d'outils Photos/Mise en page/Pages, seule sur sa ligne et centree ;
-   .atelier-header-secondary (Inviter, Composer automatiquement, ?), alignee
-   a droite sur sa propre ligne. flex-direction:column + align-items:stretch
-   (par defaut) donne a chaque enfant direct sa pleine largeur, donc sa
-   propre ligne, sans avoir besoin d'un hack flex-basis:100%. */
+/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29, Gabarit 2
+   "bandeau test detachable" le meme jour — voir l'artefact "Célébrons —
+   pistes d'interface", onglet "Barre d'atelier"). Deux lignes dans
+   .atelier-header : .atelier-header-top (retour, titre, format+pagination,
+   "Terminer mon livre" pousse a droite) puis .atelier-tools-row (barre
+   d'outils VRAIMENT centree + actions secondaires en survol a droite, voir
+   plus bas). Le mode test (livre verrouille mais modifiable, ALLOW_BOOK_
+   EDITS_AFTER_PAYMENT=1) sort entierement de ces deux lignes : voir
+   .atelier-test-banner, rendu par BookAtelierLuxe.js AVANT ce header. */
 .atelier-header {
   display: flex;
   flex-direction: column;
@@ -43,6 +41,37 @@
   gap: var(--space-md);
   flex-wrap: wrap;
 }
+
+/* Bandeau "Mode test" DETACHABLE (Gabarit 2, retour utilisateur 2026-09-29 :
+   "le mode test sort entierement de la barre de titre... un bandeau fin et
+   refermable tout en haut, a part"). Refermable pour la session (etat React,
+   voir showTestBanner) — se represente si le livre est rouvert plus tard. */
+.atelier-test-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-sm);
+  padding: 7px 14px;
+  border: 1px solid rgba(184, 146, 74, 0.28);
+  border-radius: 8px;
+  background: rgba(184, 146, 74, 0.08);
+  font-size: 12px;
+  color: #8b6a2f;
+}
+.atelier-test-banner b { font-weight: 700; }
+.atelier-test-banner-close {
+  margin-left: auto;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  color: #a08e63;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.atelier-test-banner-close:hover { color: #8b6a2f; }
 
 .atelier-back-link {
   color: var(--ink);
@@ -89,33 +118,36 @@
   letter-spacing: 0.02em;
   animation: atelierPriceDeltaIn 200ms ease;
 }
-/* Verrouillage apres paiement, mode test (retour utilisateur, 2026-09-28) :
-   texte discret, jamais un bandeau — meme philosophie que le reste de
-   l'en-tete ("le titre, le format, rien de plus en permanence"), juste une
-   teinte ambree pour se distinguer du texte informatif normal. */
-.atelier-header-lock-note {
-  color: #a86a1f;
-  font-weight: 600;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .atelier-header-price-delta { animation: none; }
 }
 
-/* Regroupe les actions secondaires a droite de l'en-tete — deux pour un
-   livre solo (Composer automatiquement, Aide), trois pour un livre
-   collectif (+ Inviter/Gerer le collectif, retour utilisateur 2026-09-29).
-   Au-dela, direction un menu "..." plutot que de s'aligner en ligne. Ecart
-   volontairement plus large que --space-sm entre chaque action (retour
-   utilisateur 2026-09-26 : "éloigne un peu 'composer automatiquement' du
-   bouton d'aide") — trop proches, elles se lisaient comme un seul groupe
-   alors que ce sont des actions sans rapport entre elles. */
+/* Regroupe les actions secondaires — deux pour un livre solo (Composer
+   automatiquement, Aide), trois pour un livre collectif (+ Inviter, retour
+   utilisateur 2026-09-29). Au-dela, direction un menu "..." plutot que de
+   s'aligner en ligne. Ecart volontairement plus large que --space-sm entre
+   chaque action (retour utilisateur 2026-09-26 : "éloigne un peu 'composer
+   automatiquement' du bouton d'aide") — trop proches, elles se lisaient
+   comme un seul groupe alors que ce sont des actions sans rapport entre
+   elles.
+   3e COLONNE DE .atelier-tools-row (Gabarit 2, retour utilisateur
+   2026-09-29 : "les 3 boutons... tjrs centres" tout en partageant leur
+   ligne avec Inviter/Composer automatiquement/?) — voir la grille plus bas.
+   min-width:0 autorise ce groupe a se laisser retrecir par la grille (sinon
+   sa largeur "naturelle" force la colonne a deborder) ; flex-wrap:wrap le
+   fait alors passer sur 2 lignes DANS SA PROPRE COLONNE plutot que
+   chevaucher la colonne centree voisine, si jamais il manque de place —
+   l'essai precedent (position:absolute) chevauchait reellement "Pages" des
+   1024px de large, verifie a l'ecran. */
 .atelier-header-secondary {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--space-lg);
+  grid-column: 3;
+  justify-self: end;
+  min-width: 0;
 }
 
 /* Mode automatique : un lien texte, pas un bouton plein (retour utilisateur
@@ -172,21 +204,56 @@
   margin-bottom: var(--space-md);
 }
 
+/* Ligne 2 de l'en-tete (Gabarit 2, retour utilisateur 2026-09-29) : la barre
+   d'outils ET les actions secondaires PARTAGENT cette ligne. GRILLE A 3
+   COLONNES plutot que le position:absolute du gabarit d'origine (qui
+   chevauchait reellement "Pages" des 1024px de large a l'ecran) : colonne 1
+   vide, colonne 2 (.atelier-tools-bar, largeur auto) VRAIMENT centree
+   puisque les colonnes 1 et 3 se partagent a parts egales (1fr chacune) le
+   reste de la largeur, colonne 3 (.atelier-header-secondary) alignee a
+   droite. minmax(0,1fr) — et non 1fr seul — autorise les colonnes laterales
+   a retrecir sous la largeur de leur contenu : si la colonne 3 manque de
+   place, ses boutons passent sur 2 lignes DANS leur propre colonne (voir
+   .atelier-header-secondary) au lieu de deborder sur la colonne centree.
+   Filet superieur : separe cette ligne de .atelier-header-top, comme dans
+   le gabarit approuve. */
+.atelier-tools-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(184, 146, 74, 0.18);
+}
+
+/* Meme la grille a ses limites : Inviter + Composer automatiquement + ?
+   (~325px sur une seule ligne) ne tiennent dans la colonne 3 qu'a partir
+   d'environ 1066px de large (verifie a l'ecran, Puppeteer, plusieurs
+   largeurs). EN DESSOUS, la grille ne surperpose plus rien (minmax(0,1fr)
+   fait bien son travail), mais le repli sur 2 lignes a l'interieur de la
+   colonne 3 isole "?" tout seul, loin a droite, avec un grand vide au-dessus
+   — verifie a l'ecran a 1024px (tres courant : iPad paysage, petits
+   portables), ce n'est pas propre. Plutot que d'ajuster au chiffre pile,
+   1080px garde une petite marge, et fait basculer sur l'empilement vertical
+   (barre centree, puis actions centrees dessous) AVANT ce point de rupture
+   plutot qu'apres. */
+@media (max-width: 1080px) {
+  .atelier-tools-row { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .atelier-header-secondary { justify-content: center; width: 100%; }
+}
+
 /* --- Barre d'outils contextuelle (AtelierToolsBar, refonte 2026-09-25,
-   polie 2026-09-26 §5, remontee dans .atelier-header le 2026-09-29, mise en
-   evidence puis, apres un essai de fusion avec les actions secondaires non
-   retenu le meme jour, republiee CENTREE sur sa propre ligne — retour
-   utilisateur : "les 3 boutons... tjrs centres"). Enfant direct de
-   .atelier-header (flex-direction:column) : occupe deja toute la largeur,
-   justify-content:center centre les pastilles en son sein. Pastilles
+   polie 2026-09-26 §5, remontee dans .atelier-header le 2026-09-29, Gabarit
+   2 le meme jour — voir .atelier-tools-row juste au-dessus). Pastilles
    conservees (fond leger, bordure au repos, fond dore actif) — plus lisibles
    que le soulignement d'origine. */
 .atelier-tools-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
+  grid-column: 2;
+  justify-self: center;
 }
 
 .atelier-tools-bar-sep {
