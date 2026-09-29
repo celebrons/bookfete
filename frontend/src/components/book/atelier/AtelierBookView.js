@@ -277,6 +277,11 @@ function AtelierBookView({
   canGoPrevious,
   canGoNext,
   navLabel,
+  // Sauts directs couverture/4e (retour utilisateur, 2026-09-29) — facultatifs :
+  // absents, les boutons ne s'affichent simplement pas (repli neutre, comme
+  // partout ailleurs dans ce composant).
+  onGoToCover,
+  onGoToBackCover,
   // Incrustation de glisser-deposer directe (voir AtelierPageOverlay) —
   // n'affiche jamais que sur le cote actuellement selectionne : c'est lui
   // seul que draftLayoutSlug/draftSlotItemIds (BookAtelierLuxe.js)
@@ -478,11 +483,27 @@ function AtelierBookView({
         <div className="atelier-book-nav-side" aria-hidden="true" />
         {/* NAVIGATION ALLEGEE (refonte 2026-09-26, §4) : deux fleches fines
             et un numero, plus de gros boutons rectangulaires. Les sauts
-            directs vers la couverture/4e (autrefois deux boutons ici)
-            vivent desormais dans le tiroir "Pages" (AtelierPageFilmstrip a
-            deja des cellules Cvr/4e, voir plus bas) — une action secondaire,
-            pas la navigation principale. */}
+            directs vers la couverture/4e ont un temps vecu UNIQUEMENT dans
+            le tiroir "Pages" (AtelierPageFilmstrip) ; retour utilisateur,
+            2026-09-29 (a la suite de la meme harmonisation sur Apercu
+            final, capture a l'appui) : rejoignent desormais aussi cette
+            barre, en icone seule (libelle dans l'infobulle uniquement) —
+            memes emplacements et memes classes qu'Apercu final
+            (.atelier-book-nav-jump/.atelier-realsize-jump, memes valeurs
+            que .preview-final-nav-jump/.preview-final-realsize-jump). */}
         <div className="atelier-book-nav-controls">
+          {onGoToCover && (
+            <button
+              type="button"
+              className="atelier-book-nav-jump"
+              onClick={onGoToCover}
+              disabled={!canGoPrevious}
+              title="Aller à la couverture"
+              aria-label="Aller à la couverture"
+            >
+              ⇤
+            </button>
+          )}
           <button
             type="button"
             className="atelier-book-nav-arrow"
@@ -504,6 +525,18 @@ function AtelierBookView({
           >
             ›
           </button>
+          {onGoToBackCover && (
+            <button
+              type="button"
+              className="atelier-book-nav-jump"
+              onClick={onGoToBackCover}
+              disabled={!canGoNext}
+              title="Aller à la 4e de couverture"
+              aria-label="Aller à la 4e de couverture"
+            >
+              ⇥
+            </button>
+          )}
         </div>
         {/* Deplace hors du coin de page (retour utilisateur : "le rendre
             plus visible/permanent renforcerait la confiance avant Terminer
@@ -623,6 +656,18 @@ function AtelierBookView({
                 arrow que la navigation principale, variante claire pour ce
                 fond sombre) + zoom, cote a cote sur une seule ligne. */}
             <div className="atelier-realsize-footer" onClick={(event) => event.stopPropagation()}>
+              {onGoToCover && (
+                <button
+                  type="button"
+                  className="atelier-realsize-jump"
+                  onClick={onGoToCover}
+                  disabled={!canGoPrevious}
+                  title="Aller à la couverture"
+                  aria-label="Aller à la couverture"
+                >
+                  ⇤
+                </button>
+              )}
               <button
                 type="button"
                 className="atelier-realsize-nav-arrow"
@@ -642,6 +687,18 @@ function AtelierBookView({
               >
                 ›
               </button>
+              {onGoToBackCover && (
+                <button
+                  type="button"
+                  className="atelier-realsize-jump"
+                  onClick={onGoToBackCover}
+                  disabled={!canGoNext}
+                  title="Aller à la 4e de couverture"
+                  aria-label="Aller à la 4e de couverture"
+                >
+                  ⇥
+                </button>
+              )}
               <span className="atelier-realsize-footer-divider" aria-hidden="true" />
               <ZoomControls zoom={zoom} onZoomChange={setZoom} />
             </div>

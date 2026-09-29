@@ -1691,6 +1691,29 @@
 .atelier-realsize-nav-arrow:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
 .atelier-realsize-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
 
+/* Sauts directs couverture/4e, icone seule (retour utilisateur, 2026-09-29 :
+   memes emplacements/style qu'Apercu final — voir .preview-final-realsize-jump,
+   BookPreviewFinalLuxe.css, dont ceci reprend EXACTEMENT les memes valeurs).
+   Le libelle vit uniquement dans l'infobulle (`title`), jamais affiche en
+   permanence. */
+.atelier-realsize-jump {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-realsize-jump:hover:not(:disabled) { color: var(--white); background: rgba(255, 255, 255, 0.14); }
+.atelier-realsize-jump:disabled { opacity: 0.3; cursor: not-allowed; }
+
 .atelier-realsize-footer-divider {
   width: 1px;
   height: 18px;
@@ -2167,9 +2190,10 @@
 
 /* Navigation allegee (refonte 2026-09-26, §4) : deux fleches fines, plus de
    gros boutons rectangulaires "PRECEDENTE"/"SUIVANTE". Les sauts directs
-   couverture/4e (autrefois ici) vivent desormais dans le tiroir "Pages"
-   (AtelierPageFilmstrip a deja des cellules Cvr/4e) — une action secondaire,
-   pas la navigation principale. */
+   couverture/4e, un temps deplaces dans le seul tiroir "Pages"
+   (AtelierPageFilmstrip), sont revenus ici le 2026-09-29 (retour
+   utilisateur, meme traitement qu'Apercu final) — voir .atelier-book-nav-jump
+   juste apres. */
 .atelier-book-nav-arrow {
   display: inline-flex;
   align-items: center;
@@ -2187,6 +2211,28 @@
 }
 .atelier-book-nav-arrow:hover:not(:disabled) { background: rgba(184, 146, 74, 0.14); color: var(--gold-deep, var(--gold)); }
 .atelier-book-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Sauts directs couverture/4e, icone seule — memes valeurs que
+   .preview-final-nav-jump (BookPreviewFinalLuxe.css), variante claire de
+   .atelier-realsize-jump plus haut. Le libelle vit uniquement dans
+   l'infobulle (`title`), jamais affiche en permanence. */
+.atelier-book-nav-jump {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-light);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-book-nav-jump:hover:not(:disabled) { color: var(--gold-deep, var(--gold)); background: rgba(184, 146, 74, 0.14); }
+.atelier-book-nav-jump:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .atelier-book-nav-label {
   font-size: 13px;

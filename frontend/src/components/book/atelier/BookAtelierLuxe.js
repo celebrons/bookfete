@@ -2475,6 +2475,13 @@ export default function BookAtelierLuxe() {
               canGoPrevious={canGoPrevious}
               canGoNext={canGoNext}
               navLabel={navLabel}
+              // Sauts directs couverture/4e (retour utilisateur, 2026-09-29 :
+              // "les mettre aussi dans l'atelier et sa prévisualisation",
+              // apres la meme harmonisation sur Apercu final) — meme
+              // fonction que le tiroir "Pages" (AtelierPageFilmstrip),
+              // deja disponible ici.
+              onGoToCover={() => goToFilmstripTarget('cover')}
+              onGoToBackCover={() => goToFilmstripTarget('back-cover')}
               overlay={pageOverlay}
               pageActions={pageActions}
               printFormat={book.print_format}
