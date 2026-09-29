@@ -597,6 +597,26 @@ export default function BookAtelierLuxe() {
   // aurait leve une ReferenceError au premier rendu.
   useEffect(() => { setUndoSnapshot(null); }, [currentPageIndex]);
 
+  // Fermeture EN DOUCEUR de la barre "Annuler" (retour utilisateur,
+  // 2026-09-29 : "quand je feuillette... l'album bouge" — cette barre
+  // disparaissait d'un coup en changeant de page puisqu'elle n'existe que
+  // pour LA page courante, voir undoBar plus bas ; sa disparition instantanee
+  // faisait sauter le livre vers le haut pour reprendre l'espace libere).
+  // React demonte un element conditionnel immediatement : sans ce
+  // "sursis", aucune transition CSS n'aurait le temps de jouer. Ce state ne
+  // fait que garder le DERNIER contenu affiche pendant que la barre se
+  // referme (voir .atelier-undo-bar-wrap, animee en CSS) — handleUndo reste
+  // sans effet une fois la page changee (deja garde par son propre
+  // pageIndex !== currentPageIndex), donc rien ne peut etre annule "en
+  // trop" pendant ce court delai.
+  const undoBarActive = Boolean(undoSnapshot && undoSnapshot.pageIndex === currentPageIndex);
+  const [undoBarLingering, setUndoBarLingering] = useState(null);
+  useEffect(() => {
+    if (undoBarActive) { setUndoBarLingering({ label: undoSnapshot.label }); return undefined; }
+    const timer = setTimeout(() => setUndoBarLingering(null), 260);
+    return () => clearTimeout(timer);
+  }, [undoBarActive, undoSnapshot?.label]);
+
   const refreshPagePreview = useCallback(async (pageIndex) => {
     if (!book?.id || pageIndex == null) return;
     try {
@@ -2065,12 +2085,19 @@ export default function BookAtelierLuxe() {
   // page etait vide) ne valait que pour le changement de mise en page ; elle
   // masquait le lien apres un remplacement de photo, cas ou il est justement
   // le plus utile.
-  const undoBar = undoSnapshot && undoSnapshot.pageIndex === currentPageIndex ? (
-    <button type="button" className="atelier-undo-bar" onClick={handleUndo}>
-      <span aria-hidden="true">↩</span>
-      <span>Annuler — {undoSnapshot.label}</span>
-    </button>
-  ) : null;
+  // TOUJOURS monte (contrairement a avant, un simple null conditionnel) :
+  // c'est .atelier-undo-bar-wrap qui anime l'ouverture/fermeture via
+  // max-height/opacite — voir undoBarActive/undoBarLingering plus haut.
+  const undoBar = (
+    <div className={`atelier-undo-bar-wrap ${undoBarActive ? 'is-open' : ''}`}>
+      {undoBarLingering && (
+        <button type="button" className="atelier-undo-bar" onClick={handleUndo} disabled={!undoBarActive}>
+          <span aria-hidden="true">↩</span>
+          <span>Annuler — {undoBarLingering.label}</span>
+        </button>
+      )}
+    </div>
+  );
 
   // Retour au livre d'AVANT la derniere generation automatique. Distinct du
   // bandeau "Annuler" ci-dessus, qui ne concerne que la page courante : celui-ci

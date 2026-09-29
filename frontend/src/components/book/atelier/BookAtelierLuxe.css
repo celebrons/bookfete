@@ -2544,6 +2544,29 @@
   .atelier-snapshot-bar-actions { justify-content: space-between; }
 }
 
+/* Enveloppe TOUJOURS montee, animant l'ouverture/fermeture du bandeau
+   "Annuler" (retour utilisateur, 2026-09-29 : "quand je feuillette...
+   l'album bouge" — la disparition instantanee de ce bandeau en changeant de
+   page faisait sauter le livre vers le haut). 60px de marge au-dessus de la
+   hauteur reelle du bandeau (~44px avec sa marge basse) : jamais coupe,
+   meme si le libelle "Annuler — ..." passe sur deux lignes sur un ecran
+   etroit. Sans effet sous 1080px : .atelier-undo-bar y devient
+   position:fixed (voir plus bas), donc plus soumis a la boite de cette
+   enveloppe. */
+.atelier-undo-bar-wrap {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 220ms ease, opacity 160ms ease;
+}
+.atelier-undo-bar-wrap.is-open {
+  max-height: 60px;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .atelier-undo-bar-wrap { transition: none; }
+}
+
 .atelier-undo-bar {
   display: flex;
   align-items: center;
