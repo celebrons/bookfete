@@ -14,6 +14,7 @@ import { formatEurosDelta } from '../../utils/formatPrice';
 import { PageZoomStage, ZoomControls } from '../common/PageZoomStage';
 import FadeInFrame from '../common/FadeInFrame';
 import PrintQualityRecapModal from '../common/PrintQualityRecapModal';
+import { avertissementsDejaAcquittes, acquitterAvertissementsQualite } from '../../utils/qualityAcknowledgment';
 import { spreadPair, spreadCount as compterVisAVis } from '../../utils/pageParity';
 import '../../styles/luxe-theme.css';
 import './BookPreviewFinalLuxe.css';
@@ -447,19 +448,32 @@ export default function BookPreviewFinalLuxe() {
   // l'ecran recapitulatif si au moins une photo est sous le seuil de
   // resolution". C'est ici que le verrou vit (et pas dans l'atelier) parce
   // que c'est le seul passage oblige vers /checkout — on peut arriver sur
-  // cet ecran sans avoir ouvert "Terminer mon livre".
-  // Jamais bloquant en cas d'echec du controle lui-meme (reseau, etc.) :
-  // on laisse alors passer plutot que d'empecher une commande legitime.
+  // cet ecran sans avoir ouvert "Terminer mon livre". Jamais bloquant en
+  // cas d'echec du controle lui-meme (reseau, etc.) : on laisse alors
+  // passer plutot que d'empecher une commande legitime.
+  //
+  // NE RE-DEMANDE PAS si les MEMES photos ont deja ete vues et confirmees
+  // dans l'atelier POUR CE LIVRE (retour utilisateur, 2026-09-29 : "on va
+  // enlever l'alerte... vu qu'on l'affiche deja... dans l'atelier") — le
+  // verrou lui-meme reste en place (avertissementsDejaAcquittes verifie les
+  // itemIds un a un, pas juste "deja vu une fois" : une photo NOUVELLEMENT
+  // signalee depuis re-ouvre l'ecran normalement). Voir
+  // utils/qualityAcknowledgment.js.
   const handleOrder = async () => {
     setOrdering(true);
     try {
       const check = await getPrintQualityCheck(bookId);
-      if (check?.hasWarnings) {
+      const itemIdsActuels = (check?.warnings || []).map((entry) => entry.itemId);
+      if (check?.hasWarnings && !avertissementsDejaAcquittes(bookId, itemIdsActuels)) {
         setQualityWarnings(check.warnings || []);
         setIsQualityRecapOpen(true);
         setOrdering(false);
         return;
       }
+      // Passe (avertissements deja acquittes, ou aucun) : memorise/rafraichit
+      // quand meme l'acquit, pour couvrir le cas "aucun avertissement"
+      // explicitement et garder l'horodatage a jour.
+      acquitterAvertissementsQualite(bookId, itemIdsActuels);
     } catch (_err) {
       // Controle indisponible : on continue (voir commentaire ci-dessus).
     }
@@ -684,7 +698,14 @@ export default function BookPreviewFinalLuxe() {
         warnings={qualityWarnings}
         loading={ordering}
         onClose={() => setIsQualityRecapOpen(false)}
-        onContinueAnyway={() => { setIsQualityRecapOpen(false); proceedToCheckout(); }}
+        onContinueAnyway={() => {
+          // Meme si le paiement echoue et que l'utilisateur reclique
+          // "Commander", inutile de reposer la meme question pour les
+          // memes photos.
+          acquitterAvertissementsQualite(bookId, qualityWarnings.map((entry) => entry.itemId));
+          setIsQualityRecapOpen(false);
+          proceedToCheckout();
+        }}
         onReviewPage={(pageIndex) => {
           setIsQualityRecapOpen(false);
           navigate(`/book/${bookId}/atelier?page=${pageIndex}`);

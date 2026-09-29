@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getPrintQualityCheck } from '../../../services/compositionApi';
+import { acquitterAvertissementsQualite } from '../../../utils/qualityAcknowledgment';
 import { RATIO_GAP_THRESHOLD } from './photoQuality';
 
 // Verification automatique au clic sur "Terminer mon livre" — calculee a
@@ -60,6 +61,21 @@ function AtelierFinishModal({
   // de texte, qui ne parlent pas de nettete et ont leur propre signalement.
   const photoWarnings = (qualityCheck?.warnings || []).filter((entry) => entry.kind !== 'texte');
   const lowQualityCount = photoWarnings.length;
+
+  // Continuer DEPUIS CET ECRAN veut dire "j'ai vu ces avertissements (ou
+  // leur absence)" — memorise pour que l'ecran Apercu final, plus loin dans
+  // le parcours, n'ait pas besoin de reposer la meme question pour les
+  // MEMES photos (retour utilisateur, 2026-09-29). Seulement si le controle
+  // a REELLEMENT charge (`qualityCheck` non nul) : sans ca, un controle qui
+  // echoue ou n'a pas fini de charger memoriserait a tort "rien a
+  // signaler", et desamorcerait le verrou obligatoire de l'ecran suivant
+  // pour un livre jamais vraiment verifie.
+  const handleContinuer = () => {
+    if (qualityCheck) {
+      acquitterAvertissementsQualite(bookId, photoWarnings.map((entry) => entry.itemId));
+    }
+    onContinue();
+  };
 
   // Regroupees PAR PAGE : c'est la page qu'on va rouvrir, pas la photo. Une
   // page portant 3 photos trop justes ne doit apparaitre qu'une fois.
@@ -190,7 +206,7 @@ function AtelierFinishModal({
 
         <div className="atelier-modal-actions">
           {isReady ? (
-            <button type="button" className="btn btn-primary" onClick={onContinue}>
+            <button type="button" className="btn btn-primary" onClick={handleContinuer}>
               Voir mon livre →
             </button>
           ) : (
@@ -198,7 +214,7 @@ function AtelierFinishModal({
               <button type="button" className="btn btn-outline" onClick={onClose}>
                 Corriger dans l'atelier
               </button>
-              <button type="button" className="btn btn-primary" onClick={onContinue}>
+              <button type="button" className="btn btn-primary" onClick={handleContinuer}>
                 Voir quand même
               </button>
             </>
