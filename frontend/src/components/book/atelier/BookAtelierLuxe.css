@@ -19,11 +19,14 @@
   padding: var(--space-md);
 }
 
-/* EN-TETE TRES DISCRETE (refonte visuelle 2026-09-25).
+/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29).
    Remplace l'en-tete du site (masquee sur cette route, voir Layout.js) :
-   retour, titre, format+pagination, et seulement deux actions secondaires,
-   texte plutot que boutons pleins — l'atelier n'a plus qu'une seule ligne
-   de chrome permanent. */
+   retour, titre, format+pagination, texte plutot que boutons pleins. Porte
+   aussi desormais la barre d'outils (Photos/Mise en page/Pages) et le
+   raccourci Inviter/Gerer le collectif — regroupes ici plutot que sur des
+   lignes separees moins visibles (retour utilisateur : "j'ai du chercher
+   pour les retrouver"). flex-wrap deja en place : passe a la ligne sur
+   petit ecran plutot que de deborder. */
 .atelier-header {
   display: flex;
   align-items: baseline;
@@ -90,13 +93,14 @@
   .atelier-header-price-delta { animation: none; }
 }
 
-/* Regroupe les deux actions secondaires a droite de l'en-tete — jamais plus
-   de deux, sinon elles retourneraient dans un menu "..." plutot que de
-   s'aligner en ligne. Ecart volontairement plus large que --space-sm entre
-   les deux (retour utilisateur 2026-09-26 : "éloigne un peu 'composer
-   automatiquement' du bouton d'aide") — trop proches, les deux se lisaient
-   comme un seul groupe alors que ce sont deux actions sans rapport (l'une
-   compose tout le livre, l'autre ouvre l'aide). */
+/* Regroupe les actions secondaires a droite de l'en-tete — deux pour un
+   livre solo (Composer automatiquement, Aide), trois pour un livre
+   collectif (+ Inviter/Gerer le collectif, retour utilisateur 2026-09-29).
+   Au-dela, direction un menu "..." plutot que de s'aligner en ligne. Ecart
+   volontairement plus large que --space-sm entre chaque action (retour
+   utilisateur 2026-09-26 : "éloigne un peu 'composer automatiquement' du
+   bouton d'aide") — trop proches, elles se lisaient comme un seul groupe
+   alors que ce sont des actions sans rapport entre elles. */
 .atelier-header-secondary {
   display: flex;
   align-items: center;
@@ -142,20 +146,19 @@
 }
 
 /* --- Barre d'outils contextuelle (AtelierToolsBar, refonte 2026-09-25,
-   polie 2026-09-26 §5) -----------------------------------------------------
+   polie 2026-09-26 §5, remontee dans .atelier-header le 2026-09-29) --------
    Retour utilisateur : les pastilles pleines (fond/bordure/icone) faisaient
    "trois gros boutons d'application". Devenue trois libelles textuels,
    separes par un trait fin (meme forme que .atelier-filmstrip-sep), actifs
    par un soulignement dore plutot qu'un remplissage — proche d'un sommaire
-   editorial, pas d'une barre d'outils logicielle. Centree, pas collee a un
-   bord : elle flotte au-dessus du livre comme les tiroirs qu'elle declenche. */
+   editorial, pas d'une barre d'outils logicielle. Vit desormais DANS
+   .atelier-header (element flex parmi d'autres, plus un bloc pleine largeur
+   centre) : ni justify-content ni marge basse n'ont plus de role a jouer. */
 .atelier-tools-bar {
   display: flex;
-  justify-content: center;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
 }
 
 .atelier-tools-bar-sep {
