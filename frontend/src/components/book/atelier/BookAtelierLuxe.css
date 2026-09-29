@@ -19,20 +19,34 @@
   padding: var(--space-md);
 }
 
-/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29).
-   Remplace l'en-tete du site (masquee sur cette route, voir Layout.js) :
-   retour, titre, format+pagination, texte plutot que boutons pleins. Porte
-   aussi desormais la barre d'outils (Photos/Mise en page/Pages) et le
-   raccourci Inviter/Gerer le collectif — regroupes ici plutot que sur des
-   lignes separees moins visibles (retour utilisateur : "j'ai du chercher
-   pour les retrouver"). flex-wrap deja en place : passe a la ligne sur
-   petit ecran plutot que de deborder. */
+/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29, fusionnee sur
+   deux lignes le meme jour). Remplace l'en-tete du site (masquee sur cette
+   route, voir Layout.js). Deux lignes empilees : .atelier-header-top (retour,
+   titre, format+pagination) puis .atelier-header-row2 (barre d'outils Photos/
+   Mise en page/Pages ET actions secondaires — Inviter, Composer
+   automatiquement, ?, Terminer mon livre — SUR LA MEME LIGNE, retour
+   utilisateur : "monter inviter/composer auto/? au meme niveau que
+   photos/mise en page/pages... vu qu'il y a de l'espace", "Terminer mon
+   livre" reprend au passage la place gagnee au lieu de rester tout en bas). */
 .atelier-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.atelier-header-top {
   display: flex;
   align-items: baseline;
   gap: var(--space-md);
   flex-wrap: wrap;
-  margin-bottom: var(--space-sm);
+}
+
+.atelier-header-row2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
 }
 
 .atelier-back-link {
@@ -104,6 +118,7 @@
 .atelier-header-secondary {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-lg);
   margin-left: auto;
 }
@@ -141,34 +156,34 @@
 }
 .atelier-help-btn:hover { border-color: var(--gold); color: var(--gold); }
 
+/* "Terminer mon livre" DANS L'EN-TETE (retour utilisateur, 2026-09-29 :
+   deplacee depuis le bas de page — voir l'ancienne .atelier-finish-bar,
+   retiree — pour rejoindre Inviter/Composer automatiquement/? sur la meme
+   ligne que la barre d'outils). Gabarit compact : le bouton plein (.btn
+   .btn-primary) est pense pour une action isolee en bas de page, pas pour
+   voisiner des liens texte de 12px dans une ligne d'en-tete. */
+.atelier-header-finish-btn {
+  padding: 8px 18px;
+  font-size: 13px;
+}
+
 .atelier-error {
   margin-bottom: var(--space-md);
 }
 
 /* --- Barre d'outils contextuelle (AtelierToolsBar, refonte 2026-09-25,
-   polie 2026-09-26 §5, remontee dans .atelier-header le 2026-09-29, recentree
-   et mise en evidence le meme jour) --------------------------------------
-   Retour utilisateur (deuxieme passe, meme jour) : une fois dans l'en-tete,
-   la barre se lisait comme un troisieme element parmi d'autres et manquait
-   de visibilite ("centre ce menu et mets le en evidence encore plus"). Deux
-   changements : `flex: 1 1 100%` la force TOUJOURS sur sa propre ligne dans
-   .atelier-header (quel que soit l'espace deja pris par le titre, puisque
-   100% de base ne peut jamais tenir a cote d'autre chose dans un conteneur
-   qui wrap), ligne alors centree et separee par un filet ; les trois
-   libelles texte deviennent des pastilles (fond leger, bordure au repos),
-   actif = fond dore plutot qu'un simple soulignement — plus proche d'une
-   vraie sous-navigation que d'un sommaire discret. Les separateurs fins
-   (utiles entre libelles nus) deviennent superflus entre des pastilles. */
+   polie 2026-09-26 §5, remontee dans .atelier-header le 2026-09-29, mise en
+   evidence puis fusionnee avec les actions secondaires le meme jour) -------
+   Vit desormais dans .atelier-header-row2, a cote de .atelier-header-secondary
+   (margin-left:auto la pousse a droite) : plus besoin de forcer sa propre
+   ligne ni de la centrer, la ligne entiere fait deja office de sous-
+   navigation. Pastilles conservees (fond leger, bordure au repos, fond dore
+   actif) — plus lisibles que le soulignement d'origine. */
 .atelier-tools-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
-  flex: 1 1 100%;
-  padding-top: 10px;
-  margin-top: 2px;
-  border-top: 1px solid rgba(184, 146, 74, 0.18);
 }
 
 .atelier-tools-bar-sep {
@@ -493,22 +508,7 @@
 .atelier-filmstrip-add.is-remove:hover:not(:disabled) { background: rgba(36, 31, 24, 0.09); }
 .atelier-filmstrip-add.is-remove:disabled { cursor: not-allowed; }
 
-/* --- "Terminer mon livre" (bas de page) + verification --------------- */
-/* Repositionne en bas a droite (refonte 2026-09-26 §7) : retour utilisateur,
-   la barre centree pleine largeur avec son trait separateur dominait l'ecran
-   comme la barre d'un logiciel. En bas a droite, action clairement visible
-   (accent dore, .btn-primary) mais qui ne barre plus la largeur du livre. */
-.atelier-finish-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-lg);
-}
-
-.atelier-finish-btn {
-  padding: 12px 28px;
-  font-size: 14px;
-}
-
+/* --- Verification de fin (AtelierFinishModal) ------------------------- */
 .atelier-finish-checklist {
   list-style: none;
   margin: 0 0 var(--space-md);
@@ -2728,10 +2728,18 @@
   .atelier-sidebar-add-btn,
   .atelier-layout-change-btn,
   .atelier-header-link,
-  .atelier-tool-btn {
+  .atelier-tool-btn,
+  .atelier-header-finish-btn {
     min-height: 44px;
   }
   .atelier-book-nav-arrow { width: 44px; height: 44px; }
+
+  /* Sur telephone, la ligne d'outils et les actions secondaires sont deja
+     empilees par le flex-wrap : ancrer .atelier-header-secondary a droite
+     (utile en large, ou elle partage sa ligne avec la barre d'outils) n'a
+     plus de sens une fois seule sur sa propre ligne — juste alignee comme
+     le reste. */
+  .atelier-header-secondary { margin-left: 0; }
 
   /* Les deux pictogrammes d'action de la page, et l'oeil : plus grands et
      plus ecartes du bord, sinon ils se touchent du pouce. */

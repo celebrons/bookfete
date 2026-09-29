@@ -2095,98 +2095,111 @@ export default function BookAtelierLuxe() {
           mode automatique reste un lien texte, explique au survol
           seulement (§9 de la demande initiale). */}
       <header className="atelier-header">
-        {/* Plus de lien vers /book/:bookId (l'onglet "Edition" n'existe
-            plus, remplace par l'atelier lui-meme — voir BookPageLuxe.js qui
-            redirige desormais cette route directement ici) : retour direct
-            au tableau de bord. */}
-        <Link to="/dashboard" className="atelier-back-link">← Retour</Link>
-        <h1 className="atelier-title">{book.title || 'Mon livre'}</h1>
-        {/* Le FORMAT reste visible pendant toute la composition : il decide de
-            la taille reelle des cadres photo — donc de la resolution
-            necessaire — et du prix. Le choisir au depart puis l'oublier
-            reviendrait a composer sans savoir ce qu'on fabrique
-            (decision produit 2026-09-15). Les dimensions viennent de la meme
-            table que le rendu. */}
-        <span className="atelier-header-note">
-          {formatCourant
-            ? `${formatCourant.nom} · ${formatCourant.taille}${totalPages ? ` · ${totalPages} pages` : ''}`
-            : 'Atelier de creation personnalisee'}
-          {/* Prix discret (§6 : "STANDARD · 34 pages · 44,30 €" ou
-              equivalent — jamais un panneau, juste ce texte). */}
-          {Number.isFinite(priceInfo?.bookPriceCents) && ` · ${formatEuros(priceInfo.bookPriceCents)}`}
-          {/* Indication breve au moment d'un changement (§7/§8/§11) — puis
-              disparait toute seule (showPriceDelta/priceDeltaTimeoutRef). */}
-          {priceDelta && (
-            <span className="atelier-header-price-delta">
-              {priceDelta.pages ? `${priceDelta.pages > 0 ? '+' : ''}${priceDelta.pages} pages · ` : ''}
-              {formatEurosDelta(priceDelta.priceCents)}
-            </span>
-          )}
-          {/* Verrouillage apres paiement (retour utilisateur, 2026-09-28) :
-              un livre paye n'est modifiable que parce que le serveur tourne
-              avec ALLOW_BOOK_EDITS_AFTER_PAYMENT=1 (mode test) — le dire
-              explicitement, plutot que de laisser croire que ce serait
-              possible en production. */}
-          {book.locked_at && (
-            <span className="atelier-header-lock-note" title="Ce livre a deja une commande payee">
-              {' '}· Mode test : modifiable malgré le paiement — en production, ce ne serait pas possible
-            </span>
-          )}
-        </span>
+        <div className="atelier-header-top">
+          {/* Plus de lien vers /book/:bookId (l'onglet "Edition" n'existe
+              plus, remplace par l'atelier lui-meme — voir BookPageLuxe.js qui
+              redirige desormais cette route directement ici) : retour direct
+              au tableau de bord. */}
+          <Link to="/dashboard" className="atelier-back-link">← Retour</Link>
+          <h1 className="atelier-title">{book.title || 'Mon livre'}</h1>
+          {/* Le FORMAT reste visible pendant toute la composition : il decide de
+              la taille reelle des cadres photo — donc de la resolution
+              necessaire — et du prix. Le choisir au depart puis l'oublier
+              reviendrait a composer sans savoir ce qu'on fabrique
+              (decision produit 2026-09-15). Les dimensions viennent de la meme
+              table que le rendu. */}
+          <span className="atelier-header-note">
+            {formatCourant
+              ? `${formatCourant.nom} · ${formatCourant.taille}${totalPages ? ` · ${totalPages} pages` : ''}`
+              : 'Atelier de creation personnalisee'}
+            {/* Prix discret (§6 : "STANDARD · 34 pages · 44,30 €" ou
+                equivalent — jamais un panneau, juste ce texte). */}
+            {Number.isFinite(priceInfo?.bookPriceCents) && ` · ${formatEuros(priceInfo.bookPriceCents)}`}
+            {/* Indication breve au moment d'un changement (§7/§8/§11) — puis
+                disparait toute seule (showPriceDelta/priceDeltaTimeoutRef). */}
+            {priceDelta && (
+              <span className="atelier-header-price-delta">
+                {priceDelta.pages ? `${priceDelta.pages > 0 ? '+' : ''}${priceDelta.pages} pages · ` : ''}
+                {formatEurosDelta(priceDelta.priceCents)}
+              </span>
+            )}
+            {/* Verrouillage apres paiement (retour utilisateur, 2026-09-28) :
+                un livre paye n'est modifiable que parce que le serveur tourne
+                avec ALLOW_BOOK_EDITS_AFTER_PAYMENT=1 (mode test) — le dire
+                explicitement, plutot que de laisser croire que ce serait
+                possible en production. */}
+            {book.locked_at && (
+              <span className="atelier-header-lock-note" title="Ce livre a deja une commande payee">
+                {' '}· Mode test : modifiable malgré le paiement — en production, ce ne serait pas possible
+              </span>
+            )}
+          </span>
+        </div>
 
-        {/* Barre Photos/Mise en page/Pages REMONTEE dans l'en-tete (retour
-            utilisateur, 2026-09-29 : "j'ai du chercher pour les retrouver",
-            valable aussi bien pour un livre solo que collectif) — vivait
-            auparavant sur sa propre ligne, juste en dessous, moins visible.
-            .atelier-header a deja flex-wrap:wrap : passe naturellement a la
-            ligne sur petit ecran plutot que de deborder. Meme garde que
-            avant : sans pages, il n'y a rien a composer, donc rien a ouvrir
-            depuis cette barre. */}
-        {book.page_count ? (
-          <AtelierToolsBar
-            activeDrawer={activeDrawer}
-            onToggle={toggleDrawer}
-            photosCount={photos.length}
-            totalPages={totalPages}
-          />
-        ) : null}
+        {/* Deuxieme ligne : outils Photos/Mise en page/Pages ET actions
+            secondaires SUR LA MEME LIGNE (retour utilisateur, 2026-09-29 :
+            "monter inviter/composer automatiquement/? au meme niveau que
+            photos/mise en page/pages... vu qu'il y a de l'espace"). Vivaient
+            avant sur deux lignes distinctes (barre centree, puis actions en
+            dessous) — regroupees ici pour reprendre la hauteur gagnee.
+            "Terminer mon livre" (auparavant sous le livre, voir §7 de la
+            refonte du 2026-09-26) rejoint ce groupe pour la meme raison. */}
+        <div className="atelier-header-row2">
+          {book.page_count ? (
+            <AtelierToolsBar
+              activeDrawer={activeDrawer}
+              onToggle={toggleDrawer}
+              photosCount={photos.length}
+              totalPages={totalPages}
+            />
+          ) : null}
 
-        <span className="atelier-header-secondary">
-          {/* "Inviter" (retour utilisateur, 2026-09-29 : simplification de
-              l'en-tete — un seul libelle constant, plus de "Gerer le
-              collectif" une fois active). Ouvre l'activation si le mode
-              collectif n'est pas encore active, sinon la page de suivi
-              (lien, invitations, contributions) — voir handleInvite. */}
-          {book?.collection_mode !== 'solo' && (
+          <span className="atelier-header-secondary">
+            {/* "Inviter" (retour utilisateur, 2026-09-29 : simplification de
+                l'en-tete — un seul libelle constant, plus de "Gerer le
+                collectif" une fois active). Ouvre l'activation si le mode
+                collectif n'est pas encore active, sinon la page de suivi
+                (lien, invitations, contributions) — voir handleInvite. */}
+            {book?.collection_mode !== 'solo' && (
+              <button
+                type="button"
+                className="atelier-header-link"
+                onClick={handleInvite}
+                title={book?.collective_activated_at
+                  ? 'Voir le lien, inviter et suivre les contributions'
+                  : 'Inviter vos proches a deposer leurs photos et leurs mots'}
+              >
+                Inviter
+              </button>
+            )}
             <button
               type="button"
               className="atelier-header-link"
-              onClick={handleInvite}
-              title={book?.collective_activated_at
-                ? 'Voir le lien, inviter et suivre les contributions'
-                : 'Inviter vos proches a deposer leurs photos et leurs mots'}
+              onClick={handleGenerateButtonClick}
+              title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
             >
-              Inviter
+              ✦ Composer automatiquement
             </button>
-          )}
-          <button
-            type="button"
-            className="atelier-header-link"
-            onClick={handleGenerateButtonClick}
-            title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
-          >
-            ✦ Composer automatiquement
-          </button>
-          <button
-            type="button"
-            className="atelier-help-btn"
-            onClick={() => setShowOnboarding(true)}
-            title="Revoir les explications"
-            aria-label="Revoir les explications"
-          >
-            ?
-          </button>
-        </span>
+            <button
+              type="button"
+              className="atelier-help-btn"
+              onClick={() => setShowOnboarding(true)}
+              title="Revoir les explications"
+              aria-label="Revoir les explications"
+            >
+              ?
+            </button>
+            {book.page_count ? (
+              <button
+                type="button"
+                className="btn btn-primary atelier-header-finish-btn"
+                onClick={() => setIsFinishModalOpen(true)}
+              >
+                Terminer mon livre →
+              </button>
+            ) : null}
+          </span>
+        </div>
       </header>
 
       <AtelierConfirmSwitchDialog
@@ -2449,14 +2462,6 @@ export default function BookAtelierLuxe() {
             movingPage={movingPage}
           />
         </AtelierDrawer>
-      ) : null}
-
-      {book.page_count ? (
-        <div className="atelier-finish-bar">
-          <button type="button" className="btn btn-primary atelier-finish-btn" onClick={() => setIsFinishModalOpen(true)}>
-            Terminer mon livre →
-          </button>
-        </div>
       ) : null}
 
       <AtelierDuplicatePhotosModal
