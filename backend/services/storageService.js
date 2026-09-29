@@ -277,4 +277,16 @@ const getSignedUrl = async (bucket, fileName, expiresIn = 3600) => {
   }
 };
 
-module.exports = { uploadFile, deleteFile, deleteByPublicUrl, getSignedUrl };
+module.exports = {
+  uploadFile,
+  deleteFile,
+  deleteByPublicUrl,
+  getSignedUrl,
+  // Exportes pour scripts/plafonner-photos-existantes.js (retour utilisateur,
+  // 2026-09-29) : reutilise EXACTEMENT la meme logique/les memes constantes
+  // que les nouveaux uploads, plutot que de la dupliquer et risquer un
+  // desalignement futur entre les deux.
+  capOriginalResolution,
+  ORIGINAL_MAX_PX,
+  ORIGINAL_QUALITY
+};
