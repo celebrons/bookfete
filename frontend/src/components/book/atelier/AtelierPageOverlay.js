@@ -65,6 +65,20 @@ function EyeIcon() {
   );
 }
 
+// Meme icone que CoverPhotoOverlay (AtelierBookView.js) — un seul et meme
+// geste "changer la photo" dans tout l'atelier, jamais deux pictogrammes
+// differents pour la meme action selon qu'on est sur une page interieure ou
+// la couverture.
+function ChangeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="14" height="14" rx="2" />
+      <path d="M8 12l2.5 2.5L15 10" />
+      <path d="M21 8v6a2 2 0 0 1-2 2h-2" />
+    </svg>
+  );
+}
+
 function AtelierPageOverlay({
   slug, slotTypes, slotItems, onAssignSlot, onRemoveSlot, onAdjustSlot,
   selectedSidebarItem, photoAdjustments, printFormat,
@@ -324,6 +338,32 @@ function AtelierPageOverlay({
                       aria-label={photoCaptions?.[item.id] ? 'Modifier la légende' : 'Ajouter une légende'}
                     >
                       <CaptionIcon />
+                    </button>
+                  )}
+                  {/* "Changer la photo" (retour utilisateur, 2026-09-29 :
+                      "quand je clique sur une image j'accede uniquement a
+                      'ajuster le cadrage'... il faut donner aussi la
+                      possibilite de modifier l'image") — meme geste et meme
+                      fenetre que pour un emplacement VIDE
+                      (AtelierPhotoPickerModal via onOpenPhotoPicker), juste
+                      declenche depuis un emplacement DEJA rempli. Reprend le
+                      pattern deja existant sur la couverture (voir
+                      CoverPhotoOverlay, AtelierBookView.js — meme retour
+                      utilisateur, 2026-09-26), qui n'avait jamais ete
+                      etendu aux pages interieures. */}
+                  {slotType === 'photo' && onOpenPhotoPicker && (
+                    <button
+                      type="button"
+                      className="atelier-overlay-slot-icon-btn atelier-overlay-slot-change-btn"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPendingRemoveIndex(null);
+                        onOpenPhotoPicker(index);
+                      }}
+                      title="Choisir une autre photo pour cet emplacement"
+                      aria-label="Changer la photo"
+                    >
+                      <ChangeIcon />
                     </button>
                   )}
                   {slotType === 'photo' && (

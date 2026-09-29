@@ -43,7 +43,16 @@ function AtelierPhotoAdjustModal({
   onSave,
   onReset,
   onClose,
-  onChooseSuggestedLayout
+  onChooseSuggestedLayout,
+  // Choisir une AUTRE photo pour cet emplacement (retour utilisateur,
+  // 2026-09-29 : "quand je clique sur une image j'accede uniquement a
+  // 'ajuster le cadrage'... il faut donner aussi la possibilite de modifier
+  // l'image"). Cette modale ne connait pas la bibliotheque de photos — elle
+  // delegue au parent (BookAtelierLuxe.js), qui sait deja assigner un
+  // nouvel item a un emplacement DEJA occupe (handleAssignSlot le gerait
+  // deja, voir son commentaire "REMPLACEMENT d'un emplacement deja
+  // occupe" — seul un declencheur au clic manquait).
+  onReplace
 }) {
   const [focalX, setFocalX] = useState(0.5);
   const [focalY, setFocalY] = useState(0.5);
@@ -203,6 +212,25 @@ function AtelierPhotoAdjustModal({
               transformOrigin: `${focalX * 100}% ${focalY * 100}%`
             }}
           />
+
+          {/* Changer de photo, DEPUIS cette meme fenetre (retour utilisateur
+              2026-09-29) — sur la photo elle-meme, comme un geste d'edition
+              directe plutot qu'un bouton perdu parmi les actions de bas de
+              modale. stopPropagation sur les deux evenements : le clic ne
+              doit ni fermer la modale (le backdrop est juste derriere) ni
+              demarrer un glisser-deposer (le cadre entier ecoute
+              pointerdown pour le pan). */}
+          {onReplace && (
+            <button
+              type="button"
+              className="atelier-adjust-replace-btn"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => { event.stopPropagation(); onReplace(); }}
+              title="Choisir une autre photo pour cet emplacement"
+            >
+              ⇄ Changer la photo
+            </button>
+          )}
         </div>
 
         <label className="atelier-adjust-zoom-row">

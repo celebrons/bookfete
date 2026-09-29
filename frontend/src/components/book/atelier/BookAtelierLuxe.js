@@ -1129,6 +1129,25 @@ export default function BookAtelierLuxe() {
     setAdjustTargetSlotIndex(slotIndex);
   };
 
+  // "Changer la photo" DEPUIS la modale d'ajustement (retour utilisateur,
+  // 2026-09-29) : au clic sur une photo deja placee, on ne pouvait
+  // qu'ajuster son cadrage, jamais la remplacer par une autre. Ferme la
+  // modale d'ajustement et rouvre le meme selecteur de bibliotheque que
+  // pour un emplacement VIDE (handleOpenPhotoPicker/handleOpenCoverPhotoPicker)
+  // — handleAssignSlot sait deja remplacer un emplacement deja occupe
+  // (avec undo), il ne manquait que ce declencheur.
+  const handleRequestReplacePhoto = () => {
+    const face = adjustCoverFace;
+    const slotIndex = adjustTargetSlotIndex;
+    setAdjustTargetSlotIndex(null);
+    setAdjustCoverFace(null);
+    if (face) {
+      handleOpenCoverPhotoPicker(face);
+    } else if (slotIndex != null) {
+      handleOpenPhotoPicker(slotIndex);
+    }
+  };
+
   // Sauvegarde d'un texte modifie EN PLACE sur la page (cahier des charges
   // typographique §1, voir AtelierTextEditor.js).
   //
@@ -2267,6 +2286,7 @@ export default function BookAtelierLuxe() {
         onReset={adjustCoverFace ? handleResetCoverAdjustment : handleResetPhotoAdjustment}
         onClose={() => { setAdjustTargetSlotIndex(null); setAdjustCoverFace(null); }}
         onChooseSuggestedLayout={handleChooseSuggestedLayout}
+        onReplace={handleRequestReplacePhoto}
       />
 
       <AtelierPhotoPickerModal
