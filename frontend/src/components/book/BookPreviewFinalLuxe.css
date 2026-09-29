@@ -249,31 +249,32 @@
 .preview-final-nav-arrow:hover:not(:disabled) { background: rgba(184, 146, 74, 0.14); color: var(--gold-deep, var(--gold)); }
 .preview-final-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
 
-/* Sauts directs aux extremites (2026-09-15). Volontairement plus DISCRETS
-   que precedent/suivant : ce sont des raccourcis, pas le geste principal de
-   lecture. Sur ecran etroit seul le pictogramme reste — le libelle est la
-   premiere chose a sacrifier, la fleche suffit a comprendre. */
+/* Sauts directs aux extremites (2026-09-15, icone seule depuis le
+   2026-09-29 — retour utilisateur : "enlever 'couverture' et '4e
+   couverture'... mettre les fleches comme en pj [le plein ecran]... au
+   survol on affiche couverture ou 4e"). Le libelle vit desormais UNIQUEMENT
+   dans l'infobulle (`title`, deja pose par l'appelant) — jamais affiche en
+   permanence. Volontairement plus DISCRET que precedent/suivant : ce sont
+   des raccourcis, pas le geste principal de lecture. Memes valeurs que
+   .preview-final-realsize-jump (variante sombre du plein ecran, plus bas) —
+   seule la couleur change pour rester lisible sur fond clair. */
 .preview-final-nav-jump {
-  font-size: 12px;
-  padding: 6px 12px;
-  opacity: 0.85;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-light, #7a7266);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition-fast);
 }
-
-.preview-final-nav-jump:hover:not(:disabled) { opacity: 1; }
-
-@media (max-width: 640px) {
-  .preview-final-nav-jump {
-    font-size: 0;
-    padding: 6px 10px;
-  }
-  /* Le pictogramme est un caractere du libelle : on le fait reapparaitre
-     seul, via un contenu genere, plutot que de dupliquer le balisage. */
-  .preview-final-nav-jump::before {
-    font-size: 15px;
-    content: '⇤';
-  }
-  .preview-final-nav-jump:last-child::before { content: '⇥'; }
-}
+.preview-final-nav-jump:hover:not(:disabled) { color: var(--gold-deep, var(--gold)); background: rgba(184, 146, 74, 0.14); }
+.preview-final-nav-jump:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .preview-final-nav-label {
   min-width: 140px;

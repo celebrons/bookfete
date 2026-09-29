@@ -578,12 +578,13 @@ export default function BookPreviewFinalLuxe() {
           <div className="preview-final-nav">
             <button
               type="button"
-              className="btn btn-outline preview-final-nav-jump"
+              className="preview-final-nav-jump"
               onClick={goToCover}
               disabled={!canGoPrevious}
               title="Aller à la couverture"
+              aria-label="Aller à la couverture"
             >
-              ⇤ Couverture
+              ⇤
             </button>
             <button type="button" className="preview-final-nav-arrow" onClick={goPrevious} disabled={!canGoPrevious} aria-label="Page précédente">
               ‹
@@ -594,12 +595,13 @@ export default function BookPreviewFinalLuxe() {
             </button>
             <button
               type="button"
-              className="btn btn-outline preview-final-nav-jump"
+              className="preview-final-nav-jump"
               onClick={goToBackCover}
               disabled={!canGoNext}
               title="Aller à la 4e de couverture"
+              aria-label="Aller à la 4e de couverture"
             >
-              4e ⇥
+              ⇥
             </button>
           </div>
         </div>
