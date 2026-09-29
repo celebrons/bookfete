@@ -2134,72 +2134,75 @@ export default function BookAtelierLuxe() {
               </span>
             )}
           </span>
+
+          {/* "Terminer mon livre" SUR LA LIGNE DU TITRE, tout a droite
+              (retour utilisateur, 2026-09-29 : "je le voyais plus haut, en
+              face de [titre]... tout a droite" — l'essai precedent le
+              placait plus bas, aux cotes d'Inviter/Composer automatiquement,
+              ce n'etait pas ce qui etait attendu). margin-left:auto le pousse
+              en bout de cette ligne, quel que soit ce que le titre/format
+              occupent deja. */}
+          {book.page_count ? (
+            <button
+              type="button"
+              className="btn btn-primary atelier-header-finish-btn"
+              onClick={() => setIsFinishModalOpen(true)}
+            >
+              Terminer mon livre →
+            </button>
+          ) : null}
         </div>
 
-        {/* Deuxieme ligne : outils Photos/Mise en page/Pages ET actions
-            secondaires SUR LA MEME LIGNE (retour utilisateur, 2026-09-29 :
-            "monter inviter/composer automatiquement/? au meme niveau que
-            photos/mise en page/pages... vu qu'il y a de l'espace"). Vivaient
-            avant sur deux lignes distinctes (barre centree, puis actions en
-            dessous) — regroupees ici pour reprendre la hauteur gagnee.
-            "Terminer mon livre" (auparavant sous le livre, voir §7 de la
-            refonte du 2026-09-26) rejoint ce groupe pour la meme raison. */}
-        <div className="atelier-header-row2">
-          {book.page_count ? (
-            <AtelierToolsBar
-              activeDrawer={activeDrawer}
-              onToggle={toggleDrawer}
-              photosCount={photos.length}
-              totalPages={totalPages}
-            />
-          ) : null}
+        {/* Barre Photos/Mise en page/Pages : TOUJOURS CENTREE sur sa propre
+            ligne (retour utilisateur, 2026-09-29 : "les 3 boutons... tjrs
+            centres" — l'essai precedent l'avait ramenee a gauche pour
+            partager sa ligne avec Inviter/Composer automatiquement/?, ce
+            n'etait pas voulu). */}
+        {book.page_count ? (
+          <AtelierToolsBar
+            activeDrawer={activeDrawer}
+            onToggle={toggleDrawer}
+            photosCount={photos.length}
+            totalPages={totalPages}
+          />
+        ) : null}
 
-          <span className="atelier-header-secondary">
-            {/* "Inviter" (retour utilisateur, 2026-09-29 : simplification de
-                l'en-tete — un seul libelle constant, plus de "Gerer le
-                collectif" une fois active). Ouvre l'activation si le mode
-                collectif n'est pas encore active, sinon la page de suivi
-                (lien, invitations, contributions) — voir handleInvite. */}
-            {book?.collection_mode !== 'solo' && (
-              <button
-                type="button"
-                className="atelier-header-link"
-                onClick={handleInvite}
-                title={book?.collective_activated_at
-                  ? 'Voir le lien, inviter et suivre les contributions'
-                  : 'Inviter vos proches a deposer leurs photos et leurs mots'}
-              >
-                Inviter
-              </button>
-            )}
+        <span className="atelier-header-secondary">
+          {/* "Inviter" (retour utilisateur, 2026-09-29 : simplification de
+              l'en-tete — un seul libelle constant, plus de "Gerer le
+              collectif" une fois active). Ouvre l'activation si le mode
+              collectif n'est pas encore active, sinon la page de suivi
+              (lien, invitations, contributions) — voir handleInvite. */}
+          {book?.collection_mode !== 'solo' && (
             <button
               type="button"
               className="atelier-header-link"
-              onClick={handleGenerateButtonClick}
-              title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
+              onClick={handleInvite}
+              title={book?.collective_activated_at
+                ? 'Voir le lien, inviter et suivre les contributions'
+                : 'Inviter vos proches a deposer leurs photos et leurs mots'}
             >
-              ✦ Composer automatiquement
+              Inviter
             </button>
-            <button
-              type="button"
-              className="atelier-help-btn"
-              onClick={() => setShowOnboarding(true)}
-              title="Revoir les explications"
-              aria-label="Revoir les explications"
-            >
-              ?
-            </button>
-            {book.page_count ? (
-              <button
-                type="button"
-                className="btn btn-primary atelier-header-finish-btn"
-                onClick={() => setIsFinishModalOpen(true)}
-              >
-                Terminer mon livre →
-              </button>
-            ) : null}
-          </span>
-        </div>
+          )}
+          <button
+            type="button"
+            className="atelier-header-link"
+            onClick={handleGenerateButtonClick}
+            title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
+          >
+            ✦ Composer automatiquement
+          </button>
+          <button
+            type="button"
+            className="atelier-help-btn"
+            onClick={() => setShowOnboarding(true)}
+            title="Revoir les explications"
+            aria-label="Revoir les explications"
+          >
+            ?
+          </button>
+        </span>
       </header>
 
       <AtelierConfirmSwitchDialog

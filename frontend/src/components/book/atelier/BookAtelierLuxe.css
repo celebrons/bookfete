@@ -19,15 +19,17 @@
   padding: var(--space-md);
 }
 
-/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29, fusionnee sur
-   deux lignes le meme jour). Remplace l'en-tete du site (masquee sur cette
-   route, voir Layout.js). Deux lignes empilees : .atelier-header-top (retour,
-   titre, format+pagination) puis .atelier-header-row2 (barre d'outils Photos/
-   Mise en page/Pages ET actions secondaires — Inviter, Composer
-   automatiquement, ?, Terminer mon livre — SUR LA MEME LIGNE, retour
-   utilisateur : "monter inviter/composer auto/? au meme niveau que
-   photos/mise en page/pages... vu qu'il y a de l'espace", "Terminer mon
-   livre" reprend au passage la place gagnee au lieu de rester tout en bas). */
+/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29, republiee en
+   trois lignes le meme jour apres un essai de fusion qui ne convenait pas :
+   "terminer mon livre je le voyais plus haut, en face de [titre]... tout a
+   droite" + "les 3 boutons photos/mise en page/pages tjrs centres"). Trois
+   lignes empilees : .atelier-header-top (retour, titre, format+pagination,
+   et "Terminer mon livre" pousse a droite par la meme occasion) ; la barre
+   d'outils Photos/Mise en page/Pages, seule sur sa ligne et centree ;
+   .atelier-header-secondary (Inviter, Composer automatiquement, ?), alignee
+   a droite sur sa propre ligne. flex-direction:column + align-items:stretch
+   (par defaut) donne a chaque enfant direct sa pleine largeur, donc sa
+   propre ligne, sans avoir besoin d'un hack flex-basis:100%. */
 .atelier-header {
   display: flex;
   flex-direction: column;
@@ -38,13 +40,6 @@
 .atelier-header-top {
   display: flex;
   align-items: baseline;
-  gap: var(--space-md);
-  flex-wrap: wrap;
-}
-
-.atelier-header-row2 {
-  display: flex;
-  align-items: center;
   gap: var(--space-md);
   flex-wrap: wrap;
 }
@@ -118,9 +113,9 @@
 .atelier-header-secondary {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--space-lg);
-  margin-left: auto;
 }
 
 /* Mode automatique : un lien texte, pas un bouton plein (retour utilisateur
@@ -156,13 +151,19 @@
 }
 .atelier-help-btn:hover { border-color: var(--gold); color: var(--gold); }
 
-/* "Terminer mon livre" DANS L'EN-TETE (retour utilisateur, 2026-09-29 :
-   deplacee depuis le bas de page — voir l'ancienne .atelier-finish-bar,
-   retiree — pour rejoindre Inviter/Composer automatiquement/? sur la meme
-   ligne que la barre d'outils). Gabarit compact : le bouton plein (.btn
-   .btn-primary) est pense pour une action isolee en bas de page, pas pour
-   voisiner des liens texte de 12px dans une ligne d'en-tete. */
+/* "Terminer mon livre" DANS L'EN-TETE, SUR LA LIGNE DU TITRE (retour
+   utilisateur, 2026-09-29 : deplacee depuis le bas de page — voir l'ancienne
+   .atelier-finish-bar, retiree — puis repositionnee ici precisement, "en
+   face du titre... tout a droite", apres un essai plus bas qui ne convenait
+   pas). margin-left:auto la pousse en bout de .atelier-header-top, quel que
+   soit l'espace deja pris par le titre/format. align-self:center corrige
+   l'alignement sur la ligne de base du texte voisin (baseline), peu naturel
+   pour un bouton plein. Gabarit compact : le bouton plein (.btn .btn-primary)
+   est pense pour une action isolee en bas de page, pas pour voisiner du texte
+   de 12-25px dans une ligne d'en-tete. */
 .atelier-header-finish-btn {
+  margin-left: auto;
+  align-self: center;
   padding: 8px 18px;
   font-size: 13px;
 }
@@ -173,15 +174,17 @@
 
 /* --- Barre d'outils contextuelle (AtelierToolsBar, refonte 2026-09-25,
    polie 2026-09-26 §5, remontee dans .atelier-header le 2026-09-29, mise en
-   evidence puis fusionnee avec les actions secondaires le meme jour) -------
-   Vit desormais dans .atelier-header-row2, a cote de .atelier-header-secondary
-   (margin-left:auto la pousse a droite) : plus besoin de forcer sa propre
-   ligne ni de la centrer, la ligne entiere fait deja office de sous-
-   navigation. Pastilles conservees (fond leger, bordure au repos, fond dore
-   actif) — plus lisibles que le soulignement d'origine. */
+   evidence puis, apres un essai de fusion avec les actions secondaires non
+   retenu le meme jour, republiee CENTREE sur sa propre ligne — retour
+   utilisateur : "les 3 boutons... tjrs centres"). Enfant direct de
+   .atelier-header (flex-direction:column) : occupe deja toute la largeur,
+   justify-content:center centre les pastilles en son sein. Pastilles
+   conservees (fond leger, bordure au repos, fond dore actif) — plus lisibles
+   que le soulignement d'origine. */
 .atelier-tools-bar {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -2733,13 +2736,6 @@
     min-height: 44px;
   }
   .atelier-book-nav-arrow { width: 44px; height: 44px; }
-
-  /* Sur telephone, la ligne d'outils et les actions secondaires sont deja
-     empilees par le flex-wrap : ancrer .atelier-header-secondary a droite
-     (utile en large, ou elle partage sa ligne avec la barre d'outils) n'a
-     plus de sens une fois seule sur sa propre ligne — juste alignee comme
-     le reste. */
-  .atelier-header-secondary { margin-left: 0; }
 
   /* Les deux pictogrammes d'action de la page, et l'oeil : plus grands et
      plus ecartes du bord, sinon ils se touchent du pouce. */
