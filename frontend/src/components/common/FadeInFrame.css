@@ -1,0 +1,14 @@
+/* Voir FadeInFrame.js. Opacite seule (pas de transform ici) : le conteneur
+   qui englobe cet iframe porte deja sa propre animation d'entree
+   (scale+opacity), superposer un second mouvement au meme instant ferait
+   deux transitions concurrentes plutot qu'une seule lisible. */
+.fade-in-frame {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+.fade-in-frame.is-loaded {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-frame { transition: none; opacity: 1; }
+}

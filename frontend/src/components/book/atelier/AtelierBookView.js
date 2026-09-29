@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PageZoomStage, ZoomControls } from '../../common/PageZoomStage';
+import FadeInFrame from '../../common/FadeInFrame';
 
 // Colonne centrale de l'atelier : le livre sous forme de vraies pages, en
 // double-page — feuilletage COUVERTURE -> pages interieures -> 4E DE
@@ -576,7 +577,7 @@ function AtelierBookView({
                   <div className="atelier-zoom-spread atelier-zoom-page-change" key={pageChangeKey}>
                     {leftPageNumber != null && (
                       leftHtml ? (
-                        <iframe title={`Page ${leftPageNumber}`} srcDoc={leftHtml} className="atelier-zoom-frame" />
+                        <FadeInFrame title={`Page ${leftPageNumber}`} srcDoc={leftHtml} className="atelier-zoom-frame" />
                       ) : (
                         <div className="atelier-page-placeholder" />
                       )
@@ -584,7 +585,7 @@ function AtelierBookView({
                     {isSpreadWithBothPages && <span className="atelier-zoom-spine" aria-hidden="true" />}
                     {rightPageNumber != null && (
                       rightHtml ? (
-                        <iframe title={`Page ${rightPageNumber}`} srcDoc={rightHtml} className="atelier-zoom-frame" />
+                        <FadeInFrame title={`Page ${rightPageNumber}`} srcDoc={rightHtml} className="atelier-zoom-frame" />
                       ) : (
                         <div className="atelier-page-placeholder" />
                       )
@@ -593,7 +594,7 @@ function AtelierBookView({
                 ) : (
                   <div className="atelier-zoom-single atelier-zoom-page-change" key={pageChangeKey}>
                     {singleHtml ? (
-                      <iframe
+                      <FadeInFrame
                         title={viewKind === 'cover' ? 'Couverture' : '4e de couverture'}
                         srcDoc={singleHtml}
                         className="atelier-zoom-frame"

@@ -12,6 +12,7 @@ import { listPrintFormats } from '../../services/ordersApi';
 import { applyLifecycleStatus } from '../../utils/bookLifecycle';
 import { formatEurosDelta } from '../../utils/formatPrice';
 import { PageZoomStage, ZoomControls } from '../common/PageZoomStage';
+import FadeInFrame from '../common/FadeInFrame';
 import PrintQualityRecapModal from '../common/PrintQualityRecapModal';
 import { spreadPair, spreadCount as compterVisAVis } from '../../utils/pageParity';
 import '../../styles/luxe-theme.css';
@@ -722,7 +723,7 @@ export default function BookPreviewFinalLuxe() {
                   <div className="preview-final-zoom-spread preview-final-zoom-page-change" key={fullscreenPageChangeKey}>
                     {leftPageIndex != null && (
                       leftHtml ? (
-                        <iframe title="Page gauche" srcDoc={leftHtml} className="preview-final-zoom-frame" />
+                        <FadeInFrame title="Page gauche" srcDoc={leftHtml} className="preview-final-zoom-frame" />
                       ) : (
                         <div className="atelier-page-placeholder" />
                       )
@@ -730,7 +731,7 @@ export default function BookPreviewFinalLuxe() {
                     {isFullscreenSpreadWithBothPages && <span className="preview-final-zoom-spine" aria-hidden="true" />}
                     {rightPageIndex != null && (
                       rightHtml ? (
-                        <iframe title="Page droite" srcDoc={rightHtml} className="preview-final-zoom-frame" />
+                        <FadeInFrame title="Page droite" srcDoc={rightHtml} className="preview-final-zoom-frame" />
                       ) : (
                         <div className="atelier-page-placeholder" />
                       )
@@ -739,7 +740,7 @@ export default function BookPreviewFinalLuxe() {
                 ) : (
                   <div className="preview-final-zoom-single preview-final-zoom-page-change" key={fullscreenPageChangeKey}>
                     {singleHtml ? (
-                      <iframe title="Aperçu plein écran" srcDoc={singleHtml} className="preview-final-zoom-frame" />
+                      <FadeInFrame title="Aperçu plein écran" srcDoc={singleHtml} className="preview-final-zoom-frame" />
                     ) : (
                       <div className="atelier-page-placeholder" />
                     )}
