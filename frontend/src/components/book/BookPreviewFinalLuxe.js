@@ -585,11 +585,11 @@ export default function BookPreviewFinalLuxe() {
             >
               ⇤ Couverture
             </button>
-            <button type="button" className="btn btn-outline" onClick={goPrevious} disabled={!canGoPrevious}>
+            <button type="button" className="preview-final-nav-arrow" onClick={goPrevious} disabled={!canGoPrevious} aria-label="Page précédente">
               ‹
             </button>
             <span className="preview-final-nav-label">{viewLabel}</span>
-            <button type="button" className="btn btn-outline" onClick={goNext} disabled={!canGoNext}>
+            <button type="button" className="preview-final-nav-arrow" onClick={goNext} disabled={!canGoNext} aria-label="Page suivante">
               ›
             </button>
             <button

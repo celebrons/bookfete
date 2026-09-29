@@ -220,6 +220,35 @@
   justify-content: center;
 }
 
+/* Fleches precedent/suivant EN HARMONIE avec celles du "Prévisualiser"
+   plein ecran (retour utilisateur, 2026-09-29 : "harmoniser les fleches...
+   mettre comme celles presentes dans le prévisualiser") — jusqu'ici de
+   simples .btn.btn-outline (gros rectangle borde, 14px/32px de padding),
+   bien plus imposantes que les fleches fines et rondes utilisees PARTOUT
+   ailleurs (atelier normal, atelier plein ecran, cette meme page en plein
+   ecran — voir .preview-final-realsize-nav-arrow plus bas et
+   .atelier-book-nav-arrow, BookAtelierLuxe.css, dont ceci reprend EXACTEMENT
+   les memes valeurs). Seuls ‹/› sont concernes : les raccourcis "Couverture"/
+   "4e" (.preview-final-nav-jump, juste apres) restent des boutons a texte,
+   un geste volontairement distinct du defilement page a page. */
+.preview-final-nav-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.preview-final-nav-arrow:hover:not(:disabled) { background: rgba(184, 146, 74, 0.14); color: var(--gold-deep, var(--gold)); }
+.preview-final-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
 /* Sauts directs aux extremites (2026-09-15). Volontairement plus DISCRETS
    que precedent/suivant : ce sont des raccourcis, pas le geste principal de
    lecture. Sur ecran etroit seul le pictogramme reste — le libelle est la
