@@ -173,6 +173,14 @@ export default function BookAtelierLuxe() {
   // la sauvegarde automatique.
   const [draftPageIndex, setDraftPageIndex] = useState(null);
   const [adjustTargetSlotIndex, setAdjustTargetSlotIndex] = useState(null);
+  // Itemid dont l'ecran recapitulatif ("Terminer mon livre") a demande
+  // l'ouverture directe de l'ajustement (retour utilisateur, 2026-09-29) —
+  // voir l'effet plus bas qui la resout des que le brouillon de la NOUVELLE
+  // page est charge (draftPageIndex === currentPageIndex). Ne peut pas
+  // ouvrir adjustTargetSlotIndex tout de suite : changer de page reinitialise
+  // le brouillon (et adjustTargetSlotIndex avec), voir l'effet d'init plus
+  // haut.
+  const [pendingAdjustItemId, setPendingAdjustItemId] = useState(null);
   // Emplacement PHOTO VIDE dont on vient d'ouvrir le choix (retour
   // utilisateur, 2026-09-25 : "accéder aux photos importées ou en importer
   // une nouvelle directement via ses fichiers"), et l'etat de l'import direct
@@ -1169,6 +1177,22 @@ export default function BookAtelierLuxe() {
     if (!draftSlotItemIds[slotIndex]) return;
     setAdjustTargetSlotIndex(slotIndex);
   };
+
+  // Resout une demande d'ouverture directe posee par l'ecran recapitulatif
+  // (retour utilisateur, 2026-09-29 : atteindre en un clic le message de
+  // forme/suggestion de mise en page deja present dans cette modale, plutot
+  // que de naviguer puis devoir recliquer sur la photo soi-meme). Attend que
+  // le brouillon de la page CIBLE soit charge : juste apres un changement de
+  // page, draftSlotItemIds appartient encore a l'ancienne (voir
+  // draftPageIndex/l'effet d'initialisation plus haut) — cherche trop tot,
+  // l'item n'y serait pas.
+  useEffect(() => {
+    if (!pendingAdjustItemId) return;
+    if (draftPageIndex !== currentPageIndex) return;
+    const slotIndex = draftSlotItemIds.indexOf(pendingAdjustItemId);
+    if (slotIndex !== -1) setAdjustTargetSlotIndex(slotIndex);
+    setPendingAdjustItemId(null);
+  }, [pendingAdjustItemId, draftPageIndex, currentPageIndex, draftSlotItemIds]);
 
   // "Changer la photo" DEPUIS la modale d'ajustement (retour utilisateur,
   // 2026-09-29) : au clic sur une photo deja placee, on ne pouvait
@@ -2570,7 +2594,15 @@ export default function BookAtelierLuxe() {
         stats={finishStats}
         onContinue={() => navigate(`/book/${bookId}/apercu`)}
         bookId={book?.id}
-        onViewPage={goToFilmstripTarget}
+        // Navigue ET pose la demande d'ouverture directe de l'ajustement
+        // (retour utilisateur, 2026-09-29) — voir l'effet de resolution
+        // pres de handleOpenAdjust. `pageIndex` seul (sans itemId, ex.
+        // depuis la pellicule de pages) garde l'ancien comportement : on
+        // navigue, rien ne s'ouvre tout seul.
+        onViewPage={(pageIndex, itemId) => {
+          goToFilmstripTarget(pageIndex);
+          if (itemId) setPendingAdjustItemId(itemId);
+        }}
         warnings={qualityWarnings}
         onRefreshQuality={refreshQualityWarnings}
       />

@@ -609,6 +609,16 @@
 }
 .atelier-finish-quality-link:hover { color: var(--ink); }
 
+/* Astuce generale au-dessus de la liste (retour utilisateur, 2026-09-29) :
+   texte discret, pas un second avertissement — elle desamorce plutot
+   qu'elle n'alarme ("souvent ce n'est pas la photo, juste le cadrage"). */
+.atelier-finish-quality-tip {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-light, #7a7266);
+  font-style: italic;
+}
+
 /* Liste des pages concernees, depliable sous l'avertissement (2026-09-14).
    Remplace l'ancien lien qui sautait a la PREMIERE page signalee : quand
    c'etait celle ou l'on se trouvait deja, cliquer ne produisait rien de

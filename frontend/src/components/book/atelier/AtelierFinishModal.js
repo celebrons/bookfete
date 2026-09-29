@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getPrintQualityCheck } from '../../../services/compositionApi';
+import { RATIO_GAP_THRESHOLD } from './photoQuality';
 
 // Verification automatique au clic sur "Terminer mon livre" — calculee a
 // partir des donnees deja chargees dans l'atelier (voir BookAtelierLuxe.js:
@@ -62,16 +63,32 @@ function AtelierFinishModal({
 
   // Regroupees PAR PAGE : c'est la page qu'on va rouvrir, pas la photo. Une
   // page portant 3 photos trop justes ne doit apparaitre qu'une fois.
+  // `itemId` retient la PREMIERE photo signalee de la page (celle que le
+  // clic ouvrira directement, voir plus bas) ; `ratioGap` remonte a vrai des
+  // qu'AU MOINS une des photos de la page a une forme tres eloignee de son
+  // cadre — c'est le cas le plus frequent (retour utilisateur, 2026-09-29 :
+  // 8 photos sur 10 sur un livre reel etaient dans ce cas, pas vraiment
+  // "mauvaises", juste tres rognees) et il a une vraie solution en un clic
+  // une fois sur la page (photo entiere / autre mise en page), d'ou le mot
+  // different ci-dessous plutot que "resolution insuffisante" partout.
   const pagesConcernees = [];
   photoWarnings.forEach((entry) => {
     if (entry.pageIndex == null) return;
+    const aUnEcartDeForme = typeof entry.ecartRatio === 'number' && entry.ecartRatio > RATIO_GAP_THRESHOLD;
     const existante = pagesConcernees.find((p2) => p2.pageIndex === entry.pageIndex);
     if (existante) {
       existante.count += 1;
       if (entry.statut === 'insuffisant') existante.pire = 'insuffisant';
+      if (aUnEcartDeForme) existante.ratioGap = true;
       return;
     }
-    pagesConcernees.push({ pageIndex: entry.pageIndex, count: 1, pire: entry.statut });
+    pagesConcernees.push({
+      pageIndex: entry.pageIndex,
+      itemId: entry.itemId,
+      count: 1,
+      pire: entry.statut,
+      ratioGap: aUnEcartDeForme
+    });
   });
   pagesConcernees.sort((x, y) => x.pageIndex - y.pageIndex);
 
@@ -126,24 +143,45 @@ function AtelierFinishModal({
                     marquees d'un ⚠️ dans la bande de vignettes, pour les
                     retrouver sans rouvrir cet ecran. */}
                 {listeDepliee && (
-                  <ul className="atelier-finish-quality-pages">
-                    {pagesConcernees.map((entree) => (
-                      <li key={entree.pageIndex}>
-                        <button
-                          type="button"
-                          className={`atelier-finish-quality-page ${entree.pire === 'insuffisant' ? 'is-severe' : ''}`}
-                          onClick={() => { onClose(); if (onViewPage) onViewPage(entree.pageIndex); }}
-                          disabled={!onViewPage}
-                        >
-                          <span className="atelier-finish-quality-page-num">Page {entree.pageIndex + 1}</span>
-                          <span className="atelier-finish-quality-page-count">
-                            {entree.count} photo{entree.count > 1 ? 's' : ''}
-                            {entree.pire === 'insuffisant' ? ' · résolution insuffisante' : ' · un peu juste'}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    {/* Astuce generale (retour utilisateur, 2026-09-29) :
+                        la plupart de ces avertissements viennent d'un
+                        cadrage tres serre, pas d'une photo reellement
+                        mauvaise — le dire une fois ici evite de faire
+                        chercher la solution a chacun. */}
+                    <p className="atelier-finish-quality-tip">
+                      Souvent, il suffit de passer la photo en « Photo entière » ou de choisir une mise en page mieux adaptée à sa forme — cliquez sur une page pour essayer directement.
+                    </p>
+                    <ul className="atelier-finish-quality-pages">
+                      {pagesConcernees.map((entree) => (
+                        <li key={entree.pageIndex}>
+                          <button
+                            type="button"
+                            className={`atelier-finish-quality-page ${entree.pire === 'insuffisant' ? 'is-severe' : ''}`}
+                            // Ouvre DIRECTEMENT l'ajustement de la photo
+                            // signalee (retour utilisateur, 2026-09-29) —
+                            // avant, "Voir la page concernee" se contentait
+                            // de naviguer, il fallait ensuite recliquer sur
+                            // la photo soi-meme pour atteindre le message de
+                            // forme/suggestion de mise en page (deja
+                            // existant, juste mal atteignable). Voir
+                            // BookAtelierLuxe.js (onViewPage) : navigue ET
+                            // ouvre l'ajustement en un seul geste.
+                            onClick={() => { onClose(); if (onViewPage) onViewPage(entree.pageIndex, entree.itemId); }}
+                            disabled={!onViewPage}
+                          >
+                            <span className="atelier-finish-quality-page-num">Page {entree.pageIndex + 1}</span>
+                            <span className="atelier-finish-quality-page-count">
+                              {entree.count} photo{entree.count > 1 ? 's' : ''}
+                              {entree.pire === 'insuffisant'
+                                ? (entree.ratioGap ? ' · cadrage très serré' : ' · résolution insuffisante')
+                                : ' · un peu juste'}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 )}
               </li>
             )
