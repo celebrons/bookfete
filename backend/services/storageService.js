@@ -50,13 +50,57 @@ async function normalizeOrientation(buffer) {
 
 // Miniature (grille "Mes souvenirs") et version intermediaire (affichage
 // dans l'atelier une fois une photo placee) : deux tailles, jamais
-// l'original. L'original uploade par uploadFile() n'est JAMAIS retouche —
-// il reste la seule source pour le rendu PDF final (pageRenderer.js/
-// pdfService.js continuent de lire book_content_items.url, inchange).
+// l'original tel quel — voir ORIGINAL_MAX_PX ci-dessous pour ce que
+// "l'original" designe desormais.
 const THUMBNAIL_MAX_PX = 480;
 const PREVIEW_MAX_PX = 1600;
 const THUMBNAIL_QUALITY = 78;
 const PREVIEW_QUALITY = 85;
+
+// PLAFOND DE L'ORIGINAL STOCKE (retour utilisateur, 2026-09-29 : quota de
+// stockage Supabase depasse, 83% du bucket photos venant des originaux).
+//
+// scripts/audit-egress.js (2026-09-20) etablit que RIEN dans ce pipeline ne
+// demande jamais plus de 2600px de large a une photo : l'impression lit un
+// transform 2600px, la lecture PDF un transform 2000px — le fichier
+// "original" est aujourd'hui la SEULE consommation reelle des pixels
+// au-dela de ca. Un appareil photo/telephone moderne peut deposer des
+// fichiers de 6000-8000px (souvent 15-25 Mo) dont les 3/4 des pixels ne
+// servent jamais a rien.
+//
+// 3000px laisse une marge confortable au-dessus du plus gros besoin reel
+// (2600px) : aucun impact sur la qualite d'impression, seulement sur les
+// photos deja plus grandes que necessaire. NE s'applique QU'AUX NOUVEAUX
+// uploads (retour utilisateur) — les photos deja en ligne ne sont pas
+// retouchees ici.
+//
+// Qualite elevee (92, contre 78/85 pour thumb/preview) : ce fichier reste
+// la source du rendu final, pas un simple apercu ecran.
+const ORIGINAL_MAX_PX = 3000;
+const ORIGINAL_QUALITY = 92;
+
+// Ne redimensionne/reencode QUE si la photo depasse reellement le plafond —
+// une photo deja plus petite (cas frequent : la plupart des photos
+// existantes, et beaucoup de telephones deja regles sur une resolution
+// moderee) traverse cette fonction OCTET POUR OCTET, inchangee. Jamais
+// bloquant : une sonde ou un redimensionnement impossible retombe sur le
+// buffer d'origine plutot que de faire echouer l'upload.
+async function capOriginalResolution(buffer, maxPx) {
+  try {
+    const probe = sizeOf(buffer);
+    if (!probe?.width || !probe?.height) return { buffer, reencoded: false };
+    if (probe.width <= maxPx && probe.height <= maxPx) return { buffer, reencoded: false };
+
+    const redimensionne = await sharp(buffer)
+      .resize({ width: maxPx, height: maxPx, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: ORIGINAL_QUALITY })
+      .toBuffer();
+    if (!redimensionne) return { buffer, reencoded: false };
+    return { buffer: redimensionne, reencoded: true };
+  } catch (_error) {
+    return { buffer, reencoded: false };
+  }
+}
 
 // Redimensionne (jamais d'agrandissement d'une photo deja plus petite que
 // la cible, voir withoutEnlargement) une image en memoire vers une nouvelle
@@ -144,20 +188,28 @@ const deleteByPublicUrl = async (publicUrl) => {
 
 const uploadFile = async (bucket, file, folder = '') => {
   try {
-    const fileExt = file.originalname.split('.').pop();
     const baseName = uuidv4();
-    const fileName = `${folder}/${baseName}.${fileExt}`;
 
-    // Buffer orientation-corrige (voir normalizeOrientation ci-dessus) :
-    // c'est CELUI-LA qui devient "l'original" stocke, et c'est CELUI-LA qui
-    // alimente la sonde de dimensions + les deux derivees juste en dessous
-    // — un seul point de correction, tout le reste du pipeline en herite.
-    const originalBuffer = await normalizeOrientation(file.buffer);
+    // Buffer orientation-corrige (voir normalizeOrientation ci-dessus), puis
+    // plafonne a ORIGINAL_MAX_PX si necessaire (voir capOriginalResolution) —
+    // c'est CE buffer final qui devient "l'original" stocke, et c'est lui qui
+    // alimente la sonde de dimensions + les deux derivees juste en dessous —
+    // un seul point de correction, tout le reste du pipeline en herite.
+    const orienteBuffer = await normalizeOrientation(file.buffer);
+    const { buffer: originalBuffer, reencoded } = await capOriginalResolution(orienteBuffer, ORIGINAL_MAX_PX);
+
+    // Reencode en JPEG uniquement si la photo depassait le plafond (voir
+    // capOriginalResolution) : l'extension/le type MIME doivent alors suivre
+    // les VRAIS octets stockes, jamais ceux du fichier d'origine — un .png
+    // dont le contenu est en realite du JPEG casserait sa lecture ailleurs.
+    const fileExt = reencoded ? 'jpg' : file.originalname.split('.').pop();
+    const contentType = reencoded ? 'image/jpeg' : file.mimetype;
+    const fileName = `${folder}/${baseName}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from(bucket)
       .upload(fileName, originalBuffer, {
-        contentType: file.mimetype,
+        contentType,
         cacheControl: CACHE_UN_AN
       });
 

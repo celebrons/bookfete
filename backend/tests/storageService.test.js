@@ -1,8 +1,11 @@
 // Miniature (grille "Mes souvenirs" de l'atelier) et version intermediaire
-// (affichage une fois placee) : l'original ne doit JAMAIS etre modifie (seule
-// source du rendu PDF final) ; les deux variantes generees doivent etre
-// reellement plus legeres, jamais plus grandes que l'original (pas
-// d'agrandissement d'une photo deja petite).
+// (affichage une fois placee) : l'original ne doit JAMAIS etre modifie EN
+// DESSOUS DE ORIGINAL_MAX_PX (seule source du rendu PDF final jusqu'a cette
+// taille) ; les deux variantes generees doivent etre reellement plus
+// legeres, jamais plus grandes que l'original (pas d'agrandissement d'une
+// photo deja petite). Au-dela de ORIGINAL_MAX_PX (retour utilisateur,
+// 2026-09-29 : quota de stockage), l'original stocke est desormais
+// plafonne — voir le describe dedie plus bas.
 
 const sharp = require('sharp');
 const sizeOf = require('image-size');
@@ -130,5 +133,67 @@ describe("storageService.uploadFile — correction d'orientation EXIF", () => {
 
     const originalCall = uploadCalls.find((call) => call.fileName === result.fileName);
     expect(originalCall.buffer).toBe(original);
+  });
+});
+
+// Plafond du stockage de l'original (retour utilisateur, 2026-09-29 : quota
+// Supabase depasse, 83% du bucket photos venant d'originaux dont les pixels
+// au-dela de 2600px (le plus gros besoin reel, voir scripts/audit-egress.js)
+// ne servent jamais a rien).
+describe("storageService.uploadFile — plafond de l'original (ORIGINAL_MAX_PX)", () => {
+  it('une photo plus grande que le plafond est redimensionnee ET reencodee en JPEG, meme si elle etait un PNG', async () => {
+    const grande = await sharp({ create: { width: 6000, height: 4000, channels: 3, background: { r: 10, g: 200, b: 30 } } })
+      .png()
+      .toBuffer();
+    const file = { originalname: 'grande.png', mimetype: 'image/png', buffer: grande };
+
+    const result = await uploadFile('contribution-photos', file, 'book-1');
+
+    expect(result.success).toBe(true);
+    // Extension ET type MIME suivent les VRAIS octets stockes (JPEG), pas le
+    // fichier d'origine : un .png dont le contenu est en realite du JPEG
+    // casserait sa lecture ailleurs.
+    expect(result.fileName.endsWith('.jpg')).toBe(true);
+    const originalCall = uploadCalls.find((call) => call.fileName === result.fileName);
+    expect(originalCall.contentType).toBe('image/jpeg');
+    expect(originalCall.buffer).not.toBe(grande); // reencode : reference differente
+    expect(originalCall.buffer.length).toBeLessThan(grande.length);
+
+    const dims = sizeOf(originalCall.buffer);
+    expect(Math.max(dims.width, dims.height)).toBeLessThanOrEqual(3000);
+    // Aspect ratio (3:2) preserve, pas de deformation.
+    expect(Math.round((dims.width / dims.height) * 100)).toBe(150);
+    expect(result.width).toBeLessThanOrEqual(3000); // les dimensions renvoyees refletent le fichier REELLEMENT stocke
+  });
+
+  it('une photo egale ou plus petite que le plafond traverse octet pour octet, inchangee (comportement historique preserve)', async () => {
+    const normale = await makeJpegBuffer(3000, 2000); // exactement au plafond
+    const file = { originalname: 'normale.jpg', mimetype: 'image/jpeg', buffer: normale };
+
+    const result = await uploadFile('contribution-photos', file, 'book-1');
+
+    expect(result.fileName.endsWith('.jpg')).toBe(true);
+    const originalCall = uploadCalls.find((call) => call.fileName === result.fileName);
+    expect(originalCall.buffer).toBe(normale);
+    expect(originalCall.contentType).toBe('image/jpeg');
+  });
+
+  it("les vignettes/preview restent generees a partir de l'original PLAFONNE quand un plafonnage a eu lieu (jamais depuis l'original brut)", async () => {
+    const grande = await sharp({ create: { width: 6000, height: 4000, channels: 3, background: { r: 80, g: 40, b: 120 } } })
+      .jpeg()
+      .toBuffer();
+    const file = { originalname: 'grande.jpg', mimetype: 'image/jpeg', buffer: grande };
+
+    const result = await uploadFile('contribution-photos', file, 'book-1');
+
+    // Toujours 3 uploads (original plafonne + thumbnail + preview), et la
+    // preview (1600px) reste bien plus petite que le plafond (3000px) : la
+    // chaine de derivation continue de fonctionner normalement en aval.
+    expect(uploadCalls).toHaveLength(3);
+    const previewCall = uploadCalls.find((call) => call.fileName.endsWith('_preview.jpg'));
+    const previewDims = sizeOf(previewCall.buffer);
+    expect(Math.max(previewDims.width, previewDims.height)).toBeLessThanOrEqual(1600);
+    expect(result.thumbnailUrl).toBeDefined();
+    expect(result.previewUrl).toBeDefined();
   });
 });
