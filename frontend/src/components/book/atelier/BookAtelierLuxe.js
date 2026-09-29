@@ -37,7 +37,6 @@ import AtelierConfirmSwitchDialog from './AtelierConfirmSwitchDialog';
 import AtelierOnboarding from './AtelierOnboarding';
 import AtelierFinishModal from './AtelierFinishModal';
 import AtelierDuplicatePhotosModal from './AtelierDuplicatePhotosModal';
-import AtelierPartagerLien from './AtelierPartagerLien';
 import CollectiveActivateModal from '../../dashboard/CollectiveActivateModal';
 import AtelierPageFilmstrip from './AtelierPageFilmstrip';
 import AtelierPhotoAdjustModal from './AtelierPhotoAdjustModal';
@@ -2149,43 +2148,25 @@ export default function BookAtelierLuxe() {
             onToggle={toggleDrawer}
             photosCount={photos.length}
             totalPages={totalPages}
-            // Alerte REGROUPEE (§7 : "Pages · 32   2 pages a completer" plutot
-            // que des pastilles disseminees). finishStats est deja calcule
-            // pour la modale de fin — reutilise tel quel, aucune donnee de
-            // plus a suivre.
-            //
-            // N'apparait QUE s'il y a une vraie PROGRESSION PARTIELLE (au
-            // moins une page faite, au moins une a faire) — verifie a
-            // l'ecran : sur un livre tout juste cree, ou aucune page n'est
-            // encore composee, ca affichait "30 a completer" en orange des
-            // le premier regard. Exactement le bruit permanent que cette
-            // refonte visait a supprimer — un livre vierge n'a rien de
-            // "manquant", il n'a simplement pas encore commence. Meme
-            // principe deja retenu pour la bibliotheque de photos (l'ancien
-            // indice "regroupees en bas" ne s'affichait, lui aussi, qu'en
-            // presence d'un vrai melange).
-            pagesAlert={finishStats.incompletePages > 0 && finishStats.incompletePages < totalPages
-              ? `${finishStats.incompletePages} à compléter`
-              : null}
           />
         ) : null}
 
         <span className="atelier-header-secondary">
-          {/* Raccourci "Inviter"/"Gerer le collectif" (retour utilisateur,
-              2026-09-29 : meme plainte de visibilite que la barre d'outils
-              ci-dessus) — la carte "Album collectif" plus bas reste en place
-              (premiere decouverte/explication), ceci n'est qu'un acces
-              immediat pour qui sait deja ce qu'il cherche. */}
+          {/* "Inviter" (retour utilisateur, 2026-09-29 : simplification de
+              l'en-tete — un seul libelle constant, plus de "Gerer le
+              collectif" une fois active). Ouvre l'activation si le mode
+              collectif n'est pas encore active, sinon la page de suivi
+              (lien, invitations, contributions) — voir handleInvite. */}
           {book?.collection_mode !== 'solo' && (
             <button
               type="button"
               className="atelier-header-link"
               onClick={handleInvite}
               title={book?.collective_activated_at
-                ? 'Suivre et relancer vos invites'
+                ? 'Voir le lien, inviter et suivre les contributions'
                 : 'Inviter vos proches a deposer leurs photos et leurs mots'}
             >
-              👥 {book?.collective_activated_at ? 'Gérer le collectif' : 'Inviter'}
+              Inviter
             </button>
           )}
           <button
@@ -2328,16 +2309,6 @@ export default function BookAtelierLuxe() {
             </AtelierDrawer>
 
             <div className="atelier-center-column">
-              {/* Retour en arriere place AU-DESSUS DU LIVRE : sur telephone,
-                  un tiroir ouvert recouvre l'ecran, le lien doit rester
-                  joignable independamment. */}
-              {/* Inviter des proches SANS quitter la composition : on y
-                  pense en voyant les emplacements vides, pas en regardant
-                  une liste de livres (2026-09-22). */}
-              {book?.collection_mode !== 'solo' && (
-                <AtelierPartagerLien recipientName={book?.recipient_name} />
-              )}
-
               {snapshotBar}
               {undoBar}
 
@@ -2442,6 +2413,15 @@ export default function BookAtelierLuxe() {
           onClose={() => setActiveDrawer(null)}
           title="Toutes les pages"
           hint="Glissez une vignette pour déplacer la page — ou réglez sa position par le picto au coin de la page."
+          // Deplacee ici depuis la barre d'outils de l'en-tete (retour
+          // utilisateur, 2026-09-29 : "29 a completer ne doit pas etre
+          // affiche comme element permanent dans cette barre... plus
+          // pertinent dans le panneau Pages"). Meme garde qu'avant : une
+          // vraie progression PARTIELLE seulement (au moins une page faite,
+          // au moins une a faire) — un livre vierge n'a rien de "manquant".
+          subtitle={finishStats.incompletePages > 0 && finishStats.incompletePages < totalPages
+            ? `${finishStats.incompletePages} à compléter`
+            : null}
         >
           <AtelierPageFilmstrip
             pageStatuses={finishStats.pageStatuses}

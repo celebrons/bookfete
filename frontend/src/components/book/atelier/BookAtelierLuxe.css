@@ -210,18 +210,6 @@
 }
 .atelier-tool-btn.is-active .atelier-tool-count { color: #7a5c2a; }
 
-/* Resume regroupe des alertes (§7 : "Pages · 32   2 pages a completer"
-   plutot que des pastilles disseminees) — n'apparait que s'il y a
-   effectivement quelque chose a signaler (voir AtelierToolsBar.js). */
-.atelier-tool-alert {
-  font-size: 11px;
-  font-weight: 700;
-  color: #9a5b12;
-  background: rgba(201, 130, 34, 0.14);
-  border-radius: 999px;
-  padding: 1px 8px;
-}
-
 /* --- Tiroirs contextuels (AtelierDrawer, refonte 2026-09-25) -----------
    Coquille commune a Photos / Mise en page / Pages. EN POSITION FIXE, PAS
    DANS LA GRILLE : le livre ne retrecit jamais quand un tiroir s'ouvre —

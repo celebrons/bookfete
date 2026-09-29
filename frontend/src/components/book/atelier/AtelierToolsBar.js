@@ -6,7 +6,7 @@ import React from 'react';
 // par un simple trait fin, actifs par un soulignement dore plutot qu'un
 // remplissage. Meme principe qu'avant (cliquer sur ce dont on a besoin, le
 // reste reste range), presentation plus editoriale, moins "boutons d'appli".
-function AtelierToolsBar({ activeDrawer, onToggle, photosCount, totalPages, pagesAlert }) {
+function AtelierToolsBar({ activeDrawer, onToggle, photosCount, totalPages }) {
   return (
     <div className="atelier-tools-bar" role="toolbar" aria-label="Outils de composition">
       <button
@@ -36,10 +36,6 @@ function AtelierToolsBar({ activeDrawer, onToggle, photosCount, totalPages, page
       >
         Pages
         {totalPages > 0 && <span className="atelier-tool-count">{totalPages}</span>}
-        {/* Resume regroupe (§7 de la demande) : "Pages · 32   2 pages a
-            completer" plutot que des pastilles d'alerte disseminees. Absent
-            tant qu'il n'y a rien a signaler. */}
-        {pagesAlert && <span className="atelier-tool-alert">{pagesAlert}</span>}
       </button>
     </div>
   );
