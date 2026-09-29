@@ -81,6 +81,27 @@ const ONBOARDING_SEEN_KEY_PREFIX = 'atelierOnboardingSeen_';
 // tant qu'aucun emplacement n'est rempli (voir l'effet d'initialisation).
 const DEFAULT_EMPTY_PAGE_LAYOUT = 'FULL_PHOTO';
 
+// JSON.stringify NAIF, ORDONNE PAR CLE D'INSERTION : suffit tant que les
+// deux valeurs comparees viennent du meme processus JS, mais PAS quand l'une
+// des deux a fait un aller-retour par le JSONB de Postgres — Postgres NE
+// GARANTIT PAS l'ordre des cles d'un objet JSONB (contrairement aux
+// tableaux, dont l'ordre EST preserve). Verifie a la main (retour
+// utilisateur, 2026-09-29 : le compte de qualite photo restait bloque
+// apres un changement de cadrage) : { focalX, focalY, zoom, fitMode }
+// envoye revient { zoom, focalX, focalY, fitMode } une fois relu — deux
+// chaines differentes pour la MEME valeur. Utilisee pour comparer
+// photoAdjustments/photoCaptions/textRoles/textStyles (tous des objets
+// {itemId: ...} passes par la base) dans l'effet de sauvegarde
+// automatique : sans ce tri, `alreadySaved` restait perpetuellement faux
+// des qu'un de ces champs etait non vide, et l'effet se re-sauvegardait en
+// boucle a chaque rendu (pages change de reference a chaque sauvegarde,
+// qui est elle-meme une dependance de l'effet).
+function stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+}
+
 export default function BookAtelierLuxe() {
   const { bookId } = useParams();
   const [searchParams] = useSearchParams();
@@ -783,7 +804,10 @@ export default function BookAtelierLuxe() {
           setPages((previous) => previous.filter((page) => page.page_index !== currentPageIndex));
           setSaveStatus('idle');
           if (texteSorti) resyncItems();
-          return refreshPagePreview(currentPageIndex);
+          // Meme raison que l'autre branche plus bas : une page videe peut
+          // faire disparaitre un avertissement (sa derniere photo posait
+          // probleme), le compte doit le refleter sans attendre.
+          return Promise.all([refreshPagePreview(currentPageIndex), refreshQualityWarnings()]);
         })
         .catch((err) => {
           if (cancelledEmpty) return;
@@ -806,12 +830,16 @@ export default function BookAtelierLuxe() {
     // photoAdjustments compare AUSSI (cahier des charges "PhotoSlot") : sans
     // ca, ajuster une photo sans toucher aux emplacements (meme itemIds)
     // serait a tort considere "deja sauvegarde" et jamais persiste.
+    // itemIds reste compare par JSON.stringify simple : c'est un TABLEAU,
+    // et Postgres preserve fidelement l'ordre des tableaux JSONB (seul
+    // l'ordre des CLES d'un objet ne l'est pas — voir stableStringify
+    // ci-dessus, indispensable pour les quatre champs objets qui suivent).
     const alreadySaved = Array.isArray(pageRow?.content?.itemIds)
       && JSON.stringify(pageRow.content.itemIds) === JSON.stringify(draftSlotItemIds)
-      && JSON.stringify(pageRow.content?.photoAdjustments || {}) === JSON.stringify(draftPhotoAdjustments)
-      && JSON.stringify(pageRow.content?.photoCaptions || {}) === JSON.stringify(draftPhotoCaptions)
-      && JSON.stringify(pageRow.content?.textRoles || {}) === JSON.stringify(draftTextRoles)
-      && JSON.stringify(pageRow.content?.textStyles || {}) === JSON.stringify(draftTextStyles);
+      && stableStringify(pageRow.content?.photoAdjustments || {}) === stableStringify(draftPhotoAdjustments)
+      && stableStringify(pageRow.content?.photoCaptions || {}) === stableStringify(draftPhotoCaptions)
+      && stableStringify(pageRow.content?.textRoles || {}) === stableStringify(draftTextRoles)
+      && stableStringify(pageRow.content?.textStyles || {}) === stableStringify(draftTextStyles);
     if (alreadySaved) return undefined;
 
     const realLayout = layouts.find((entry) => entry.slug === draftLayoutSlug);
@@ -859,7 +887,20 @@ export default function BookAtelierLuxe() {
         const mirror = isComplete && atelierLayout.spread
           ? mirrorSpread(currentPageIndex, realLayout.id)
           : Promise.resolve();
-        return mirror.then(() => refreshPagePreview(currentPageIndex));
+        // Rafraichit le controle qualite APRES que la sauvegarde soit
+        // confirmee en base (retour utilisateur, 2026-09-29 : "je reviens a
+        // 'photo entiere', le triangle disparait sur la photo, mais je
+        // reclique sur 'terminer le livre' et ca compte toujours 10
+        // photos"). qualityWarnings ne se rafraichissait QUE quand
+        // pages.length/print_format changeaient (voir l'effet plus haut) —
+        // jamais apres un simple ajustement de cadrage. La modale de fin
+        // rouvrait alors l'ancien compte, deja perime, pendant que le badge
+        // sur la page (lui, calcule EN DIRECT sur le brouillon) avait deja
+        // change : deux sources de verite qui pouvaient diverger. Desormais
+        // le compte se met a jour tout seul des qu'une sauvegarde aboutit —
+        // pas besoin de rouvrir la modale une seconde fois pour le voir
+        // juste.
+        return mirror.then(() => Promise.all([refreshPagePreview(currentPageIndex), refreshQualityWarnings()]));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -874,7 +915,7 @@ export default function BookAtelierLuxe() {
     // dependances (brouillon, page courante), donc sa fermeture est fraiche
     // a chaque execution de l'effet.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftPhotoCaptions, draftTextRoles, draftTextStyles, draftPageIndex, currentPageIndex, pages, layouts, book?.id, refreshPagePreview]);
+  }, [draftLayoutSlug, draftSlotItemIds, draftPhotoAdjustments, draftPhotoCaptions, draftTextRoles, draftTextStyles, draftPageIndex, currentPageIndex, pages, layouts, book?.id, refreshPagePreview, refreshQualityWarnings]);
 
   // --- Photo sur double page -------------------------------------------
   // Les deux pages d'une double page sont celles qui se FONT FACE dans le

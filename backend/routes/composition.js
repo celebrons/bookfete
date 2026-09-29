@@ -1496,7 +1496,19 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
             layoutSlug: slug,
             slotIndex,
             formatId: book.print_format,
-            zoom: adjustmentsByItemId[itemId]?.zoom
+            zoom: adjustmentsByItemId[itemId]?.zoom,
+            // MANQUAIT (retour utilisateur, 2026-09-29 : "je reviens a
+            // 'photo entiere', le triangle disparait sur la photo... mais
+            // 'terminer le livre' compte toujours 10 photos"). Sans
+            // fitMode, checkImageFit retombe sur le calcul 'cover' (le plus
+            // exigeant) meme pour une photo explicitement passee en "photo
+            // entiere" — l'ecran recapitulatif la signalait donc a tort,
+            // pendant que le badge sur la page (checkSlotImageFit appele
+            // CORRECTEMENT avec fitMode cote client, voir
+            // AtelierPageOverlay.js) avait deja cesse de l'afficher.
+            // computePagePhotoFit, juste au-dessus dans ce meme fichier
+            // moteur, le passait deja bien — seule cette route l'oubliait.
+            fitMode: adjustmentsByItemId[itemId]?.fitMode
           });
           if (!fit || !fit.statut) return; // donnee manquante -> pas evalue, jamais un faux avertissement
           evaluatedCount += 1;

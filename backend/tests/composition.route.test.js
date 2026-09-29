@@ -125,7 +125,14 @@ jest.mock('../config/supabase', () => {
         // Volontairement dans la bande "limite" : 192 dpi effectifs en
         // FULL_PHOTO sur un standard — imprimable, pas parfait, et plus
         // signale depuis le 2026-09-20.
-        { id: 'item-5-photo-limite', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-limite.jpg', display_order: 4, metadata: { width: 1400, height: 1900 } }
+        { id: 'item-5-photo-limite', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-limite.jpg', display_order: 4, metadata: { width: 1400, height: 1900 } },
+        // Ratio tres eloigne du cadre FULL_PHOTO (quasi carre, ici tres
+        // large et peu haute) : en mode 'cover' (implicite, par defaut),
+        // 40 dpi effectifs -> 'insuffisant'. En mode 'contain', l'axe
+        // contraignant s'inverse -> 195 dpi -> 'limite' (donc filtree).
+        // Sert a verifier que la route lit bien fitMode (retour
+        // utilisateur, 2026-09-29 : elle ne le faisait pas).
+        { id: 'item-5-photo-mismatch', book_id: 'book-test-5', source: 'upload', kind: 'photo', url: 'https://cdn.test/5-mismatch.jpg', display_order: 5, metadata: { width: 1400, height: 400 } }
       ]
         // 32 photos supplementaires sur book-test-1 : template tpl-1
         // n'autorise que FULL_PHOTO (1 photo/page, voir allowed_layouts
@@ -1163,6 +1170,40 @@ describe('routes/composition', () => {
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body.warnings)).toBe(true);
+    });
+
+    // Regression (retour utilisateur, 2026-09-29) : le triangle d'alerte SUR
+    // LA PAGE disparaissait bien en passant une photo en "Photo entiere"
+    // (le brouillon cote client lit deja fitMode correctement), mais
+    // l'ecran recapitulatif ("Terminer mon livre") continuait de la
+    // signaler — cette route oubliait de transmettre fitMode a
+    // checkSlotImageFit, qui retombait donc systematiquement sur le calcul
+    // 'cover' (le plus exigeant), quel que soit le mode reellement
+    // enregistre.
+    it('respecte le fitMode enregistre (une photo "insuffisant" en mode cover peut devenir non signalee en mode contain)', async () => {
+      await request(app)
+        .put('/api/books/book-test-5/pages/11/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-1', itemIds: ['item-5-photo-mismatch'] });
+
+      const enCover = await request(app)
+        .get('/api/books/book-test-5/print-quality-check')
+        .set('Authorization', 'Bearer valid-token');
+      expect(enCover.body.warnings.find((entry) => entry.itemId === 'item-5-photo-mismatch')?.statut).toBe('insuffisant');
+
+      await request(app)
+        .put('/api/books/book-test-5/pages/11/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          layoutId: 'lay-1',
+          itemIds: ['item-5-photo-mismatch'],
+          photoAdjustments: { 'item-5-photo-mismatch': { fitMode: 'contain' } }
+        });
+
+      const enContain = await request(app)
+        .get('/api/books/book-test-5/print-quality-check')
+        .set('Authorization', 'Bearer valid-token');
+      expect(enContain.body.warnings.find((entry) => entry.itemId === 'item-5-photo-mismatch')).toBeUndefined();
     });
   });
 });
