@@ -7,9 +7,27 @@
 
 const TERMINAL_KEYS = ['single', 'maybeSingle', 'then'];
 
+// Chemin jsonb PostgREST ("metadata->>gelatoError", "metadata->foo->>bar") :
+// sans cette resolution, `row?.["metadata->>gelatoError"]` cherchait une
+// propriete litteralement nommee ainsi (elle n'existe jamais) et valait donc
+// TOUJOURS `undefined` — un filtre `.not(..., 'is', null)` sur ce chemin
+// passait alors pour TOUTE ligne, quel que soit son contenu reel (constate
+// le 2026-09-30 en testant listGelatoSubmissions). Repli exact sur l'ancien
+// comportement (acces direct) quand la colonne ne contient pas "->".
+function resolveColumnValue(row, column) {
+  if (!column.includes('->')) return row?.[column];
+  const [base, ...chemin] = column.split(/->>?/).map((part) => part.trim());
+  let valeur = row?.[base];
+  for (const clef of chemin) {
+    if (valeur === null || valeur === undefined) return null;
+    valeur = valeur[clef];
+  }
+  return valeur === undefined ? null : valeur;
+}
+
 function matchesFilters(row, filters) {
   return filters.every((filter) => {
-    const value = row?.[filter.column];
+    const value = resolveColumnValue(row, filter.column);
     switch (filter.type) {
       case 'eq':
         return String(value) === String(filter.value);

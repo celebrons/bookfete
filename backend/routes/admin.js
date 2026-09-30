@@ -131,7 +131,7 @@ router.get('/jobs', authenticate, requireAdmin, async (req, res) => {
     // eslint-disable-next-line global-require
     const fabrications = require('./books').listPdfExportJobs();
     // eslint-disable-next-line global-require
-    const envois = require('./orders').listGelatoSubmissions();
+    const envois = await require('./orders').listGelatoSubmissions();
     const travaux = [...fabrications, ...envois];
 
     // Le titre du livre en une seule requete : sans lui, la liste n'affiche
@@ -203,6 +203,33 @@ router.post('/jobs/gelato/:orderId/stop', authenticate, requireAdmin, (req, res)
     });
 
     if (!resultat.relache) return res.status(409).json(resultat);
+    return res.json(resultat);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Relancer un envoi imprimeur qui a echoue (retour utilisateur 2026-09-30).
+// Sans danger a rejouer : submitPrintOrderToGelato est idempotente
+// (metadata.gelatoOrderId), donc un clic sur une commande deja envoyee ou
+// deja en cours d'envoi ne fait rien de plus — voir retryGelatoSubmission.
+router.post('/jobs/gelato/:orderId/retry', authenticate, requireAdmin, async (req, res) => {
+  try {
+    // eslint-disable-next-line global-require
+    const resultat = await require('./orders').retryGelatoSubmission(req.params.orderId);
+
+    logEvent({
+      type: 'admin.job.retried',
+      level: resultat.lancee ? 'info' : 'warn',
+      actor: req.user?.email,
+      orderId: req.params.orderId,
+      message: resultat.lancee
+        ? "Envoi a l'imprimeur relance depuis l'administration"
+        : `Relance impossible : ${resultat.raison}`,
+      metadata: resultat
+    });
+
+    if (!resultat.lancee) return res.status(409).json(resultat);
     return res.json(resultat);
   } catch (error) {
     return res.status(500).json({ error: error.message });

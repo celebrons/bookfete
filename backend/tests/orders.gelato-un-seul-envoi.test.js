@@ -116,7 +116,7 @@ describe('Un seul envoi a l imprimeur a la fois', () => {
 
     // Un verrou pris et jamais rendu bloquerait cette commande jusqu'au
     // redemarrage du serveur — un remede pire que le mal.
-    expect(listGelatoSubmissions().some((t) => t.orderId === ORDER_ID)).toBe(false);
+    expect((await listGelatoSubmissions()).some((t) => t.orderId === ORDER_ID)).toBe(false);
 
     __triggerGelatoPourLesTests({ db, order: commande(), ownerEmail: 'client@test.local' });
     await attendre(400);

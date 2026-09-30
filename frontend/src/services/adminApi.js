@@ -97,6 +97,7 @@ const action = async (chemin) => {
 
 export const stopPdfJob = (jobId) => action(`/jobs/pdf/${encodeURIComponent(jobId)}/stop`);
 export const stopGelatoJob = (orderId) => action(`/jobs/gelato/${encodeURIComponent(orderId)}/stop`);
+export const retryGelatoJob = (orderId) => action(`/jobs/gelato/${encodeURIComponent(orderId)}/retry`);
 export const cleanupJobs = () => action('/jobs/cleanup');
 
 export const listAllBooks = (search = '') => request(

@@ -356,7 +356,7 @@ const travauxEnCours = () => {
   } catch (_error) { /* module non charge : rien en cours */ }
   try {
     // eslint-disable-next-line global-require
-    total += require('./routes/orders').listGelatoSubmissions().length;
+    total += require('./routes/orders').countActiveGelatoSubmissions();
   } catch (_error) { /* idem */ }
   return total;
 };

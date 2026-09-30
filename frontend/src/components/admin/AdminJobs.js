@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { listJobs, stopPdfJob, stopGelatoJob, cleanupJobs } from '../../services/adminApi';
+import { listJobs, stopPdfJob, stopGelatoJob, retryGelatoJob, cleanupJobs } from '../../services/adminApi';
 import './AdminJobs.css';
 
 // Les travaux longs : fabrications de PDF et envois a l'imprimeur.
@@ -106,6 +106,24 @@ function AdminJobs() {
     }
   };
 
+  // Relancer un envoi imprimeur echoue (retour utilisateur 2026-09-30) :
+  // sans danger a rejouer, submitPrintOrderToGelato est idempotente — voir
+  // retryGelatoSubmission cote serveur.
+  const relancer = async (travail) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Relancer cet envoi vers l’imprimeur ?')) return;
+
+    setEnAction(travail.id);
+    try {
+      await retryGelatoJob(travail.orderId);
+      await charger();
+    } catch (err) {
+      setErreur(err?.message || 'Relance impossible');
+    } finally {
+      setEnAction('');
+    }
+  };
+
   const nettoyer = async () => {
     // eslint-disable-next-line no-alert
     if (!window.confirm('Oublier les demandes terminées ?\n\nCelles qui tournent encore ne sont pas touchées.')) return;
@@ -186,6 +204,16 @@ function AdminJobs() {
                     disabled={enAction === t.id}
                   >
                     {t.genre === 'gelato' ? 'Déverrouiller' : 'Arrêter'}
+                  </button>
+                )}
+                {t.relancable && (
+                  <button
+                    className="btn btn-outline btn-petit"
+                    type="button"
+                    onClick={() => relancer(t)}
+                    disabled={enAction === t.id}
+                  >
+                    Réessayer
                   </button>
                 )}
               </span>

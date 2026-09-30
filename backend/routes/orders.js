@@ -76,6 +76,10 @@ const ORDER_STATUS_SEQUENCE = [
   'shipped',
   'delivered'
 ];
+// Etats definitifs : une fois atteints, plus rien ne les remplace (voir
+// shouldAdvance, GET /:orderId/tracking) — ni un recul dans la sequence
+// normale, ni une annulation/echec qui arriverait apres coup.
+const ORDER_STATUS_TERMINAL = new Set(['delivered', 'cancelled', 'failed']);
 const ORDER_STATUS_REQUIRES_PAID = new Set([
   'pdf_generating',
   'pdf_ready',
@@ -578,6 +582,19 @@ const persistStripePaymentForOrder = async ({
 // imprimes et deux factures.
 //
 // Un seul verrou pour les deux chemins, et une trace dans les deux cas.
+// Une seule nouvelle tentative automatique (meme principe et meme limite
+// que PDF_EXPORT_MAX_ATTEMPTS, routes/books.js, retour utilisateur
+// 2026-09-27 : "une nouvelle tentative automatique, un statut explicite, et
+// une alerte, pas un echec silencieux"). Un envoi Gelato est couteux (rendu
+// des pages + televersement d'un fichier de plusieurs dizaines de Mo) : une
+// cause structurelle (adresse invalide, catalogue Gelato indisponible) ne
+// sera pas resolue par un deuxieme essai identique, mais une cause
+// transitoire (reseau, API Gelato indisponible un instant) a de bonnes
+// chances de passer. Sans risque de doublon : submitPrintOrderToGelato est
+// idempotente (voir son commentaire d'en-tete et le correctif du
+// 2026-09-30 qui couvre aussi l'echec juste apres une creation reussie).
+const GELATO_SUBMIT_MAX_ATTEMPTS = 2;
+
 const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
   const type = String(order?.type || '').toLowerCase();
   if (type !== 'print' && type !== 'pack') return;
@@ -623,9 +640,15 @@ const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
         return;
       }
 
-      const result = await submitPrintOrderToGelato({ db: supabase, book, order, ownerEmail });
+      let result = null;
+      for (let tentative = 1; tentative <= GELATO_SUBMIT_MAX_ATTEMPTS; tentative += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        result = await submitPrintOrderToGelato({ db: supabase, book, order, ownerEmail });
+        if (!result.error) break;
+        console.error(`Soumission Gelato echouee (tentative ${tentative}/${GELATO_SUBMIT_MAX_ATTEMPTS}) pour la commande`, order.id, ':', result.error);
+      }
+
       if (result.error) {
-        console.error('Soumission Gelato echouee pour la commande', order.id, ':', result.error);
         logEvent({
           type: 'gelato.submit.failed',
           level: 'error',
@@ -633,8 +656,32 @@ const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
           orderId: order.id,
           bookId: order.book_id,
           message: 'Envoi a l\'imprimeur echoue (declenche par le paiement)',
-          metadata: { origine: 'paiement', erreur: String(result.error).slice(0, 300) }
+          metadata: { origine: 'paiement', erreur: String(result.error).slice(0, 300), tentatives: GELATO_SUBMIT_MAX_ATTEMPTS }
         });
+
+        // Alerte admin (meme principe que PDF_EXPORT_MAX_ATTEMPTS,
+        // routes/books.js) : jamais bloquante (voir REGLE ABSOLUE en tete de
+        // transactionalEmails.js), et la commande reste "payee" — elle n'a
+        // simplement pas ete transmise, une nouvelle tentative reste
+        // possible sans creer de doublon chez Gelato (voir gelatoOrderCree
+        // dans gelatoOrderService.js).
+        try {
+          await emails.envoyerAlerteAdmin({
+            sujet: `Envoi imprimeur echoue - commande ${order.order_number || order.id}`,
+            lignes: [
+              `L'envoi chez Gelato n'a pas abouti apres ${GELATO_SUBMIT_MAX_ATTEMPTS} tentative(s).`,
+              'La commande reste "payee", sans fichier chez l\'imprimeur.'
+            ],
+            details: [
+              ['Commande', order.order_number || order.id],
+              ['orderId', order.id],
+              ['bookId', order.book_id],
+              ['Erreur', String(result.error).slice(0, 300)]
+            ]
+          });
+        } catch (alertError) {
+          console.error('Erreur alerte admin envoi Gelato echoue:', alertError.message);
+        }
       } else if (!result.skipped) {
         console.log(`Commande Gelato ${result.gelatoOrderType} creee (${result.gelatoOrderId}) pour la commande Celebrons ${order.id}`);
         logEvent({
@@ -1050,30 +1097,52 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
     }
 
     let gelatoOrder = null;
+    // UN 404 N'EST PAS UNE PANNE : c'est Gelato qui dit que cette commande
+    // n'existe plus. Constate le 2026-09-30 sur une vraie commande (brouillon
+    // supprime depuis le tableau de bord Gelato pour tester le parcours
+    // d'annulation) : getOrder renvoyait 404, et jusqu'ici CETTE reponse
+    // prenait le meme chemin qu'un reseau indisponible — « stale: true » —
+    // et l'ecran de suivi restait fige indefiniment sur le dernier statut
+    // connu, sans jamais dire que le livre n'etait plus chez l'imprimeur.
+    let supprimeeChezGelato = false;
     try {
       gelatoOrder = await gelatoClient.getOrder(gelatoOrderId);
     } catch (error) {
-      console.error('Suivi Gelato indisponible pour la commande', order.id, ':', error.message);
-      return res.json({ ...localState, source: 'cache', stale: true });
+      if (error.status === 404) {
+        supprimeeChezGelato = true;
+      } else {
+        console.error('Suivi Gelato indisponible pour la commande', order.id, ':', error.message);
+        return res.json({ ...localState, source: 'cache', stale: true });
+      }
     }
 
-    const rawStatus = gelatoTracking.readGelatoFulfillmentStatus(gelatoOrder);
+    const rawStatus = supprimeeChezGelato ? 'canceled' : gelatoTracking.readGelatoFulfillmentStatus(gelatoOrder);
     const mappedStatus = gelatoTracking.mapGelatoStatus(rawStatus);
-    const tracking = gelatoTracking.extractTracking(gelatoOrder);
-    const delivery = gelatoTracking.extractDelivery(gelatoOrder);
+    const tracking = supprimeeChezGelato ? localState.tracking : gelatoTracking.extractTracking(gelatoOrder);
+    const delivery = supprimeeChezGelato ? localState.delivery : gelatoTracking.extractDelivery(gelatoOrder);
 
     // Avancee seulement : un statut inconnu (mappedStatus null) ou anterieur
-    // laisse la commande exactement ou elle est.
+    // laisse la commande exactement ou elle est. EXCEPTION explicite pour
+    // annulation/echec : `cancelled`/`failed` sont hors sequence a dessein
+    // (ce ne sont pas des etapes d'avancement, voir ORDER_STATUS_SEQUENCE
+    // plus haut) et un rang de -1 les faisait donc TOUJOURS rejeter, quel
+    // que soit l'etat courant — la commande ci-dessus restait « Envoye a
+    // l'imprimeur » alors que Gelato l'avait supprimee. Jamais applique
+    // si la commande a deja atteint un etat definitif (ORDER_STATUS_TERMINAL) :
+    // un livre deja livre ne redevient pas « annule » sur un B403/404 tardif.
     const currentRank = ORDER_STATUS_SEQUENCE.indexOf(order.status);
     const nextRank = mappedStatus ? ORDER_STATUS_SEQUENCE.indexOf(mappedStatus) : -1;
-    const shouldAdvance = mappedStatus && nextRank > -1 && nextRank > currentRank;
+    const estAnnulationOuEchec = mappedStatus === 'cancelled' || mappedStatus === 'failed';
+    const shouldAdvance = Boolean(mappedStatus) && !ORDER_STATUS_TERMINAL.has(order.status) && (
+      estAnnulationOuEchec || (nextRank > -1 && nextRank > currentRank)
+    );
 
     // Un brouillon confirme depuis le tableau de bord Gelato devient une
     // vraie commande sans que notre base le sache. On enregistre donc le
     // type REEL a chaque consultation du suivi — jamais a l'envers : une
     // commande devenue `order` ne peut plus redevenir `draft` chez nous,
     // sinon une reponse inattendue desarmerait la protection.
-    const typeReel = gelatoTracking.readGelatoOrderType(gelatoOrder);
+    const typeReel = supprimeeChezGelato ? null : gelatoTracking.readGelatoOrderType(gelatoOrder);
     const typeConnu = order.metadata?.gelatoOrderType || null;
     const typeRetenu = typeConnu === 'order' ? 'order' : (typeReel || typeConnu);
 
@@ -1084,7 +1153,13 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
       gelatoOrderType: typeRetenu,
       gelatoCheckedAt: nowIso,
       tracking,
-      delivery
+      delivery,
+      // Trace distincte du cas 404 : un vrai statut "canceled" renvoye par
+      // Gelato et une suppression constatee via 404 aboutissent au meme
+      // mappedStatus ('cancelled'), mais seule cette valeur dit COMMENT on
+      // l'a su — utile pour comprendre un statut annule sans reponse Gelato
+      // correspondante dans le journal.
+      ...(supprimeeChezGelato ? { gelatoDeletedAt: nowIso } : {})
     };
 
     if (shouldAdvance) {
@@ -1094,12 +1169,15 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
         orderId: order.id,
         bookId: order.book_id,
         ownerId: order.owner_id,
-        message: `Statut : ${order.status} -> ${mappedStatus}`,
+        message: supprimeeChezGelato
+          ? `Commande supprimee chez Gelato (404) : statut ${order.status} -> cancelled`
+          : `Statut : ${order.status} -> ${mappedStatus}`,
         metadata: {
           avant: order.status,
           apres: mappedStatus,
           source: 'gelato',
           gelatoStatus: rawStatus,
+          supprimeeChezGelato,
           // Qui regardait le suivi au moment ou Gelato a repondu.
           consulteePar: req.user.email || null
         }
@@ -2351,7 +2429,14 @@ module.exports = router;
 // oublie — et tant qu il tient, la commande refuse tout nouvel envoi.
 const VERROU_GELATO_SUSPECT_MS = 30 * 60 * 1000;
 
-module.exports.listGelatoSubmissions = () => {
+// Compte SYNCHRONE des envois EN COURS (jamais les echecs deja termines,
+// voir listGelatoSubmissions plus bas) — reserve a server.js:travauxEnCours,
+// qui decide s'il faut attendre avant un arret propre. Une commande deja
+// echouee ne tourne plus : l'interrompre ne signifie rien, rien n'attend
+// donc dessus. Mirroir de countActivePdfJobs (routes/books.js).
+module.exports.countActiveGelatoSubmissions = () => gelatoSubmissionsEnCours.size;
+
+module.exports.listGelatoSubmissions = async () => {
   const travaux = [];
   gelatoSubmissionsEnCours.forEach((info, orderId) => {
     const debut = Date.parse(info?.debutLe || '');
@@ -2367,6 +2452,7 @@ module.exports.listGelatoSubmissions = () => {
       etat: bloquee ? 'bloquee' : 'en cours',
       bloquee,
       arretable: true,
+      relancable: false,
       creeLe: info?.debutLe || null,
       demarreLe: info?.debutLe || null,
       fini: null,
@@ -2375,6 +2461,50 @@ module.exports.listGelatoSubmissions = () => {
       fichier: null
     });
   });
+
+  // Commandes dont l'envoi a ECHOUE (les GELATO_SUBMIT_MAX_ATTEMPTS
+  // tentatives automatiques epuisees) et qui n'ont jamais ete creees chez
+  // Gelato depuis : sans cette liste, un echec disparaissait du panneau
+  // "Travaux" des que son verrou se relachait — quelques secondes apres
+  // l'echec, voir gelatoSubmissionsEnCours.delete dans le `finally` de
+  // triggerGelatoSubmissionIfNeeded — alors que l'ecran client promet
+  // "notre equipe le relance" (StepTracking.js). Il fallait pouvoir la
+  // retrouver plus tard pour tenir cette promesse.
+  try {
+    const { data: echouees, error } = await supabase
+      .from('orders')
+      .select('id, book_id, metadata, updated_at')
+      .in('type', ['print', 'pack'])
+      .not('metadata->>gelatoError', 'is', null)
+      .is('metadata->>gelatoOrderId', null);
+    if (error) throw error;
+
+    (echouees || [])
+      .filter((order) => !gelatoSubmissionsEnCours.has(order.id))
+      .forEach((order) => {
+        travaux.push({
+          genre: 'gelato',
+          id: order.id,
+          orderId: order.id,
+          bookId: order.book_id || null,
+          demandeur: null,
+          etat: 'echouee',
+          bloquee: false,
+          arretable: false,
+          relancable: true,
+          creeLe: order.metadata?.gelatoErrorAt || order.updated_at || null,
+          demarreLe: null,
+          fini: order.metadata?.gelatoErrorAt || null,
+          avancement: null,
+          erreur: order.metadata?.gelatoError || null,
+          fichier: null
+        });
+      });
+  } catch (error) {
+    // Jamais bloquant : le panneau affiche au moins les envois en cours.
+    console.error('Lecture des envois Gelato echoues impossible:', error.message);
+  }
+
   return travaux.sort((a, b) => Date.parse(b.creeLe || 0) - Date.parse(a.creeLe || 0));
 };
 
@@ -2392,6 +2522,52 @@ module.exports.releaseGelatoSubmission = (orderId) => {
   if (!gelatoSubmissionsEnCours.has(cle)) return { relache: false, raison: 'aucun envoi en cours' };
   gelatoSubmissionsEnCours.delete(cle);
   return { relache: true };
+};
+
+// Relance MANUELLE d'un envoi imprimeur echoue, depuis l'administration
+// (retour utilisateur 2026-09-30 : "une nouvelle tentative reste possible").
+// L'ecran de suivi client promet deja "notre equipe le relance" des qu'un
+// envoi echoue (StepTracking.js) — cette fonction est ce qui rend cette
+// promesse vraie : sans elle, une commande dont les 2 tentatives
+// automatiques ont echoue ne repartait plus jamais toute seule.
+//
+// Reutilise EXACTEMENT le meme chemin que l'envoi automatique
+// (triggerGelatoSubmissionIfNeeded, donc le meme verrou et la meme
+// idempotence via metadata.gelatoOrderId) — jamais un second pipeline.
+module.exports.retryGelatoSubmission = async (orderId) => {
+  const { data: order, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .single();
+  if (error || !order) return { lancee: false, raison: 'commande introuvable' };
+
+  const type = String(order.type || '').toLowerCase();
+  if (type !== 'print' && type !== 'pack') {
+    return { lancee: false, raison: "cette commande n'inclut pas d'impression" };
+  }
+  if (order.metadata?.gelatoOrderId) {
+    return { lancee: false, raison: 'deja envoyee', gelatoOrderId: order.metadata.gelatoOrderId };
+  }
+  if (gelatoSubmissionsEnCours.has(order.id)) {
+    return { lancee: false, raison: 'un envoi est deja en cours pour cette commande' };
+  }
+
+  // Email du client, pour la commande Gelato (facultatif : voir
+  // mapShippingAddress dans gelatoOrderService.js) — jamais bloquant si on
+  // ne le trouve pas.
+  let ownerEmail = order.shipping_address?.email || order.metadata?.billingAddress?.email || null;
+  if (!ownerEmail) {
+    try {
+      const { data } = await supabase.auth.admin.getUserById(order.owner_id);
+      ownerEmail = data?.user?.email || null;
+    } catch (_erreur) {
+      // Compte introuvable/API indisponible : l'envoi part quand meme.
+    }
+  }
+
+  triggerGelatoSubmissionIfNeeded({ db: supabase, order, ownerEmail });
+  return { lancee: true };
 };
 
 // Expose pour les tests : verifier qu un doublon d envoi est impossible

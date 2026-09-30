@@ -35,6 +35,7 @@ jest.mock('@supabase/supabase-js', () => ({
 const mockCancel = jest.fn(() => ({ arrete: true, navigateursTues: 1 }));
 const mockPurge = jest.fn(() => ({ oubliees: 3 }));
 const mockRelease = jest.fn(() => ({ relache: true }));
+const mockRetry = jest.fn(async () => ({ lancee: true }));
 
 jest.mock('../routes/books', () => {
   const express = require('express');
@@ -84,18 +85,38 @@ jest.mock('../routes/orders', () => {
   const express = require('express');
   const routeur = express.Router();
   return Object.assign(routeur, {
-    listGelatoSubmissions: () => ([{
-      genre: 'gelato',
-      id: 'commande-9',
-      orderId: 'commande-9',
-      bookId: 'livre-1',
-      demandeur: 'client@test.local',
-      etat: 'bloquee',
-      bloquee: true,
-      arretable: true,
-      creeLe: new Date(Date.now() - 5400000).toISOString()
-    }]),
-    releaseGelatoSubmission: mockRelease
+    listGelatoSubmissions: async () => ([
+      {
+        genre: 'gelato',
+        id: 'commande-9',
+        orderId: 'commande-9',
+        bookId: 'livre-1',
+        demandeur: 'client@test.local',
+        etat: 'bloquee',
+        bloquee: true,
+        arretable: true,
+        relancable: false,
+        creeLe: new Date(Date.now() - 5400000).toISOString()
+      },
+      // Envoi definitivement echoue (2 tentatives automatiques epuisees,
+      // voir GELATO_SUBMIT_MAX_ATTEMPTS) : plus "en cours", mais toujours
+      // relancable depuis l'administration (retour utilisateur 2026-09-30).
+      {
+        genre: 'gelato',
+        id: 'commande-10',
+        orderId: 'commande-10',
+        bookId: 'livre-1',
+        demandeur: null,
+        etat: 'echouee',
+        bloquee: false,
+        arretable: false,
+        relancable: true,
+        erreur: 'Gelato API 500',
+        creeLe: new Date(Date.now() - 1800000).toISOString()
+      }
+    ]),
+    releaseGelatoSubmission: mockRelease,
+    retryGelatoSubmission: mockRetry
   });
 });
 
@@ -126,6 +147,7 @@ describe('Travaux en cours, vus de l administration', () => {
     mockCancel.mockClear();
     mockPurge.mockClear();
     mockRelease.mockClear();
+    mockRetry.mockClear();
   });
 
   const commeAdmin = (chemin, methode = 'get') => request(app)[methode](chemin)
@@ -154,6 +176,7 @@ describe('Travaux en cours, vus de l administration', () => {
     // Deux bloquees : une fabrication enlisee et un verrou d'envoi oublie.
     expect(reponse.body.resume.bloquees).toBe(2);
     expect(reponse.body.resume.reussies).toBe(1);
+    expect(reponse.body.resume.echouees).toBe(1);
   });
 
   it('arrete une fabrication', async () => {
@@ -180,6 +203,23 @@ describe('Travaux en cours, vus de l administration', () => {
     expect(mockRelease).toHaveBeenCalledWith('commande-9');
   });
 
+  it('relance un envoi imprimeur echoue', async () => {
+    const reponse = await commeAdmin('/api/admin/jobs/gelato/commande-10/retry', 'post');
+
+    expect(reponse.status).toBe(200);
+    expect(reponse.body.lancee).toBe(true);
+    expect(mockRetry).toHaveBeenCalledWith('commande-10');
+  });
+
+  it('refuse de relancer un envoi qui ne peut pas repartir, sans mentir', async () => {
+    mockRetry.mockResolvedValueOnce({ lancee: false, raison: 'deja envoyee', gelatoOrderId: 'gelato-x' });
+
+    const reponse = await commeAdmin('/api/admin/jobs/gelato/commande-9/retry', 'post');
+
+    expect(reponse.status).toBe(409);
+    expect(reponse.body.raison).toBe('deja envoyee');
+  });
+
   it('nettoie les demandes terminees', async () => {
     const reponse = await commeAdmin('/api/admin/jobs/cleanup', 'post');
 
@@ -194,10 +234,12 @@ describe('Travaux en cours, vus de l administration', () => {
     // 404 et non 403 : on ne confirme pas l'existence de cet espace.
     expect((await commeAdmin('/api/admin/jobs')).status).toBe(404);
     expect((await commeAdmin('/api/admin/jobs/pdf/x/stop', 'post')).status).toBe(404);
+    expect((await commeAdmin('/api/admin/jobs/gelato/x/retry', 'post')).status).toBe(404);
     expect((await commeAdmin('/api/admin/jobs/cleanup', 'post')).status).toBe(404);
     // Et surtout : rien n'a ete execute.
     expect(mockCancel).not.toHaveBeenCalled();
     expect(mockPurge).not.toHaveBeenCalled();
+    expect(mockRetry).not.toHaveBeenCalled();
 
     process.env.ADMIN_EMAILS = ADMIN;
   });

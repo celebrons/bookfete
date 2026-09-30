@@ -186,6 +186,57 @@ describe('gelatoOrderService', () => {
     expect(savedMetadata.gelatoOrderId).toBeUndefined();
   });
 
+  // CORRECTIF 2026-09-30 : createOrder reussit (une VRAIE commande existe
+  // desormais chez Gelato) mais l'ecriture Supabase qui suit echoue. Avant
+  // ce correctif, le bloc catch n'enregistrait que gelatoError — perdant la
+  // trace du gelatoOrderId — si bien qu'une nouvelle tentative repartait de
+  // zero et en creait une SECONDE chez Gelato (un vrai doublon facture des
+  // que GELATO_LIVE_ORDERS=1).
+  it('createOrder reussit mais l ecriture Supabase echoue juste apres : le gelatoOrderId est quand meme retenu, un retry ne cree pas de doublon', async () => {
+    delete process.env.GELATO_LIVE_ORDERS;
+    const updateSpy = jest.fn();
+    let appelNumero = 0;
+    const db = {
+      from: () => ({
+        update: (payload) => ({
+          eq: () => {
+            appelNumero += 1;
+            updateSpy(payload);
+            if (appelNumero === 1) {
+              return Promise.reject(new Error('Supabase indisponible'));
+            }
+            return Promise.resolve({ data: null, error: null });
+          }
+        })
+      })
+    };
+
+    const result = await submitPrintOrderToGelato({ db, book, order: baseOrder });
+
+    expect(result.error).toBe('Supabase indisponible');
+    expect(result.gelatoOrderId).toBe('gelato-order-fake-1');
+    expect(gelatoClient.createOrder).toHaveBeenCalledTimes(1);
+
+    // Le deuxieme appel (celui du bloc catch, qui a reussi) a bien
+    // enregistre l'id de la commande Gelato reellement creee.
+    const catchMetadata = updateSpy.mock.calls[1][0].metadata;
+    expect(catchMetadata.gelatoOrderId).toBe('gelato-order-fake-1');
+    expect(catchMetadata.gelatoOrderType).toBe('draft');
+    expect(catchMetadata.gelatoError).toBe('Supabase indisponible');
+
+    // La preuve que ca empeche vraiment un doublon : rejouer la soumission
+    // avec la metadata desormais persistee doit la traiter comme deja
+    // envoyee, sans rappeler Gelato.
+    gelatoClient.createOrder.mockClear();
+    const retry = await submitPrintOrderToGelato({
+      db,
+      book,
+      order: { ...baseOrder, metadata: catchMetadata }
+    });
+    expect(retry.skipped).toBe(true);
+    expect(gelatoClient.createOrder).not.toHaveBeenCalled();
+  });
+
   describe('mapShippingAddress', () => {
     it('coupe le nom complet au premier espace (prenom / nom)', () => {
       const mapped = mapShippingAddress(baseOrder.shipping_address, 'marie@test.local');

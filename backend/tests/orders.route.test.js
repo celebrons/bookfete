@@ -52,6 +52,18 @@ jest.mock('../config/supabase', () => {
           updated_at: '2026-09-11T10:00:00.000Z'
         },
         { id: 'order-autre', owner_id: 'someone-else', book_id: 'order-book-2', type: 'print', status: 'paid', metadata: {} },
+        // Deja livree : sert a verifier qu'un etat DEFINITIF ne se fait pas
+        // ecraser par une annulation tardive (2026-09-30).
+        {
+          id: 'order-print-delivered',
+          owner_id: 'owner-test-1',
+          book_id: 'order-book-1',
+          order_number: 'CMD-TEST-DELIVERED',
+          type: 'print',
+          status: 'delivered',
+          metadata: { gelatoOrderId: 'gelato-livree' },
+          updated_at: '2026-09-11T10:00:00.000Z'
+        },
         // Renvoi d'un test apres changement de format (2026-09-11) : un
         // BROUILLON doit etre rejouable, une VRAIE commande jamais.
         {
@@ -380,6 +392,54 @@ describe('GET /api/orders/:orderId/tracking', () => {
     expect(response.body.tracking).toEqual({
       carrier: 'Colissimo', code: 'AB123', url: 'https://suivi.test/AB123'
     });
+  });
+
+  // CORRECTIF 2026-09-30 : 'cancelled'/'failed' sont hors ORDER_STATUS_SEQUENCE
+  // "a dessein" (ce ne sont pas des etapes d'avancement) — mais leur rang de
+  // -1 les faisait donc TOUJOURS rejeter par shouldAdvance, quel que soit
+  // l'etat courant. Une vraie annulation cote Gelato ne remontait donc
+  // jamais dans Celebrons.
+  it('Gelato dit "canceled" : le statut passe a cancelled meme si -1 est hors sequence', async () => {
+    gelatoClient.getOrder.mockResolvedValue({ fulfillmentStatus: 'canceled' });
+
+    const response = await request(app)
+      .get('/api/orders/order-print-shipped/tracking')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('cancelled');
+  });
+
+  // Deuxieme volet du meme correctif : Gelato SUPPRIME une commande deletee
+  // (getOrder renvoie 404), il ne la garde pas avec un statut "canceled".
+  // Avant, un 404 prenait le meme chemin qu'une panne reseau ordinaire
+  // ("stale: true", commande figee sur son dernier statut connu) — constate
+  // le 2026-09-30 sur une vraie commande de test supprimee depuis le
+  // tableau de bord Gelato pour verifier le parcours d'annulation.
+  it('Gelato renvoie 404 (commande supprimee) : traite comme une annulation, pas comme une panne', async () => {
+    const erreur404 = new Error("Order with id 'gelato-abc' wasn't found");
+    erreur404.status = 404;
+    gelatoClient.getOrder.mockRejectedValue(erreur404);
+
+    const response = await request(app)
+      .get('/api/orders/order-print-shipped/tracking')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('cancelled');
+    expect(response.body.stale).toBe(false);
+    expect(response.body.source).toBe('gelato');
+  });
+
+  it('un etat DEFINITIF (livree) ne se fait jamais ecraser par une annulation tardive', async () => {
+    gelatoClient.getOrder.mockResolvedValue({ fulfillmentStatus: 'canceled' });
+
+    const response = await request(app)
+      .get('/api/orders/order-print-delivered/tracking')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('delivered');
   });
 });
 

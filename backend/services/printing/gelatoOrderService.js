@@ -92,6 +92,14 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
   }
 
   const nowIso = new Date().toISOString();
+  const isLive = isGelatoLiveOrdersEnabled();
+  // Capture en dehors du bloc ou elle est creee : si createOrder reussit
+  // mais que l'ecriture Supabase qui suit echoue (reseau, table verrouillee),
+  // le bloc catch doit savoir qu'une VRAIE commande existe deja chez Gelato
+  // — sinon une nouvelle tentative repartirait de zero et en creerait une
+  // SECONDE (le garde-fou d'idempotence en tete de fonction ne lit que
+  // metadata.gelatoOrderId, jamais ecrit dans ce scenario precis).
+  let gelatoOrderCree = null;
 
   try {
     const [interiorPages, items, layouts, template] = await Promise.all([
@@ -132,7 +140,6 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
     const fileUrl = await uploadPrintFile(built.outputPath, `orders/${order.id}/print-ready.pdf`);
     if (typeof onProgress === 'function') onProgress({ phase: 'submitting' });
 
-    const isLive = isGelatoLiveOrdersEnabled();
     const payload = gelatoClient.buildOrderPayload({
       orderReferenceId: order.order_number || order.id,
       orderType: isLive ? 'order' : 'draft',
@@ -144,6 +151,7 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
     });
 
     const gelatoOrder = await gelatoClient.createOrder(payload);
+    gelatoOrderCree = gelatoOrder;
 
     const nextMetadata = {
       ...(order.metadata || {}),
@@ -184,7 +192,18 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
     const nextMetadata = {
       ...(order.metadata || {}),
       gelatoError: errorMessage,
-      gelatoErrorAt: nowIso
+      gelatoErrorAt: nowIso,
+      // VOIR gelatoOrderCree plus haut : si la commande a ete creee chez
+      // Gelato juste avant que l'echec ne survienne (ex. l'ecriture
+      // Supabase qui suit createOrder), on enregistre quand meme son id ICI
+      // — sinon une nouvelle tentative croirait n'avoir jamais ete envoyee
+      // et en creerait une seconde chez Gelato, un vrai doublon facture le
+      // jour ou GELATO_LIVE_ORDERS=1.
+      ...(gelatoOrderCree ? {
+        gelatoOrderId: gelatoOrderCree.id,
+        gelatoOrderType: isLive ? 'order' : 'draft',
+        gelatoSubmittedAt: nowIso
+      } : {})
     };
     // PAS de `.catch()` directement sur la requete : le constructeur de
     // requetes Supabase est « thenable » (il a `.then`) mais n'expose PAS
@@ -199,7 +218,7 @@ async function submitPrintOrderToGelato({ db, book, order, ownerEmail, onProgres
       // Ne jamais masquer l'erreur d'origine : c'est elle qui explique
       // pourquoi la soumission a echoue.
     }
-    return { skipped: false, error: errorMessage };
+    return { skipped: false, error: errorMessage, gelatoOrderId: gelatoOrderCree?.id || null };
   }
 }
 
