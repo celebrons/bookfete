@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { activateCollective } from '../../services/compositionApi';
-
-const DEFAULT_MESSAGE = 'Nous préparons un livre souvenir. Partagez un souvenir, quelques mots et/ou vos photos.';
 
 // Activation du mode collectif (cahier des charges §2) — titre de
 // l'evenement + message aux invites (optionnels) et date limite de
@@ -11,8 +10,9 @@ const DEFAULT_MESSAGE = 'Nous préparons un livre souvenir. Partagez un souvenir
 // est gere par le backend (valeur par defaut), pas encore ajustable ici,
 // voir l'onglet Parametres de BookCollectiveLuxe.js pour la suite.
 function CollectiveActivateModal({ book, onClose, onActivated }) {
+  const { t } = useTranslation('dashboard');
   const [eventTitle, setEventTitle] = useState('');
-  const [message, setMessage] = useState(DEFAULT_MESSAGE);
+  const [message, setMessage] = useState(() => t('collectiveModal.defaultMessage'));
   const [deadline, setDeadline] = useState('');
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -21,7 +21,7 @@ function CollectiveActivateModal({ book, onClose, onActivated }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!deadline) {
-      setError('La date limite de participation est obligatoire.');
+      setError(t('collectiveModal.deadlineRequired'));
       return;
     }
     setSaving(true);
@@ -36,7 +36,7 @@ function CollectiveActivateModal({ book, onClose, onActivated }) {
       });
       onActivated(updated);
     } catch (err) {
-      setError(err.message || "Impossible d'activer le mode collectif.");
+      setError(err.message || t('collectiveModal.activateFailed'));
       setSaving(false);
     }
   };
@@ -48,23 +48,23 @@ function CollectiveActivateModal({ book, onClose, onActivated }) {
     // inventer un nouveau pour ce seul formulaire.
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-        <h2 className="modal-title">👥 Activer le mode collectif</h2>
+        <h2 className="modal-title">👥 {t('collectiveModal.title')}</h2>
 
         <form onSubmit={handleSubmit}>
           <label className="modal-form-field">
-            <span>Titre de l'événement</span>
+            <span>{t('collectiveModal.eventTitleLabel')}</span>
             <input
               type="text"
               className="input-luxe"
               value={eventTitle}
               onChange={(event) => setEventTitle(event.target.value)}
-              placeholder="Ex : Anniversaire de Sophie"
+              placeholder={t('collectiveModal.eventTitlePlaceholder')}
               maxLength={120}
             />
           </label>
 
           <label className="modal-form-field">
-            <span>Message aux invités</span>
+            <span>{t('collectiveModal.messageLabel')}</span>
             <textarea
               className="input-luxe"
               rows={3}
@@ -75,7 +75,7 @@ function CollectiveActivateModal({ book, onClose, onActivated }) {
           </label>
 
           <label className="modal-form-field">
-            <span>📅 Date limite de participation <em>(obligatoire)</em></span>
+            <span>📅 {t('collectiveModal.deadlineLabel')} <em>{t('collectiveModal.deadlineRequiredHint')}</em></span>
             <input
               type="date"
               className="input-luxe"
@@ -91,15 +91,15 @@ function CollectiveActivateModal({ book, onClose, onActivated }) {
               checked={remindersEnabled}
               onChange={(event) => setRemindersEnabled(event.target.checked)}
             />
-            <span>Activer les relances automatiques (7 puis 2 jours avant la date limite)</span>
+            <span>{t('collectiveModal.remindersLabel')}</span>
           </label>
 
           {error && <p className="modal-text" style={{ color: '#b42318' }}>{error}</p>}
 
           <div className="modal-actions">
-            <button type="button" className="modal-btn modal-btn-cancel" onClick={onClose}>Annuler</button>
+            <button type="button" className="modal-btn modal-btn-cancel" onClick={onClose}>{t('collectiveModal.cancel')}</button>
             <button type="submit" className="modal-btn modal-btn-primary" disabled={saving}>
-              {saving ? 'Activation...' : 'Activer'}
+              {saving ? t('collectiveModal.activating') : t('collectiveModal.activate')}
             </button>
           </div>
         </form>

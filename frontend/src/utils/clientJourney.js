@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { getBookLifecycleStatusFromBook } from './bookLifecycle';
 
 const ORDER_JOURNEY_STATUSES = new Set([
@@ -14,103 +15,30 @@ const ORDER_JOURNEY_STATUSES = new Set([
   'failed'
 ]);
 
-const JOURNEY_STATUS_CONFIG = {
-  editing: {
-    label: 'Édition en cours',
-    tone: 'is-editing'
-  },
-  preview_available: {
-    label: 'Aperçu disponible',
-    tone: 'is-preview'
-  },
-  finalized: {
-    label: 'Validé définitivement',
-    tone: 'is-finalized'
-  },
-  awaiting_payment: {
-    label: 'En attente paiement',
-    tone: 'is-awaiting'
-  },
-  paid: {
-    label: 'Paiement validé',
-    tone: 'is-paid'
-  },
-  pdf_generating: {
-    label: 'Génération PDF',
-    tone: 'is-progress'
-  },
-  pdf_ready: {
-    label: 'PDF prêt',
-    tone: 'is-ready'
-  },
-  print_queued: {
-    label: 'Mise en production',
-    tone: 'is-printer'
-  },
-  sent_to_printer: {
-    label: 'Envoyée imprimeur',
-    tone: 'is-printer'
-  },
-  printed: {
-    label: 'Imprimée',
-    tone: 'is-printed'
-  },
-  shipped: {
-    label: 'Expédiée',
-    tone: 'is-shipped'
-  },
-  delivered: {
-    label: 'Livrée',
-    tone: 'is-ready'
-  },
-  cancelled: {
-    label: 'Commande annulée',
-    tone: 'is-muted'
-  },
-  failed: {
-    label: 'Commande en erreur',
-    tone: 'is-error'
-  }
+// Traduits a l'appel via i18n.t() (chantier bilingue, 2026-10-01) : voir
+// bookLifecycle.js/getBookLifecycleConfig pour la meme raison.
+const JOURNEY_STATUS_TONES = {
+  editing: 'is-editing',
+  preview_available: 'is-preview',
+  finalized: 'is-finalized',
+  awaiting_payment: 'is-awaiting',
+  paid: 'is-paid',
+  pdf_generating: 'is-progress',
+  pdf_ready: 'is-ready',
+  print_queued: 'is-printer',
+  sent_to_printer: 'is-printer',
+  printed: 'is-printed',
+  shipped: 'is-shipped',
+  delivered: 'is-ready',
+  cancelled: 'is-muted',
+  failed: 'is-error'
 };
 
-const JOURNEY_PRIMARY_ACTION = {
-  continue_editing: {
-    label: "Continuer l'album",
-    note: 'Photos, textes et mise en page'
-  },
-  view_preview: {
-    label: "Voir l'aperçu",
-    note: 'Vérifier le rendu du livre'
-  },
-  open_checkout: {
-    label: 'Commander',
-    note: 'Choisir PDF, impression ou pack'
-  },
-  pay_pending_order: {
-    label: 'Payer',
-    note: 'Finaliser la commande en attente'
-  },
-  follow_pdf_generation: {
-    label: 'Suivre la génération',
-    note: 'Le PDF final se prépare'
-  },
-  download_pdf: {
-    label: 'Télécharger le PDF',
-    note: 'Intérieur et couverture'
-  },
-  follow_order: {
-    label: 'Suivre la commande',
-    note: 'Production et livraison'
-  },
-  open_orders: {
-    label: 'Voir la commande',
-    note: 'Historique et détails'
-  },
-  relaunch_order: {
-    label: 'Relancer la commande',
-    note: 'Revenir au checkout'
-  }
-};
+const buildPrimaryAction = (key) => ({
+  key,
+  label: i18n.t(`dashboard:journeyAction.${key}.label`),
+  note: i18n.t(`dashboard:journeyAction.${key}.note`)
+});
 
 const normalizeOrderStatus = (status) => (
   typeof status === 'string' ? status.trim().toLowerCase() : ''
@@ -150,42 +78,46 @@ export const resolveBookJourneyStatus = ({ book, latestOrder = null }) => {
   return 'editing';
 };
 
-export const getJourneyStatusConfig = (status) => (
-  JOURNEY_STATUS_CONFIG[status] || JOURNEY_STATUS_CONFIG.editing
-);
+export const getJourneyStatusConfig = (status) => {
+  const normalized = JOURNEY_STATUS_TONES[status] ? status : 'editing';
+  return {
+    label: i18n.t(`dashboard:journeyStatus.${normalized}`),
+    tone: JOURNEY_STATUS_TONES[normalized]
+  };
+};
 
 export const getJourneyPrimaryAction = (status, latestOrder = null) => {
   const orderType = String(latestOrder?.type || '').toLowerCase();
   switch (status) {
     case 'editing':
-      return { key: 'continue_editing', ...JOURNEY_PRIMARY_ACTION.continue_editing };
+      return buildPrimaryAction('continue_editing');
     case 'preview_available':
-      return { key: 'view_preview', ...JOURNEY_PRIMARY_ACTION.view_preview };
+      return buildPrimaryAction('view_preview');
     case 'finalized':
-      return { key: 'open_checkout', ...JOURNEY_PRIMARY_ACTION.open_checkout };
+      return buildPrimaryAction('open_checkout');
     case 'awaiting_payment':
-      return { key: 'pay_pending_order', ...JOURNEY_PRIMARY_ACTION.pay_pending_order };
+      return buildPrimaryAction('pay_pending_order');
     case 'paid':
       if (orderType === 'print') {
-        return { key: 'follow_order', ...JOURNEY_PRIMARY_ACTION.follow_order };
+        return buildPrimaryAction('follow_order');
       }
-      return { key: 'follow_pdf_generation', ...JOURNEY_PRIMARY_ACTION.follow_pdf_generation };
+      return buildPrimaryAction('follow_pdf_generation');
     case 'pdf_generating':
-      return { key: 'follow_pdf_generation', ...JOURNEY_PRIMARY_ACTION.follow_pdf_generation };
+      return buildPrimaryAction('follow_pdf_generation');
     case 'pdf_ready':
-      return { key: 'download_pdf', ...JOURNEY_PRIMARY_ACTION.download_pdf };
+      return buildPrimaryAction('download_pdf');
     case 'print_queued':
     case 'sent_to_printer':
     case 'printed':
     case 'shipped':
-      return { key: 'follow_order', ...JOURNEY_PRIMARY_ACTION.follow_order };
+      return buildPrimaryAction('follow_order');
     case 'delivered':
-      return { key: 'open_orders', ...JOURNEY_PRIMARY_ACTION.open_orders };
+      return buildPrimaryAction('open_orders');
     case 'cancelled':
     case 'failed':
-      return { key: 'relaunch_order', ...JOURNEY_PRIMARY_ACTION.relaunch_order };
+      return buildPrimaryAction('relaunch_order');
     default:
-      return { key: 'continue_editing', ...JOURNEY_PRIMARY_ACTION.continue_editing };
+      return buildPrimaryAction('continue_editing');
   }
 };
 

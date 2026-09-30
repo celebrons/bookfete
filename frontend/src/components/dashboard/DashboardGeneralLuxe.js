@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import BookCardLuxe from './BookCardLuxe';
 import Loading from '../common/Loading';
@@ -16,6 +17,7 @@ import '../../styles/luxe-theme.css';
 import './DashboardLuxe.css';
 
 const DashboardGeneralLuxe = () => {
+  const { t, i18n } = useTranslation('dashboard');
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [books, setBooks] = useState([]);
@@ -176,7 +178,7 @@ const DashboardGeneralLuxe = () => {
       });
     } catch (error) {
       console.error('Erreur chargement livres:', error);
-      showNotice('Impossible de charger la bibliotheque.', 'error');
+      showNotice(t('general.loadBooksFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -261,12 +263,12 @@ const DashboardGeneralLuxe = () => {
 
       closeArchiveModal();
       showNotice(
-        `Livre archive pour ${months} mois. Suppression automatique le ${autoDeleteDate.toLocaleDateString('fr-FR')}.`,
+        t('general.archivedFor', { months, date: autoDeleteDate.toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'fr-FR') }),
         'success'
       );
     } catch (error) {
       console.error('Erreur archivage:', error);
-      showNotice(`Erreur lors de l'archivage: ${error.message}`, 'error');
+      showNotice(t('general.archiveFailed', { message: error.message }), 'error');
       setArchiveModal((prev) => ({ ...prev, archiving: false }));
     }
   };
@@ -319,10 +321,10 @@ const DashboardGeneralLuxe = () => {
       setArchivedBooks((prev) => prev.filter((book) => book.id !== bookId));
       setBooks((prev) => [{ ...restoredBook, status: 'actif' }, ...prev]);
 
-      showNotice('Livre restaure avec succes.', 'success');
+      showNotice(t('general.restoredSuccess'), 'success');
     } catch (error) {
       console.error('Erreur restauration:', error);
-      showNotice(`Erreur lors de la restauration: ${error.message}`, 'error');
+      showNotice(t('general.restoreFailed', { message: error.message }), 'error');
     }
   };
 
@@ -412,30 +414,30 @@ const DashboardGeneralLuxe = () => {
       }
 
       closeDeleteModal();
-      showNotice('Livre supprime definitivement.', 'success');
+      showNotice(t('general.deletedSuccess'), 'success');
     } catch (error) {
       console.error('Erreur suppression:', error);
-      showNotice(`Erreur lors de la suppression: ${error.message}`, 'error');
+      showNotice(t('general.deleteFailed', { message: error.message }), 'error');
       setDeleteModal((prev) => ({ ...prev, deleting: false }));
     }
   };
 
-  if (loading) return <Loading message="Chargement de votre bibliotheque..." />;
+  if (loading) return <Loading message={t('general.loading')} />;
 
   return (
     <div className="dashboard-container">
       <div className="dashboard-content">
         <div className="dashboard-toolbar">
           <div className="dashboard-header">
-            <div className="dashboard-eyebrow">Bibliotheque personnelle</div>
-            <h1>Bonjour, {user?.user_metadata?.full_name || user?.email}</h1>
-            <p>Vos livres, leur avancement, et ce qu'il reste a faire.</p>
+            <div className="dashboard-eyebrow">{t('general.eyebrow')}</div>
+            <h1>{t('general.greeting', { name: user?.user_metadata?.full_name || user?.email })}</h1>
+            <p>{t('general.subtitle')}</p>
           </div>
 
           <div className="quick-actions dashboard-header-actions">
             <Link to="/create-book" className="btn-new">
               <IconPlus />
-              Nouveau livre
+              {t('general.newBook')}
             </Link>
 
             {stats.archives.count > 0 && (
@@ -444,7 +446,7 @@ const DashboardGeneralLuxe = () => {
                 onClick={() => setShowArchived(!showArchived)}
                 className={`btn-archive-toggle ${showArchived ? 'active' : ''}`}
               >
-                {showArchived ? 'Masquer les archives' : `Archives (${stats.archives.count})`}
+                {showArchived ? t('general.hideArchives') : t('general.archivesCount', { count: stats.archives.count })}
               </button>
             )}
           </div>
@@ -457,7 +459,7 @@ const DashboardGeneralLuxe = () => {
               type="button"
               className="dashboard-feedback-close"
               onClick={dismissNotice}
-              aria-label="Fermer le message"
+              aria-label={t('general.closeNotice')}
             >
               x
             </button>
@@ -470,28 +472,28 @@ const DashboardGeneralLuxe = () => {
             reste visible dans chaque carte livre, pas duplique ici (retour
             utilisateur 2026-09-28 : "des carres et des chiffres partout"). */}
         <div className="stats-line">
-          <span className="stats-line-item"><strong>{stats.enCours.count}</strong> en cours</span>
+          <span className="stats-line-item"><strong>{stats.enCours.count}</strong> {t('general.statsInProgress')}</span>
           <span className="stats-line-sep">·</span>
-          <span className="stats-line-item"><strong>{stats.termines.count}</strong> {stats.termines.count > 1 ? 'termines' : 'termine'}</span>
+          <span className="stats-line-item"><strong>{stats.termines.count}</strong> {t('general.statsFinished', { count: stats.termines.count })}</span>
           <span className="stats-line-sep">·</span>
-          <span className="stats-line-item"><strong>{stats.archives.count}</strong> {stats.archives.count > 1 ? 'archives' : 'archive'}</span>
+          <span className="stats-line-item"><strong>{stats.archives.count}</strong> {t('general.statsArchived', { count: stats.archives.count })}</span>
         </div>
 
         {!showArchived && (
           <div className="dashboard-section-panel">
             <div className="section-title">
-              <h2>Mes livres</h2>
+              <h2>{t('general.myBooks')}</h2>
               <span className="section-count">{books.length}</span>
             </div>
 
             {books.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon"><IconBook /></div>
-                <h3>Vous n'avez pas encore de livre</h3>
-                <p>Creez votre premier livre pour commencer.</p>
+                <h3>{t('general.noBooksYet')}</h3>
+                <p>{t('general.createFirstBook')}</p>
                 <Link to="/create-book" className="btn-new">
                   <IconPlus />
-                  Creer un livre
+                  {t('general.createBook')}
                 </Link>
               </div>
             ) : (
@@ -513,15 +515,15 @@ const DashboardGeneralLuxe = () => {
         {showArchived && (
           <div className="dashboard-section-panel">
             <div className="section-title">
-              <h2>Livres archives</h2>
+              <h2>{t('general.archivedBooks')}</h2>
               <span className="section-count">{archivedBooks.length}</span>
             </div>
 
             {archivedBooks.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon"><IconArchive /></div>
-                <h3>Aucun livre archive</h3>
-                <p>Les livres que vous archivez apparaitront ici.</p>
+                <h3>{t('general.noArchivedBooks')}</h3>
+                <p>{t('general.archivedBooksAppearHere')}</p>
               </div>
             ) : (
               <div className="books-grid books-grid-archived">
@@ -544,18 +546,18 @@ const DashboardGeneralLuxe = () => {
       {archiveModal.show && (
         <div className="modal-overlay">
           <div className="modal-card">
-            <h3 className="modal-title">Archiver le livre</h3>
+            <h3 className="modal-title">{t('general.archiveModal.title')}</h3>
             <p className="modal-text">
-              Voulez-vous archiver "{archiveModal.bookTitle}" ?
+              {t('general.archiveModal.confirm', { title: archiveModal.bookTitle })}
             </p>
             <select
               value={archiveModal.duration}
               onChange={(event) => setArchiveModal({ ...archiveModal, duration: parseInt(event.target.value, 10) })}
               className="modal-select"
             >
-              <option value={3}>3 mois</option>
-              <option value={6}>6 mois</option>
-              <option value={12}>1 an</option>
+              <option value={3}>{t('general.archiveModal.duration3')}</option>
+              <option value={6}>{t('general.archiveModal.duration6')}</option>
+              <option value={12}>{t('general.archiveModal.duration12')}</option>
             </select>
             <div className="modal-actions">
               <button
@@ -563,14 +565,14 @@ const DashboardGeneralLuxe = () => {
                 className="modal-btn modal-btn-cancel"
                 disabled={archiveModal.archiving}
               >
-                Annuler
+                {t('general.archiveModal.cancel')}
               </button>
               <button
                 onClick={handleArchiveBook}
                 className="modal-btn modal-btn-archive"
                 disabled={archiveModal.archiving}
               >
-                {archiveModal.archiving ? 'Archivage...' : 'Archiver'}
+                {archiveModal.archiving ? t('general.archiveModal.archiving') : t('general.archiveModal.archive')}
               </button>
             </div>
           </div>
@@ -580,9 +582,9 @@ const DashboardGeneralLuxe = () => {
       {deleteModal.show && (
         <div className="modal-overlay">
           <div className="modal-card">
-            <h3 className="modal-title modal-title-danger">Supprimer definitivement ?</h3>
+            <h3 className="modal-title modal-title-danger">{t('general.deleteModal.title')}</h3>
             <p className="modal-text">
-              Etes-vous sur de vouloir supprimer "{deleteModal.bookTitle}" ? Cette action est irreversible.
+              {t('general.deleteModal.confirm', { title: deleteModal.bookTitle })}
             </p>
             <div className="modal-actions">
               <button
@@ -590,14 +592,14 @@ const DashboardGeneralLuxe = () => {
                 className="modal-btn modal-btn-cancel"
                 disabled={deleteModal.deleting}
               >
-                Annuler
+                {t('general.deleteModal.cancel')}
               </button>
               <button
                 onClick={handleDeleteBook}
                 className="modal-btn modal-btn-delete"
                 disabled={deleteModal.deleting}
               >
-                {deleteModal.deleting ? 'Suppression...' : 'Supprimer'}
+                {deleteModal.deleting ? t('general.deleteModal.deleting') : t('general.deleteModal.delete')}
               </button>
             </div>
           </div>

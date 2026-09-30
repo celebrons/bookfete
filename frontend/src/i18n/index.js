@@ -18,6 +18,8 @@ import atelierFr from '../locales/fr/atelier.json';
 import atelierEn from '../locales/en/atelier.json';
 import previewFr from '../locales/fr/preview.json';
 import previewEn from '../locales/en/preview.json';
+import dashboardFr from '../locales/fr/dashboard.json';
+import dashboardEn from '../locales/en/dashboard.json';
 
 // Chantier bilingue (2026-09-30) : un namespace par grand domaine de l'app
 // (mirroring frontend/src/components/<dossier>) plutot qu'un fichier de
@@ -27,8 +29,8 @@ import previewEn from '../locales/en/preview.json';
 // chaque phase suivante ajoute le sien (checkout, atelier, collective,
 // legal...) sans jamais toucher a celui-ci.
 const resources = {
-  fr: { common: commonFr, auth: authFr, home: homeFr, createBook: createBookFr, checkout: checkoutFr, account: accountFr, atelier: atelierFr, preview: previewFr },
-  en: { common: commonEn, auth: authEn, home: homeEn, createBook: createBookEn, checkout: checkoutEn, account: accountEn, atelier: atelierEn, preview: previewEn }
+  fr: { common: commonFr, auth: authFr, home: homeFr, createBook: createBookFr, checkout: checkoutFr, account: accountFr, atelier: atelierFr, preview: previewFr, dashboard: dashboardFr },
+  en: { common: commonEn, auth: authEn, home: homeEn, createBook: createBookEn, checkout: checkoutEn, account: accountEn, atelier: atelierEn, preview: previewEn, dashboard: dashboardEn }
 };
 
 i18n
@@ -43,7 +45,7 @@ i18n
     // pour 'en-US'/'en-GB'.
     nonExplicitSupportedLngs: true,
     load: 'languageOnly',
-    ns: ['common', 'auth', 'home', 'createBook', 'checkout', 'account', 'atelier', 'preview'],
+    ns: ['common', 'auth', 'home', 'createBook', 'checkout', 'account', 'atelier', 'preview', 'dashboard'],
     defaultNS: 'common',
     detection: {
       // localStorage d'abord (dernier choix explicite fait sur CE

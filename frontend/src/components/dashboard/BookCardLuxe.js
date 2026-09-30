@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Tooltip from '../ui/Tooltip';
 import {
   IconArchive,
@@ -28,6 +29,7 @@ const BookCardLuxe = ({
   showRestore = false,
   autoDeleteDate
 }) => {
+  const { t, i18n } = useTranslation('dashboard');
   const navigate = useNavigate();
   const lifecycleConfig = getBookLifecycleConfig(getBookLifecycleStatusFromBook(book));
   const latestOrder = book?.latestOrder || null;
@@ -82,7 +84,7 @@ const BookCardLuxe = ({
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: book.title || 'Célébrons', text: 'Participez à ce livre souvenir avec moi.', url: link });
+        await navigator.share({ title: book.title || t('card.shareTitle'), text: t('card.shareText'), url: link });
         return;
       } catch (err) {
         if (err?.name === 'AbortError') return;
@@ -100,17 +102,18 @@ const BookCardLuxe = ({
     }
   };
 
+  const dateLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR');
+    return date.toLocaleDateString(dateLocale);
   };
   // Jour/mois seulement (ex. "22/09"), pour la ligne meta unique de la carte
   // — la maquette de reference n'y affiche jamais l'annee.
   const formatShortDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    return date.toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit' });
   };
   const resolvePrimaryActionPath = () => {
     if (primaryAction.key === 'follow_order' || primaryAction.key === 'open_orders') {
@@ -146,8 +149,8 @@ const BookCardLuxe = ({
 
         <div className="dashboard-book-tools">
           {autoDeleteDate && (
-            <Tooltip text={`Suppression auto le ${formatDate(autoDeleteDate)}`}>
-              <span className="dashboard-book-auto-delete-chip">Auto</span>
+            <Tooltip text={t('card.autoDeleteTooltip', { date: formatDate(autoDeleteDate) })}>
+              <span className="dashboard-book-auto-delete-chip">{t('card.auto')}</span>
             </Tooltip>
           )}
 
@@ -167,7 +170,7 @@ const BookCardLuxe = ({
               }}
               aria-haspopup="true"
               aria-expanded={menuOpen}
-              aria-label="Autres actions"
+              aria-label={t('card.otherActions')}
             >
               <IconMore />
             </button>
@@ -183,7 +186,7 @@ const BookCardLuxe = ({
                     la confirmation "Lien copie !" reste visible. */}
                 {!showRestore && !isSoloProject && book.share_token && (
                   <button type="button" onClick={handleShareLink}>
-                    {shareCopied ? 'Lien copié !' : 'Partager le lien'}
+                    {shareCopied ? t('card.linkCopied') : t('card.shareLink')}
                   </button>
                 )}
 
@@ -196,7 +199,7 @@ const BookCardLuxe = ({
                       onArchive();
                     }}
                   >
-                    <IconArchive /> Archiver
+                    <IconArchive /> {t('card.archive')}
                   </button>
                 )}
 
@@ -209,7 +212,7 @@ const BookCardLuxe = ({
                       onRestore();
                     }}
                   >
-                    <IconRestore /> Restaurer
+                    <IconRestore /> {t('card.restore')}
                   </button>
                 )}
 
@@ -222,7 +225,7 @@ const BookCardLuxe = ({
                     onDelete();
                   }}
                 >
-                  <IconDelete /> Supprimer
+                  <IconDelete /> {t('card.delete')}
                 </button>
               </div>
             )}
@@ -238,22 +241,22 @@ const BookCardLuxe = ({
           <div>
             {/* Repli : un livre peut legitimement n'avoir pas encore de titre
                 — il ne se saisit plus qu'a l'etape couverture (2026-09-15). */}
-            <h3 className="dashboard-book-title">{book.title || 'Livre sans titre'}</h3>
+            <h3 className="dashboard-book-title">{book.title || t('card.untitledBook')}</h3>
             <p
               className="dashboard-book-date"
-              title={isSoloProject ? 'Projet solo : vous ajoutez vous-meme photos et textes' : 'Projet groupe : vos proches contribuent via un lien'}
+              title={isSoloProject ? t('card.soloTitle') : t('card.groupTitle')}
             >
-              {isSoloProject ? 'Solo' : 'Groupe'}
+              {isSoloProject ? t('card.solo') : t('card.group')}
             </p>
           </div>
         </div>
 
         <p className="dashboard-book-summary">
-          {souvenirsCount > 0 && <>{souvenirsCount} souvenir{souvenirsCount > 1 ? 's' : ''} · </>}
-          {photosCount} photo{photosCount > 1 ? 's' : ''}
-          {!isSoloProject ? ' reçue' + (photosCount > 1 ? 's' : '') : ''}
-          {book.page_count ? ` · ${book.page_count} pages` : ''}
-          {book.updated_at ? ` · modifié le ${formatShortDate(book.updated_at)}` : ''}
+          {souvenirsCount > 0 && <>{t('card.memoriesCount', { count: souvenirsCount })} · </>}
+          {t('card.photosCount', { count: photosCount })}
+          {!isSoloProject ? t('card.receivedSuffix', { count: photosCount }) : ''}
+          {book.page_count ? t('card.pagesCountInline', { count: book.page_count }) : ''}
+          {book.updated_at ? t('card.updatedOnInline', { date: formatShortDate(book.updated_at) }) : ''}
         </p>
       </Link>
 
@@ -284,7 +287,7 @@ const BookCardLuxe = ({
                   navigate(`/book/${book.id}/collectif`);
                 }}
               >
-                Gérer le collectif ({collectiveCompletedCount}/{collectiveTotalCount})
+                {t('card.manageCollective', { completed: collectiveCompletedCount, total: collectiveTotalCount })}
               </button>
             ) : (
               <button
@@ -296,7 +299,7 @@ const BookCardLuxe = ({
                   setShowActivateModal(true);
                 }}
               >
-                Inviter
+                {t('card.invite')}
               </button>
             )
           )}
@@ -305,7 +308,7 @@ const BookCardLuxe = ({
 
       {autoDeleteDate && (
         <div className="dashboard-book-delete-note">
-          Suppression auto: {formatDate(autoDeleteDate)}
+          {t('card.autoDeleteNote', { date: formatDate(autoDeleteDate) })}
         </div>
       )}
     </article>

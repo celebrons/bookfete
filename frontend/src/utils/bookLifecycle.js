@@ -1,3 +1,5 @@
+import i18n from '../i18n';
+
 const BOOK_LIFECYCLE_ORDER = [
   'editing',
   'preview_available',
@@ -7,44 +9,29 @@ const BOOK_LIFECYCLE_ORDER = [
   'shipped'
 ];
 
-const BOOK_LIFECYCLE_CONFIG = {
-  editing: {
-    label: 'Édition en cours',
-    shortLabel: 'Édition',
-    tone: 'is-editing'
-  },
-  preview_available: {
-    label: 'Aperçu généré',
-    shortLabel: 'Aperçu',
-    tone: 'is-preview'
-  },
-  finalized: {
-    label: 'Validé définitivement',
-    shortLabel: 'Validé',
-    tone: 'is-finalized'
-  },
-  sent_to_printer: {
-    label: 'Commande en production',
-    shortLabel: 'Commande',
-    tone: 'is-printer'
-  },
-  printed: {
-    label: 'Imprimé',
-    shortLabel: 'Imprimé',
-    tone: 'is-printed'
-  },
-  shipped: {
-    label: 'Expédié',
-    shortLabel: 'Envoyé',
-    tone: 'is-shipped'
-  }
+const BOOK_LIFECYCLE_TONES = {
+  editing: 'is-editing',
+  preview_available: 'is-preview',
+  finalized: 'is-finalized',
+  sent_to_printer: 'is-printer',
+  printed: 'is-printed',
+  shipped: 'is-shipped'
 };
 
 export { BOOK_LIFECYCLE_ORDER };
 
+// Libelles traduits (chantier bilingue, 2026-10-01) : lus au moment de
+// l'appel via i18n.t(), jamais figes dans une table statique — sinon ils
+// restent dans la langue active au premier import du module et ne suivent
+// plus un changement de langue (meme raison que getOrderStatusConfig dans
+// utils/orderWorkflow.js, premier a etablir ce pattern).
 export const getBookLifecycleConfig = (status) => {
   const normalized = normalizeBookLifecycleStatus(status) || 'editing';
-  return BOOK_LIFECYCLE_CONFIG[normalized] || BOOK_LIFECYCLE_CONFIG.editing;
+  return {
+    label: i18n.t(`dashboard:lifecycleStatus.${normalized}.label`),
+    shortLabel: i18n.t(`dashboard:lifecycleStatus.${normalized}.shortLabel`),
+    tone: BOOK_LIFECYCLE_TONES[normalized] || BOOK_LIFECYCLE_TONES.editing
+  };
 };
 
 export const normalizeBookLifecycleStatus = (value) => {
