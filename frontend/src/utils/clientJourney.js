@@ -16,15 +16,15 @@ const ORDER_JOURNEY_STATUSES = new Set([
 
 const JOURNEY_STATUS_CONFIG = {
   editing: {
-    label: 'Edition en cours',
+    label: 'Édition en cours',
     tone: 'is-editing'
   },
   preview_available: {
-    label: 'Apercu disponible',
+    label: 'Aperçu disponible',
     tone: 'is-preview'
   },
   finalized: {
-    label: 'Valide definitivement',
+    label: 'Validé définitivement',
     tone: 'is-finalized'
   },
   awaiting_payment: {
@@ -32,15 +32,15 @@ const JOURNEY_STATUS_CONFIG = {
     tone: 'is-awaiting'
   },
   paid: {
-    label: 'Paiement valide',
+    label: 'Paiement validé',
     tone: 'is-paid'
   },
   pdf_generating: {
-    label: 'Generation PDF',
+    label: 'Génération PDF',
     tone: 'is-progress'
   },
   pdf_ready: {
-    label: 'PDF pret',
+    label: 'PDF prêt',
     tone: 'is-ready'
   },
   print_queued: {
@@ -48,23 +48,23 @@ const JOURNEY_STATUS_CONFIG = {
     tone: 'is-printer'
   },
   sent_to_printer: {
-    label: 'Envoye imprimeur',
+    label: 'Envoyée imprimeur',
     tone: 'is-printer'
   },
   printed: {
-    label: 'Imprime',
+    label: 'Imprimée',
     tone: 'is-printed'
   },
   shipped: {
-    label: 'Expedie',
+    label: 'Expédiée',
     tone: 'is-shipped'
   },
   delivered: {
-    label: 'Livre',
+    label: 'Livrée',
     tone: 'is-ready'
   },
   cancelled: {
-    label: 'Commande annulee',
+    label: 'Commande annulée',
     tone: 'is-muted'
   },
   failed: {
@@ -79,8 +79,8 @@ const JOURNEY_PRIMARY_ACTION = {
     note: 'Photos, textes et mise en page'
   },
   view_preview: {
-    label: 'Voir l apercu',
-    note: 'Verifier le rendu du livre'
+    label: "Voir l'aperçu",
+    note: 'Vérifier le rendu du livre'
   },
   open_checkout: {
     label: 'Commander',
@@ -91,12 +91,12 @@ const JOURNEY_PRIMARY_ACTION = {
     note: 'Finaliser la commande en attente'
   },
   follow_pdf_generation: {
-    label: 'Suivre la generation',
-    note: 'Le PDF final se prepare'
+    label: 'Suivre la génération',
+    note: 'Le PDF final se prépare'
   },
   download_pdf: {
-    label: 'Telecharger le PDF',
-    note: 'Interieur et couverture'
+    label: 'Télécharger le PDF',
+    note: 'Intérieur et couverture'
   },
   follow_order: {
     label: 'Suivre la commande',
@@ -104,7 +104,7 @@ const JOURNEY_PRIMARY_ACTION = {
   },
   open_orders: {
     label: 'Voir la commande',
-    note: 'Historique et details'
+    note: 'Historique et détails'
   },
   relaunch_order: {
     label: 'Relancer la commande',

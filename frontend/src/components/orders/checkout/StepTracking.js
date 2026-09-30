@@ -69,7 +69,7 @@ const statutDuPdf = ({ pret, enCours, echec }) => {
 };
 
 const statutDeLImpression = ({ statut, gelatoOrderId, echec }) => {
-  if (echec) return { label: 'Envoi a reprendre', tone: 'is-error' };
+  if (echec) return { label: 'Envoi à reprendre', tone: 'is-error' };
   const affiche = etapeAffichee(statut);
   if (['printed', 'shipped', 'delivered', 'cancelled', 'failed'].includes(affiche)) {
     return getOrderStatusConfig(affiche);
@@ -246,7 +246,7 @@ function StepTracking({
 
       <div className="orders-result-grid">
         <div>
-          <span>Numero</span>
+          <span>Numéro</span>
           <strong>{order.order_number}</strong>
         </div>
         {pdfAchete && (
@@ -375,7 +375,19 @@ function StepTracking({
                 L'envoi a l'imprimeur se declenche tout seul apres le
                 paiement, en tache de fond : rien ne le disait, et on ne
                 savait pas si le livre avait ete transmis. */}
-            {echecEnvoi ? (
+            {/* ANNULEE OU EN ECHEC DEFINITIF (retour utilisateur, 2026-09-30) :
+                plus rien n'avance, donc plus rien a suivre. Avant, la frise
+                ci-dessous continuait a s'afficher (souvent figee en plein
+                milieu) et le message "Reçu par l'imprimeur n°..." restait
+                visible alors que la commande n'existait plus chez Gelato —
+                deux informations perimees et trompeuses a la fois. */}
+            {status === 'cancelled' || status === 'failed' ? (
+              <p className="tracking-sent">
+                {status === 'cancelled'
+                  ? 'Cette commande a été annulée.'
+                  : "L'impression de cette commande a échoué."} Contactez-nous si vous avez besoin d’aide.
+              </p>
+            ) : echecEnvoi ? (
               <p className="tracking-sent is-failed">
                 L’envoi à l’imprimeur a échoué : {echecEnvoi}. Notre équipe le relance,
                 votre commande n’est pas perdue.
@@ -393,17 +405,19 @@ function StepTracking({
               </p>
             )}
 
-            <ol className="tracking-timeline">
-              {buildPrintTimeline(status).map((step) => (
-                <li
-                  key={step.key}
-                  className={`tracking-step ${step.done ? 'is-done' : ''} ${step.current ? 'is-current' : ''}`}
-                >
-                  <span className="tracking-dot" aria-hidden="true" />
-                  <span className="tracking-label">{step.label}</span>
-                </li>
-              ))}
-            </ol>
+            {status !== 'cancelled' && status !== 'failed' && (
+              <ol className="tracking-timeline">
+                {buildPrintTimeline(status).map((step) => (
+                  <li
+                    key={step.key}
+                    className={`tracking-step ${step.done ? 'is-done' : ''} ${step.current ? 'is-current' : ''}`}
+                  >
+                    <span className="tracking-dot" aria-hidden="true" />
+                    <span className="tracking-label">{step.label}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
 
             {/* Numero de suivi : n'apparait que quand le transporteur en a fourni un. */}
             {tracking?.tracking?.code && (
@@ -422,7 +436,7 @@ function StepTracking({
                 faussement rassurant. */}
             {tracking?.stale && (
               <p className="orders-disclaimer">
-                L'imprimeur est momentanement injoignable : voici le dernier etat connu.
+                L'imprimeur est momentanément injoignable : voici le dernier état connu.
               </p>
             )}
             {tracking?.gelatoStatusUnknown && (

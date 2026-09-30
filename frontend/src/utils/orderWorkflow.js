@@ -13,16 +13,16 @@ export const ORDER_STATUS_SEQUENCE = [
 const ORDER_STATUS_CONFIG = {
   draft: { label: 'Brouillon', tone: 'is-draft' },
   awaiting_payment: { label: 'En attente paiement', tone: 'is-awaiting' },
-  paid: { label: 'Payee', tone: 'is-paid' },
-  pdf_generating: { label: 'Paiement valide - generation PDF', tone: 'is-progress' },
-  pdf_ready: { label: 'PDF pret', tone: 'is-ready' },
+  paid: { label: 'Payée', tone: 'is-paid' },
+  pdf_generating: { label: 'Paiement validé - génération PDF', tone: 'is-progress' },
+  pdf_ready: { label: 'PDF prêt', tone: 'is-ready' },
   print_queued: { label: 'Mise en production', tone: 'is-progress' },
-  sent_to_printer: { label: 'Envoye imprimeur', tone: 'is-progress' },
-  printed: { label: 'Imprime', tone: 'is-progress' },
-  shipped: { label: 'Expedie', tone: 'is-progress' },
-  delivered: { label: 'Livre', tone: 'is-ready' },
-  cancelled: { label: 'Annulee', tone: 'is-muted' },
-  failed: { label: 'Echec', tone: 'is-error' }
+  sent_to_printer: { label: 'Envoyée imprimeur', tone: 'is-progress' },
+  printed: { label: 'Imprimé', tone: 'is-progress' },
+  shipped: { label: 'Expédiée', tone: 'is-progress' },
+  delivered: { label: 'Livrée', tone: 'is-ready' },
+  cancelled: { label: 'Annulée', tone: 'is-muted' },
+  failed: { label: 'Échec', tone: 'is-error' }
 };
 
 export const getOrderStatusConfig = (status) => (

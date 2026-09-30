@@ -9,18 +9,18 @@ const BOOK_LIFECYCLE_ORDER = [
 
 const BOOK_LIFECYCLE_CONFIG = {
   editing: {
-    label: 'Edition en cours',
-    shortLabel: 'Edition',
+    label: 'Édition en cours',
+    shortLabel: 'Édition',
     tone: 'is-editing'
   },
   preview_available: {
-    label: 'Apercu genere',
-    shortLabel: 'Apercu',
+    label: 'Aperçu généré',
+    shortLabel: 'Aperçu',
     tone: 'is-preview'
   },
   finalized: {
-    label: 'Valide definitivement',
-    shortLabel: 'Valide',
+    label: 'Validé définitivement',
+    shortLabel: 'Validé',
     tone: 'is-finalized'
   },
   sent_to_printer: {
@@ -29,13 +29,13 @@ const BOOK_LIFECYCLE_CONFIG = {
     tone: 'is-printer'
   },
   printed: {
-    label: 'Imprime',
-    shortLabel: 'Imprime',
+    label: 'Imprimé',
+    shortLabel: 'Imprimé',
     tone: 'is-printed'
   },
   shipped: {
-    label: 'Expedie',
-    shortLabel: 'Envoye',
+    label: 'Expédié',
+    shortLabel: 'Envoyé',
     tone: 'is-shipped'
   }
 };
