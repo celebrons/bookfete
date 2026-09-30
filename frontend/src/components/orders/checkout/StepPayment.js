@@ -43,40 +43,27 @@ function StepPayment({
     <article className="orders-panel">
       <h2>Recapitulatif et paiement</h2>
 
-      <div className="orders-result-grid">
+      {/* UN SEUL BLOC (retour utilisateur, 2026-09-30, piste "Commande &
+          compte") : livre + produit + quantite + total tenaient avant sur
+          quatre a six lignes encadrees separement (orders-result-grid +
+          orders-summary). Le detail (unite, livraison) reste present en
+          texte discret sous le titre — rien n'est perdu, juste regroupe
+          autour du seul chiffre qui compte vraiment avant de payer : le
+          total. */}
+      <div className="orders-recap-compact">
         <div>
-          <span>Livre</span>
-          <strong>{bookTitle || 'Sans titre'}</strong>
+          <span className="orders-recap-compact-title">
+            {TYPE_LABELS[orderType] || orderType} · {bookTitle || 'Sans titre'}
+          </span>
+          <span className="orders-recap-compact-sub">
+            {quantity} exemplaire{quantity > 1 ? 's' : ''}
+            {quantity > 1 && Number.isFinite(unitCents) ? ` · ${formatPriceCents(unitCents)} l'unité` : ''}
+            {withPrint
+              ? (Number.isFinite(shippingCents) ? ` · livraison ${formatPriceCents(shippingCents)}` : ' · livraison à domicile')
+              : ' · téléchargement uniquement'}
+          </span>
         </div>
-        <div>
-          <span>Produit</span>
-          <strong>{TYPE_LABELS[orderType] || orderType}</strong>
-        </div>
-      </div>
-
-      <div className="orders-summary">
-        <div>
-          <span>Prix unitaire</span>
-          <strong>{formatPriceCents(unitCents)}</strong>
-        </div>
-        <div>
-          <span>Quantite</span>
-          <strong>{quantity}</strong>
-        </div>
-        {/* Livraison distinguee (§3/§13 : "le prix total doit etre
-            parfaitement visible avant le paiement" — sans le detail, ce
-            dernier ecran avant Stripe montrerait un total qui inclut la
-            livraison sans jamais le dire). */}
-        {withPrint && Number.isFinite(shippingCents) && (
-          <div>
-            <span>Livraison</span>
-            <strong>{formatPriceCents(shippingCents)}</strong>
-          </div>
-        )}
-        <div>
-          <span>Total a payer</span>
-          <strong>{formatPriceCents(totalCents)}</strong>
-        </div>
+        <span className="orders-recap-compact-total">{formatPriceCents(totalCents)}</span>
       </div>
 
       {withPrint && (

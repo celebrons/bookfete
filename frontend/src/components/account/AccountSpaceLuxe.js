@@ -245,12 +245,11 @@ const AccountSpaceLuxe = () => {
   return (
     <div className="account-page">
       <div className="container-luxe account-shell">
-        <header className="account-hero card-luxe">
-          <div className="label-gold">Mon espace</div>
-          <h1>Espace client</h1>
-          <p>
-            Retrouvez vos commandes, vos projets, vos adresses et la securite de votre compte.
-          </p>
+        <header className="account-hero">
+          <div>
+            <h1>Espace client</h1>
+            <p>Retrouvez vos commandes, vos projets, vos adresses et la sécurité de votre compte.</p>
+          </div>
         </header>
 
         {notice?.message && (

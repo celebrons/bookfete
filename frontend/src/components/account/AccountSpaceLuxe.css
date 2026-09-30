@@ -8,24 +8,27 @@
   padding-bottom: 80px;
 }
 
+/* En-tete SOBRE (retour utilisateur, 2026-09-30, piste "Commande & compte")
+   — memes valeurs que .orders-hero (OrdersLuxe.css) : plus de bandeau beige
+   degrade en carte, un filet fin suffit. */
 .account-hero {
-  padding: 28px 32px;
-  border: 1px solid rgba(184, 146, 74, 0.25);
-  border-radius: 20px;
-  background: linear-gradient(160deg, #f8f4ea 0%, #ffffff 72%);
-  margin-bottom: 20px;
+  margin-bottom: 26px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(223, 216, 201, 0.9);
 }
 
 .account-hero h1 {
-  margin: 8px 0 10px;
-  font-size: clamp(30px, 3.6vw, 48px);
+  margin: 0 0 4px;
+  font-family: var(--font-editorial);
+  font-size: 22px;
+  color: var(--ink);
 }
 
 .account-hero p {
   margin: 0;
   max-width: 760px;
-  font-size: 15px;
-  color: rgba(31, 31, 31, 0.75);
+  font-size: 13px;
+  color: var(--text-light);
 }
 
 .account-loading {

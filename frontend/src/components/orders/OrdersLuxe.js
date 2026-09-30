@@ -4,11 +4,27 @@ import {
   getOrderStatusConfig,
   includesPrint,
   includesPdf,
+  isPdfReady,
   formatPriceCents
 } from '../../utils/orderWorkflow';
-import { createStripeCheckoutSession, deleteOrder, getOrderTracking, listOrders } from '../../services/ordersApi';
+import { createStripeCheckoutSession, deleteOrder, getOrderInvoice, getOrderTracking, listOrders } from '../../services/ordersApi';
 import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
+
+// Une seule action PRINCIPALE par commande (retour utilisateur, 2026-09-30,
+// piste "Commande & compte" : "une action principale et un menu ··· pour le
+// reste") — priorite a ce qui fait le plus avancer la commande. Tout le
+// reste (retour au livre, facture, suppression) rejoint le menu "···".
+function resolveActionPrincipale(order) {
+  if (order.status === 'awaiting_payment') return 'payer';
+  if (order.status === 'pdf_generating' && includesPdf(order.type)) return 'suivre_pdf';
+  if (isPdfReady(order) && includesPdf(order.type)) return 'recuperer_pdf';
+  if (includesPrint(order.type) && order.book_id) return 'suivre_livraison';
+  if (order.status === 'paid' && includesPdf(order.type)) return 'finaliser_pdf';
+  return 'retour_livre';
+}
+
+const LIBELLE_TYPE = { pdf: 'PDF', print: 'Livre imprimé', pack: 'Pack PDF + imprimé' };
 
 // L'avance MANUELLE du statut d'impression a ete retiree le 2026-09-18.
 //
@@ -35,6 +51,8 @@ const OrdersLuxe = () => {
   const [notice, setNotice] = useState(null);
   const [startingPaymentOrderId, setStartingPaymentOrderId] = useState('');
   const [deletingOrderId, setDeletingOrderId] = useState('');
+  const [openMenuOrderId, setOpenMenuOrderId] = useState('');
+  const [fetchingInvoiceId, setFetchingInvoiceId] = useState('');
 
   const loadOrders = async () => {
     try {
@@ -81,6 +99,17 @@ const OrdersLuxe = () => {
     loadOrders();
   }, []);
 
+  // Ferme le menu "···" ouvert des qu'on clique ailleurs sur la page — sans
+  // ca, plusieurs menus pourraient rester ouverts en meme temps.
+  useEffect(() => {
+    if (!openMenuOrderId) return undefined;
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.orders-card-menu')) setOpenMenuOrderId('');
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuOrderId]);
+
 
   // Suppression d'une commande (essais de formats/types/paiement). Le serveur
   // est seul juge de ce qui est supprimable : on se contente de confirmer
@@ -100,6 +129,24 @@ const OrdersLuxe = () => {
       setNotice({ type: 'error', message: error.message });
     } finally {
       setDeletingOrderId('');
+    }
+  };
+
+  // Ouverture de la facture depuis le menu "···" — a la demande, pas de
+  // sondage systematique comme dans InvoiceDownloadLink.js (evite N appels
+  // reseau simultanes sur une liste qui peut compter plusieurs commandes).
+  const voirLaFacture = async (order) => {
+    if (!order?.id || fetchingInvoiceId) return;
+    try {
+      setFetchingInvoiceId(order.id);
+      setNotice(null);
+      const invoice = await getOrderInvoice(order.id);
+      if (!invoice?.url) throw new Error('Facture indisponible pour le moment.');
+      window.open(invoice.url, '_blank', 'noopener');
+    } catch (error) {
+      setNotice({ type: 'error', message: error.message || "Impossible d'ouvrir la facture." });
+    } finally {
+      setFetchingInvoiceId('');
     }
   };
 
@@ -132,12 +179,13 @@ const OrdersLuxe = () => {
   return (
     <div className="orders-page">
       <div className="container-luxe orders-shell">
-        <header className="orders-hero card-luxe">
-          <div className="label-gold">Compte client</div>
-          <h1>Mes commandes</h1>
-          <p>Suivez vos commandes PDF et imprimees en temps reel.</p>
+        <header className="orders-hero">
+          <div>
+            <h1>Mes commandes</h1>
+            <p>Suivez vos commandes PDF et imprimées en temps réel.</p>
+          </div>
           <div className="orders-hero-links">
-            <Link to="/account" className="btn btn-outline">Retour espace client</Link>
+            <Link to="/account" className="orders-hero-link">← Espace client</Link>
           </div>
         </header>
 
@@ -156,105 +204,115 @@ const OrdersLuxe = () => {
             {orders.map((order) => {
               const statusConfig = getOrderStatusConfig(order.status);
               const bookId = order.book_id;
+              const actionPrincipale = resolveActionPrincipale(order);
+              const menuOuvert = openMenuOrderId === order.id;
+
               return (
-                <article key={order.id} className="orders-list-card">
-                  <div className="orders-list-head">
-                    <div>
-                      <h3>{order.book_title || 'Livre sans titre'}</h3>
-                      <p>{order.order_number}</p>
-                    </div>
-                    <span className={`orders-status-chip ${statusConfig.tone}`}>{statusConfig.label}</span>
-                  </div>
+                <article key={order.id} className="orders-card">
+                  <div className="orders-card-top">
+                    <span className={`orders-card-status ${statusConfig.tone}`}>{statusConfig.label}</span>
 
-                  <div className="orders-meta-grid">
-                    <div>
-                      <span>Type</span>
-                      <strong>{order.type === 'pdf' ? 'PDF' : order.type === 'print' ? 'Imprime' : 'Pack'}</strong>
-                    </div>
-                    <div>
-                      <span>Total</span>
-                      <strong>{formatPriceCents(order.total_cents, order.currency || 'EUR')}</strong>
-                    </div>
-                    <div>
-                      <span>Date</span>
-                      <strong>{new Date(order.created_at).toLocaleString('fr-FR')}</strong>
-                    </div>
-                  </div>
-
-                  <div className="orders-card-actions">
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => navigate(`/book/${bookId}`)}
-                    >
-                      Retour au livre
-                    </button>
-
-                    {order.status === 'awaiting_payment' && (
+                    {/* Meme famille que la carte Bibliotheque
+                        (BookCardLuxe.js) : une action principale visible,
+                        le reste (retour au livre sauf s'il est deja
+                        l'action principale, facture, suppression) derriere
+                        "···". */}
+                    <div className="orders-card-menu">
                       <button
                         type="button"
-                        className="btn btn-primary"
+                        className={`orders-card-menu-btn ${menuOuvert ? 'is-open' : ''}`}
+                        onClick={() => setOpenMenuOrderId(menuOuvert ? '' : order.id)}
+                        aria-haspopup="true"
+                        aria-expanded={menuOuvert}
+                        aria-label="Autres actions"
+                      >
+                        ···
+                      </button>
+                      {menuOuvert && (
+                        <div className="orders-card-menu-panel">
+                          {actionPrincipale !== 'retour_livre' && (
+                            <button type="button" onClick={() => { setOpenMenuOrderId(''); navigate(`/book/${bookId}`); }}>
+                              Retour au livre
+                            </button>
+                          )}
+                          {order.status !== 'awaiting_payment' && (
+                            <button
+                              type="button"
+                              disabled={fetchingInvoiceId === order.id}
+                              onClick={() => { setOpenMenuOrderId(''); voirLaFacture(order); }}
+                            >
+                              {fetchingInvoiceId === order.id ? 'Ouverture...' : 'Voir la facture'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="is-danger"
+                            disabled={deletingOrderId === order.id}
+                            onClick={() => { setOpenMenuOrderId(''); removeOrder(order); }}
+                          >
+                            {deletingOrderId === order.id ? 'Suppression...' : 'Supprimer'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="orders-card-body">
+                    <h3>{order.book_title || 'Livre sans titre'}</h3>
+                    <p className="orders-card-type">{LIBELLE_TYPE[order.type] || order.type}</p>
+                  </div>
+
+                  {/* Une seule ligne de meta-donnees (retour utilisateur,
+                      2026-09-30, piste "Commande & compte") a la place des
+                      trois cases Type / Total / Date : le type est deja
+                      dans le corps de la carte ci-dessus. */}
+                  <p className="orders-card-summary">
+                    {formatPriceCents(order.total_cents, order.currency || 'EUR')}
+                    {' · '}
+                    {new Date(order.created_at).toLocaleDateString('fr-FR')}
+                    {' · '}
+                    {order.order_number}
+                  </p>
+
+                  <div className="orders-card-footer">
+                    {actionPrincipale === 'payer' && (
+                      <button
+                        type="button"
+                        className="orders-card-primary-btn"
                         disabled={startingPaymentOrderId === order.id}
                         onClick={() => startStripePayment(order)}
                       >
                         {startingPaymentOrderId === order.id ? 'Redirection...' : 'Payer'}
                       </button>
                     )}
-
-                    {order.status === 'paid' && includesPdf(order.type) && (
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => navigate(`/book/${bookId}/checkout`)}
-                      >
-                        Finaliser PDF
+                    {actionPrincipale === 'suivre_pdf' && (
+                      <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}/checkout`)}>
+                        Suivre la génération PDF
                       </button>
                     )}
-
-                    {order.status === 'pdf_generating' && includesPdf(order.type) && (
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => navigate(`/book/${bookId}/checkout`)}
-                      >
-                        Suivre generation PDF
+                    {actionPrincipale === 'recuperer_pdf' && (
+                      <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}/checkout`)}>
+                        Récupérer le PDF
                       </button>
                     )}
-
-                    {includesPdf(order.type) && (order.status === 'pdf_ready' || order?.metadata?.pdfReady) && (
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => navigate(`/book/${bookId}/checkout`)}
-                      >
-                        Recuperer PDF
-                      </button>
-                    )}
-
                     {/* Le detail du suivi (frise de production, numero de
                         colis) vit dans l'ecran de suivi du parcours de
                         commande : on y renvoie plutot que de le dupliquer. */}
-                    {includesPrint(order.type) && bookId && (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => navigate(`/book/${bookId}/checkout`)}
-                      >
-                        Voir le suivi
+                    {actionPrincipale === 'suivre_livraison' && (
+                      <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}/checkout`)}>
+                        Suivre la livraison
                       </button>
                     )}
-
-                    {/* Nettoyage des essais : le serveur refuse de lui-meme
-                        une commande partie en production ou reellement
-                        payee, on affiche alors son message. */}
-                    <button
-                      type="button"
-                      className="btn btn-outline is-danger"
-                      disabled={deletingOrderId === order.id}
-                      onClick={() => removeOrder(order)}
-                    >
-                      {deletingOrderId === order.id ? 'Suppression...' : 'Supprimer'}
-                    </button>
+                    {actionPrincipale === 'finaliser_pdf' && (
+                      <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}/checkout`)}>
+                        Finaliser le PDF
+                      </button>
+                    )}
+                    {actionPrincipale === 'retour_livre' && (
+                      <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}`)}>
+                        Retour au livre
+                      </button>
+                    )}
                   </div>
                 </article>
               );

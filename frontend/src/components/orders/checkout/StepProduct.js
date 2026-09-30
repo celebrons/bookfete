@@ -124,45 +124,42 @@ function StepProduct({
         })}
       </div>
 
-      <div className="orders-field">
-        <label htmlFor="quantity">Quantité</label>
-        <input
-          id="quantity"
-          type="number"
-          min="1"
-          max="20"
-          className="input-luxe"
-          value={quantity}
-          onChange={(event) => onChangeQuantity(Number(event.target.value || 1))}
-          disabled={locked}
-        />
-      </div>
-
-      <div className="orders-summary">
-        <div>
-          <span>Prix unitaire</span>
-          <strong>{formatPriceCents(unitCents)}</strong>
+      {/* UNE SEULE LIGNE (retour utilisateur, 2026-09-30, piste "Commande &
+          compte") : le champ Quantité et les trois blocs Prix unitaire /
+          Quantité / Total affichaient quatre fois la meme donnee sur quatre
+          lignes separees. Le total reste la SEULE chose mise en avant
+          visuellement (a droite, en gras) ; le detail (unite, livraison)
+          n'est plus qu'un texte discret entre le selecteur et le total.
+          Rien n'est perdu : memes trois informations (prix unitaire des que
+          quantite > 1, livraison si applicable, total), juste regroupees. */}
+      <div className="orders-recap-line">
+        <div className="orders-qty-stepper">
+          <button
+            type="button"
+            className="orders-qty-btn"
+            onClick={() => onChangeQuantity(Math.max(1, quantity - 1))}
+            disabled={locked || quantity <= 1}
+            aria-label="Réduire la quantité"
+          >
+            −
+          </button>
+          <span className="orders-qty-val">{quantity}</span>
+          <button
+            type="button"
+            className="orders-qty-btn"
+            onClick={() => onChangeQuantity(Math.min(20, quantity + 1))}
+            disabled={locked || quantity >= 20}
+            aria-label="Augmenter la quantité"
+          >
+            +
+          </button>
         </div>
-        <div>
-          <span>Quantité</span>
-          <strong>{quantity}</strong>
-        </div>
-        {/* Livraison distinguee du prix du livre (chantier "tarification
-            dynamique", 2026-09-27, §3 : "ne jamais faire 44,30€ livraison
-            incluse") — totalCents l'inclut deja, cette ligne dit ce qu'elle
-            represente au lieu de laisser le total "sauter" sans explication.
-            Absente pour le PDF (aucune livraison, voir le disclaimer plus
-            bas). */}
-        {includesPrint(orderType) && Number.isFinite(shippingCents) && (
-          <div>
-            <span>Livraison</span>
-            <strong>{formatPriceCents(shippingCents)}</strong>
-          </div>
-        )}
-        <div>
-          <span>Total</span>
-          <strong>{formatPriceCents(totalCents)}</strong>
-        </div>
+        <span className="orders-recap-detail">
+          {quantity} exemplaire{quantity > 1 ? 's' : ''}
+          {quantity > 1 && Number.isFinite(unitCents) ? ` · ${formatPriceCents(unitCents)} l'unité` : ''}
+          {includesPrint(orderType) && Number.isFinite(shippingCents) ? ` · livraison ${formatPriceCents(shippingCents)}` : ''}
+        </span>
+        <span className="orders-recap-total">{formatPriceCents(totalCents)}</span>
       </div>
 
       <p className="orders-disclaimer">

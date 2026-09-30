@@ -1392,19 +1392,22 @@ const BookCheckoutLuxe = () => {
   return (
     <div className="orders-page">
       <div className="container-luxe orders-shell">
-        <header className="orders-hero card-luxe">
-          <div className="label-gold">Commande</div>
-          <h1>Finaliser votre commande</h1>
-          <p>
-            Livre: <strong>{book?.title || 'Sans titre'}</strong>
-          </p>
-          {/* Ni pastille de statut, ni « Prochaine action ». La frise
-              d etapes juste en dessous dit deja ou on en est, et mieux :
-              « Valide definitivement / Prochaine action: Commander »
-              inquietait sans informer (retour utilisateur 2026-09-19). */}
+        {/* En-tete SOBRE (retour utilisateur, 2026-09-30, piste "Commande &
+            compte") : plus de bandeau beige repete sur les 4 ecrans du
+            parcours — un titre, le livre concerne, deux liens discrets.
+            Ni pastille de statut, ni « Prochaine action ». La frise
+            d etapes juste en dessous dit deja ou on en est, et mieux :
+            « Valide definitivement / Prochaine action: Commander »
+            inquietait sans informer (retour utilisateur 2026-09-19). */}
+        <header className="orders-hero">
+          <div>
+            <h1>Finaliser votre commande</h1>
+            <p>{book?.title || 'Sans titre'}{book?.page_count ? ` · ${book.page_count} pages` : ''}</p>
+          </div>
           <div className="orders-hero-links">
-            <Link to={`/book/${bookId}`} className="btn btn-outline">Retour au livre</Link>
-            <Link to="/orders" className="btn btn-outline">Mes commandes</Link>
+            <Link to={`/book/${bookId}`} className="orders-hero-link">← Retour au livre</Link>
+            <Link to={`/book/${bookId}/apercu`} className="orders-hero-link">Aperçu</Link>
+            <Link to="/orders" className="orders-hero-link">Mes commandes</Link>
           </div>
         </header>
 

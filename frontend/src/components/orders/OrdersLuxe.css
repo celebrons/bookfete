@@ -8,29 +8,56 @@
   padding-bottom: 80px;
 }
 
+/* En-tete SOBRE (retour utilisateur, 2026-09-30 : mise en place de la piste
+   "Commande & compte", artefact "Célébrons — pistes d'interface") — remplace
+   l'ancien bandeau beige degrade, identique sur les 5 ecrans du parcours
+   (produit/adresse/paiement/suivi + liste des commandes), qui repetait la
+   meme composition (eyebrow + tres grand titre + carte) a chaque etape.
+   Filet fin en bas plutot qu'un encadre : coherent avec le reste du site
+   (atelier, dashboard), jamais une "carte" a part. */
 .orders-hero {
-  padding: 28px 32px;
-  border-radius: 20px;
-  border: 1px solid rgba(184, 146, 74, 0.24);
-  background: linear-gradient(155deg, #f8f3e8 0%, #ffffff 74%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid rgba(223, 216, 201, 0.9);
 }
 
 .orders-hero h1 {
-  margin: 8px 0 8px;
-  font-size: clamp(30px, 3.8vw, 48px);
+  margin: 0 0 4px;
+  font-family: var(--font-editorial);
+  font-size: 22px;
+  color: var(--ink);
 }
 
 .orders-hero p {
   margin: 0;
-  color: rgba(31, 31, 31, 0.74);
+  font-size: 13px;
+  color: var(--text-light);
 }
 
 .orders-hero-links {
-  margin-top: 18px;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding-top: 4px;
 }
+
+.orders-hero-link {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--gold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+.orders-hero-link:hover { opacity: 0.72; }
 
 .orders-journey {
   margin-top: 12px;
@@ -105,18 +132,103 @@
   font-size: 22px;
 }
 
-.orders-field {
-  display: grid;
-  gap: 8px;
-  margin-top: 14px;
+/* Recapitulatif prix EN UNE LIGNE (StepProduct.js), remplace l'ancien champ
+   Quantite + les trois blocs Prix unitaire/Quantite/Total encadres
+   separement (retour utilisateur, 2026-09-30, piste "Commande & compte") —
+   memes valeurs que .co-recap-ligne dans l'artefact de reference. */
+.orders-recap-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 18px;
+  margin-top: 16px;
+  border-top: 1px solid rgba(184, 146, 74, 0.2);
 }
 
-.orders-field label {
-  font-size: 12px;
+.orders-qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(184, 146, 74, 0.3);
+  border-radius: 999px;
+  padding: 4px;
+  flex: none;
+}
+
+.orders-qty-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(184, 146, 74, 0.12);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.orders-qty-btn:hover:not(:disabled) { background: rgba(184, 146, 74, 0.22); }
+.orders-qty-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.orders-qty-val {
+  min-width: 16px;
+  text-align: center;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(31, 31, 31, 0.7);
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+}
+
+.orders-recap-detail {
+  font-size: 12.5px;
+  color: var(--text-light);
+  margin-right: auto;
+}
+
+.orders-recap-total {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Recapitulatif compact du paiement (StepPayment.js) — remplace
+   orders-result-grid + orders-summary (livre/produit/prix unitaire/
+   quantite/livraison/total, six cases encadrees separement). Memes valeurs
+   que .co-recap-compact dans l'artefact de reference. */
+.orders-recap-compact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 0;
+  margin: 16px 0 20px;
+  border-top: 1px solid rgba(184, 146, 74, 0.2);
+  border-bottom: 1px solid rgba(184, 146, 74, 0.2);
+}
+
+.orders-recap-compact-title {
+  display: block;
+  font-family: var(--font-editorial);
+  font-size: 15.5px;
+  color: var(--ink);
+}
+
+.orders-recap-compact-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+.orders-recap-compact-total {
+  font-family: var(--font-editorial);
+  font-size: 21px;
+  color: var(--gold-deep, var(--gold));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .product-choice-grid {
@@ -352,34 +464,6 @@
   color: rgba(31, 31, 31, 0.7);
 }
 
-.orders-summary {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.orders-summary div {
-  border: 1px solid rgba(184, 146, 74, 0.2);
-  border-radius: 10px;
-  padding: 10px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.orders-summary span {
-  font-size: 12px;
-  color: rgba(31, 31, 31, 0.7);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700;
-}
-
-.orders-summary strong {
-  font-size: 15px;
-}
-
 .orders-disclaimer {
   margin-top: 10px;
   font-size: 12px;
@@ -448,47 +532,6 @@
   color: rgba(31, 31, 31, 0.65);
 }
 
-.orders-status-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  border: 1px solid transparent;
-  min-width: 120px;
-}
-
-.orders-status-chip.is-draft,
-.orders-status-chip.is-muted {
-  background: rgba(148, 163, 184, 0.1);
-  border-color: rgba(148, 163, 184, 0.3);
-  color: #516173;
-}
-
-.orders-status-chip.is-awaiting,
-.orders-status-chip.is-progress {
-  background: rgba(184, 146, 74, 0.12);
-  border-color: rgba(184, 146, 74, 0.32);
-  color: #7e5f2a;
-}
-
-.orders-status-chip.is-paid,
-.orders-status-chip.is-ready {
-  background: rgba(47, 133, 90, 0.1);
-  border-color: rgba(47, 133, 90, 0.3);
-  color: #1f5b3d;
-}
-
-.orders-status-chip.is-error {
-  background: rgba(177, 54, 66, 0.1);
-  border-color: rgba(177, 54, 66, 0.3);
-  color: #7b1f2b;
-}
-
 .orders-empty {
   margin: 0;
   color: rgba(31, 31, 31, 0.65);
@@ -496,66 +539,172 @@
 
 .orders-list-full {
   margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
 }
 
-.orders-list-card {
-  border: 1px solid rgba(184, 146, 74, 0.22);
-  border-radius: 16px;
-  padding: 16px;
+/* Carte "Mes commandes" (retour utilisateur, 2026-09-30, piste "Commande &
+   compte") : reprend la meme famille visuelle que la carte Bibliotheque
+   (dashboard-book-card, DashboardLuxe.css) — point de statut en texte, une
+   seule ligne de meta-donnees au lieu de trois cases (Type / Total / Date),
+   une action principale et un menu "···" pour le reste. Prefixe orders-*
+   propre a cet ecran plutot qu'un import croise de DashboardLuxe.css. */
+.orders-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  border-radius: 10px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
   background: rgba(255, 255, 255, 0.9);
+  padding: 20px;
 }
 
-.orders-list-head {
+.orders-card-top {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-bottom: 10px;
+}
+
+/* Un point de couleur et un mot, jamais une pastille encadree — meme
+   traitement que .dashboard-book-status. */
+.orders-card-status {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-light);
 }
 
-.orders-list-head h3 {
-  margin: 0;
-  font-size: 20px;
+.orders-card-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+  flex: none;
 }
 
-.orders-list-head p {
-  margin: 4px 0 0;
-  color: rgba(31, 31, 31, 0.65);
-  font-size: 13px;
+.orders-card-status.is-draft,
+.orders-card-status.is-muted { color: #5f6770; }
+.orders-card-status.is-awaiting,
+.orders-card-status.is-progress { color: #8b5e11; }
+.orders-card-status.is-paid,
+.orders-card-status.is-ready { color: #1f7a3d; }
+.orders-card-status.is-error { color: #b42318; }
+
+.orders-card-menu {
+  position: relative;
 }
 
-.orders-meta-grid {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+.orders-card-menu-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition-fast);
 }
 
-.orders-meta-grid > div {
-  border: 1px solid rgba(184, 146, 74, 0.18);
-  border-radius: 10px;
-  padding: 10px;
+.orders-card-menu-btn:hover,
+.orders-card-menu-btn.is-open {
+  border-color: rgba(184, 146, 74, 0.4);
+  background: rgba(184, 146, 74, 0.08);
 }
 
-.orders-meta-grid span {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(31, 31, 31, 0.68);
-}
-
-.orders-card-actions {
-  margin-top: 12px;
+.orders-card-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  min-width: 168px;
+  padding: 6px;
+  background: var(--white);
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 20px 32px -20px rgba(58, 44, 20, 0.32);
 }
 
-@media (max-width: 980px) {
-  .orders-meta-grid {
-    grid-template-columns: 1fr;
-  }
+.orders-card-menu-panel button {
+  border: none;
+  background: none;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.orders-card-menu-panel button:hover {
+  background: rgba(184, 146, 74, 0.1);
+}
+
+.orders-card-menu-panel button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.orders-card-menu-panel button.is-danger {
+  color: #b42318;
+}
+
+.orders-card-menu-panel button.is-danger:hover {
+  background: rgba(180, 35, 24, 0.1);
+}
+
+.orders-card-body h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.orders-card-type {
+  margin: 3px 0 0;
+  color: var(--text-light);
+  font-size: 12px;
+}
+
+.orders-card-summary {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #38414c;
+  font-weight: 500;
+}
+
+.orders-card-footer {
+  margin-top: 12px;
+}
+
+.orders-card-primary-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #8b5e11;
+  cursor: pointer;
+}
+
+.orders-card-primary-btn:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.orders-card-primary-btn::after {
+  content: ' →';
 }
 
 /* --- Parcours en 4 ecrans (2026-09-11) ---------------------------------- */
