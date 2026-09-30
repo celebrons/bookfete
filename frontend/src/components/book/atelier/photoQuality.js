@@ -58,10 +58,16 @@ export const RATIO_GAP_THRESHOLD = 0.15;
 // `ok` n'a volontairement aucun message ni badge (critere d'acceptation
 // n°1 : une bonne photo ne declenche aucun avertissement visible).
 export const FIT_DISPLAY = {
-  ok: { severity: null, label: '' },
-  limite: { severity: 'warning', label: "Cette photo risque d'apparaître légèrement floue à l'impression" },
-  insuffisant: { severity: 'danger', label: "Résolution insuffisante : cette photo risque d'apparaître floue à l'impression" }
+  ok: { severity: null },
+  limite: { severity: 'warning' },
+  insuffisant: { severity: 'danger' }
 };
+
+// Libelle traduit (chantier bilingue, 2026-09-30) : calcule a l'affichage
+// par l'appelant, jamais au chargement du module — sinon il reste fige dans
+// la langue active au premier import et ne suit plus un changement de
+// langue (meme raison qu'atelierLayouts.js/atelierMoods.js).
+export const getFitLabel = (statut, t) => (statut ? t(`photoQuality.fitLabels.${statut}`) : '');
 
 function resolveUsableAreaMm(printFormat) {
   const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;

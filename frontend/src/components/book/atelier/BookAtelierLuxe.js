@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../../services/supabaseClient';
 import {
   listContentItems,
@@ -103,6 +104,7 @@ function stableStringify(value) {
 }
 
 export default function BookAtelierLuxe() {
+  const { t } = useTranslation('atelier');
   const { bookId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -2394,10 +2396,10 @@ export default function BookAtelierLuxe() {
         onUploadFile={handleUploadPhotoForPicker}
         onClose={handleClosePhotoPicker}
         title={pickerTargetCoverFace
-          ? (pickerTargetCoverFace === 'front' ? 'Choisir la photo de couverture' : 'Choisir la photo de 4e de couverture')
+          ? (pickerTargetCoverFace === 'front' ? t('photoPickerModal.coverTitle') : t('photoPickerModal.backCoverTitle'))
           : undefined}
-        introHint={pickerTargetCoverFace ? 'Vos photos importées :' : undefined}
-        emptyHint={pickerTargetCoverFace ? 'Importez une photo pour pouvoir en choisir une ici.' : undefined}
+        introHint={pickerTargetCoverFace ? t('photoPickerModal.coverIntroHint') : undefined}
+        emptyHint={pickerTargetCoverFace ? t('photoPickerModal.coverEmptyHint') : undefined}
       />
 
       {error && <div className="wizard-error atelier-error">{error}</div>}

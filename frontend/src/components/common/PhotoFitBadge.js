@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { getFitLabel } from '../book/atelier/photoQuality';
 import './PhotoFitBadge.css';
 
 // Badge d'avertissement de qualite d'impression (cahier des charges v2,
@@ -14,6 +16,7 @@ import './PhotoFitBadge.css';
 // (ecran recapitulatif). `as` : 'span' par defaut ; passer 'div' quand le
 // badge ne doit pas etre imbrique dans du texte.
 function PhotoFitBadge({ fit, size = 'sm', className = '' }) {
+  const { t } = useTranslation('atelier');
   // ALLEGEMENT DU 2026-09-20 : plus de badge ambre.
   //
   // 'limite' (150-250 dpi) signalait une photo qui s'imprime tres bien.
@@ -27,12 +30,17 @@ function PhotoFitBadge({ fit, size = 'sm', className = '' }) {
   // remettre a l'ecran, il suffit de reaccepter 'warning' ici et dans
   // backend/routes/composition.js (print-quality-check).
   if (!fit || fit.severity !== 'danger') return null;
+  // `fit.label` : deja traduit cote serveur pour l'ecran recapitulatif
+  // (PrintQualityRecapModal, texte OU photo — print-quality-check), sinon
+  // calcule ici pour un `fit` purement frontend (toujours une photo, voir
+  // photoQuality.js).
+  const label = fit.label || getFitLabel(fit.statut, t);
 
   return (
     <span
       className={`photo-fit-badge is-${fit.severity} is-${size} ${className}`.trim()}
-      title={fit.label}
-      aria-label={fit.label}
+      title={label}
+      aria-label={label}
       role="img"
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

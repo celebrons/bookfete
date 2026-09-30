@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { resolveSlotSizeMm, checkImageFit, suggestLayoutsForPhotoRatio } from './photoQuality';
-import { ATELIER_LAYOUTS } from './atelierLayouts';
+import { useTranslation } from 'react-i18next';
+import { resolveSlotSizeMm, checkImageFit, suggestLayoutsForPhotoRatio, getFitLabel } from './photoQuality';
+import { ATELIER_LAYOUTS, getLayoutLabel } from './atelierLayouts';
 import PhotoFitBadge from '../../common/PhotoFitBadge';
 
 // Repositionnement/zoom d'une photo DANS son cadre (cahier des charges v2 :
@@ -54,6 +55,7 @@ function AtelierPhotoAdjustModal({
   // occupe" — seul un declencheur au clic manquait).
   onReplace
 }) {
+  const { t } = useTranslation('atelier');
   const [focalX, setFocalX] = useState(0.5);
   const [focalY, setFocalY] = useState(0.5);
   const [zoom, setZoom] = useState(1);
@@ -157,22 +159,22 @@ function AtelierPhotoAdjustModal({
     <div className="atelier-modal-backdrop" onClick={onClose}>
       <div className="atelier-modal atelier-adjust-modal" onClick={(event) => event.stopPropagation()}>
         <div className="atelier-modal-head">
-          <h2 className="atelier-modal-title">Ajuster le cadrage</h2>
-          <button type="button" className="atelier-modal-close" onClick={onClose} aria-label="Fermer">×</button>
+          <h2 className="atelier-modal-title">{t('photoAdjustModal.title')}</h2>
+          <button type="button" className="atelier-modal-close" onClick={onClose} aria-label={t('photoAdjustModal.close')}>×</button>
         </div>
 
         <p className="atelier-adjust-hint">
           {fitMode === 'contain'
-            ? 'La photo entiere tient dans le cadre. Zoomez pour la faire remplir davantage.'
-            : 'Faites glisser la photo pour la repositionner, zoomez si besoin.'}
+            ? t('photoAdjustModal.hintContain')
+            : t('photoAdjustModal.hintCover')}
         </p>
 
         {/* Choix du mode. Deux options nommees par ce qu'elles FONT, jamais
             par le terme technique (cover/contain). */}
-        <div className="atelier-adjust-mode" role="group" aria-label="Cadrage dans l'emplacement">
+        <div className="atelier-adjust-mode" role="group" aria-label={t('photoAdjustModal.modeGroupLabel')}>
           {[
-            { value: 'cover', label: 'Remplir le cadre' },
-            { value: 'contain', label: 'Photo entiere' }
+            { value: 'cover', label: t('photoAdjustModal.modeCover') },
+            { value: 'contain', label: t('photoAdjustModal.modeContain') }
           ].map((mode) => (
             <button
               key={mode.value}
@@ -226,15 +228,15 @@ function AtelierPhotoAdjustModal({
               className="atelier-adjust-replace-btn"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => { event.stopPropagation(); onReplace(); }}
-              title="Choisir une autre photo pour cet emplacement"
+              title={t('photoAdjustModal.replacePhotoTitle')}
             >
-              ⇄ Changer la photo
+              ⇄ {t('photoAdjustModal.replacePhoto')}
             </button>
           )}
         </div>
 
         <label className="atelier-adjust-zoom-row">
-          <span>Zoom</span>
+          <span>{t('photoAdjustModal.zoom')}</span>
           <input
             type="range"
             min={PHOTO_ZOOM_MIN}
@@ -247,7 +249,7 @@ function AtelierPhotoAdjustModal({
 
         {fit?.severity && (
           <p className="atelier-adjust-quality">
-            <PhotoFitBadge fit={fit} size="sm" /> {fit.label}
+            <PhotoFitBadge fit={fit} size="sm" /> {getFitLabel(fit.statut, t)}
           </p>
         )}
 
@@ -257,12 +259,11 @@ function AtelierPhotoAdjustModal({
         {fit?.ratioGap && onChooseSuggestedLayout && (
           <div className="atelier-adjust-suggest">
             <p className="atelier-adjust-suggest-text">
-              Cette photo a une forme très différente de son cadre : une partie est coupée.
-              Vous pouvez aussi choisir « Photo entière » ci-dessus pour ne rien couper.
+              {t('photoAdjustModal.ratioGapText')}
             </p>
             {!showSuggestions ? (
               <button type="button" className="atelier-adjust-suggest-btn" onClick={() => setShowSuggestions(true)}>
-                Voir d'autres mises en page adaptées
+                {t('photoAdjustModal.seeOtherLayouts')}
               </button>
             ) : suggestions.length > 0 ? (
               <div className="atelier-adjust-suggest-list">
@@ -273,13 +274,13 @@ function AtelierPhotoAdjustModal({
                     className="atelier-adjust-suggest-option"
                     onClick={() => onChooseSuggestedLayout(layout.slug)}
                   >
-                    {layout.label}
+                    {getLayoutLabel(layout.slug, t)}
                   </button>
                 ))}
               </div>
             ) : (
               <p className="atelier-adjust-suggest-text">
-                Aucune mise en page du catalogue n'épouse mieux la forme de cette photo — le recadrage reste la meilleure option ici.
+                {t('photoAdjustModal.noSuggestion')}
               </p>
             )}
           </div>
@@ -287,14 +288,14 @@ function AtelierPhotoAdjustModal({
 
         <div className="atelier-modal-actions">
           <button type="button" className="btn btn-outline" onClick={() => onReset(item.id)}>
-            Réinitialiser le cadrage
+            {t('photoAdjustModal.resetCrop')}
           </button>
           <button
             type="button"
             className="btn btn-primary"
             onClick={() => onSave(item.id, { focalX, focalY, zoom, fitMode })}
           >
-            Enregistrer
+            {t('photoAdjustModal.save')}
           </button>
         </div>
       </div>

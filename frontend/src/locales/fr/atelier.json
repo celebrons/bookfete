@@ -1,0 +1,228 @@
+{
+  "common": {
+    "close": "Fermer"
+  },
+  "confirmSwitch": {
+    "title": "Passer en mode automatique ?",
+    "body": "Célébrons va proposer une nouvelle organisation de votre livre à partir de vos contenus. Les pages que vous avez déjà construites à la main restent intactes — seules les pages encore automatiques seront réorganisées.",
+    "keep": "Conserver mon travail",
+    "continue": "Continuer"
+  },
+  "toolsBar": {
+    "ariaLabel": "Outils de composition",
+    "photos": "Photos",
+    "layout": "Mise en page",
+    "pages": "Pages"
+  },
+  "onboarding": {
+    "close": "Fermer",
+    "title": "Comment construire votre livre",
+    "steps": {
+      "photos": {
+        "title": "Vos photos",
+        "text": "Cliquez sur \"Photos\" en haut pour ouvrir votre bibliothèque, y ajouter des photos et des textes."
+      },
+      "dragDrop": {
+        "title": "Glissez-déposez",
+        "text": "Glissez un souvenir dans un emplacement de la page — ou cliquez dessus puis cliquez l'emplacement."
+      },
+      "layout": {
+        "title": "Mise en page",
+        "text": "Cliquez sur \"Mise en page\" (ou sur l'icône posée sur la page) pour choisir la mise en page de la page affichée, juste à côté du livre."
+      },
+      "navigate": {
+        "title": "Naviguer dans les pages",
+        "text": "Les flèches ‹ › sous le livre font tourner les pages une à une. Pour aller directement à une page, à la couverture ou à la 4e de couverture, ouvrez \"Pages\"."
+      },
+      "auto": {
+        "title": "Mode automatique",
+        "text": "Ou laissez Célébrons composer tout le livre (\"Composer automatiquement\", en haut), puis ajustez les pages que vous voulez à la main."
+      }
+    }
+  },
+  "layouts": {
+    "categories": {
+      "photo-single": "Une photo",
+      "photo-multi": "Plusieurs photos",
+      "photo-text": "Photos & texte",
+      "text": "Un ou plusieurs souvenirs",
+      "title-photos": "Titre + photos"
+    },
+    "slugs": {
+      "FULL_PHOTO": "1 grande photo",
+      "FULL_PHOTO_SPREAD": "1 photo sur double page",
+      "TWO_PHOTOS": "2 photos verticales",
+      "TWO_PHOTOS_STACKED": "2 photos horizontales",
+      "THREE_PHOTOS": "3 photos",
+      "FOUR_PHOTOS": "4 photos",
+      "PHOTO_TEXT": "Photo puis texte",
+      "TEXT_PHOTO": "Texte puis photo",
+      "PHOTO_WITH_CAPTION": "Grande photo, petite légende",
+      "TWO_PHOTOS_TEXT": "2 photos et un texte",
+      "ONE_TESTIMONY": "1 témoignage",
+      "TWO_TESTIMONIES": "2 témoignages",
+      "THREE_TESTIMONIES": "3 témoignages",
+      "TITLE_TEXT": "Titre et texte",
+      "TITLE_TWO_PHOTOS": "Titre et 2 photos",
+      "TITLE_FOUR_PHOTOS": "Titre et 4 photos"
+    }
+  },
+  "moods": {
+    "classique": { "label": "Classique", "description": "Le rythme habituel, équilibré entre photos et textes." },
+    "aere": { "label": "Aéré", "description": "Chaque photo respire seule — plus de pages, moins de densité." },
+    "compact": { "label": "Compact", "description": "Caser un maximum de souvenirs dans le nombre de pages choisi." },
+    "chapitre": { "label": "Chapitre", "description": "Des pages-titres rythment le livre, esprit magazine." },
+    "collage": { "label": "Collage", "description": "Très photo, en grilles denses, quasiment pas de texte seul." }
+  },
+  "layoutPanel": {
+    "title": "Mise en page",
+    "saving": "Enregistrement...",
+    "saved": "Enregistré",
+    "saveError": "Erreur d'enregistrement",
+    "question": "Que souhaitez-vous mettre sur cette page ?",
+    "changeLayout": "Changer de mise en page",
+    "slotLabels": {
+      "photo": "Photo",
+      "text": "Texte",
+      "title": "Titre",
+      "empty": "Emplacement"
+    },
+    "clickToConfirmRemove": "Cliquer à nouveau pour confirmer le retrait",
+    "clickToRemove": "Cliquer pour retirer",
+    "confirmRemove": "Confirmer le retrait ?",
+    "remove": "Retirer"
+  },
+  "generateModal": {
+    "title": "Générer automatiquement",
+    "close": "Fermer",
+    "intro": "Choisissez une ambiance : Célébrons compose tout le livre d'un coup à partir de vos souvenirs, chaque photo et chaque texte utilisé une seule fois. Vous pourrez ensuite ajuster n'importe quelle page à la main, ou régénérer avec une autre ambiance.",
+    "manualKept_one": "Votre {{count}} page composée à la main est conservée telle quelle : la génération ne remplit que les pages restantes, et n'y replace jamais une photo ou un souvenir que vous y avez déjà posé.",
+    "manualKept_other": "Vos {{count}} pages composées à la main sont conservées telles quelles : la génération ne remplit que les pages restantes, et n'y replace jamais une photo ou un souvenir que vous y avez déjà posé.",
+    "replaceWarning": "Les pages déjà composées automatiquement seront remplacées par la nouvelle proposition. Vos photos et souvenirs, eux, ne sont jamais supprimés.",
+    "checkingContent": "Vérification du contenu...",
+    "overflow": {
+      "prefix": "Votre contenu demande ",
+      "pagesBold": "{{count}} pages",
+      "middle": " alors que votre livre en compte {{current}}. Célébrons ne laisse jamais une photo de côté : le livre passera donc à {{next}} pages",
+      "priceChangePrefix": ", et son prix de ",
+      "priceChangeSeparator": " à ",
+      "suffix": ". Pour garder {{current}} pages, fermez cette fenêtre et retirez des photos dans « Mes souvenirs »."
+    },
+    "remaining": {
+      "main_one": "Votre contenu remplit environ {{estimated}} page{{estimatedPlural}} sur les {{min}} de votre livre : la dernière page restera blanche.",
+      "main_other": "Votre contenu remplit environ {{estimated}} page{{estimatedPlural}} sur les {{min}} de votre livre : les {{count}} dernières pages resteront blanches.",
+      "note": "Célébrons ne répète jamais une photo ni un souvenir pour combler l'espace — vous pourrez les composer à la main, ou ajouter du contenu dans « Mes souvenirs »."
+    },
+    "cancel": "Annuler",
+    "willGrowTo": "Le livre passera à {{pages}} pages",
+    "generating": "Génération...",
+    "generate": "Générer"
+  },
+  "photoAdjustModal": {
+    "title": "Ajuster le cadrage",
+    "close": "Fermer",
+    "hintContain": "La photo entière tient dans le cadre. Zoomez pour la faire remplir davantage.",
+    "hintCover": "Faites glisser la photo pour la repositionner, zoomez si besoin.",
+    "modeGroupLabel": "Cadrage dans l'emplacement",
+    "modeCover": "Remplir le cadre",
+    "modeContain": "Photo entière",
+    "replacePhoto": "Changer la photo",
+    "replacePhotoTitle": "Choisir une autre photo pour cet emplacement",
+    "zoom": "Zoom",
+    "ratioGapText": "Cette photo a une forme très différente de son cadre : une partie est coupée. Vous pouvez aussi choisir « Photo entière » ci-dessus pour ne rien couper.",
+    "seeOtherLayouts": "Voir d'autres mises en page adaptées",
+    "noSuggestion": "Aucune mise en page du catalogue n'épouse mieux la forme de cette photo — le recadrage reste la meilleure option ici.",
+    "resetCrop": "Réinitialiser le cadrage",
+    "save": "Enregistrer"
+  },
+  "finishModal": {
+    "titleReady": "Votre livre est prêt à être prévisualisé",
+    "titleAlmost": "Presque prêt",
+    "photosUsed_one": "{{count}} photo utilisée",
+    "photosUsed_other": "{{count}} photos utilisées",
+    "memoriesUsed_one": "{{count}} souvenir utilisé",
+    "memoriesUsed_other": "{{count}} souvenirs utilisés",
+    "pagesCreated_one": "{{count}} page créée",
+    "pagesCreated_other": "{{count}} pages créées",
+    "allPagesComplete": "Toutes les pages sont complètes",
+    "incompletePages_one": "{{count}} page n'est pas encore complète",
+    "incompletePages_other": "{{count}} pages ne sont pas encore complètes",
+    "qualityChecked": "Qualité photo vérifiée",
+    "lowQualityWarning_one": "{{count}} photo pourrait être moins nette",
+    "lowQualityWarning_other": "{{count}} photos pourraient être moins nettes",
+    "hidePages": "Masquer les pages",
+    "seePages_one": "Voir la page concernée",
+    "seePages_other": "Voir les {{count}} pages concernées",
+    "qualityTip": "Souvent, il suffit de passer la photo en « Photo entière » ou de choisir une mise en page mieux adaptée à sa forme — cliquez sur une page pour essayer directement.",
+    "pageNumber": "Page {{number}}",
+    "photoCount_one": "{{count}} photo",
+    "photoCount_other": "{{count}} photos",
+    "tightCrop": "cadrage très serré",
+    "insufficientRes": "résolution insuffisante",
+    "slightlyLow": "un peu juste",
+    "viewBook": "Voir mon livre",
+    "fixInAtelier": "Corriger dans l'atelier",
+    "viewAnyway": "Voir quand même"
+  },
+  "pageActions": {
+    "editLayoutTitle": "Modifier la mise en page de cette page",
+    "moveTitle": "Déplacer cette page dans le livre (actuellement page {{current}} sur {{total}})",
+    "moveLabel": "Déplacer cette page dans le livre",
+    "positionTitle": "Position dans le livre",
+    "moveBackward": "Avancer cette page d'un cran vers le début",
+    "moveForward": "Reculer cette page d'un cran vers la fin",
+    "pagePrefix": "page",
+    "pageSuffix": "sur {{total}}",
+    "positionAriaLabel": "Position de cette page (1 à {{total}})",
+    "positionError": "Entrez un numéro entre 1 et {{total}}.",
+    "moving": "Déplacement en cours…",
+    "moveHint": "Les autres pages se décalent. Vous pouvez aussi glisser la vignette dans la bande du bas.",
+    "clearTitle": "Vider cette page",
+    "clearConfirmTitle": "Vider cette page ?",
+    "clearHint": "Les souvenirs restent dans votre bibliothèque, seule la page est vidée.",
+    "cancel": "Annuler",
+    "clear": "Vider"
+  },
+  "duplicatePhotosModal": {
+    "title": "Ces {{count}} photos sont déjà dans votre livre",
+    "titleSingular": "Cette photo est déjà dans votre livre",
+    "introSamePlural": "Elles portent",
+    "introSameSingular": "Elle porte",
+    "introMiddle": " le même nom et la même taille que ",
+    "introTargetPlural": "des photos déjà déposées",
+    "introTargetSingular": "une photo déjà déposée",
+    "newPhotosPrefix": "Votre sélection contient aussi",
+    "newPhotosCount": "{{count}} photo{{plural}} nouvelle{{plural}}",
+    "remainingCount": "+{{count}}",
+    "cancel": "Annuler",
+    "addAnyway": "Ajouter quand même",
+    "addNewOnly": "N'ajouter que les {{count}} nouvelle{{plural}}",
+    "noteWithNew": "« Ajouter quand même » remet aussi les photos déjà présentes. « Annuler » n'ajoute rien du tout.",
+    "noteWithoutNew": "« Annuler » n'ajoute aucune photo."
+  },
+  "photoPickerModal": {
+    "defaultTitle": "Choisir une photo",
+    "defaultIntroHint": "Vos photos importées, pas encore utilisées :",
+    "defaultEmptyHint": "Toutes vos photos importées sont déjà placées dans le livre.",
+    "coverTitle": "Choisir la photo de couverture",
+    "backCoverTitle": "Choisir la photo de 4e de couverture",
+    "coverIntroHint": "Vos photos importées :",
+    "coverEmptyHint": "Importez une photo pour pouvoir en choisir une ici.",
+    "useThisPhoto": "Utiliser cette photo",
+    "or": "ou",
+    "uploading": "Import en cours…",
+    "uploadFromFiles": "Importer une photo depuis mes fichiers"
+  },
+  "photoQuality": {
+    "fitLabels": {
+      "ok": "",
+      "limite": "Cette photo risque d'apparaître légèrement floue à l'impression",
+      "insuffisant": "Résolution insuffisante : cette photo risque d'apparaître floue à l'impression"
+    },
+    "textFitLabels": {
+      "ok": "Texte bien placé",
+      "limite": "Texte réduit pour tenir",
+      "insuffisant": "Texte trop long pour cet emplacement"
+    }
+  }
+}

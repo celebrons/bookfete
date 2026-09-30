@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ATELIER_CATEGORIES, ATELIER_LAYOUTS, layoutsByCategory, slotAcceptsItem } from './atelierLayouts';
+import { useTranslation } from 'react-i18next';
+import { ATELIER_CATEGORIES, ATELIER_LAYOUTS, layoutsByCategory, slotAcceptsItem, getCategoryLabel, getLayoutLabel } from './atelierLayouts';
 import { makeSlotHandlers } from './atelierSlotInteractions';
 import { getOverlayGeometry, OVERLAY_CONTENT_INSET_PCT } from './atelierLayoutGeometry';
 
@@ -9,8 +10,6 @@ import { getOverlayGeometry, OVERLAY_CONTENT_INSET_PCT } from './atelierLayoutGe
 // galerie de formats (jamais un second mecanisme de choix). Format choisi
 // -> les emplacements apparaissent, cibles de glisser-deposer ou de clic
 // (si un element est deja selectionne cote gauche).
-
-const SLOT_LABELS = { photo: 'Photo', text: 'Texte', title: 'Titre' };
 
 // Repere "photo" dessine dans les emplacements image de la vignette. A cette
 // taille (une case fait parfois 12 px de haut) un pictogramme detaille
@@ -113,6 +112,7 @@ function LayoutMiniPreview({ slug, slots, printFormat, spread }) {
 }
 
 function FormatGallery({ layouts, selectedSlug, onChoose, printFormat }) {
+  const { t } = useTranslation('atelier');
   return (
     <div className="atelier-format-grid">
       {layouts.map((layout) => (
@@ -128,7 +128,7 @@ function FormatGallery({ layouts, selectedSlug, onChoose, printFormat }) {
             printFormat={printFormat}
             spread={layout.spread}
           />
-          <span className="atelier-format-label">{layout.label}</span>
+          <span className="atelier-format-label">{getLayoutLabel(layout.slug, t)}</span>
         </button>
       ))}
     </div>
@@ -159,6 +159,7 @@ const FORMAT_DIMENSIONS_MM = {
 // deposer/clic fonctionnent ici exactement comme avant, seule la forme et
 // le contenu affiche par emplacement changent.
 function LayoutFormatMiniature({ layout, slotItems, printFormat, selectedSidebarItem, onAssignSlot, onRemoveSlot }) {
+  const { t } = useTranslation('atelier');
   const geometry = getOverlayGeometry(layout.slug);
   const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
 
@@ -220,19 +221,19 @@ function LayoutFormatMiniature({ layout, slotItems, printFormat, selectedSidebar
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => handleDrop(event, index, slotType)}
               onClick={() => handleClick(index, item, slotType)}
-              title={item ? (isPending ? 'Cliquer a nouveau pour confirmer le retrait' : 'Cliquer pour retirer') : undefined}
+              title={item ? (isPending ? t('layoutPanel.clickToConfirmRemove') : t('layoutPanel.clickToRemove')) : undefined}
             >
               {item ? (
                 isPending ? (
-                  <span className="atelier-format-slot-confirm">Confirmer le retrait ?</span>
+                  <span className="atelier-format-slot-confirm">{t('layoutPanel.confirmRemove')}</span>
                 ) : (
                   <>
                     <span className="atelier-format-slot-check" aria-hidden="true">✓</span>
-                    <span className="atelier-format-slot-remove" aria-hidden="true">Retirer</span>
+                    <span className="atelier-format-slot-remove" aria-hidden="true">{t('layoutPanel.remove')}</span>
                   </>
                 )
               ) : (
-                <span className="atelier-format-slot-empty-label">{SLOT_LABELS[slotType] || 'Emplacement'}</span>
+                <span className="atelier-format-slot-empty-label">{t(`layoutPanel.slotLabels.${slotType}`, { defaultValue: t('layoutPanel.slotLabels.empty') })}</span>
               )}
             </div>
           );
@@ -272,6 +273,7 @@ function AtelierLayoutPanel({
   // (2026-09-25). Non fourni -> on le propose, comportement d'avant.
   doublePagePossible = true
 }) {
+  const { t } = useTranslation('atelier');
   const isAvailable = (slug) => (
     (!availableSlugs || availableSlugs.has(slug))
     && (doublePagePossible || !ATELIER_LAYOUTS.find((layout) => layout.slug === slug)?.spread)
@@ -283,17 +285,17 @@ function AtelierLayoutPanel({
   return (
     <aside className="atelier-layout-panel">
       <div className="atelier-layout-panel-head">
-        <span className="atelier-layout-panel-title">Mise en page</span>
+        <span className="atelier-layout-panel-title">{t('layoutPanel.title')}</span>
         {saveStatus && saveStatus !== 'idle' && (
           <span className={`atelier-save-status is-${saveStatus}`}>
-            {saveStatus === 'saving' ? 'Enregistrement...' : saveStatus === 'saved' ? '✓ Enregistre' : "Erreur d'enregistrement"}
+            {saveStatus === 'saving' ? t('layoutPanel.saving') : saveStatus === 'saved' ? `✓ ${t('layoutPanel.saved')}` : t('layoutPanel.saveError')}
           </span>
         )}
       </div>
 
       {!draftLayout ? (
         <>
-          <p className="atelier-layout-question">Que souhaitez-vous mettre sur cette page ?</p>
+          <p className="atelier-layout-question">{t('layoutPanel.question')}</p>
           <div className="atelier-category-list">
             {ATELIER_CATEGORIES.map((category) => (
               <button
@@ -303,7 +305,7 @@ function AtelierLayoutPanel({
                 onClick={() => onSelectCategory(activeCategory === category.id ? null : category.id)}
               >
                 <span className="atelier-category-icon" aria-hidden="true">{category.icon}</span>
-                {category.label}
+                {getCategoryLabel(category.id, t)}
               </button>
             ))}
           </div>
@@ -317,9 +319,9 @@ function AtelierLayoutPanel({
       ) : (
         <>
           <div className="atelier-layout-chosen">
-            <p className="atelier-layout-chosen-label">{draftLayout.label}</p>
+            <p className="atelier-layout-chosen-label">{getLayoutLabel(draftLayout.slug, t)}</p>
             <button type="button" className="atelier-layout-change-btn" onClick={() => onChangeFormat()}>
-              Changer de mise en page
+              {t('layoutPanel.changeLayout')}
             </button>
           </div>
 

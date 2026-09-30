@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ATELIER_MOODS } from './atelierMoods';
+import { useTranslation } from 'react-i18next';
+import { ATELIER_MOODS, getMoodLabel, getMoodDescription } from './atelierMoods';
 import { formatPriceCents as formatEuro } from '../../../utils/orderWorkflow';
 
 // Point d'entree de la generation automatique depuis l'atelier (remplace le
@@ -24,6 +25,7 @@ function AtelierGenerateModal({
   // l utilisateur ce qui leur arrivera (rien).
   manualPagesCount = 0
 }) {
+  const { t } = useTranslation('atelier');
   const [selectedMood, setSelectedMood] = useState('classique');
 
   // `estimatedPages` porte ici le nombre de pages REELLEMENT remplies dans ce
@@ -62,13 +64,11 @@ function AtelierGenerateModal({
     <div className="atelier-modal-backdrop" onClick={() => !isGenerating && onClose()}>
       <div className="atelier-modal" onClick={(event) => event.stopPropagation()}>
         <div className="atelier-modal-head">
-          <h2 className="atelier-modal-title">Generer automatiquement</h2>
-          <button type="button" className="atelier-modal-close" onClick={onClose} disabled={isGenerating} aria-label="Fermer">×</button>
+          <h2 className="atelier-modal-title">{t('generateModal.title')}</h2>
+          <button type="button" className="atelier-modal-close" onClick={onClose} disabled={isGenerating} aria-label={t('generateModal.close')}>×</button>
         </div>
         <p className="atelier-hint">
-          Choisissez une ambiance : Celebrons compose tout le livre d'un coup a partir de vos souvenirs, chaque
-          photo et chaque texte utilise une seule fois. Vous pourrez ensuite ajuster n'importe quelle page a la
-          main, ou regenerer avec une autre ambiance.
+          {t('generateModal.intro')}
         </p>
 
         {/* Dit noir sur blanc ce qui arrive aux pages deja faites a la main.
@@ -80,10 +80,7 @@ function AtelierGenerateModal({
             (2026-09-14). */}
         {manualPagesCount > 0 && (
           <p className="atelier-hint atelier-hint-safe">
-            Vos {manualPagesCount} page{manualPagesCount > 1 ? 's' : ''} composée{manualPagesCount > 1 ? 's' : ''} à
-            la main {manualPagesCount > 1 ? 'sont conservées' : 'est conservée'} telle
-            {manualPagesCount > 1 ? 's quelles' : ' quelle'} : la génération ne remplit que les pages restantes, et
-            n'y replace jamais une photo ou un souvenir que vous y avez déjà posé.
+            {t('generateModal.manualKept', { count: manualPagesCount })}
           </p>
         )}
 
@@ -97,11 +94,10 @@ function AtelierGenerateModal({
 
             On dit donc simplement ce qui change, et ce qui ne change pas. */}
         <p className="atelier-hint atelier-hint-warning">
-          Les pages déjà composées automatiquement seront remplacées par la nouvelle
-          proposition. Vos photos et souvenirs, eux, ne sont jamais supprimés.
+          {t('generateModal.replaceWarning')}
         </p>
 
-        {loadingEstimate && <p className="atelier-hint">Verification du contenu...</p>}
+        {loadingEstimate && <p className="atelier-hint">{t('generateModal.checkingContent')}</p>}
 
         {/* LE LIVRE VA GRANDIR, ET LE PRIX AVEC (2026-09-21).
             Le moteur ne tronque jamais : tout le contenu est place, et le
@@ -111,24 +107,25 @@ function AtelierGenerateModal({
             laisse decider : composer ainsi, ou revenir retirer des photos. */}
         {debordement && (
           <p className="atelier-hint atelier-hint-warning">
-            Votre contenu demande <strong>{debordement.pagesPrevues} pages</strong> alors que votre
-            livre en compte {debordement.pagesActuelles}. Célébrons ne laisse jamais une photo de côté :
-            le livre passera donc à {debordement.pagesPrevues} pages
+            {t('generateModal.overflow.prefix')}<strong>{t('generateModal.overflow.pagesBold', { count: debordement.pagesPrevues })}</strong>
+            {t('generateModal.overflow.middle', { current: debordement.pagesActuelles, next: debordement.pagesPrevues })}
             {debordement.prixActuelCents != null && debordement.prixPrevuCents != null && (
-              <>, et son prix de <strong>{formatEuro(debordement.prixActuelCents)}</strong> à{' '}
+              <>{t('generateModal.overflow.priceChangePrefix')}<strong>{formatEuro(debordement.prixActuelCents)}</strong>{t('generateModal.overflow.priceChangeSeparator')}
               <strong>{formatEuro(debordement.prixPrevuCents)}</strong></>
-            )}.
-            {' '}Pour garder {debordement.pagesActuelles} pages, fermez cette fenêtre et retirez des photos
-            dans « Mes souvenirs ».
+            )}
+            {t('generateModal.overflow.suffix', { current: debordement.pagesActuelles })}
           </p>
         )}
 
         {pagesRestantes > 0 && (
           <p className="atelier-hint atelier-hint-warning">
-            Votre contenu remplit environ {estimatedPages} page{estimatedPages > 1 ? 's' : ''} sur les {minPages} de
-            votre livre : les {pagesRestantes} dernière{pagesRestantes > 1 ? 's' : ''} resteront blanche
-            {pagesRestantes > 1 ? 's' : ''}. Celebrons ne répète jamais une photo ni un souvenir pour combler
-            l'espace — vous pourrez les composer à la main, ou ajouter du contenu dans « Mes souvenirs ».
+            {t('generateModal.remaining.main', {
+              count: pagesRestantes,
+              estimated: estimatedPages,
+              estimatedPlural: estimatedPages > 1 ? 's' : '',
+              min: minPages
+            })}
+            {' '}{t('generateModal.remaining.note')}
           </p>
         )}
 
@@ -141,8 +138,8 @@ function AtelierGenerateModal({
               onClick={() => setSelectedMood(mood.id)}
               disabled={isGenerating}
             >
-              <span className="atelier-mood-card-label">{mood.label}</span>
-              <span className="atelier-mood-card-description">{mood.description}</span>
+              <span className="atelier-mood-card-label">{getMoodLabel(mood.id, t)}</span>
+              <span className="atelier-mood-card-description">{getMoodDescription(mood.id, t)}</span>
             </button>
           ))}
         </div>
@@ -151,16 +148,16 @@ function AtelierGenerateModal({
 
         <div className="atelier-modal-actions">
           <button type="button" className="btn btn-outline" onClick={onClose} disabled={isGenerating}>
-            Annuler
+            {t('generateModal.cancel')}
           </button>
           <button
             type="button"
             className="btn btn-primary"
             onClick={() => onGenerate(selectedMood)}
             disabled={isGenerating || loadingEstimate}
-            title={debordement ? `Le livre passera a ${debordement.pagesPrevues} pages` : undefined}
+            title={debordement ? t('generateModal.willGrowTo', { pages: debordement.pagesPrevues }) : undefined}
           >
-            {isGenerating ? 'Generation...' : 'Generer'}
+            {isGenerating ? t('generateModal.generating') : t('generateModal.generate')}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // TIROIR GENERIQUE (refonte visuelle 2026-09-25).
 //
@@ -51,6 +52,7 @@ import React, { useEffect } from 'react';
 //   facon pas la place pour les deux a la fois : il redevient alors un
 //   panneau plein ecran classique, memes gestes qu'un modal.
 function AtelierDrawer({ side = 'right', variant = 'modal', isOpen, onClose, title, subtitle, hint, children }) {
+  const { t } = useTranslation('atelier');
   const isRail = variant === 'rail';
 
   // Echap pour fermer. Le blocage du defilement de page derriere (mode
@@ -86,7 +88,7 @@ function AtelierDrawer({ side = 'right', variant = 'modal', isOpen, onClose, tit
           <span className="atelier-drawer-title" title={hint}>{title}</span>
           {subtitle && <span className="atelier-drawer-subtitle">{subtitle}</span>}
         </div>
-        <button type="button" className="atelier-drawer-close" onClick={onClose} aria-label="Fermer">×</button>
+        <button type="button" className="atelier-drawer-close" onClick={onClose} aria-label={t('common.close')}>×</button>
       </div>
       <div className="atelier-drawer-body">
         {children}

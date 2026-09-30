@@ -1,0 +1,228 @@
+{
+  "common": {
+    "close": "Close"
+  },
+  "confirmSwitch": {
+    "title": "Switch to automatic mode?",
+    "body": "Célébrons will propose a new layout for your book based on your content. Pages you've already built by hand stay untouched — only the pages still on automatic will be reorganized.",
+    "keep": "Keep my work",
+    "continue": "Continue"
+  },
+  "toolsBar": {
+    "ariaLabel": "Composition tools",
+    "photos": "Photos",
+    "layout": "Layout",
+    "pages": "Pages"
+  },
+  "onboarding": {
+    "close": "Close",
+    "title": "How to build your book",
+    "steps": {
+      "photos": {
+        "title": "Your photos",
+        "text": "Click \"Photos\" at the top to open your library, add photos and text there."
+      },
+      "dragDrop": {
+        "title": "Drag and drop",
+        "text": "Drag a memory into a slot on the page — or click it, then click the slot."
+      },
+      "layout": {
+        "title": "Layout",
+        "text": "Click \"Layout\" (or the icon on the page) to choose the layout for the current page, right next to the book."
+      },
+      "navigate": {
+        "title": "Navigate pages",
+        "text": "The ‹ › arrows under the book turn pages one at a time. To go straight to a page, the cover, or the back cover, open \"Pages\"."
+      },
+      "auto": {
+        "title": "Automatic mode",
+        "text": "Or let Célébrons compose the whole book (\"Compose automatically\", at the top), then adjust any pages you like by hand."
+      }
+    }
+  },
+  "layouts": {
+    "categories": {
+      "photo-single": "One photo",
+      "photo-multi": "Several photos",
+      "photo-text": "Photos & text",
+      "text": "One or more memories",
+      "title-photos": "Title + photos"
+    },
+    "slugs": {
+      "FULL_PHOTO": "1 large photo",
+      "FULL_PHOTO_SPREAD": "1 photo across two pages",
+      "TWO_PHOTOS": "2 vertical photos",
+      "TWO_PHOTOS_STACKED": "2 horizontal photos",
+      "THREE_PHOTOS": "3 photos",
+      "FOUR_PHOTOS": "4 photos",
+      "PHOTO_TEXT": "Photo then text",
+      "TEXT_PHOTO": "Text then photo",
+      "PHOTO_WITH_CAPTION": "Large photo, small caption",
+      "TWO_PHOTOS_TEXT": "2 photos and a text",
+      "ONE_TESTIMONY": "1 memory",
+      "TWO_TESTIMONIES": "2 memories",
+      "THREE_TESTIMONIES": "3 memories",
+      "TITLE_TEXT": "Title and text",
+      "TITLE_TWO_PHOTOS": "Title and 2 photos",
+      "TITLE_FOUR_PHOTOS": "Title and 4 photos"
+    }
+  },
+  "moods": {
+    "classique": { "label": "Classic", "description": "The usual rhythm, balanced between photos and text." },
+    "aere": { "label": "Airy", "description": "Each photo breathes alone — more pages, less density." },
+    "compact": { "label": "Compact", "description": "Fit as many memories as possible into the chosen page count." },
+    "chapitre": { "label": "Chapters", "description": "Title pages punctuate the book, magazine feel." },
+    "collage": { "label": "Collage", "description": "Very photo-heavy, dense grids, almost no text alone." }
+  },
+  "layoutPanel": {
+    "title": "Layout",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "saveError": "Save error",
+    "question": "What would you like to put on this page?",
+    "changeLayout": "Change layout",
+    "slotLabels": {
+      "photo": "Photo",
+      "text": "Text",
+      "title": "Title",
+      "empty": "Slot"
+    },
+    "clickToConfirmRemove": "Click again to confirm removal",
+    "clickToRemove": "Click to remove",
+    "confirmRemove": "Confirm removal?",
+    "remove": "Remove"
+  },
+  "generateModal": {
+    "title": "Generate automatically",
+    "close": "Close",
+    "intro": "Choose a mood: Célébrons composes the whole book at once from your memories, each photo and each piece of text used only once. You can then adjust any page by hand, or regenerate with a different mood.",
+    "manualKept_one": "Your {{count}} page composed by hand is kept as is: generation only fills the remaining pages, and never replaces a photo or memory you've already placed there.",
+    "manualKept_other": "Your {{count}} pages composed by hand are kept as is: generation only fills the remaining pages, and never replaces a photo or memory you've already placed there.",
+    "replaceWarning": "Pages already composed automatically will be replaced by the new proposal. Your photos and memories, on the other hand, are never deleted.",
+    "checkingContent": "Checking content...",
+    "overflow": {
+      "prefix": "Your content needs ",
+      "pagesBold": "{{count}} pages",
+      "middle": " while your book has {{current}}. Célébrons never leaves a photo out: the book will grow to {{next}} pages",
+      "priceChangePrefix": ", and its price from ",
+      "priceChangeSeparator": " to ",
+      "suffix": ". To keep {{current}} pages, close this window and remove some photos in \"My memories\"."
+    },
+    "remaining": {
+      "main_one": "Your content fills about {{estimated}} page{{estimatedPlural}} out of the {{min}} in your book: the last page will stay blank.",
+      "main_other": "Your content fills about {{estimated}} page{{estimatedPlural}} out of the {{min}} in your book: the last {{count}} pages will stay blank.",
+      "note": "Célébrons never repeats a photo or memory to fill the space — you can compose them by hand, or add content in \"My memories\"."
+    },
+    "cancel": "Cancel",
+    "willGrowTo": "The book will grow to {{pages}} pages",
+    "generating": "Generating...",
+    "generate": "Generate"
+  },
+  "photoAdjustModal": {
+    "title": "Adjust framing",
+    "close": "Close",
+    "hintContain": "The whole photo fits in the frame. Zoom in to fill it more.",
+    "hintCover": "Drag the photo to reposition it, zoom in if needed.",
+    "modeGroupLabel": "Framing within the slot",
+    "modeCover": "Fill the frame",
+    "modeContain": "Whole photo",
+    "replacePhoto": "Change photo",
+    "replacePhotoTitle": "Choose a different photo for this slot",
+    "zoom": "Zoom",
+    "ratioGapText": "This photo has a very different shape from its frame: part of it is cropped. You can also choose \"Whole photo\" above to crop nothing.",
+    "seeOtherLayouts": "See other suitable layouts",
+    "noSuggestion": "No layout in the catalog fits this photo's shape better — cropping remains the best option here.",
+    "resetCrop": "Reset framing",
+    "save": "Save"
+  },
+  "finishModal": {
+    "titleReady": "Your book is ready to preview",
+    "titleAlmost": "Almost ready",
+    "photosUsed_one": "{{count}} photo used",
+    "photosUsed_other": "{{count}} photos used",
+    "memoriesUsed_one": "{{count}} memory used",
+    "memoriesUsed_other": "{{count}} memories used",
+    "pagesCreated_one": "{{count}} page created",
+    "pagesCreated_other": "{{count}} pages created",
+    "allPagesComplete": "All pages are complete",
+    "incompletePages_one": "{{count}} page is not yet complete",
+    "incompletePages_other": "{{count}} pages are not yet complete",
+    "qualityChecked": "Photo quality checked",
+    "lowQualityWarning_one": "{{count}} photo might be less sharp",
+    "lowQualityWarning_other": "{{count}} photos might be less sharp",
+    "hidePages": "Hide pages",
+    "seePages_one": "See the page concerned",
+    "seePages_other": "See the {{count}} pages concerned",
+    "qualityTip": "Often, switching the photo to \"Whole photo\" or choosing a layout better suited to its shape is enough — click a page to try it directly.",
+    "pageNumber": "Page {{number}}",
+    "photoCount_one": "{{count}} photo",
+    "photoCount_other": "{{count}} photos",
+    "tightCrop": "very tight crop",
+    "insufficientRes": "insufficient resolution",
+    "slightlyLow": "a bit low",
+    "viewBook": "View my book",
+    "fixInAtelier": "Fix it in the editor",
+    "viewAnyway": "View anyway"
+  },
+  "pageActions": {
+    "editLayoutTitle": "Change this page's layout",
+    "moveTitle": "Move this page in the book (currently page {{current}} of {{total}})",
+    "moveLabel": "Move this page in the book",
+    "positionTitle": "Position in the book",
+    "moveBackward": "Move this page one step toward the start",
+    "moveForward": "Move this page one step toward the end",
+    "pagePrefix": "page",
+    "pageSuffix": "of {{total}}",
+    "positionAriaLabel": "Position of this page (1 to {{total}})",
+    "positionError": "Enter a number between 1 and {{total}}.",
+    "moving": "Moving…",
+    "moveHint": "Other pages shift accordingly. You can also drag the thumbnail in the strip below.",
+    "clearTitle": "Clear this page",
+    "clearConfirmTitle": "Clear this page?",
+    "clearHint": "Memories stay in your library, only the page is cleared.",
+    "cancel": "Cancel",
+    "clear": "Clear"
+  },
+  "duplicatePhotosModal": {
+    "title": "These {{count}} photos are already in your book",
+    "titleSingular": "This photo is already in your book",
+    "introSamePlural": "They have",
+    "introSameSingular": "It has",
+    "introMiddle": " the same name and size as ",
+    "introTargetPlural": "photos already added",
+    "introTargetSingular": "a photo already added",
+    "newPhotosPrefix": "Your selection also contains",
+    "newPhotosCount": "{{count}} new photo{{plural}}",
+    "remainingCount": "+{{count}}",
+    "cancel": "Cancel",
+    "addAnyway": "Add anyway",
+    "addNewOnly": "Only add the {{count}} new one{{plural}}",
+    "noteWithNew": "\"Add anyway\" also re-adds the photos already present. \"Cancel\" adds nothing at all.",
+    "noteWithoutNew": "\"Cancel\" adds no photos."
+  },
+  "photoPickerModal": {
+    "defaultTitle": "Choose a photo",
+    "defaultIntroHint": "Your imported photos, not yet used:",
+    "defaultEmptyHint": "All your imported photos are already placed in the book.",
+    "coverTitle": "Choose the cover photo",
+    "backCoverTitle": "Choose the back cover photo",
+    "coverIntroHint": "Your imported photos:",
+    "coverEmptyHint": "Import a photo to be able to choose one here.",
+    "useThisPhoto": "Use this photo",
+    "or": "or",
+    "uploading": "Uploading…",
+    "uploadFromFiles": "Upload a photo from my files"
+  },
+  "photoQuality": {
+    "fitLabels": {
+      "ok": "",
+      "limite": "This photo may appear slightly blurry when printed",
+      "insuffisant": "Insufficient resolution: this photo may appear blurry when printed"
+    },
+    "textFitLabels": {
+      "ok": "Text fits well",
+      "limite": "Text shrunk to fit",
+      "insuffisant": "Text too long for this slot"
+    }
+  }
+}

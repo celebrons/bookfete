@@ -13,11 +13,16 @@
 // presence de pages-titres), jamais sur les couleurs/polices.
 
 export const ATELIER_MOODS = [
-  { id: 'classique', label: 'Classique', description: 'Le rythme habituel, equilibre entre photos et textes.' },
-  { id: 'aere', label: 'Aere', description: 'Chaque photo respire seule — plus de pages, moins de densite.' },
-  { id: 'compact', label: 'Compact', description: 'Caser un maximum de souvenirs dans le nombre de pages choisi.' },
-  { id: 'chapitre', label: 'Chapitre', description: 'Des pages-titres rythment le livre, esprit magazine.' },
-  { id: 'collage', label: 'Collage', description: 'Tres photo, en grilles denses, quasiment pas de texte seul.' }
+  { id: 'classique' },
+  { id: 'aere' },
+  { id: 'compact' },
+  { id: 'chapitre' },
+  { id: 'collage' }
 ];
 
 export const findAtelierMood = (id) => ATELIER_MOODS.find((mood) => mood.id === id) || null;
+
+// Meme raison qu'atelierLayouts.js: libelles calcules a l'affichage, jamais
+// au chargement du module.
+export const getMoodLabel = (id, t) => t(`moods.${id}.label`);
+export const getMoodDescription = (id, t) => t(`moods.${id}.description`);

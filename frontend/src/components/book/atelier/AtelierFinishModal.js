@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getPrintQualityCheck } from '../../../services/compositionApi';
 import { acquitterAvertissementsQualite } from '../../../utils/qualityAcknowledgment';
 import { RATIO_GAP_THRESHOLD } from './photoQuality';
@@ -26,6 +27,7 @@ function AtelierFinishModal({
   warnings: warningsFromParent,
   onRefreshQuality
 }) {
+  const { t } = useTranslation('atelier');
   const [qualityCheck, setQualityCheck] = useState(null);
   // La liste des pages concernees est REPLIEE par defaut : sur un livre a 37
   // avertissements, la derouler d'office noierait le bouton "Voir mon livre".
@@ -113,26 +115,26 @@ function AtelierFinishModal({
       <div className="atelier-modal" onClick={(event) => event.stopPropagation()}>
         <div className="atelier-modal-head">
           <h2 className="atelier-modal-title">
-            {isReady ? 'Votre livre est prêt à être prévisualisé' : 'Presque prêt'}
+            {isReady ? t('finishModal.titleReady') : t('finishModal.titleAlmost')}
           </h2>
-          <button type="button" className="atelier-modal-close" onClick={onClose} aria-label="Fermer">×</button>
+          <button type="button" className="atelier-modal-close" onClick={onClose} aria-label={t('common.close')}>×</button>
         </div>
 
         <ul className="atelier-finish-checklist">
-          <li className="is-ok">✓ {stats.photosCount} photo{stats.photosCount > 1 ? 's' : ''} utilisée{stats.photosCount > 1 ? 's' : ''}</li>
-          <li className="is-ok">✓ {stats.souvenirsCount} souvenir{stats.souvenirsCount > 1 ? 's' : ''} utilisé{stats.souvenirsCount > 1 ? 's' : ''}</li>
-          <li className="is-ok">✓ {stats.pagesCreated} page{stats.pagesCreated > 1 ? 's' : ''} créée{stats.pagesCreated > 1 ? 's' : ''}</li>
+          <li className="is-ok">✓ {t('finishModal.photosUsed', { count: stats.photosCount })}</li>
+          <li className="is-ok">✓ {t('finishModal.memoriesUsed', { count: stats.souvenirsCount })}</li>
+          <li className="is-ok">✓ {t('finishModal.pagesCreated', { count: stats.pagesCreated })}</li>
           {isReady ? (
-            <li className="is-ok">✓ Toutes les pages sont complètes</li>
+            <li className="is-ok">✓ {t('finishModal.allPagesComplete')}</li>
           ) : (
-            <li className="is-warning">⚠️ {stats.incompletePages} page{stats.incompletePages > 1 ? 's' : ''} ne {stats.incompletePages > 1 ? 'sont' : 'est'} pas encore complète{stats.incompletePages > 1 ? 's' : ''}</li>
+            <li className="is-warning">⚠️ {t('finishModal.incompletePages', { count: stats.incompletePages })}</li>
           )}
           {qualityCheck && (
             lowQualityCount === 0 ? (
-              <li className="is-ok">✓ Qualité photo vérifiée</li>
+              <li className="is-ok">✓ {t('finishModal.qualityChecked')}</li>
             ) : (
               <li className="is-warning">
-                ⚠️ {lowQualityCount} photo{lowQualityCount > 1 ? 's' : ''} pourraient être moins nette{lowQualityCount > 1 ? 's' : ''}
+                ⚠️ {t('finishModal.lowQualityWarning', { count: lowQualityCount })}
                 {pagesConcernees.length > 0 && (
                   <>
                     {' — '}
@@ -143,10 +145,8 @@ function AtelierFinishModal({
                       aria-expanded={listeDepliee}
                     >
                       {listeDepliee
-                        ? 'Masquer les pages'
-                        : (pagesConcernees.length > 1
-                          ? `Voir les ${pagesConcernees.length} pages concernées`
-                          : 'Voir la page concernée')}
+                        ? t('finishModal.hidePages')
+                        : t('finishModal.seePages', { count: pagesConcernees.length })}
                     </button>
                   </>
                 )}
@@ -166,7 +166,7 @@ function AtelierFinishModal({
                         mauvaise — le dire une fois ici evite de faire
                         chercher la solution a chacun. */}
                     <p className="atelier-finish-quality-tip">
-                      Souvent, il suffit de passer la photo en « Photo entière » ou de choisir une mise en page mieux adaptée à sa forme — cliquez sur une page pour essayer directement.
+                      {t('finishModal.qualityTip')}
                     </p>
                     <ul className="atelier-finish-quality-pages">
                       {pagesConcernees.map((entree) => (
@@ -186,12 +186,12 @@ function AtelierFinishModal({
                             onClick={() => { onClose(); if (onViewPage) onViewPage(entree.pageIndex, entree.itemId); }}
                             disabled={!onViewPage}
                           >
-                            <span className="atelier-finish-quality-page-num">Page {entree.pageIndex + 1}</span>
+                            <span className="atelier-finish-quality-page-num">{t('finishModal.pageNumber', { number: entree.pageIndex + 1 })}</span>
                             <span className="atelier-finish-quality-page-count">
-                              {entree.count} photo{entree.count > 1 ? 's' : ''}
+                              {t('finishModal.photoCount', { count: entree.count })}
                               {entree.pire === 'insuffisant'
-                                ? (entree.ratioGap ? ' · cadrage très serré' : ' · résolution insuffisante')
-                                : ' · un peu juste'}
+                                ? (entree.ratioGap ? ` · ${t('finishModal.tightCrop')}` : ` · ${t('finishModal.insufficientRes')}`)
+                                : ` · ${t('finishModal.slightlyLow')}`}
                             </span>
                           </button>
                         </li>
@@ -207,15 +207,15 @@ function AtelierFinishModal({
         <div className="atelier-modal-actions">
           {isReady ? (
             <button type="button" className="btn btn-primary" onClick={handleContinuer}>
-              Voir mon livre →
+              {t('finishModal.viewBook')} →
             </button>
           ) : (
             <>
               <button type="button" className="btn btn-outline" onClick={onClose}>
-                Corriger dans l'atelier
+                {t('finishModal.fixInAtelier')}
               </button>
               <button type="button" className="btn btn-primary" onClick={handleContinuer}>
-                Voir quand même
+                {t('finishModal.viewAnyway')}
               </button>
             </>
           )}

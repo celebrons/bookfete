@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Actions qui portent sur LA PAGE elle-meme — la deplacer dans le livre, la
 // vider — posees au coin bas droit de la page en cours de modification, en
@@ -66,6 +67,7 @@ function AtelierPageActions({
   // comportement d'avant inchange.
   onOpenLayoutDrawer
 }) {
+  const { t } = useTranslation('atelier');
   // Un seul volet ouvert a la fois : deux petits panneaux superposes dans un
   // coin seraient illisibles.
   const [open, setOpen] = useState(null); // 'move' | 'clear' | null
@@ -102,7 +104,7 @@ function AtelierPageActions({
     const wanted = Number(value);
     if (wanted === pageNumber) { setPositionError(''); return; }
     if (!Number.isInteger(wanted) || wanted < 1 || wanted > totalPages) {
-      setPositionError(`Entrez un numéro entre 1 et ${totalPages}.`);
+      setPositionError(t('pageActions.positionError', { total: totalPages }));
       setPositionDraft(String(pageNumber));
       return;
     }
@@ -131,8 +133,8 @@ function AtelierPageActions({
             type="button"
             className="atelier-page-action-btn"
             onClick={onOpenLayoutDrawer}
-            title="Modifier la mise en page de cette page"
-            aria-label="Modifier la mise en page de cette page"
+            title={t('pageActions.editLayoutTitle')}
+            aria-label={t('pageActions.editLayoutTitle')}
           >
             <LayoutIcon />
           </button>
@@ -145,8 +147,8 @@ function AtelierPageActions({
             type="button"
             className={`atelier-page-action-btn ${open === 'move' ? 'is-open' : ''}`}
             onClick={() => setOpen(open === 'move' ? null : 'move')}
-            title={`Déplacer cette page dans le livre (actuellement page ${pageNumber} sur ${totalPages})`}
-            aria-label="Déplacer cette page dans le livre"
+            title={t('pageActions.moveTitle', { current: pageNumber, total: totalPages })}
+            aria-label={t('pageActions.moveLabel')}
             aria-expanded={open === 'move'}
             disabled={movingPage}
           >
@@ -155,20 +157,20 @@ function AtelierPageActions({
 
           {open === 'move' && (
             <div className="atelier-page-popover">
-              <span className="atelier-page-popover-title">Position dans le livre</span>
+              <span className="atelier-page-popover-title">{t('pageActions.positionTitle')}</span>
               <div className="atelier-page-position-row">
                 <button
                   type="button"
                   className="atelier-page-position-step"
                   onClick={() => onMoveToPosition(pageNumber - 1)}
                   disabled={movingPage || pageNumber <= 1}
-                  title="Avancer cette page d'un cran vers le début"
-                  aria-label="Avancer cette page d'un cran vers le début"
+                  title={t('pageActions.moveBackward')}
+                  aria-label={t('pageActions.moveBackward')}
                 >
                   ◀
                 </button>
                 <span className="atelier-page-position-field">
-                  page
+                  {t('pageActions.pagePrefix')}
                   <input
                     type="number"
                     min={1}
@@ -203,25 +205,25 @@ function AtelierPageActions({
                         committedRef.current = null;
                       }
                     }}
-                    aria-label={`Position de cette page (1 à ${totalPages})`}
+                    aria-label={t('pageActions.positionAriaLabel', { total: totalPages })}
                   />
-                  sur {totalPages}
+                  {t('pageActions.pageSuffix', { total: totalPages })}
                 </span>
                 <button
                   type="button"
                   className="atelier-page-position-step"
                   onClick={() => onMoveToPosition(pageNumber + 1)}
                   disabled={movingPage || pageNumber >= totalPages}
-                  title="Reculer cette page d'un cran vers la fin"
-                  aria-label="Reculer cette page d'un cran vers la fin"
+                  title={t('pageActions.moveForward')}
+                  aria-label={t('pageActions.moveForward')}
                 >
                   ▶
                 </button>
               </div>
               <p className={`atelier-page-popover-hint ${positionError ? 'is-error' : ''}`}>
                 {positionError || (movingPage
-                  ? 'Déplacement en cours…'
-                  : 'Les autres pages se décalent. Vous pouvez aussi glisser la vignette dans la bande du bas.')}
+                  ? t('pageActions.moving')
+                  : t('pageActions.moveHint'))}
               </p>
             </div>
           )}
@@ -234,8 +236,8 @@ function AtelierPageActions({
             type="button"
             className={`atelier-page-action-btn is-danger ${open === 'clear' ? 'is-open' : ''}`}
             onClick={() => setOpen(open === 'clear' ? null : 'clear')}
-            title="Vider cette page"
-            aria-label="Vider cette page"
+            title={t('pageActions.clearTitle')}
+            aria-label={t('pageActions.clearTitle')}
             aria-expanded={open === 'clear'}
           >
             <ClearIcon />
@@ -245,9 +247,9 @@ function AtelierPageActions({
               temps, seul son emplacement change. */}
           {open === 'clear' && (
             <div className="atelier-page-popover">
-              <span className="atelier-page-popover-title">Vider cette page ?</span>
+              <span className="atelier-page-popover-title">{t('pageActions.clearConfirmTitle')}</span>
               <p className="atelier-page-popover-hint">
-                Les souvenirs restent dans votre bibliothèque, seule la page est vidée.
+                {t('pageActions.clearHint')}
               </p>
               <div className="atelier-page-popover-actions">
                 <button
@@ -255,14 +257,14 @@ function AtelierPageActions({
                   className="atelier-page-popover-cancel"
                   onClick={() => setOpen(null)}
                 >
-                  Annuler
+                  {t('pageActions.cancel')}
                 </button>
                 <button
                   type="button"
                   className="atelier-page-popover-confirm"
                   onClick={() => { setOpen(null); onClearPage(); }}
                 >
-                  Vider
+                  {t('pageActions.clear')}
                 </button>
               </div>
             </div>

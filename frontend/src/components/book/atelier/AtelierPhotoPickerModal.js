@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Emplacement PHOTO VIDE : que se passe-t-il au clic ?
 //
@@ -35,10 +36,14 @@ function AtelierPhotoPickerModal({
   onPick,
   onUploadFile,
   onClose,
-  title = 'Choisir une photo',
-  introHint = 'Vos photos importées, pas encore utilisées :',
-  emptyHint = 'Toutes vos photos importées sont déjà placées dans le livre.'
+  title = null,
+  introHint = null,
+  emptyHint = null
 }) {
+  const { t } = useTranslation('atelier');
+  const resolvedTitle = title || t('photoPickerModal.defaultTitle');
+  const resolvedIntroHint = introHint || t('photoPickerModal.defaultIntroHint');
+  const resolvedEmptyHint = emptyHint || t('photoPickerModal.defaultEmptyHint');
   if (!isOpen) return null;
 
   const handleFileChange = (event) => {
@@ -57,13 +62,13 @@ function AtelierPhotoPickerModal({
     <div className="atelier-modal-backdrop" onClick={requestClose}>
       <div className="atelier-modal atelier-photo-picker-modal" onClick={(event) => event.stopPropagation()}>
         <div className="atelier-modal-head">
-          <h2 className="atelier-modal-title">{title}</h2>
-          <button type="button" className="atelier-modal-close" onClick={requestClose} disabled={uploading} aria-label="Fermer">×</button>
+          <h2 className="atelier-modal-title">{resolvedTitle}</h2>
+          <button type="button" className="atelier-modal-close" onClick={requestClose} disabled={uploading} aria-label={t('common.close')}>×</button>
         </div>
 
         {photosDisponibles.length > 0 ? (
           <>
-            <p className="atelier-photo-picker-hint">{introHint}</p>
+            <p className="atelier-photo-picker-hint">{resolvedIntroHint}</p>
             <div className="atelier-photo-picker-grid">
               {photosDisponibles.map((item) => (
                 <button
@@ -72,22 +77,22 @@ function AtelierPhotoPickerModal({
                   className="atelier-photo-picker-thumb"
                   onClick={() => onPick(item.id)}
                   disabled={uploading}
-                  title="Utiliser cette photo"
+                  title={t('photoPickerModal.useThisPhoto')}
                 >
                   <img src={item.metadata?.thumbnailUrl || item.url} alt="" loading="lazy" />
                 </button>
               ))}
             </div>
-            <div className="atelier-photo-picker-divider"><span>ou</span></div>
+            <div className="atelier-photo-picker-divider"><span>{t('photoPickerModal.or')}</span></div>
           </>
         ) : (
           <p className="atelier-photo-picker-hint">
-            {emptyHint}
+            {resolvedEmptyHint}
           </p>
         )}
 
         <label className={`atelier-photo-picker-upload ${uploading ? 'is-disabled' : ''}`}>
-          {uploading ? 'Import en cours…' : '+ Importer une photo depuis mes fichiers'}
+          {uploading ? t('photoPickerModal.uploading') : `+ ${t('photoPickerModal.uploadFromFiles')}`}
           <input
             type="file"
             accept="image/*"

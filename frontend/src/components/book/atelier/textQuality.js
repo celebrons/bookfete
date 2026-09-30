@@ -63,13 +63,19 @@ export function checkSlotTextFit({ item, layoutSlug, slotIndex, printFormat, rec
     role: safeRole,
     statut,
     severity: statut === 'ok' ? 'ok' : (statut === 'limite' ? 'warning' : 'error'),
-    label: statut === 'insuffisant'
-      ? 'Texte trop long pour cet emplacement'
-      : (statut === 'limite' ? 'Texte reduit pour tenir' : 'Texte bien place'),
     sizePt,
     lines: fit.lines,
     overflowMm: fit.overflowMm ?? 0
   };
 }
+
+// Libelle traduit (chantier bilingue, 2026-09-30) : meme raison que
+// photoQuality.js/getFitLabel — calcule a l'affichage par l'appelant, jamais
+// au chargement du module, pour rester reactif a un changement de langue.
+export const getTextFitLabel = (statut, t) => (
+  statut === 'insuffisant'
+    ? t('photoQuality.textFitLabels.insuffisant')
+    : (statut === 'limite' ? t('photoQuality.textFitLabels.limite') : t('photoQuality.textFitLabels.ok'))
+);
 
 export { FORMAT_DIMENSIONS_MM };

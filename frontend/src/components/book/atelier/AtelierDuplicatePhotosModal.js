@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Fenetre d'avertissement « ces photos sont deja dans votre livre ».
 //
@@ -29,6 +30,7 @@ function AtelierDuplicatePhotosModal({
   onAddAnyway,
   onCancel
 }) {
+  const { t } = useTranslation('atelier');
   const [vignettes, setVignettes] = useState([]);
 
   useEffect(() => {
@@ -59,16 +61,17 @@ function AtelierDuplicatePhotosModal({
       <div className="atelier-modal atelier-doublons" onClick={(event) => event.stopPropagation()}>
         <div className="atelier-modal-head">
           <h2 className="atelier-modal-title">
-            {pluriel ? `Ces ${nombre} photos sont déjà dans votre livre` : 'Cette photo est déjà dans votre livre'}
+            {pluriel ? t('duplicatePhotosModal.title', { count: nombre }) : t('duplicatePhotosModal.titleSingular')}
           </h2>
-          <button type="button" className="atelier-modal-close" onClick={onCancel} aria-label="Fermer">×</button>
+          <button type="button" className="atelier-modal-close" onClick={onCancel} aria-label={t('common.close')}>×</button>
         </div>
 
         <p className="atelier-doublons-intro">
-          {pluriel ? 'Elles portent' : 'Elle porte'} le même nom et la même taille que{' '}
-          {pluriel ? 'des photos déjà déposées' : 'une photo déjà déposée'}.
+          {pluriel ? t('duplicatePhotosModal.introSamePlural') : t('duplicatePhotosModal.introSameSingular')}
+          {t('duplicatePhotosModal.introMiddle')}
+          {pluriel ? t('duplicatePhotosModal.introTargetPlural') : t('duplicatePhotosModal.introTargetSingular')}.
           {nouvelles > 0 && (
-            <> Votre sélection contient aussi <strong>{nouvelles} photo{nouvelles > 1 ? 's' : ''} nouvelle{nouvelles > 1 ? 's' : ''}</strong>.</>
+            <> {t('duplicatePhotosModal.newPhotosPrefix')}<strong>{t('duplicatePhotosModal.newPhotosCount', { count: nouvelles, plural: nouvelles > 1 ? 's' : '' })}</strong>.</>
           )}
         </p>
 
@@ -80,7 +83,7 @@ function AtelierDuplicatePhotosModal({
             </figure>
           ))}
           {nombre > vignettes.length && (
-            <span className="atelier-doublons-reste">+{nombre - vignettes.length}</span>
+            <span className="atelier-doublons-reste">{t('duplicatePhotosModal.remainingCount', { count: nombre - vignettes.length })}</span>
           )}
         </div>
 
@@ -90,25 +93,25 @@ function AtelierDuplicatePhotosModal({
             fois la meme photo est un choix legitime — pas une erreur. */}
         <div className="atelier-modal-actions">
           <button type="button" className="btn btn-outline" onClick={onCancel}>
-            Annuler
+            {t('duplicatePhotosModal.cancel')}
           </button>
           <button
             type="button"
             className={`btn ${aDesNouvelles ? 'btn-outline' : 'btn-primary'}`}
             onClick={onAddAnyway}
           >
-            Ajouter quand même
+            {t('duplicatePhotosModal.addAnyway')}
           </button>
           {aDesNouvelles && (
             <button type="button" className="btn btn-primary" onClick={onAddNewOnly}>
-              N’ajouter que les {nouvelles} nouvelle{nouvelles > 1 ? 's' : ''}
+              {t('duplicatePhotosModal.addNewOnly', { count: nouvelles, plural: nouvelles > 1 ? 's' : '' })}
             </button>
           )}
         </div>
         <p className="atelier-doublons-note">
           {aDesNouvelles
-            ? '« Ajouter quand même » remet aussi les photos déjà présentes. « Annuler » n’ajoute rien du tout.'
-            : '« Annuler » n’ajoute aucune photo.'}
+            ? t('duplicatePhotosModal.noteWithNew')
+            : t('duplicatePhotosModal.noteWithoutNew')}
         </p>
       </div>
     </div>

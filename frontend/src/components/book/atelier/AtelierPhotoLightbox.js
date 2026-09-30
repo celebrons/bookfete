@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Apercu plein ecran d'UNE photo entiere (retour utilisateur, 2026-09-11 :
 // "un petit oeil... pour voir la photo en taille reelle") — la photo telle
@@ -14,6 +15,7 @@ import React, { useEffect } from 'react';
 // que AtelierBookView.js's "Voir a l'echelle" — reutilisable depuis
 // n'importe quel ecran de l'atelier, pas specifique aux pages interieures.
 function AtelierPhotoLightbox({ url, onClose }) {
+  const { t } = useTranslation('atelier');
   useEffect(() => {
     if (!url) return undefined;
     const handleKeyDown = (event) => {
@@ -36,7 +38,7 @@ function AtelierPhotoLightbox({ url, onClose }) {
         type="button"
         className="atelier-photo-lightbox-close"
         onClick={onClose}
-        aria-label="Fermer"
+        aria-label={t('common.close')}
       >
         ×
       </button>

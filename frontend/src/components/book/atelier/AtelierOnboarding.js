@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Explications de prise en main de l'atelier — affichees par defaut a la
 // premiere visite (voir BookAtelierLuxe.js: SEEN_KEY en localStorage,
@@ -19,45 +20,26 @@ import React from 'react';
 // Suivante/4e) — sans explication, l'acces a la couverture/4e depuis le
 // tiroir Pages n'a plus rien d'evident. Nouvelle 5e carte dediee.
 const STEPS = [
-  {
-    icon: '🖼️',
-    title: 'Vos photos',
-    text: 'Cliquez sur "Photos" en haut pour ouvrir votre bibliothèque, y ajouter des photos et des textes.'
-  },
-  {
-    icon: '🖱️',
-    title: 'Glissez-déposez',
-    text: 'Glissez un souvenir dans un emplacement de la page — ou cliquez dessus puis cliquez l\'emplacement.'
-  },
-  {
-    icon: '▦',
-    title: 'Mise en page',
-    text: 'Cliquez sur "Mise en page" (ou sur l\'icône posée sur la page) pour choisir la mise en page de la page affichée, juste à côté du livre.'
-  },
-  {
-    icon: '↔',
-    title: 'Naviguer dans les pages',
-    text: 'Les flèches ‹ › sous le livre font tourner les pages une à une. Pour aller directement à une page, à la couverture ou à la 4e de couverture, ouvrez "Pages".'
-  },
-  {
-    icon: '✨',
-    title: 'Mode automatique',
-    text: 'Ou laissez Celebrons composer tout le livre ("Composer automatiquement", en haut), puis ajustez les pages que vous voulez à la main.'
-  }
+  { id: 'photos', icon: '🖼️' },
+  { id: 'dragDrop', icon: '🖱️' },
+  { id: 'layout', icon: '▦' },
+  { id: 'navigate', icon: '↔' },
+  { id: 'auto', icon: '✨' }
 ];
 
 function AtelierOnboarding({ onDismiss }) {
+  const { t } = useTranslation('atelier');
   return (
     <div className="atelier-onboarding">
-      <button type="button" className="atelier-onboarding-close" onClick={onDismiss} aria-label="Fermer">×</button>
-      <p className="atelier-onboarding-title">Comment construire votre livre</p>
+      <button type="button" className="atelier-onboarding-close" onClick={onDismiss} aria-label={t('onboarding.close')}>×</button>
+      <p className="atelier-onboarding-title">{t('onboarding.title')}</p>
       <div className="atelier-onboarding-steps">
         {STEPS.map((step) => (
-          <div key={step.title} className="atelier-onboarding-step">
+          <div key={step.id} className="atelier-onboarding-step">
             <span className="atelier-onboarding-step-icon" aria-hidden="true">{step.icon}</span>
             <div>
-              <p className="atelier-onboarding-step-title">{step.title}</p>
-              <p className="atelier-onboarding-step-text">{step.text}</p>
+              <p className="atelier-onboarding-step-title">{t(`onboarding.steps.${step.id}.title`)}</p>
+              <p className="atelier-onboarding-step-text">{t(`onboarding.steps.${step.id}.text`)}</p>
             </div>
           </div>
         ))}
