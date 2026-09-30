@@ -45,7 +45,7 @@ import AtelierPhotoPickerModal from './AtelierPhotoPickerModal';
 import AtelierPageActions from './AtelierPageActions';
 import AtelierDrawer from './AtelierDrawer';
 import AtelierToolsBar from './AtelierToolsBar';
-import { findAtelierLayout } from './atelierLayouts';
+import { findAtelierLayout, getLayoutLabel } from './atelierLayouts';
 import { FORMAT_DIMENSIONS_MM } from './photoQuality';
 import { spreadPair, spreadCount, spreadOfPage, facingPageIndex, isLeftPage } from '../../../utils/pageParity';
 import AnonymousBanner from '../../common/AnonymousBanner';
@@ -385,7 +385,7 @@ export default function BookAtelierLuxe() {
         listLayouts(),
         listPages(bookId)
       ]);
-      if (bookError) throw new Error(bookError.message || 'Livre introuvable.');
+      if (bookError) throw new Error(bookError.message || t('main.errors.bookNotFound'));
 
       setBook(bookRow);
       setItems(itemList || []);
@@ -394,10 +394,10 @@ export default function BookAtelierLuxe() {
       setContentVersion((previous) => previous + 1);
 
       if (!bookRow.page_count) {
-        setError("Choisissez le nombre de pages du livre (onglet Configuration) avant d'ouvrir l'atelier.");
+        setError(t('main.errors.noPageCount'));
       }
     } catch (err) {
-      setError(err.message || 'Erreur de chargement.');
+      setError(err.message || t('main.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -842,7 +842,7 @@ export default function BookAtelierLuxe() {
         .catch((err) => {
           if (cancelledEmpty) return;
           setSaveStatus('error');
-          setSaveError(err.message || "L'effacement a echoue.");
+          setSaveError(err.message || t('main.errors.clearFailed'));
         });
       return () => { cancelledEmpty = true; };
     }
@@ -935,7 +935,7 @@ export default function BookAtelierLuxe() {
       .catch((err) => {
         if (cancelled) return;
         setSaveStatus('error');
-        setSaveError(err.message || 'La sauvegarde a echoue. Verifiez le contenu place.');
+        setSaveError(err.message || t('main.errors.saveFailed'));
       });
 
     return () => { cancelled = true; };
@@ -997,7 +997,7 @@ export default function BookAtelierLuxe() {
       // Non bloquant : la page courante est deja enregistree. L'utilisateur
       // verra une demi-image plutot qu'un message d'erreur trompeur sur une
       // sauvegarde qui, elle, a reussi.
-      setSaveError("La seconde page de la double page n'a pas pu etre enregistree.");
+      setSaveError(t('main.errors.spreadSiblingFailed'));
     }
   };
 
@@ -1034,7 +1034,7 @@ export default function BookAtelierLuxe() {
       photoCaptions: { ...draftPhotoCaptions },
       textRoles: { ...draftTextRoles },
       textStyles: { ...draftTextStyles },
-      label: label || `revenir à « ${findAtelierLayout(draftLayoutSlug)?.label || 'la mise en page précédente'} » avec son contenu`
+      label: label || t('main.undo.restoreLayout', { layout: findAtelierLayout(draftLayoutSlug) ? getLayoutLabel(draftLayoutSlug, t) : t('main.undo.previousLayoutFallback') })
     });
   };
 
@@ -1085,7 +1085,7 @@ export default function BookAtelierLuxe() {
     const remplace = Boolean(draftSlotItemIds[slotIndex]) && draftSlotItemIds[slotIndex] !== itemId;
     if (remplace) {
       const ancien = itemsById[draftSlotItemIds[slotIndex]];
-      captureUndo(ancien?.kind === 'texte' ? 'remettre le souvenir précédent' : 'remettre la photo précédente');
+      captureUndo(ancien?.kind === 'texte' ? t('main.undo.restorePreviousMemory') : t('main.undo.restorePreviousPhoto'));
     }
     setDraftSlotItemIds((previous) => {
       const next = [...previous];
@@ -1099,7 +1099,7 @@ export default function BookAtelierLuxe() {
     const removedItemId = draftSlotItemIds[slotIndex];
     if (removedItemId) {
       const retire = itemsById[removedItemId];
-      captureUndo(retire?.kind === 'texte' ? 'remettre le souvenir retiré' : 'remettre la photo retirée');
+      captureUndo(retire?.kind === 'texte' ? t('main.undo.restoreRemovedMemory') : t('main.undo.restoreRemovedPhoto'));
     }
     setDraftSlotItemIds((previous) => {
       const next = [...previous];
@@ -1187,7 +1187,7 @@ export default function BookAtelierLuxe() {
       }
       handleClosePhotoPicker();
     } catch (err) {
-      setPickerUploadError(err.message || "La photo n'a pas pu être importée.");
+      setPickerUploadError(err.message || t('main.errors.photoUploadFailed'));
     } finally {
       setPickerUploading(false);
     }
@@ -1279,7 +1279,7 @@ export default function BookAtelierLuxe() {
       setItems((previous) => previous.map((item) => (
         item.id === itemId ? { ...item, text: current.text } : item
       )));
-      setSaveError(err.message || "La modification du texte n'a pas pu etre enregistree.");
+      setSaveError(err.message || t('main.errors.textUpdateFailed'));
       setSaveStatus('error');
     }
   };
@@ -1313,7 +1313,7 @@ export default function BookAtelierLuxe() {
       handleAssignSlot(slotIndex, created.id);
     } catch (err) {
       setSaveStatus('error');
-      setSaveError(err.message || "Le texte n'a pas pu etre cree.");
+      setSaveError(err.message || t('main.errors.textCreateFailed'));
     }
   };
 
@@ -1474,7 +1474,7 @@ export default function BookAtelierLuxe() {
 
   const handleClearPage = async () => {
     if (currentPageIndex == null || !book?.id) return;
-    captureUndo('restaurer le contenu de cette page');
+    captureUndo(t('main.undo.restorePageContent'));
     // Vider une moitie de double page vide aussi l'autre : une demi-photo
     // seule n'a aucun sens.
     if (savedPageIsSpread(currentPageIndex)) await releaseSpreadSibling(currentPageIndex);
@@ -1494,7 +1494,7 @@ export default function BookAtelierLuxe() {
       await refreshPagePreview(currentPageIndex);
     } catch (err) {
       setSaveStatus('error');
-      setSaveError(err.message || 'Impossible de vider cette page.');
+      setSaveError(err.message || t('main.errors.clearPageFailed'));
     }
   };
 
@@ -1521,7 +1521,7 @@ export default function BookAtelierLuxe() {
       setContentVersion((previous) => previous + 1);
       setRefreshToken((previous) => previous + 1);
     } catch (err) {
-      setGenerateError(err.message || "Le retour en arriere a echoue.");
+      setGenerateError(err.message || t('main.errors.restoreFailed'));
     } finally {
       setRestoringSnapshot(false);
     }
@@ -1607,7 +1607,7 @@ export default function BookAtelierLuxe() {
         const created = await uploadPhoto(book.id, list[index], items.length + index);
         setItems((previous) => [...previous, created]);
       } catch (err) {
-        failures.push({ name: list[index]?.name || `photo ${index + 1}`, message: err.message });
+        failures.push({ name: list[index]?.name || t('main.upload.photoFallbackName', { number: index + 1 }), message: err.message });
       }
       setUploadProgress({ done: index + 1, total: list.length, failed: failures.length });
     }
@@ -1615,8 +1615,8 @@ export default function BookAtelierLuxe() {
     if (failures.length > 0) {
       const noms = failures.slice(0, 3).map((f) => f.name).join(', ');
       setSidebarAddError(
-        `${failures.length} photo${failures.length > 1 ? 's' : ''} sur ${list.length} n'${failures.length > 1 ? 'ont' : 'a'} pas pu être ajoutée${failures.length > 1 ? 's' : ''} (${noms}${failures.length > 3 ? '…' : ''}). `
-        + 'Les autres sont bien enregistrées — vous pouvez relancer uniquement celles-ci.'
+        t('main.upload.someFailed', { count: failures.length, total: list.length, names: noms, ellipsis: failures.length > 3 ? '…' : '' })
+        + t('main.upload.othersOk')
       );
     }
 
@@ -1699,12 +1699,11 @@ export default function BookAtelierLuxe() {
     if (concernes.length === 0) return;
 
     const label = kind === 'photo'
-      ? `${concernes.length} photo${concernes.length > 1 ? 's' : ''}`
-      : `${concernes.length} souvenir${concernes.length > 1 ? 's' : ''}`;
+      ? t('main.deleteAll.labelPhotos', { count: concernes.length })
+      : t('main.deleteAll.labelMemories', { count: concernes.length });
     // eslint-disable-next-line no-restricted-globals
     if (!window.confirm(
-      `Supprimer définitivement ${label} ?\n\n`
-      + 'Ils seront aussi retirés des pages où vous les aviez placés. Cette action est irréversible.'
+      `${t('main.deleteAll.confirmTitle', { label })}\n\n${t('main.deleteAll.confirmBody')}`
     )) return;
 
     setDeletingAll(true);
@@ -1718,7 +1717,7 @@ export default function BookAtelierLuxe() {
       setSelectedSidebarItem(null);
       setRefreshToken((previous) => previous + 1);
     } catch (err) {
-      setSidebarAddError(err.message || 'La suppression a echoue.');
+      setSidebarAddError(err.message || t('main.errors.deleteFailed'));
     } finally {
       setDeletingAll(false);
     }
@@ -1732,7 +1731,7 @@ export default function BookAtelierLuxe() {
       setItems((previous) => previous.filter((item) => item.id !== itemId));
       if (selectedSidebarItem?.id === itemId) setSelectedSidebarItem(null);
     } catch (err) {
-      setSidebarAddError(err.message || 'La suppression a echoue.');
+      setSidebarAddError(err.message || t('main.errors.deleteFailed'));
     }
   };
 
@@ -1881,7 +1880,7 @@ export default function BookAtelierLuxe() {
       // ni refreshPagePreview) : la permutation ci-dessus suffit, et toute
       // requete supplementaire ne ferait que reintroduire la course.
     } catch (err) {
-      setSaveError(err.message || "La page n'a pas pu etre deplacee.");
+      setSaveError(err.message || t('main.errors.moveFailed'));
     } finally {
       setMovingPage(false);
     }
@@ -1926,7 +1925,7 @@ export default function BookAtelierLuxe() {
       // change pas) : refreshToken garantit le rechargement dans tous les cas.
       setRefreshToken((previous) => previous + 1);
     } catch (err) {
-      setGenerateError(err.message || 'La generation automatique a echoue.');
+      setGenerateError(err.message || t('main.errors.generateFailed'));
     } finally {
       setIsGenerating(false);
     }
@@ -1973,7 +1972,7 @@ export default function BookAtelierLuxe() {
       setRefreshToken((previous) => previous + 1);
       announcePriceChange(updatedBook.page_count, 2);
     } catch (err) {
-      setError(err.message || "Impossible d'ajouter des pages.");
+      setError(err.message || t('main.errors.addPagesFailed'));
     } finally {
       setAddingPages(false);
     }
@@ -2004,10 +2003,10 @@ export default function BookAtelierLuxe() {
     } catch (err) {
       const details = err?.payload;
       if (details?.needsConfirmation) {
-        const numbers = (details.pageNumbers || []).join(' et ');
+        const numbers = (details.pageNumbers || []).join(t('main.removePages.and'));
         const message = details.lockedCount > 0
-          ? `Les pages ${numbers} contiennent du contenu ou sont verrouillees. Les supprimer definitivement ?`
-          : `Les pages ${numbers} contiennent du contenu. Les supprimer definitivement ?`;
+          ? t('main.removePages.confirmLocked', { numbers })
+          : t('main.removePages.confirmContent', { numbers });
         // eslint-disable-next-line no-restricted-globals
         if (!window.confirm(message)) {
           setRemovingPages(false);
@@ -2016,10 +2015,10 @@ export default function BookAtelierLuxe() {
         try {
           applyResult(await shrinkBookPages(book.id, 2, true));
         } catch (confirmErr) {
-          setError(confirmErr.message || 'Impossible de retirer des pages.');
+          setError(confirmErr.message || t('main.errors.removePagesFailed'));
         }
       } else {
-        setError(err.message || 'Impossible de retirer des pages.');
+        setError(err.message || t('main.errors.removePagesFailed'));
       }
     } finally {
       setRemovingPages(false);
@@ -2095,7 +2094,7 @@ export default function BookAtelierLuxe() {
       {undoBarLingering && (
         <button type="button" className="atelier-undo-bar" onClick={handleUndo} disabled={!undoBarActive}>
           <span aria-hidden="true">↩</span>
-          <span>Annuler — {undoBarLingering.label}</span>
+          <span>{t('main.undo.undoBar', { label: undoBarLingering.label })}</span>
         </button>
       )}
     </div>
@@ -2113,11 +2112,11 @@ export default function BookAtelierLuxe() {
   const snapshotBar = snapshot ? (
     <div className="atelier-snapshot-bar">
       <span className="atelier-snapshot-bar-text">
-        <strong>Vous testez la version automatique.</strong>
-        {' '}Votre livre d'avant est conservé
-        {snapshot.pageCount ? ` (${snapshot.pageCount} page${snapshot.pageCount > 1 ? 's' : ''}` : ''}
+        <strong>{t('main.snapshotBar.title')}</strong>
+        {' '}{t('main.snapshotBar.kept')}
+        {snapshot.pageCount ? ` (${t('main.snapshotBar.pageCount', { count: snapshot.pageCount })}` : ''}
         {snapshot.pageCount && snapshot.manualPages
-          ? `, dont ${snapshot.manualPages} faite${snapshot.manualPages > 1 ? 's' : ''} à la main)`
+          ? `, ${t('main.snapshotBar.withManual', { count: snapshot.manualPages })})`
           : (snapshot.pageCount ? ')' : '')}
         .
       </span>
@@ -2128,7 +2127,7 @@ export default function BookAtelierLuxe() {
           onClick={handleRestoreSnapshot}
           disabled={restoringSnapshot}
         >
-          {restoringSnapshot ? 'Retour en cours…' : "↩ Revenir à mon livre d'avant"}
+          {restoringSnapshot ? t('main.snapshotBar.restoring') : `↩ ${t('main.snapshotBar.restore')}`}
         </button>
         <button
           type="button"
@@ -2136,7 +2135,7 @@ export default function BookAtelierLuxe() {
           onClick={handleDiscardSnapshot}
           disabled={restoringSnapshot}
         >
-          Je garde cette version
+          {t('main.snapshotBar.keep')}
         </button>
       </span>
     </div>
@@ -2173,7 +2172,7 @@ export default function BookAtelierLuxe() {
     if (!id) return null;
     const dims = FORMAT_DIMENSIONS_MM[id];
     if (!dims) return null;
-    const noms = { livret: 'Livret', standard: 'Standard', luxe: 'Luxe' };
+    const noms = { livret: t('main.formats.livret'), standard: t('main.formats.standard'), luxe: t('main.formats.luxe') };
     return {
       nom: noms[id] || id,
       taille: `${Math.round(dims.widthMm / 10)} × ${Math.round(dims.heightMm / 10)} cm`
@@ -2181,17 +2180,17 @@ export default function BookAtelierLuxe() {
   })();
 
   const navLabel = viewKind === 'cover'
-    ? 'Couverture'
+    ? t('bookView.coverLabel')
     : viewKind === 'back-cover'
-      ? '4e de couverture'
-      : `Page ${leftPageIndex + 1}`;
+      ? t('bookView.backCoverLabel')
+      : t('bookView.pageLabel', { number: leftPageIndex + 1 });
 
   if (loading) {
-    return <div className="atelier-loading">Chargement de l'atelier...</div>;
+    return <div className="atelier-loading">{t('main.loading')}</div>;
   }
 
   if (!book) {
-    return <div className="atelier-loading">{error || 'Livre introuvable.'}</div>;
+    return <div className="atelier-loading">{error || t('main.errors.bookNotFound')}</div>;
   }
 
   return (
@@ -2214,13 +2213,13 @@ export default function BookAtelierLuxe() {
           (§9 de la demande initiale). */}
       {book.locked_at && showTestBanner && (
         <div className="atelier-test-banner">
-          <span aria-hidden="true">🔧</span> <b>Mode test</b> — modifiable malgré le paiement, ce ne serait pas possible en production.
+          <span aria-hidden="true">🔧</span> <b>{t('main.testBanner.title')}</b> — {t('main.testBanner.body')}
           <button
             type="button"
             className="atelier-test-banner-close"
             onClick={() => setShowTestBanner(false)}
-            title="Masquer"
-            aria-label="Masquer le bandeau mode test"
+            title={t('main.testBanner.hide')}
+            aria-label={t('main.testBanner.hideAria')}
           >
             ×
           </button>
@@ -2233,8 +2232,8 @@ export default function BookAtelierLuxe() {
               plus, remplace par l'atelier lui-meme — voir BookPageLuxe.js qui
               redirige desormais cette route directement ici) : retour direct
               au tableau de bord. */}
-          <Link to="/dashboard" className="atelier-back-link">← Retour</Link>
-          <h1 className="atelier-title">{book.title || 'Mon livre'}</h1>
+          <Link to="/dashboard" className="atelier-back-link">← {t('main.header.back')}</Link>
+          <h1 className="atelier-title">{book.title || t('main.header.untitledBook')}</h1>
           {/* Le FORMAT reste visible pendant toute la composition : il decide de
               la taille reelle des cadres photo — donc de la resolution
               necessaire — et du prix. Le choisir au depart puis l'oublier
@@ -2243,8 +2242,8 @@ export default function BookAtelierLuxe() {
               table que le rendu. */}
           <span className="atelier-header-note">
             {formatCourant
-              ? `${formatCourant.nom} · ${formatCourant.taille}${totalPages ? ` · ${totalPages} pages` : ''}`
-              : 'Atelier de creation personnalisee'}
+              ? `${formatCourant.nom} · ${formatCourant.taille}${totalPages ? ` · ${t('main.header.pagesCount', { count: totalPages })}` : ''}`
+              : t('main.header.customAtelier')}
             {/* Prix discret (§6 : "STANDARD · 34 pages · 44,30 €" ou
                 equivalent — jamais un panneau, juste ce texte). */}
             {Number.isFinite(priceInfo?.bookPriceCents) && ` · ${formatEuros(priceInfo.bookPriceCents)}`}
@@ -2252,7 +2251,7 @@ export default function BookAtelierLuxe() {
                 disparait toute seule (showPriceDelta/priceDeltaTimeoutRef). */}
             {priceDelta && (
               <span className="atelier-header-price-delta">
-                {priceDelta.pages ? `${priceDelta.pages > 0 ? '+' : ''}${priceDelta.pages} pages · ` : ''}
+                {priceDelta.pages ? `${priceDelta.pages > 0 ? '+' : ''}${t('main.header.pagesCount', { count: priceDelta.pages })} · ` : ''}
                 {formatEurosDelta(priceDelta.priceCents)}
               </span>
             )}
@@ -2275,7 +2274,7 @@ export default function BookAtelierLuxe() {
               className="btn btn-primary atelier-header-finish-btn"
               onClick={() => setIsFinishModalOpen(true)}
             >
-              Terminer mon livre →
+              {t('main.header.finishBook')} →
             </button>
           ) : null}
         </div>
@@ -2309,26 +2308,26 @@ export default function BookAtelierLuxe() {
                   className="atelier-header-link"
                   onClick={handleInvite}
                   title={book?.collective_activated_at
-                    ? 'Voir le lien, inviter et suivre les contributions'
-                    : 'Inviter vos proches a deposer leurs photos et leurs mots'}
+                    ? t('main.header.inviteTitleManage')
+                    : t('main.header.inviteTitleNew')}
                 >
-                  Inviter
+                  {t('main.header.invite')}
                 </button>
               )}
               <button
                 type="button"
                 className="atelier-header-link"
                 onClick={handleGenerateButtonClick}
-                title="Celebrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page a la main ensuite"
+                title={t('main.header.composeAutoTitle')}
               >
-                ✦ Composer automatiquement
+                ✦ {t('main.header.composeAuto')}
               </button>
               <button
                 type="button"
                 className="atelier-help-btn"
                 onClick={() => setShowOnboarding(true)}
-                title="Revoir les explications"
-                aria-label="Revoir les explications"
+                title={t('main.header.reviewHelp')}
+                aria-label={t('main.header.reviewHelp')}
               >
                 ?
               </button>
@@ -2437,7 +2436,7 @@ export default function BookAtelierLuxe() {
               variant="rail"
               isOpen={activeDrawer === 'photos'}
               onClose={() => setActiveDrawer(null)}
-              title="Photos"
+              title={t('toolsBar.photos')}
             >
               <AtelierSidebar
                 estSolo={book?.collection_mode === 'solo'}
@@ -2511,7 +2510,7 @@ export default function BookAtelierLuxe() {
               variant="rail"
               isOpen={activeDrawer === 'layout'}
               onClose={() => setActiveDrawer(null)}
-              title={viewKind === 'spread' ? 'Mise en page' : 'Couverture'}
+              title={viewKind === 'spread' ? t('toolsBar.layout') : t('bookView.coverLabel')}
             >
               {viewKind === 'spread' ? (
                 <AtelierLayoutPanel
@@ -2567,8 +2566,8 @@ export default function BookAtelierLuxe() {
           side="bottom"
           isOpen={activeDrawer === 'pages'}
           onClose={() => setActiveDrawer(null)}
-          title="Toutes les pages"
-          hint="Glissez une vignette pour déplacer la page — ou réglez sa position par le picto au coin de la page."
+          title={t('main.pagesDrawer.title')}
+          hint={t('main.pagesDrawer.hint')}
           // Deplacee ici depuis la barre d'outils de l'en-tete (retour
           // utilisateur, 2026-09-29 : "29 a completer ne doit pas etre
           // affiche comme element permanent dans cette barre... plus
@@ -2576,7 +2575,7 @@ export default function BookAtelierLuxe() {
           // vraie progression PARTIELLE seulement (au moins une page faite,
           // au moins une a faire) — un livre vierge n'a rien de "manquant".
           subtitle={finishStats.incompletePages > 0 && finishStats.incompletePages < totalPages
-            ? `${finishStats.incompletePages} à compléter`
+            ? t('main.pagesDrawer.toComplete', { count: finishStats.incompletePages })
             : null}
         >
           <AtelierPageFilmstrip

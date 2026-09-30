@@ -135,6 +135,98 @@
     "resetCrop": "Réinitialiser le cadrage",
     "save": "Enregistrer"
   },
+  "main": {
+    "errors": {
+      "bookNotFound": "Livre introuvable.",
+      "noPageCount": "Choisissez le nombre de pages du livre (onglet Configuration) avant d'ouvrir l'atelier.",
+      "loadFailed": "Erreur de chargement.",
+      "clearFailed": "L'effacement a échoué.",
+      "saveFailed": "La sauvegarde a échoué. Vérifiez le contenu placé.",
+      "spreadSiblingFailed": "La seconde page de la double page n'a pas pu être enregistrée.",
+      "photoUploadFailed": "La photo n'a pas pu être importée.",
+      "textUpdateFailed": "La modification du texte n'a pas pu être enregistrée.",
+      "textCreateFailed": "Le texte n'a pas pu être créé.",
+      "clearPageFailed": "Impossible de vider cette page.",
+      "restoreFailed": "Le retour en arrière a échoué.",
+      "deleteFailed": "La suppression a échoué.",
+      "moveFailed": "La page n'a pas pu être déplacée.",
+      "generateFailed": "La génération automatique a échoué.",
+      "addPagesFailed": "Impossible d'ajouter des pages.",
+      "removePagesFailed": "Impossible de retirer des pages."
+    },
+    "undo": {
+      "restoreLayout": "revenir à « {{layout}} » avec son contenu",
+      "previousLayoutFallback": "la mise en page précédente",
+      "restorePreviousMemory": "remettre le souvenir précédent",
+      "restorePreviousPhoto": "remettre la photo précédente",
+      "restoreRemovedMemory": "remettre le souvenir retiré",
+      "restoreRemovedPhoto": "remettre la photo retirée",
+      "restorePageContent": "restaurer le contenu de cette page",
+      "undoBar": "Annuler — {{label}}"
+    },
+    "upload": {
+      "photoFallbackName": "photo {{number}}",
+      "someFailed_one": "{{count}} photo sur {{total}} n'a pas pu être ajoutée ({{names}}{{ellipsis}}). ",
+      "someFailed_other": "{{count}} photos sur {{total}} n'ont pas pu être ajoutées ({{names}}{{ellipsis}}). ",
+      "othersOk": "Les autres sont bien enregistrées — vous pouvez relancer uniquement celles-ci."
+    },
+    "deleteAll": {
+      "labelPhotos_one": "{{count}} photo",
+      "labelPhotos_other": "{{count}} photos",
+      "labelMemories_one": "{{count}} souvenir",
+      "labelMemories_other": "{{count}} souvenirs",
+      "confirmTitle": "Supprimer définitivement {{label}} ?",
+      "confirmBody": "Ils seront aussi retirés des pages où vous les aviez placés. Cette action est irréversible."
+    },
+    "removePages": {
+      "and": " et ",
+      "confirmLocked": "Les pages {{numbers}} contiennent du contenu ou sont verrouillées. Les supprimer définitivement ?",
+      "confirmContent": "Les pages {{numbers}} contiennent du contenu. Les supprimer définitivement ?"
+    },
+    "snapshotBar": {
+      "title": "Vous testez la version automatique.",
+      "kept": "Votre livre d'avant est conservé",
+      "pageCount_one": "{{count}} page",
+      "pageCount_other": "{{count}} pages",
+      "withManual_one": "dont {{count}} faite à la main",
+      "withManual_other": "dont {{count}} faites à la main",
+      "restoring": "Retour en cours…",
+      "restore": "Revenir à mon livre d'avant",
+      "keep": "Je garde cette version"
+    },
+    "formats": {
+      "livret": "Livret",
+      "standard": "Standard",
+      "luxe": "Luxe"
+    },
+    "loading": "Chargement de l'atelier...",
+    "testBanner": {
+      "title": "Mode test",
+      "body": "modifiable malgré le paiement, ce ne serait pas possible en production.",
+      "hide": "Masquer",
+      "hideAria": "Masquer le bandeau mode test"
+    },
+    "header": {
+      "back": "Retour",
+      "untitledBook": "Mon livre",
+      "pagesCount_one": "{{count}} page",
+      "pagesCount_other": "{{count}} pages",
+      "customAtelier": "Atelier de création personnalisée",
+      "finishBook": "Terminer mon livre",
+      "inviteTitleManage": "Voir le lien, inviter et suivre les contributions",
+      "inviteTitleNew": "Inviter vos proches à déposer leurs photos et leurs mots",
+      "invite": "Inviter",
+      "composeAutoTitle": "Célébrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page à la main ensuite",
+      "composeAuto": "Composer automatiquement",
+      "reviewHelp": "Revoir les explications"
+    },
+    "pagesDrawer": {
+      "title": "Toutes les pages",
+      "hint": "Glissez une vignette pour déplacer la page — ou réglez sa position par le picto au coin de la page.",
+      "toComplete_one": "{{count}} à compléter",
+      "toComplete_other": "{{count}} à compléter"
+    }
+  },
   "bookView": {
     "coverPhotoOverlay": {
       "useThisPhoto": "Cliquer pour utiliser cette photo",

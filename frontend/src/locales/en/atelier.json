@@ -135,6 +135,98 @@
     "resetCrop": "Reset framing",
     "save": "Save"
   },
+  "main": {
+    "errors": {
+      "bookNotFound": "Book not found.",
+      "noPageCount": "Choose the number of pages for the book (Configuration tab) before opening the editor.",
+      "loadFailed": "Loading error.",
+      "clearFailed": "Clearing failed.",
+      "saveFailed": "Save failed. Check the content placed.",
+      "spreadSiblingFailed": "The second page of the spread could not be saved.",
+      "photoUploadFailed": "The photo could not be imported.",
+      "textUpdateFailed": "The text change could not be saved.",
+      "textCreateFailed": "The text could not be created.",
+      "clearPageFailed": "Unable to clear this page.",
+      "restoreFailed": "Restoring failed.",
+      "deleteFailed": "Deletion failed.",
+      "moveFailed": "The page could not be moved.",
+      "generateFailed": "Automatic generation failed.",
+      "addPagesFailed": "Unable to add pages.",
+      "removePagesFailed": "Unable to remove pages."
+    },
+    "undo": {
+      "restoreLayout": "go back to \"{{layout}}\" with its content",
+      "previousLayoutFallback": "the previous layout",
+      "restorePreviousMemory": "restore the previous memory",
+      "restorePreviousPhoto": "restore the previous photo",
+      "restoreRemovedMemory": "restore the removed memory",
+      "restoreRemovedPhoto": "restore the removed photo",
+      "restorePageContent": "restore this page's content",
+      "undoBar": "Undo — {{label}}"
+    },
+    "upload": {
+      "photoFallbackName": "photo {{number}}",
+      "someFailed_one": "{{count}} photo out of {{total}} could not be added ({{names}}{{ellipsis}}). ",
+      "someFailed_other": "{{count}} photos out of {{total}} could not be added ({{names}}{{ellipsis}}). ",
+      "othersOk": "The others were saved successfully — you can retry just these ones."
+    },
+    "deleteAll": {
+      "labelPhotos_one": "{{count}} photo",
+      "labelPhotos_other": "{{count}} photos",
+      "labelMemories_one": "{{count}} memory",
+      "labelMemories_other": "{{count}} memories",
+      "confirmTitle": "Permanently delete {{label}}?",
+      "confirmBody": "They'll also be removed from the pages where you placed them. This action is irreversible."
+    },
+    "removePages": {
+      "and": " and ",
+      "confirmLocked": "Pages {{numbers}} contain content or are locked. Delete them permanently?",
+      "confirmContent": "Pages {{numbers}} contain content. Delete them permanently?"
+    },
+    "snapshotBar": {
+      "title": "You're trying the automatic version.",
+      "kept": "Your previous book is kept",
+      "pageCount_one": "{{count}} page",
+      "pageCount_other": "{{count}} pages",
+      "withManual_one": "including {{count}} made by hand",
+      "withManual_other": "including {{count}} made by hand",
+      "restoring": "Restoring…",
+      "restore": "Back to my previous book",
+      "keep": "I'll keep this version"
+    },
+    "formats": {
+      "livret": "Booklet",
+      "standard": "Standard",
+      "luxe": "Luxe"
+    },
+    "loading": "Loading the editor...",
+    "testBanner": {
+      "title": "Test mode",
+      "body": "editable despite payment, which wouldn't be possible in production.",
+      "hide": "Hide",
+      "hideAria": "Hide the test mode banner"
+    },
+    "header": {
+      "back": "Back",
+      "untitledBook": "My book",
+      "pagesCount_one": "{{count}} page",
+      "pagesCount_other": "{{count}} pages",
+      "customAtelier": "Custom book editor",
+      "finishBook": "Finish my book",
+      "inviteTitleManage": "See the link, invite, and track contributions",
+      "inviteTitleNew": "Invite your loved ones to add their photos and words",
+      "invite": "Invite",
+      "composeAutoTitle": "Célébrons proposes a new layout for your book — you'll always be able to adjust each page by hand afterward",
+      "composeAuto": "Compose automatically",
+      "reviewHelp": "Review the instructions"
+    },
+    "pagesDrawer": {
+      "title": "All pages",
+      "hint": "Drag a thumbnail to move the page — or set its position with the icon at the corner of the page.",
+      "toComplete_one": "{{count}} to complete",
+      "toComplete_other": "{{count}} to complete"
+    }
+  },
   "bookView": {
     "coverPhotoOverlay": {
       "useThisPhoto": "Click to use this photo",
