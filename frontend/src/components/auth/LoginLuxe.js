@@ -184,7 +184,7 @@ const LoginLuxe = () => {
             (2026-09-20). Mis AVANT « creer un compte » parce que c'est le
             cas le plus frequent de retour sur le site. */}
         <div className="auth-footer">
-          Vous avez commandé sans mot de passe ?
+          Vous avez commencé ou commandé sans mot de passe ?
           <Link to="/mes-livres">
             Retrouver mes livres
           </Link>
