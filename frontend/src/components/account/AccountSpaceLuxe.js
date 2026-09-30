@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import SupprimerMonCompte from './SupprimerMonCompte';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import { listOrders } from '../../services/ordersApi';
 import { getOrderStatusConfig } from '../../utils/orderWorkflow';
@@ -19,6 +20,7 @@ const DEFAULT_ADDRESS = {
 };
 
 const AccountSpaceLuxe = () => {
+  const { t, i18n } = useTranslation('account');
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -75,7 +77,7 @@ const AccountSpaceLuxe = () => {
         } else {
           setNotice({
             type: 'error',
-            message: `Projets: ${booksResult.reason?.message || 'chargement impossible'}`
+            message: `${t('errors.projects')}: ${booksResult.reason?.message || t('errors.loadFailed')}`
           });
         }
 
@@ -84,13 +86,13 @@ const AccountSpaceLuxe = () => {
         } else {
           setNotice({
             type: 'error',
-            message: `Commandes: ${ordersResult.reason?.message || 'chargement impossible'}`
+            message: `${t('errors.orders')}: ${ordersResult.reason?.message || t('errors.loadFailed')}`
           });
         }
       } catch (error) {
         setNotice({
           type: 'error',
-          message: `Impossible de charger votre espace: ${error.message}`
+          message: `${t('errors.loadSpaceFailed')}: ${error.message}`
         });
       } finally {
         setLoadingBooks(false);
@@ -163,12 +165,12 @@ const AccountSpaceLuxe = () => {
 
       setNotice({
         type: 'success',
-        message: 'Adresse enregistree.'
+        message: t('success.addressSaved')
       });
     } catch (error) {
       setNotice({
         type: 'error',
-        message: `Erreur sauvegarde adresse: ${error.message}`
+        message: `${t('errors.saveAddressFailed')}: ${error.message}`
       });
     } finally {
       setSavingAddress(false);
@@ -182,10 +184,10 @@ const AccountSpaceLuxe = () => {
 
     try {
       if (passwordForm.newPassword.length < 8) {
-        throw new Error('Le mot de passe doit contenir au moins 8 caracteres.');
+        throw new Error(t('errors.passwordTooShort'));
       }
       if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-        throw new Error('Les mots de passe ne correspondent pas.');
+        throw new Error(t('errors.passwordMismatch'));
       }
 
       const { error } = await supabase.auth.updateUser({
@@ -197,12 +199,12 @@ const AccountSpaceLuxe = () => {
       setPasswordForm({ newPassword: '', confirmPassword: '' });
       setNotice({
         type: 'success',
-        message: 'Mot de passe mis a jour.'
+        message: t('success.passwordUpdated')
       });
     } catch (error) {
       setNotice({
         type: 'error',
-        message: `Erreur mise a jour mot de passe: ${error.message}`
+        message: `${t('errors.updatePasswordFailed')}: ${error.message}`
       });
     } finally {
       setSavingPassword(false);
@@ -213,7 +215,7 @@ const AccountSpaceLuxe = () => {
     return (
       <div className="account-page">
         <div className="container-luxe account-shell">
-          <p className="account-loading">Chargement de votre espace client...</p>
+          <p className="account-loading">{t('loading')}</p>
         </div>
       </div>
     );
@@ -224,8 +226,8 @@ const AccountSpaceLuxe = () => {
       <div className="container-luxe account-shell">
         <header className="account-hero">
           <div>
-            <h1>Espace client</h1>
-            <p>Retrouvez vos commandes, vos projets, vos adresses et la sécurité de votre compte.</p>
+            <h1>{t('hero.title')}</h1>
+            <p>{t('hero.subtitle')}</p>
           </div>
         </header>
 
@@ -238,14 +240,14 @@ const AccountSpaceLuxe = () => {
         <section className="account-grid">
           <article className="account-panel">
             <div className="account-panel-head">
-              <h2>Mes commandes</h2>
+              <h2>{t('orders.title')}</h2>
               <span className="account-badge">{orders.length}</span>
             </div>
 
             {loadingOrders ? (
-              <p className="account-muted">Chargement des commandes...</p>
+              <p className="account-muted">{t('orders.loading')}</p>
             ) : orders.length === 0 ? (
-              <p className="account-muted">Aucune commande pour le moment.</p>
+              <p className="account-muted">{t('orders.empty')}</p>
             ) : (
               <ul className="account-list">
                 {recentOrders.map((order) => {
@@ -253,11 +255,11 @@ const AccountSpaceLuxe = () => {
                   return (
                     <li key={order.id} className="account-list-item">
                       <div>
-                        <strong>{order.book_title || 'Livre sans titre'}</strong>
+                        <strong>{order.book_title || t('orders.untitledBook')}</strong>
                         <span>{statusConfig.label}</span>
                       </div>
                       <Link to="/orders" className="account-link">
-                        Voir
+                        {t('orders.view')}
                       </Link>
                     </li>
                   );
@@ -267,31 +269,31 @@ const AccountSpaceLuxe = () => {
 
             <div className="account-actions">
               <Link to="/orders" className="btn btn-outline">
-                Gerer mes commandes
+                {t('orders.manage')}
               </Link>
             </div>
           </article>
 
           <article className="account-panel">
             <div className="account-panel-head">
-              <h2>Mes projets</h2>
+              <h2>{t('projects.title')}</h2>
               <span className="account-badge">{projectCount}</span>
             </div>
 
             {loadingBooks ? (
-              <p className="account-muted">Chargement des projets...</p>
+              <p className="account-muted">{t('projects.loading')}</p>
             ) : projectCount === 0 ? (
-              <p className="account-muted">Aucun projet enregistre.</p>
+              <p className="account-muted">{t('projects.empty')}</p>
             ) : (
               <ul className="account-list">
                 {books.slice(0, 6).map((book) => (
                   <li key={book.id} className="account-list-item">
                     <div>
-                      <strong>{book.title || 'Livre sans titre'}</strong>
-                      <span>Creer le {new Date(book.created_at).toLocaleDateString('fr-FR')}</span>
+                      <strong>{book.title || t('projects.untitledBook')}</strong>
+                      <span>{t('projects.createdOn')} {new Date(book.created_at).toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'fr-FR')}</span>
                     </div>
                     <Link to={`/book/${book.id}`} className="account-link">
-                      Editer
+                      {t('projects.edit')}
                     </Link>
                   </li>
                 ))}
@@ -300,14 +302,14 @@ const AccountSpaceLuxe = () => {
 
             <div className="account-actions">
               <Link to="/dashboard" className="btn btn-outline">
-                Voir tous mes projets
+                {t('projects.viewAll')}
               </Link>
             </div>
           </article>
 
           <article className="account-panel">
             <div className="account-panel-head">
-              <h2>Mes adresses</h2>
+              <h2>{t('address.title')}</h2>
             </div>
 
             {/* L ADRESSE ENREGISTREE, en toutes lettres. Le formulaire seul ne
@@ -318,30 +320,30 @@ const AccountSpaceLuxe = () => {
                 carte lit user_metadata, pas le formulaire. */}
             {adresseEnregistree ? (
               <div className="account-address-saved">
-                <span className="account-address-saved-label">Adresse enregistrée</span>
+                <span className="account-address-saved-label">{t('address.savedLabel')}</span>
                 <p className="account-address-saved-text">{adresseEnregistree}</p>
                 <p className="account-address-saved-hint">
-                  Elle est utilisée pour pré-remplir vos commandes. Modifiez-la ci-dessous si besoin.
+                  {t('address.savedHint')}
                 </p>
               </div>
             ) : (
               <p className="account-address-saved-hint">
-                Aucune adresse enregistrée pour le moment. Elle servira à pré-remplir vos commandes.
+                {t('address.noneYet')}
               </p>
             )}
 
             <form className="account-form" onSubmit={saveAddress}>
-              <label htmlFor="fullName">Nom complet</label>
+              <label htmlFor="fullName">{t('address.fullNameLabel')}</label>
               <input
                 id="fullName"
                 name="fullName"
                 className="input-luxe"
                 value={addressForm.fullName}
                 onChange={setAddressField}
-                placeholder="Ex: Marie Dupont"
+                placeholder={t('address.fullNamePlaceholder')}
               />
 
-              <label htmlFor="line1">Adresse</label>
+              <label htmlFor="line1">{t('address.line1Label')}</label>
               {/* Suggestions officielles (Base Adresse Nationale) : choisir une
                   proposition remplit aussi le code postal et la ville. Voir
                   AddressAutocomplete.js — jamais bloquant, saisie libre
@@ -351,22 +353,22 @@ const AccountSpaceLuxe = () => {
                 value={addressForm.line1}
                 address={addressForm}
                 onChangeField={setAddressField}
-                placeholder="Ex: 12 rue de la Paix"
+                placeholder={t('address.line1Placeholder')}
               />
 
-              <label htmlFor="line2">Complement</label>
+              <label htmlFor="line2">{t('address.line2Label')}</label>
               <input
                 id="line2"
                 name="line2"
                 className="input-luxe"
                 value={addressForm.line2}
                 onChange={setAddressField}
-                placeholder="Batiment, etage, etc."
+                placeholder={t('address.line2Placeholder')}
               />
 
               <div className="account-form-row">
                 <div>
-                  <label htmlFor="postalCode">Code postal</label>
+                  <label htmlFor="postalCode">{t('address.postalCodeLabel')}</label>
                   <AddressAutocomplete
                     field="postalCode"
                     value={addressForm.postalCode}
@@ -376,55 +378,55 @@ const AccountSpaceLuxe = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="city">Ville</label>
+                  <label htmlFor="city">{t('address.cityLabel')}</label>
                   <input
                     id="city"
                     name="city"
                     className="input-luxe"
                     value={addressForm.city}
                     onChange={setAddressField}
-                    placeholder="Paris"
+                    placeholder={t('address.cityPlaceholder')}
                   />
                 </div>
               </div>
 
               <div className="account-form-row">
                 <div>
-                  <label htmlFor="country">Pays</label>
+                  <label htmlFor="country">{t('address.countryLabel')}</label>
                   <input
                     id="country"
                     name="country"
                     className="input-luxe"
                     value={addressForm.country}
                     onChange={setAddressField}
-                    placeholder="France"
+                    placeholder={t('address.countryPlaceholder')}
                   />
                 </div>
                 <div>
-                  <label htmlFor="phone">Telephone</label>
+                  <label htmlFor="phone">{t('address.phoneLabel')}</label>
                   <input
                     id="phone"
                     name="phone"
                     className="input-luxe"
                     value={addressForm.phone}
                     onChange={setAddressField}
-                    placeholder="06 00 00 00 00"
+                    placeholder={t('address.phonePlaceholder')}
                   />
                 </div>
               </div>
 
               <button type="submit" className="btn btn-primary" disabled={savingAddress}>
-                {savingAddress ? 'Enregistrement...' : 'Enregistrer adresse'}
+                {savingAddress ? t('address.submitting') : t('address.submit')}
               </button>
             </form>
           </article>
 
           <article className="account-panel">
             <div className="account-panel-head">
-              <h2>Changer mot de passe</h2>
+              <h2>{t('password.title')}</h2>
             </div>
             <form className="account-form" onSubmit={updatePassword}>
-              <label htmlFor="newPassword">Nouveau mot de passe</label>
+              <label htmlFor="newPassword">{t('password.newLabel')}</label>
               <input
                 id="newPassword"
                 name="newPassword"
@@ -432,11 +434,11 @@ const AccountSpaceLuxe = () => {
                 className="input-luxe"
                 value={passwordForm.newPassword}
                 onChange={setPasswordField}
-                placeholder="Minimum 8 caracteres"
+                placeholder={t('password.newPlaceholder')}
                 autoComplete="new-password"
               />
 
-              <label htmlFor="confirmPassword">Confirmer le mot de passe</label>
+              <label htmlFor="confirmPassword">{t('password.confirmLabel')}</label>
               <input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -444,12 +446,12 @@ const AccountSpaceLuxe = () => {
                 className="input-luxe"
                 value={passwordForm.confirmPassword}
                 onChange={setPasswordField}
-                placeholder="Saisir a nouveau"
+                placeholder={t('password.confirmPlaceholder')}
                 autoComplete="new-password"
               />
 
               <button type="submit" className="btn btn-primary" disabled={savingPassword}>
-                {savingPassword ? 'Mise a jour...' : 'Mettre a jour'}
+                {savingPassword ? t('password.submitting') : t('password.submit')}
               </button>
             </form>
           </article>

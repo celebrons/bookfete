@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import { getApiBaseUrl } from '../../services/compositionApi';
 import './SupprimerMonCompte.css';
@@ -22,9 +23,13 @@ import './SupprimerMonCompte.css';
 //   DELIBERE. Il faut ecrire SUPPRIMER pour confirmer. Ce n'est pas une
 //   formalite : c'est le geste qui distingue une decision d'un clic de trop,
 //   et il n'existe aucune annulation apres coup.
-const MOT_DE_CONFIRMATION = 'SUPPRIMER';
-
 function SupprimerMonCompte({ nombreLivres = 0, nombreCommandes = 0 }) {
+  const { t } = useTranslation('account');
+  // Mot de confirmation TRADUIT (chantier bilingue, 2026-09-30) : un
+  // visiteur anglophone tape "DELETE", pas "SUPPRIMER" — l'instruction
+  // affichee et la verification doivent toujours s'accorder, jamais l'une
+  // en anglais et l'autre restee en francais.
+  const motDeConfirmation = t('deleteAccount.confirmWord');
   const navigate = useNavigate();
   const [ouvert, setOuvert] = useState(false);
   const [saisie, setSaisie] = useState('');
@@ -36,20 +41,20 @@ function SupprimerMonCompte({ nombreLivres = 0, nombreCommandes = 0 }) {
     setEnCours(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Session expiree. Reconnectez-vous.');
+      if (!session?.access_token) throw new Error(t('deleteAccount.errorSessionExpired'));
 
       const reponse = await fetch(`${getApiBaseUrl()}/auth/account`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
       const corps = await reponse.json().catch(() => ({}));
-      if (!reponse.ok) throw new Error(corps?.error || 'La suppression a echoue.');
+      if (!reponse.ok) throw new Error(corps?.error || t('deleteAccount.errorFailed'));
 
       // Le compte n'existe plus : la session locale n'a plus d'objet.
       await supabase.auth.signOut().catch(() => {});
       navigate('/', { replace: true });
     } catch (err) {
-      setErreur(err.message || 'La suppression a echoue.');
+      setErreur(err.message || t('deleteAccount.errorFailed'));
       setEnCours(false);
     }
   };
@@ -58,42 +63,41 @@ function SupprimerMonCompte({ nombreLivres = 0, nombreCommandes = 0 }) {
     return (
       <p className="suppr-compte-ligne">
         <button type="button" className="suppr-compte-lien" onClick={() => setOuvert(true)}>
-          Supprimer mon compte
+          {t('deleteAccount.link')}
         </button>
       </p>
     );
   }
 
-  const peutSupprimer = saisie.trim().toUpperCase() === MOT_DE_CONFIRMATION;
+  const peutSupprimer = saisie.trim().toUpperCase() === motDeConfirmation.toUpperCase();
 
   return (
     <div className="suppr-compte-panneau">
-      <h3>Supprimer définitivement votre compte</h3>
+      <h3>{t('deleteAccount.title')}</h3>
 
       <p className="suppr-compte-texte">
-        Cette action est <strong>irréversible</strong>. Seront effacés immédiatement :
+        {t('deleteAccount.intro')}
       </p>
       <ul className="suppr-compte-liste">
         <li>
           {nombreLivres > 0
-            ? <>vos <strong>{nombreLivres} livre{nombreLivres > 1 ? 's' : ''}</strong>, leurs pages et leurs souvenirs</>
-            : <>vos livres, leurs pages et leurs souvenirs</>}
+            ? <>{t('deleteAccount.itemBooksPrefix')} <strong>{t('deleteAccount.itemBooksCount', { count: nombreLivres, plural: nombreLivres > 1 ? 's' : '' })}</strong>{t('deleteAccount.itemBooksSuffix')}</>
+            : t('deleteAccount.itemBooksPlain')}
         </li>
-        <li><strong>toutes vos photos</strong>, y compris les originaux</li>
+        <li><strong>{t('deleteAccount.itemPhotos')}</strong></li>
         <li>
           {nombreCommandes > 0
-            ? <>l’historique de vos <strong>{nombreCommandes} commande{nombreCommandes > 1 ? 's' : ''}</strong></>
-            : <>l’historique de vos commandes</>}
+            ? <>{t('deleteAccount.itemOrdersPrefix')} <strong>{t('deleteAccount.itemOrdersCount', { count: nombreCommandes, plural: nombreCommandes > 1 ? 's' : '' })}</strong></>
+            : t('deleteAccount.itemOrdersPlain')}
         </li>
-        <li>votre adresse e-mail et vos adresses de livraison</li>
+        <li>{t('deleteAccount.itemAddresses')}</li>
       </ul>
       <p className="suppr-compte-texte">
-        Rien de tout cela ne pourra être récupéré, par vous ni par nous.
-        Si un livre est en cours de fabrication, la suppression sera refusée jusqu’à sa livraison.
+        {t('deleteAccount.warning')}
       </p>
 
       <label className="suppr-compte-label" htmlFor="suppr-confirmation">
-        Écrivez <strong>{MOT_DE_CONFIRMATION}</strong> pour confirmer
+        {t('deleteAccount.confirmLabel', { word: motDeConfirmation })}
       </label>
       <input
         id="suppr-confirmation"
@@ -102,7 +106,7 @@ function SupprimerMonCompte({ nombreLivres = 0, nombreCommandes = 0 }) {
         value={saisie}
         onChange={(event) => setSaisie(event.target.value)}
         autoComplete="off"
-        placeholder={MOT_DE_CONFIRMATION}
+        placeholder={motDeConfirmation}
       />
 
       {erreur && <p className="suppr-compte-erreur">{erreur}</p>}
@@ -114,7 +118,7 @@ function SupprimerMonCompte({ nombreLivres = 0, nombreCommandes = 0 }) {
           onClick={() => { setOuvert(false); setSaisie(''); setErreur(''); }}
           disabled={enCours}
         >
-          Annuler
+          {t('deleteAccount.cancel')}
         </button>
         <button
           type="button"
@@ -122,7 +126,7 @@ function SupprimerMonCompte({ nombreLivres = 0, nombreCommandes = 0 }) {
           onClick={supprimer}
           disabled={!peutSupprimer || enCours}
         >
-          {enCours ? 'Suppression…' : 'Supprimer définitivement'}
+          {enCours ? t('deleteAccount.submitting') : t('deleteAccount.submit')}
         </button>
       </div>
     </div>

@@ -1,0 +1,17 @@
+{
+  "orderStatus": {
+    "draft": "Draft",
+    "awaitingPayment": "Awaiting payment",
+    "paid": "Paid",
+    "pdfGenerating": "Payment confirmed - generating PDF",
+    "pdfReady": "PDF ready",
+    "printQueued": "In production",
+    "sentToPrinter": "Sent to printer",
+    "printed": "Printed",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled",
+    "failed": "Failed",
+    "unknown": "Unknown"
+  }
+}

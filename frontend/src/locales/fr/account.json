@@ -1,0 +1,90 @@
+{
+  "loading": "Chargement de votre espace client...",
+  "hero": {
+    "title": "Espace client",
+    "subtitle": "Retrouvez vos commandes, vos projets, vos adresses et la sécurité de votre compte."
+  },
+  "errors": {
+    "projects": "Projets",
+    "loadFailed": "chargement impossible",
+    "orders": "Commandes",
+    "loadSpaceFailed": "Impossible de charger votre espace",
+    "saveAddressFailed": "Erreur sauvegarde adresse",
+    "updatePasswordFailed": "Erreur mise à jour mot de passe",
+    "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères.",
+    "passwordMismatch": "Les mots de passe ne correspondent pas."
+  },
+  "success": {
+    "addressSaved": "Adresse enregistrée.",
+    "passwordUpdated": "Mot de passe mis à jour."
+  },
+  "orders": {
+    "title": "Mes commandes",
+    "loading": "Chargement des commandes...",
+    "empty": "Aucune commande pour le moment.",
+    "untitledBook": "Livre sans titre",
+    "view": "Voir",
+    "manage": "Gérer mes commandes"
+  },
+  "projects": {
+    "title": "Mes projets",
+    "loading": "Chargement des projets...",
+    "empty": "Aucun projet enregistré.",
+    "untitledBook": "Livre sans titre",
+    "createdOn": "Créé le",
+    "edit": "Éditer",
+    "viewAll": "Voir tous mes projets"
+  },
+  "address": {
+    "title": "Mes adresses",
+    "savedLabel": "Adresse enregistrée",
+    "savedHint": "Elle est utilisée pour pré-remplir vos commandes. Modifiez-la ci-dessous si besoin.",
+    "noneYet": "Aucune adresse enregistrée pour le moment. Elle servira à pré-remplir vos commandes.",
+    "fullNameLabel": "Nom complet",
+    "fullNamePlaceholder": "Ex: Marie Dupont",
+    "line1Label": "Adresse",
+    "line1Placeholder": "Ex: 12 rue de la Paix",
+    "line2Label": "Complément",
+    "line2Placeholder": "Bâtiment, étage, etc.",
+    "postalCodeLabel": "Code postal",
+    "cityLabel": "Ville",
+    "cityPlaceholder": "Paris",
+    "countryLabel": "Pays",
+    "countryPlaceholder": "France",
+    "phoneLabel": "Téléphone",
+    "phonePlaceholder": "06 00 00 00 00",
+    "submit": "Enregistrer adresse",
+    "submitting": "Enregistrement..."
+  },
+  "password": {
+    "title": "Changer mot de passe",
+    "newLabel": "Nouveau mot de passe",
+    "newPlaceholder": "Minimum 8 caractères",
+    "confirmLabel": "Confirmer le mot de passe",
+    "confirmPlaceholder": "Saisir à nouveau",
+    "submit": "Mettre à jour",
+    "submitting": "Mise à jour..."
+  },
+  "deleteAccount": {
+    "link": "Supprimer mon compte",
+    "title": "Supprimer définitivement votre compte",
+    "intro": "Cette action est irréversible. Seront effacés immédiatement :",
+    "itemBooksPrefix": "vos",
+    "itemBooksCount": "{{count}} livre{{plural}}",
+    "itemBooksSuffix": ", leurs pages et leurs souvenirs",
+    "itemBooksPlain": "vos livres, leurs pages et leurs souvenirs",
+    "itemPhotos": "toutes vos photos, y compris les originaux",
+    "itemOrdersPrefix": "l'historique de vos",
+    "itemOrdersCount": "{{count}} commande{{plural}}",
+    "itemOrdersPlain": "l'historique de vos commandes",
+    "itemAddresses": "votre adresse e-mail et vos adresses de livraison",
+    "warning": "Rien de tout cela ne pourra être récupéré, par vous ni par nous. Si un livre est en cours de fabrication, la suppression sera refusée jusqu'à sa livraison.",
+    "confirmWord": "SUPPRIMER",
+    "confirmLabel": "Écrivez {{word}} pour confirmer",
+    "cancel": "Annuler",
+    "submit": "Supprimer définitivement",
+    "submitting": "Suppression…",
+    "errorSessionExpired": "Session expirée. Reconnectez-vous.",
+    "errorFailed": "La suppression a échoué."
+  }
+}

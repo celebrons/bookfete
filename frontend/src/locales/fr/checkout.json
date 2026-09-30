@@ -1,0 +1,17 @@
+{
+  "orderStatus": {
+    "draft": "Brouillon",
+    "awaitingPayment": "En attente paiement",
+    "paid": "Payée",
+    "pdfGenerating": "Paiement validé - génération PDF",
+    "pdfReady": "PDF prêt",
+    "printQueued": "Mise en production",
+    "sentToPrinter": "Envoyée imprimeur",
+    "printed": "Imprimé",
+    "shipped": "Expédiée",
+    "delivered": "Livrée",
+    "cancelled": "Annulée",
+    "failed": "Échec",
+    "unknown": "Inconnu"
+  }
+}

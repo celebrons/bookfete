@@ -1,0 +1,90 @@
+{
+  "loading": "Loading your account...",
+  "hero": {
+    "title": "My account",
+    "subtitle": "Find your orders, projects, addresses, and account security."
+  },
+  "errors": {
+    "projects": "Projects",
+    "loadFailed": "failed to load",
+    "orders": "Orders",
+    "loadSpaceFailed": "Unable to load your account",
+    "saveAddressFailed": "Error saving address",
+    "updatePasswordFailed": "Error updating password",
+    "passwordTooShort": "Password must be at least 8 characters.",
+    "passwordMismatch": "Passwords do not match."
+  },
+  "success": {
+    "addressSaved": "Address saved.",
+    "passwordUpdated": "Password updated."
+  },
+  "orders": {
+    "title": "My orders",
+    "loading": "Loading orders...",
+    "empty": "No orders yet.",
+    "untitledBook": "Untitled book",
+    "view": "View",
+    "manage": "Manage my orders"
+  },
+  "projects": {
+    "title": "My projects",
+    "loading": "Loading projects...",
+    "empty": "No projects saved.",
+    "untitledBook": "Untitled book",
+    "createdOn": "Created on",
+    "edit": "Edit",
+    "viewAll": "View all my projects"
+  },
+  "address": {
+    "title": "My addresses",
+    "savedLabel": "Saved address",
+    "savedHint": "It's used to pre-fill your orders. Edit it below if needed.",
+    "noneYet": "No address saved yet. It will be used to pre-fill your orders.",
+    "fullNameLabel": "Full name",
+    "fullNamePlaceholder": "E.g. Jane Smith",
+    "line1Label": "Address",
+    "line1Placeholder": "E.g. 12 Main Street",
+    "line2Label": "Additional info",
+    "line2Placeholder": "Building, floor, etc.",
+    "postalCodeLabel": "Postal code",
+    "cityLabel": "City",
+    "cityPlaceholder": "Paris",
+    "countryLabel": "Country",
+    "countryPlaceholder": "France",
+    "phoneLabel": "Phone",
+    "phonePlaceholder": "06 00 00 00 00",
+    "submit": "Save address",
+    "submitting": "Saving..."
+  },
+  "password": {
+    "title": "Change password",
+    "newLabel": "New password",
+    "newPlaceholder": "Minimum 8 characters",
+    "confirmLabel": "Confirm password",
+    "confirmPlaceholder": "Enter it again",
+    "submit": "Update",
+    "submitting": "Updating..."
+  },
+  "deleteAccount": {
+    "link": "Delete my account",
+    "title": "Permanently delete your account",
+    "intro": "This action is irreversible. The following will be erased immediately:",
+    "itemBooksPrefix": "your",
+    "itemBooksCount": "{{count}} book{{plural}}",
+    "itemBooksSuffix": ", their pages and memories",
+    "itemBooksPlain": "your books, their pages and memories",
+    "itemPhotos": "all your photos, including the originals",
+    "itemOrdersPrefix": "the history of your",
+    "itemOrdersCount": "{{count}} order{{plural}}",
+    "itemOrdersPlain": "your order history",
+    "itemAddresses": "your email address and shipping addresses",
+    "warning": "None of this can be recovered, by you or by us. If a book is currently being produced, deletion will be refused until it's delivered.",
+    "confirmWord": "DELETE",
+    "confirmLabel": "Type {{word}} to confirm",
+    "cancel": "Cancel",
+    "submit": "Delete permanently",
+    "submitting": "Deleting…",
+    "errorSessionExpired": "Session expired. Please log in again.",
+    "errorFailed": "Deletion failed."
+  }
+}
