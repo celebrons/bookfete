@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import EmailOtpForm from './EmailOtpForm';
 import { getCurrentSession, isAnonymousSession } from '../../services/anonymousSession';
 import '../../styles/luxe-theme.css';
@@ -16,6 +17,7 @@ import './EmailOtpForm.css';
 // jamais ete cree, il n'y a donc rien a « avoir oublie » : c'est le meme
 // geste a la premiere commande et deux mois plus tard.
 function MesLivresLuxe() {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const [dejaConnecte, setDejaConnecte] = useState(false);
 
@@ -34,29 +36,28 @@ function MesLivresLuxe() {
     <div className="orders-page">
       <div className="container-luxe orders-shell">
         <article className="orders-panel" style={{ maxWidth: 520 }}>
-          <h1 style={{ marginTop: 0 }}>Retrouver mes livres</h1>
+          <h1 style={{ marginTop: 0 }}>{t('findBooks.title')}</h1>
 
           {dejaConnecte ? (
             <>
               <p className="orders-disclaimer">
-                Vous êtes déjà identifié. Vos livres vous attendent sur votre tableau de bord.
+                {t('findBooks.alreadyIn')}
               </p>
               <button type="button" className="btn btn-primary" onClick={() => navigate('/dashboard')}>
-                Voir mes livres
+                {t('findBooks.viewBooks')}
               </button>
             </>
           ) : (
             <>
               <p className="orders-disclaimer" style={{ marginBottom: 16 }}>
-                Indiquez l’adresse e-mail utilisée lors de votre commande. Nous vous envoyons
-                un code de connexion — il n’y a pas de mot de passe à retrouver.
+                {t('findBooks.intro')}
               </p>
               <EmailOtpForm
-                libelleAction="Voir mes livres"
+                libelleAction={t('findBooks.viewBooks')}
                 onSuccess={() => navigate('/dashboard', { replace: true })}
               />
               <p className="otp-hint" style={{ marginTop: 16 }}>
-                Un livre commencé sur cet appareil sans compte sera automatiquement rattaché.
+                {t('findBooks.hint')}
               </p>
             </>
           )}

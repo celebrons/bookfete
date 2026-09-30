@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import {
   convertAnonymousToAccount,
@@ -17,6 +18,7 @@ const buildApiBaseUrl = () => {
 const DRAFT_KEY = 'createBookDraftSansIA';
 
 const RegisterLuxe = () => {
+  const { t } = useTranslation('auth');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -54,13 +56,13 @@ const RegisterLuxe = () => {
     setError(null);
 
     if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.');
+      setError(t('register.errorMismatch'));
       setLoading(false);
       return;
     }
 
     if (password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caracteres.');
+      setError(t('register.errorTooShort'));
       setLoading(false);
       return;
     }
@@ -90,7 +92,7 @@ const RegisterLuxe = () => {
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.error || 'Erreur lors de la creation du compte.');
+        throw new Error(payload?.error || t('register.errorGeneric'));
       }
 
       // Le compte est cree cote serveur (client service-role) : ca n'ouvre
@@ -109,8 +111,8 @@ const RegisterLuxe = () => {
 
       setSuccessMessage(
         payload?.requiresEmailConfirmation
-          ? 'Compte cree. Confirmez votre email pour pouvoir vous connecter.'
-          : 'Votre compte est actif. Connectez-vous pour continuer.'
+          ? t('register.successMessageConfirm')
+          : t('register.successMessageActive')
       );
       setSuccess(true);
     } catch (registerError) {
@@ -133,14 +135,14 @@ const RegisterLuxe = () => {
           >
             OK
           </div>
-          <span className="label-gold">COMPTE CREE</span>
-          <h2 style={{ marginBottom: 'var(--space-md)' }}>Inscription reussie</h2>
+          <span className="label-gold">{t('register.successEyebrow')}</span>
+          <h2 style={{ marginBottom: 'var(--space-md)' }}>{t('register.successTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)' }}>
-            {successMessage || 'Compte cree avec succes.'}
+            {successMessage || t('register.successMessageFallback')}
           </p>
           {hasPendingDraft && (
             <p className="body-text" style={{ color: 'var(--text-light)' }}>
-              Votre livre est deja sauvegarde, il vous attend.
+              {t('register.successPendingDraft')}
             </p>
           )}
           <p
@@ -150,14 +152,14 @@ const RegisterLuxe = () => {
               marginBottom: 'var(--space-xl)'
             }}
           >
-            Connectez-vous pour continuer.
+            {t('register.successCta')}
           </p>
           <button
             onClick={() => navigate('/login')}
             className="btn btn-primary"
             style={{ padding: '14px 40px' }}
           >
-            Aller a la connexion
+            {t('register.successButton')}
           </button>
         </div>
       </div>
@@ -168,12 +170,12 @@ const RegisterLuxe = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <span className="label-gold">{hasPendingDraft ? 'DERNIERE ETAPE' : 'BIENVENUE'}</span>
-          <h2>{hasPendingDraft ? 'Enregistrez votre livre' : 'Inscription'}</h2>
+          <span className="label-gold">{hasPendingDraft ? t('register.eyebrowLastStep') : t('register.eyebrowWelcome')}</span>
+          <h2>{hasPendingDraft ? t('register.titleSaveBook') : t('register.titleDefault')}</h2>
           <p>
             {hasPendingDraft
-              ? 'Creez un compte pour sauvegarder votre livre et le retrouver a tout moment.'
-              : 'Creez votre compte utilisateur'}
+              ? t('register.subtitleSaveBook')
+              : t('register.subtitleDefault')}
           </p>
         </div>
 
@@ -181,13 +183,13 @@ const RegisterLuxe = () => {
 
         <form onSubmit={handleRegister} className="auth-form">
           <div className="auth-field">
-            <label htmlFor="fullName">Nom complet</label>
+            <label htmlFor="fullName">{t('register.fullNameLabel')}</label>
             <input
               id="fullName"
               type="text"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Jean Dupont"
+              placeholder={t('register.fullNamePlaceholder')}
               required
               disabled={loading}
               autoComplete="name"
@@ -195,13 +197,13 @@ const RegisterLuxe = () => {
           </div>
 
           <div className="auth-field">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">{t('register.emailLabel')}</label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="vous@exemple.com"
+              placeholder={t('register.emailPlaceholder')}
               required
               disabled={loading}
               autoComplete="email"
@@ -209,7 +211,7 @@ const RegisterLuxe = () => {
           </div>
 
           <div className="auth-field">
-            <label htmlFor="password">Mot de passe</label>
+            <label htmlFor="password">{t('register.passwordLabel')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="password"
@@ -251,12 +253,12 @@ const RegisterLuxe = () => {
                 display: 'block'
               }}
             >
-              Minimum 8 caracteres
+              {t('register.passwordHint')}
             </small>
           </div>
 
           <div className="auth-field">
-            <label htmlFor="confirmPassword">Confirmer le mot de passe</label>
+            <label htmlFor="confirmPassword">{t('register.confirmPasswordLabel')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="confirmPassword"
@@ -296,18 +298,18 @@ const RegisterLuxe = () => {
             className="btn btn-primary auth-button"
             disabled={loading}
           >
-            {loading ? 'Inscription...' : "S'inscrire"}
+            {loading ? t('register.submitting') : t('register.submit')}
           </button>
         </form>
 
         <div className="auth-divider">
-          <span>OU</span>
+          <span>{t('register.or')}</span>
         </div>
 
         <div className="auth-footer">
-          Deja un compte ?
+          {t('register.alreadyAccount')}
           <Link to="/login">
-            Se connecter
+            {t('register.login')}
           </Link>
         </div>
       </div>

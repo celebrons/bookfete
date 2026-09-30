@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { demanderUnCode, verifierLeCode } from '../../services/emailOtp';
 import './EmailOtpForm.css';
 
@@ -30,10 +31,12 @@ const CODE_MAX = 10;
 
 function EmailOtpForm({
   emailInitial = '',
-  libelleAction = 'Continuer',
+  libelleAction = null,
   onSuccess,
   onCancel
 }) {
+  const { t } = useTranslation('auth');
+  const libelleActionResolu = libelleAction || t('otp.continueDefault');
   const [etape, setEtape] = useState('email');
   const [email, setEmail] = useState(emailInitial);
   const [code, setCode] = useState('');
@@ -66,7 +69,7 @@ function EmailOtpForm({
       setEtape('code');
       setAttenteRenvoi(DELAI_RENVOI_S);
     } catch (err) {
-      setErreur(err.message || "L'envoi du code a echoue.");
+      setErreur(err.message || t('otp.errorSendFailed'));
     } finally {
       setEnCours(false);
     }
@@ -80,7 +83,7 @@ function EmailOtpForm({
       const resultat = await verifierLeCode({ email, code, voie });
       if (onSuccess) await onSuccess(resultat);
     } catch (err) {
-      setErreur(err.message || 'Verification impossible.');
+      setErreur(err.message || t('otp.errorVerificationFailed'));
     } finally {
       setEnCours(false);
     }
@@ -89,7 +92,7 @@ function EmailOtpForm({
   if (etape === 'email') {
     return (
       <form className="otp-form" onSubmit={envoyerLeCode}>
-        <label className="otp-label" htmlFor="otp-email">Votre adresse e-mail</label>
+        <label className="otp-label" htmlFor="otp-email">{t('otp.emailLabel')}</label>
         <input
           id="otp-email"
           type="email"
@@ -101,17 +104,17 @@ function EmailOtpForm({
           required
         />
         <p className="otp-hint">
-          Nous vous envoyons un code par e-mail. Pas de mot de passe à retenir.
+          {t('otp.hint')}
         </p>
         {erreur && <p className="otp-error">{erreur}</p>}
         <div className="otp-actions">
           {onCancel && (
             <button type="button" className="btn btn-outline" onClick={onCancel} disabled={enCours}>
-              Annuler
+              {t('otp.cancel')}
             </button>
           )}
           <button type="submit" className="btn btn-primary" disabled={enCours}>
-            {enCours ? 'Envoi…' : 'Recevoir mon code'}
+            {enCours ? t('otp.sending') : t('otp.receiveCode')}
           </button>
         </div>
       </form>
@@ -120,7 +123,7 @@ function EmailOtpForm({
 
   return (
     <form className="otp-form" onSubmit={validerLeCode}>
-      <label className="otp-label" htmlFor="otp-code">Code reçu par e-mail</label>
+      <label className="otp-label" htmlFor="otp-code">{t('otp.codeLabel')}</label>
       {/* Pas de « 123456 » en exemple : ce serait promettre six chiffres,
           exactement l erreur qu on vient de corriger. */}
       <input
@@ -132,18 +135,18 @@ function EmailOtpForm({
         onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_MAX))}
         inputMode="numeric"
         autoComplete="one-time-code"
-        placeholder="Votre code"
+        placeholder={t('otp.codePlaceholder')}
         maxLength={CODE_MAX}
         required
       />
       <p className="otp-hint">
-        Envoyé à <strong>{email}</strong>.{' '}
+        {t('otp.sentTo')} <strong>{email}</strong>.{' '}
         <button
           type="button"
           className="otp-link"
           onClick={() => { setEtape('email'); setCode(''); setErreur(''); }}
         >
-          Changer d’adresse
+          {t('otp.changeAddress')}
         </button>
       </p>
       {erreur && <p className="otp-error">{erreur}</p>}
@@ -154,10 +157,10 @@ function EmailOtpForm({
           onClick={envoyerLeCode}
           disabled={enCours || attenteRenvoi > 0}
         >
-          {attenteRenvoi > 0 ? `Renvoyer (${attenteRenvoi} s)` : 'Renvoyer le code'}
+          {attenteRenvoi > 0 ? t('otp.resendWithSeconds', { seconds: attenteRenvoi }) : t('otp.resend')}
         </button>
         <button type="submit" className="btn btn-primary" disabled={enCours || code.length < CODE_MIN}>
-          {enCours ? 'Vérification…' : libelleAction}
+          {enCours ? t('otp.verifying') : libelleActionResolu}
         </button>
       </div>
     </form>

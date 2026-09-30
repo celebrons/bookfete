@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import { messageReseau } from '../../services/httpClient';
 import '../../styles/luxe-theme.css';
@@ -14,6 +15,7 @@ import './AuthLuxe.css';
 // PASSWORD_RECOVERY (l'un peut arriver avant que l'ecouteur soit pose,
 // l'autre le rattrape) — la encore, jamais bloquant si l'ordre varie.
 const ResetPasswordLuxe = () => {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const [verification, setVerification] = useState(true);
   const [sessionPrete, setSessionPrete] = useState(false);
@@ -49,11 +51,11 @@ const ResetPasswordLuxe = () => {
     setError(null);
 
     if (password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères.');
+      setError(t('resetPassword.errorTooShort'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.');
+      setError(t('resetPassword.errorMismatch'));
       return;
     }
 
@@ -73,7 +75,7 @@ const ResetPasswordLuxe = () => {
     return (
       <div className="auth-container">
         <div className="auth-card" style={{ textAlign: 'center' }}>
-          <p className="body-text" style={{ color: 'var(--text-light)' }}>Vérification du lien...</p>
+          <p className="body-text" style={{ color: 'var(--text-light)' }}>{t('resetPassword.checking')}</p>
         </div>
       </div>
     );
@@ -83,10 +85,10 @@ const ResetPasswordLuxe = () => {
     return (
       <div className="auth-container">
         <div className="auth-card" style={{ textAlign: 'center' }}>
-          <span className="label-gold">MOT DE PASSE MIS À JOUR</span>
-          <h2 style={{ marginBottom: 'var(--space-md)' }}>C'est fait</h2>
+          <span className="label-gold">{t('resetPassword.successEyebrow')}</span>
+          <h2 style={{ marginBottom: 'var(--space-md)' }}>{t('resetPassword.successTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-xl)' }}>
-            Votre nouveau mot de passe est actif. Vous êtes déjà connecté·e.
+            {t('resetPassword.successBody')}
           </p>
           <button
             type="button"
@@ -94,7 +96,7 @@ const ResetPasswordLuxe = () => {
             style={{ padding: '14px 40px' }}
             onClick={() => navigate('/dashboard', { replace: true })}
           >
-            Aller à mon espace
+            {t('resetPassword.successButton')}
           </button>
         </div>
       </div>
@@ -105,13 +107,13 @@ const ResetPasswordLuxe = () => {
     return (
       <div className="auth-container">
         <div className="auth-card" style={{ textAlign: 'center' }}>
-          <span className="label-gold">LIEN EXPIRÉ</span>
-          <h2 style={{ marginBottom: 'var(--space-md)' }}>Ce lien n'est plus valide</h2>
+          <span className="label-gold">{t('resetPassword.expiredEyebrow')}</span>
+          <h2 style={{ marginBottom: 'var(--space-md)' }}>{t('resetPassword.expiredTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-xl)' }}>
-            Les liens de réinitialisation ne sont valables qu'une seule fois et pendant un temps limité.
+            {t('resetPassword.expiredBody')}
           </p>
           <Link to="/mot-de-passe-oublie" className="btn btn-primary" style={{ padding: '14px 40px' }}>
-            Redemander un lien
+            {t('resetPassword.expiredButton')}
           </Link>
         </div>
       </div>
@@ -122,16 +124,16 @@ const ResetPasswordLuxe = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <span className="label-gold">NOUVEAU MOT DE PASSE</span>
-          <h2>Choisissez un nouveau mot de passe</h2>
-          <p>Au moins 8 caractères.</p>
+          <span className="label-gold">{t('resetPassword.eyebrow')}</span>
+          <h2>{t('resetPassword.title')}</h2>
+          <p>{t('resetPassword.subtitle')}</p>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-field">
-            <label htmlFor="password">Nouveau mot de passe</label>
+            <label htmlFor="password">{t('resetPassword.newPasswordLabel')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="password"
@@ -168,7 +170,7 @@ const ResetPasswordLuxe = () => {
           </div>
 
           <div className="auth-field">
-            <label htmlFor="confirmPassword">Confirmer le mot de passe</label>
+            <label htmlFor="confirmPassword">{t('resetPassword.confirmPasswordLabel')}</label>
             <input
               id="confirmPassword"
               type={showPassword ? 'text' : 'password'}
@@ -182,7 +184,7 @@ const ResetPasswordLuxe = () => {
           </div>
 
           <button type="submit" className="btn btn-primary auth-button" disabled={loading}>
-            {loading ? 'Enregistrement...' : 'Enregistrer le mot de passe'}
+            {loading ? t('resetPassword.submitting') : t('resetPassword.submit')}
           </button>
         </form>
       </div>

@@ -4,6 +4,8 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import commonFr from '../locales/fr/common.json';
 import commonEn from '../locales/en/common.json';
+import authFr from '../locales/fr/auth.json';
+import authEn from '../locales/en/auth.json';
 
 // Chantier bilingue (2026-09-30) : un namespace par grand domaine de l'app
 // (mirroring frontend/src/components/<dossier>) plutot qu'un fichier de
@@ -13,8 +15,8 @@ import commonEn from '../locales/en/common.json';
 // chaque phase suivante ajoute le sien (checkout, atelier, collective,
 // legal...) sans jamais toucher a celui-ci.
 const resources = {
-  fr: { common: commonFr },
-  en: { common: commonEn }
+  fr: { common: commonFr, auth: authFr },
+  en: { common: commonEn, auth: authEn }
 };
 
 i18n
@@ -29,7 +31,7 @@ i18n
     // pour 'en-US'/'en-GB'.
     nonExplicitSupportedLngs: true,
     load: 'languageOnly',
-    ns: ['common'],
+    ns: ['common', 'auth'],
     defaultNS: 'common',
     detection: {
       // localStorage d'abord (dernier choix explicite fait sur CE

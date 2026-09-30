@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import {
   linkAnonymousBooksAfterLogin,
@@ -32,6 +33,7 @@ const TEST1_CREDENTIALS = {
 };
 
 const LoginLuxe = () => {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -98,33 +100,33 @@ const LoginLuxe = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <span className="label-gold">BIENVENUE</span>
-          <h2>Connexion</h2>
-          <p>Accedez a votre espace personnel</p>
+          <span className="label-gold">{t('login.eyebrow')}</span>
+          <h2>{t('login.title')}</h2>
+          <p>{t('login.subtitle')}</p>
         </div>
 
         {error && (
           <div className="auth-error">
-            {error === 'Invalid login credentials' ? 'Email ou mot de passe incorrect' : error}
+            {error === 'Invalid login credentials' ? t('login.invalidCredentials') : error}
           </div>
         )}
 
         <form onSubmit={handleLogin} className="auth-form">
           <div className="auth-field">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">{t('login.emailLabel')}</label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="vous@exemple.com"
+              placeholder={t('login.emailPlaceholder')}
               required
               autoComplete="email"
             />
           </div>
 
           <div className="auth-field">
-            <label htmlFor="password">Mot de passe</label>
+            <label htmlFor="password">{t('login.passwordLabel')}</label>
             <input
               id="password"
               type="password"
@@ -139,10 +141,10 @@ const LoginLuxe = () => {
           <div className="auth-options">
             <label className="remember-me">
               <input type="checkbox" />
-              <span>Se souvenir de moi</span>
+              <span>{t('login.rememberMe')}</span>
             </label>
             <Link to="/mot-de-passe-oublie" className="forgot-link">
-              Mot de passe oublié ?
+              {t('login.forgotPassword')}
             </Link>
           </div>
 
@@ -151,7 +153,7 @@ const LoginLuxe = () => {
             className="btn btn-primary auth-button"
             disabled={loading}
           >
-            {loading ? 'Connexion...' : 'Se connecter'}
+            {loading ? t('login.submitting') : t('login.submit')}
           </button>
         </form>
 
@@ -176,7 +178,7 @@ const LoginLuxe = () => {
         )}
 
         <div className="auth-divider">
-          <span>OU</span>
+          <span>{t('login.or')}</span>
         </div>
 
         {/* Le chemin le plus court pour quelqu'un qui a commande sans jamais
@@ -184,16 +186,16 @@ const LoginLuxe = () => {
             (2026-09-20). Mis AVANT « creer un compte » parce que c'est le
             cas le plus frequent de retour sur le site. */}
         <div className="auth-footer">
-          Vous avez commencé ou commandé sans mot de passe ?
+          {t('login.noAccountCta')}
           <Link to="/mes-livres">
-            Retrouver mes livres
+            {t('login.retrieveBooks')}
           </Link>
         </div>
 
         <div className="auth-footer">
-          Pas encore de compte ?
+          {t('login.noAccountYet')}
           <Link to="/register">
-            Creer un compte
+            {t('login.createAccount')}
           </Link>
         </div>
       </div>

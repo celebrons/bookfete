@@ -29,5 +29,9 @@
   },
   "language": {
     "switchLabel": "Language"
+  },
+  "errors": {
+    "timeout": "The server is taking too long to respond (it may be restarting). Try again in a minute.",
+    "networkInterrupted": "Connection interrupted. Check your network and try again."
   }
 }

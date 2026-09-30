@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import { messageReseau } from '../../services/httpClient';
 import '../../styles/luxe-theme.css';
@@ -13,6 +14,7 @@ import './AuthLuxe.css';
 // PDF pret, etc.) et renvoie toujours un succes, meme si l'adresse n'existe
 // pas : ne jamais reveler ici quels emails ont un compte.
 const ForgotPasswordLuxe = () => {
+  const { t } = useTranslation('auth');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -41,14 +43,13 @@ const ForgotPasswordLuxe = () => {
     return (
       <div className="auth-container">
         <div className="auth-card" style={{ textAlign: 'center' }}>
-          <span className="label-gold">EMAIL ENVOYÉ</span>
-          <h2 style={{ marginBottom: 'var(--space-md)' }}>Vérifiez votre boîte de réception</h2>
+          <span className="label-gold">{t('forgotPassword.sentEyebrow')}</span>
+          <h2 style={{ marginBottom: 'var(--space-md)' }}>{t('forgotPassword.sentTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-xl)' }}>
-            Si un compte existe avec l'adresse <strong>{email}</strong>, un email vient d'être envoyé
-            avec un lien pour choisir un nouveau mot de passe. Pensez à vérifier vos indésirables.
+            {t('forgotPassword.sentBody', { email })}
           </p>
           <Link to="/login" className="btn btn-primary" style={{ padding: '14px 40px' }}>
-            Retour à la connexion
+            {t('forgotPassword.sentButton')}
           </Link>
         </div>
       </div>
@@ -59,22 +60,22 @@ const ForgotPasswordLuxe = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <span className="label-gold">MOT DE PASSE OUBLIÉ</span>
-          <h2>Réinitialiser votre mot de passe</h2>
-          <p>Indiquez votre adresse email, nous vous envoyons un lien pour en choisir un nouveau.</p>
+          <span className="label-gold">{t('forgotPassword.eyebrow')}</span>
+          <h2>{t('forgotPassword.title')}</h2>
+          <p>{t('forgotPassword.subtitle')}</p>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-field">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">{t('forgotPassword.emailLabel')}</label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="vous@exemple.com"
+              placeholder={t('login.emailPlaceholder')}
               required
               disabled={loading}
               autoComplete="email"
@@ -82,12 +83,12 @@ const ForgotPasswordLuxe = () => {
           </div>
 
           <button type="submit" className="btn btn-primary auth-button" disabled={loading}>
-            {loading ? 'Envoi...' : 'Envoyer le lien'}
+            {loading ? t('forgotPassword.submitting') : t('forgotPassword.submit')}
           </button>
         </form>
 
         <div className="auth-footer">
-          <Link to="/login">← Retour à la connexion</Link>
+          <Link to="/login">{t('forgotPassword.backToLogin')}</Link>
         </div>
       </div>
     </div>

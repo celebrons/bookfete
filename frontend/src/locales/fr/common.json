@@ -29,5 +29,9 @@
   },
   "language": {
     "switchLabel": "Langue"
+  },
+  "errors": {
+    "timeout": "Le serveur met trop de temps à répondre (il est peut-être en train de redémarrer). Réessayez dans une minute.",
+    "networkInterrupted": "Connexion interrompue. Vérifiez votre réseau et réessayez."
   }
 }

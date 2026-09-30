@@ -53,6 +53,7 @@ import {
   linkAnonymousBooksAfterLogin
 } from './anonymousSession';
 import { getApiBaseUrl } from './compositionApi';
+import i18n from '../i18n';
 
 export const VOIE_CONVERSION = 'conversion';
 export const VOIE_CONNEXION = 'connexion';
@@ -99,11 +100,15 @@ function messageLisible(erreur, repli) {
   const texte = String(erreur?.message || '').trim();
   if (!texte) return repli;
   if (/rate limit|too many|seconds/i.test(texte)) {
-    return 'Trop de demandes coup sur coup. Patientez une minute avant de redemander un code.';
+    return i18n.t('auth:otp.errorRateLimited');
   }
   if (/invalid|expired/i.test(texte)) {
-    return 'Ce code est invalide ou a expire. Demandez-en un nouveau.';
+    return i18n.t('auth:otp.errorInvalidOrExpired');
   }
+  // Message brut de Supabase : non traduit (sa langue depend du projet
+  // Supabase, pas de la nôtre) — seuls les deux cas reconnus ci-dessus et
+  // les replis explicites (voir les appelants) passent par nos propres
+  // traductions.
   return texte;
 }
 
@@ -116,7 +121,7 @@ function messageLisible(erreur, repli) {
 export async function demanderUnCode(email) {
   const adresse = String(email || '').trim().toLowerCase();
   if (!adresse || !adresse.includes('@')) {
-    throw new Error('Indiquez une adresse e-mail valide.');
+    throw new Error(i18n.t('auth:otp.errorInvalidEmail'));
   }
 
   const session = await getCurrentSession();
@@ -127,7 +132,7 @@ export async function demanderUnCode(email) {
       return { voie: VOIE_CONVERSION };
     }
     if (!adresseDejaUtilisee(error)) {
-      throw new Error(messageLisible(error, "L'envoi du code a echoue."));
+      throw new Error(messageLisible(error, i18n.t('auth:otp.errorSendFailed')));
     }
     // L'adresse appartient deja a un compte : on ne peut pas la rattacher a
     // la session anonyme, on se connecte a ce compte et on transferera les
@@ -143,7 +148,7 @@ export async function demanderUnCode(email) {
     options: { shouldCreateUser: true }
   });
   if (error) {
-    throw new Error(messageLisible(error, "L'envoi du code a echoue."));
+    throw new Error(messageLisible(error, i18n.t('auth:otp.errorSendFailed')));
   }
   return { voie: VOIE_CONNEXION };
 }
@@ -160,7 +165,7 @@ export async function verifierLeCode({ email, code, voie }) {
   // vaut laisser passer un code de la mauvaise longueur et le faire refuser
   // par le serveur — qui, lui, sait — que bloquer un code valide.
   if (!/^\d{6,10}$/.test(jeton)) {
-    throw new Error('Le code ne contient que des chiffres. Recopiez-le tel qu il figure dans l e-mail.');
+    throw new Error(i18n.t('auth:otp.errorDigitsOnly'));
   }
 
   // `email_change` pour une conversion (on attache une adresse a un compte
@@ -170,7 +175,7 @@ export async function verifierLeCode({ email, code, voie }) {
   const type = voie === VOIE_CONVERSION ? 'email_change' : 'email';
   const { error } = await supabase.auth.verifyOtp({ email: adresse, token: jeton, type });
   if (error) {
-    throw new Error(messageLisible(error, 'Verification impossible.'));
+    throw new Error(messageLisible(error, i18n.t('auth:otp.errorVerificationFailed')));
   }
 
   // Chemin B seulement : l'identifiant a change, les livres commences

@@ -26,10 +26,18 @@
 // que l'instance commence a se reveiller pendant que l'utilisateur navigue,
 // ce qui evite le plus souvent d'en arriver a un timeout.
 
+import i18n from '../i18n';
+
 const NORMAL_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 20000);
 const COLD_START_TIMEOUT_MS = Number(process.env.REACT_APP_API_COLD_START_TIMEOUT_MS || 60000);
 
-export const TIMEOUT_MESSAGE = 'Le serveur met trop de temps a repondre (il est peut-etre en train de redemarrer). Reessayez dans une minute.';
+// FONCTION, pas une constante figee au chargement du module (chantier
+// bilingue, 2026-09-30) : la langue peut changer en cours de session, ce
+// message doit donc etre lu dans la langue CURRENTE au moment de l'erreur,
+// jamais celle active quand ce fichier a ete importe.
+export function getTimeoutMessage() {
+  return i18n.t('common:errors.timeout');
+}
 
 // CE QUE LE NAVIGATEUR DIT, ET CE QU'IL FAUT MONTRER.
 //
@@ -57,10 +65,10 @@ export function messageReseau(error) {
   if (!texte.trim()) return null;
 
   if (/aborterror|was aborted|signal is aborted|timeout|timed out/.test(texte)) {
-    return TIMEOUT_MESSAGE;
+    return getTimeoutMessage();
   }
   if (/failed to fetch|load failed|networkerror|network request failed|connexion/.test(texte)) {
-    return 'Connexion interrompue. Verifiez votre reseau et reessayez.';
+    return i18n.t('common:errors.networkInterrupted');
   }
   return null;
 }
@@ -93,13 +101,13 @@ export async function fetchWithWakeRetry(url, options = {}) {
     if (error?.name !== 'AbortError') throw error;
 
     if (!isIdempotent(options)) {
-      throw new Error(TIMEOUT_MESSAGE);
+      throw new Error(getTimeoutMessage());
     }
 
     try {
       return await fetchWithTimeout(url, options, COLD_START_TIMEOUT_MS);
     } catch (retryError) {
-      if (retryError?.name === 'AbortError') throw new Error(TIMEOUT_MESSAGE);
+      if (retryError?.name === 'AbortError') throw new Error(getTimeoutMessage());
       throw retryError;
     }
   }
