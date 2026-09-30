@@ -177,9 +177,9 @@ const LoginLuxe = () => {
               <input type="checkbox" />
               <span>Se souvenir de moi</span>
             </label>
-            <span className="forgot-link" style={{ opacity: 0.7 }}>
-              Reinitialisation bientot disponible
-            </span>
+            <Link to="/mot-de-passe-oublie" className="forgot-link">
+              Mot de passe oublié ?
+            </Link>
           </div>
 
           <button

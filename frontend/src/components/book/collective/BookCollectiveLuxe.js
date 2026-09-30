@@ -115,7 +115,7 @@ function InviteForm({ bookId, onAdded }) {
   );
 }
 
-function ParticipantRow({ bookId, participant, onChanged, onSelect }) {
+function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [emailDraft, setEmailDraft] = useState(participant.email);
@@ -123,8 +123,30 @@ function ParticipantRow({ bookId, participant, onChanged, onSelect }) {
   const meta = STATUS_META[participant.status] || STATUS_META.invited;
   const link = `${window.location.origin}/collectif/${participant.invite_token}`;
 
-  const handleCopy = async (event) => {
+  // PARTAGE DIRECT (retour utilisateur, 2026-09-30) : "il copie le lien
+  // puis l'envoie par WhatsApp ou par email au lieu d'envoyer directement
+  // par mail" — l'invitation nominative garde son email de suivi (qui a
+  // contribue reste fiable, voir routes/collective.js), mais son ENVOI
+  // n'a plus besoin de passer par l'email automatique du serveur : l'API
+  // de partage native ouvre directement WhatsApp/Mail/SMS avec le lien
+  // deja pret. Repli sur la copie presse-papiers (comportement d'avant) la
+  // ou le partage natif n'existe pas — desktop, navigateurs plus anciens.
+  const handleShare = async (event) => {
     event.stopPropagation();
+    const texte = settings?.message
+      || `Vous êtes invité·e à contribuer${settings?.eventTitle ? ` au livre « ${settings.eventTitle} »` : ' à ce livre souvenir'}.`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: settings?.eventTitle || 'Invitation à contribuer', text: texte, url: link });
+        return;
+      } catch (err) {
+        // L'utilisateur a ferme la feuille de partage sans rien choisir :
+        // ce n'est pas un echec, rien a signaler ni a retenter.
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
@@ -192,8 +214,8 @@ function ParticipantRow({ bookId, participant, onChanged, onSelect }) {
         </span>
       </button>
       <div className="collective-participant-actions">
-        <button type="button" className="btn btn-outline" onClick={handleCopy}>
-          {copied ? 'Copié !' : 'Copier le lien'}
+        <button type="button" className="btn btn-outline" onClick={handleShare}>
+          {copied ? 'Copié !' : (navigator.share ? 'Partager' : 'Copier le lien')}
         </button>
         {participant.status !== 'completed' && (
           <button type="button" className="btn btn-outline" onClick={handleRemind} disabled={busy}>
@@ -220,7 +242,7 @@ function ParticipantRow({ bookId, participant, onChanged, onSelect }) {
   );
 }
 
-function InvitesTab({ bookId, participants, onChanged, onSelectParticipant }) {
+function InvitesTab({ bookId, participants, settings, onChanged, onSelectParticipant }) {
   return (
     <div className="collective-tab-panel">
       <InviteForm bookId={bookId} onAdded={onChanged} />
@@ -233,6 +255,7 @@ function InvitesTab({ bookId, participants, onChanged, onSelectParticipant }) {
               key={participant.id}
               bookId={bookId}
               participant={participant}
+              settings={settings}
               onChanged={onChanged}
               onSelect={onSelectParticipant}
             />
@@ -432,6 +455,7 @@ export default function BookCollectiveLuxe() {
         <InvitesTab
           bookId={bookId}
           participants={participants}
+          settings={settings}
           onChanged={load}
           onSelectParticipant={(participant) => { setTab('contributions'); setSelectedContributionId(participant.id); }}
         />

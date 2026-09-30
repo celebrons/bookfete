@@ -18,6 +18,8 @@ import HomePageLuxe from './components/home/HomePageLuxe';
 import HowItWorksLuxe from './components/home/HowItWorksLuxe';
 import LoginLuxe from './components/auth/LoginLuxe';
 import RegisterLuxe from './components/auth/RegisterLuxe';
+import ForgotPasswordLuxe from './components/auth/ForgotPasswordLuxe';
+import ResetPasswordLuxe from './components/auth/ResetPasswordLuxe';
 import MesLivresLuxe from './components/auth/MesLivresLuxe';
 import CreateBookSansIA from './components/create-book/CreateBookSansIA';
 import DashboardGeneralLuxe from './components/dashboard/DashboardGeneralLuxe';
@@ -122,6 +124,8 @@ function App() {
           <Route path="/exemples" element={<ExemplesLuxe />} />
           <Route path="/login" element={<LoginLuxe />} />
           <Route path="/register" element={<RegisterLuxe />} />
+          <Route path="/mot-de-passe-oublie" element={<ForgotPasswordLuxe />} />
+          <Route path="/reinitialiser-mot-de-passe" element={<ResetPasswordLuxe />} />
           {/* Retrouver ses livres depuis un autre appareil : adresse + code,
               aucun mot de passe (voir services/emailOtp.js). */}
           <Route path="/mes-livres" element={<MesLivresLuxe />} />

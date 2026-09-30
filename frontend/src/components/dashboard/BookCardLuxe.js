@@ -68,11 +68,27 @@ const BookCardLuxe = ({
 
   const isSoloProject = (book.collection_mode || 'solo') === 'solo';
 
+  // PARTAGE DIRECT (retour utilisateur, 2026-09-30) : l'API de partage
+  // native ouvre directement WhatsApp/Mail/SMS avec le lien deja pret,
+  // plutot que de forcer un copier-coller manuel. Repli sur la copie
+  // presse-papiers (comportement d'avant) la ou le partage natif n'existe
+  // pas — desktop, navigateurs plus anciens. Meme principe que
+  // ParticipantRow (BookCollectiveLuxe.js).
   const handleShareLink = async (event) => {
     event.preventDefault();
     event.stopPropagation();
     if (!book.share_token) return;
     const link = `${window.location.origin}/participer/${book.share_token}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: book.title || 'Célébrons', text: 'Participez à ce livre souvenir avec moi.', url: link });
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
     try {
       await navigator.clipboard.writeText(link);
       setShareCopied(true);
