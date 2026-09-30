@@ -562,6 +562,41 @@ router.post(
   }
 );
 
+// DELETE /api/public/share/:token/items/:itemId
+// Retirer UNE photo qu'on vient d'envoyer (retour utilisateur, 2026-09-30,
+// avec capture d'ecran) — depuis CETTE MEME session de contribution
+// uniquement, jamais le contenu d'un autre contributeur ni, a fortiori,
+// celui du proprietaire du livre. Le contributionId (genere cote client a
+// l'ouverture de la page, voir BookShareJoinLuxe.js) est la seule
+// protection possible : ce lien n'authentifie personne.
+router.delete('/api/public/share/:token/items/:itemId', resolveBookByShareToken, async (req, res) => {
+  try {
+    const contributionId = typeof req.body?.contributionId === 'string' ? req.body.contributionId : '';
+    if (!contributionId) {
+      return res.status(400).json({ error: 'contributionId manquant.' });
+    }
+
+    const { data: item, error: itemError } = await supabase
+      .from('book_content_items')
+      .select('id, book_id, source, contribution_id')
+      .eq('id', req.params.itemId)
+      .eq('book_id', req.book.id)
+      .maybeSingle();
+
+    if (itemError || !item) {
+      return res.status(404).json({ error: 'Souvenir introuvable.' });
+    }
+    if (item.source !== 'contribution' || item.contribution_id !== contributionId) {
+      return res.status(403).json({ error: 'Vous ne pouvez retirer que vos propres envois.' });
+    }
+
+    await bookContentService.deleteContentItem(req.book.id, req.params.itemId);
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // Composition (layoutEngine) + pages assemblees (book_pages)
 // ============================================================

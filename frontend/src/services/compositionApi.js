@@ -432,6 +432,14 @@ export const submitSharePhoto = async (token, file, { contributorName, contribut
   return response.json();
 };
 
+// Retirer une photo qu'on vient d'envoyer (retour utilisateur, 2026-09-30) —
+// jamais possible pour un autre envoi que le sien, voir la verification
+// contributionId cote serveur.
+export const deleteShareItem = (token, itemId, contributionId) => publicRequest(
+  `/public/share/${token}/items/${itemId}`,
+  { method: 'DELETE', body: JSON.stringify({ contributionId }) }
+);
+
 export const getApiBaseUrl = buildApiBaseUrl;
 
 // --- Mode collectif (invitations nominatives, suivi, tracabilite) -----------

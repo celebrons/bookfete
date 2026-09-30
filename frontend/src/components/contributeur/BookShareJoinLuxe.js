@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Loading from '../common/Loading';
-import { fetchShareInfo, submitShareText, submitSharePhoto } from '../../services/compositionApi';
+import { fetchShareInfo, submitShareText, submitSharePhoto, deleteShareItem } from '../../services/compositionApi';
 import '../../styles/luxe-theme.css';
 import './InvitationLuxe.css';
 
@@ -35,7 +35,8 @@ const BookShareJoinLuxe = () => {
   const [message, setMessage] = useState('');
   const [sendingText, setSendingText] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
-  const [sentItems, setSentItems] = useState([]); // [{kind, label, previewUrl?}]
+  const [sentItems, setSentItems] = useState([]); // [{id, kind, label, previewUrl?}]
+  const [removingId, setRemovingId] = useState('');
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -80,16 +81,35 @@ const BookShareJoinLuxe = () => {
         // televersement.
         const previewUrl = URL.createObjectURL(file);
         // eslint-disable-next-line no-await-in-loop
-        await submitSharePhoto(token, file, {
+        const created = await submitSharePhoto(token, file, {
           contributorName: contributorName.trim(), contributorEmail: contributorEmail.trim(), contributionId
         });
-        setSentItems((previous) => [...previous, { kind: 'photo', label: file.name, previewUrl }]);
+        setSentItems((previous) => [...previous, { id: created?.id, kind: 'photo', label: file.name, previewUrl }]);
       }
     } catch (err) {
       setError(err.message || "L'envoi a echoue.");
     } finally {
       setUploadingPhotos(false);
       event.target.value = '';
+    }
+  };
+
+  // Retirer une photo envoyee par erreur (retour utilisateur, 2026-09-30,
+  // avec capture d'ecran) — supprime reellement cote serveur (jamais
+  // seulement de cet ecran), voir deleteShareItem : sans ca, la photo
+  // resterait visible dans "Mes souvenirs" chez le proprietaire du livre
+  // alors que le contributeur la croirait retiree.
+  const handleRemovePhoto = async (item) => {
+    if (!item?.id || removingId) return;
+    setRemovingId(item.id);
+    setError('');
+    try {
+      await deleteShareItem(token, item.id, contributionId);
+      setSentItems((previous) => previous.filter((entry) => entry.id !== item.id));
+    } catch (err) {
+      setError(err.message || 'Impossible de retirer cette photo.');
+    } finally {
+      setRemovingId('');
     }
   };
 
@@ -178,6 +198,16 @@ const BookShareJoinLuxe = () => {
               {sentItems.filter((item) => item.kind === 'photo').map((item, index) => (
                 <li key={index} className="collective-photo-thumb">
                   <img src={item.previewUrl} alt={item.label} />
+                  <button
+                    type="button"
+                    className="collective-photo-remove"
+                    onClick={() => handleRemovePhoto(item)}
+                    disabled={!item.id || removingId === item.id}
+                    aria-label={`Retirer ${item.label}`}
+                    title="Retirer cette photo"
+                  >
+                    {removingId === item.id ? '…' : '✕'}
+                  </button>
                 </li>
               ))}
             </ul>
