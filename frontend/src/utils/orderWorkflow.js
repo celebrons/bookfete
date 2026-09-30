@@ -55,10 +55,25 @@ export const includesPdf = (orderType) => orderType === 'pdf' || orderType === '
 
 export const includesPrint = (orderType) => orderType === 'print' || orderType === 'pack';
 
-export const formatPriceCents = (value, currency = 'EUR') => {
+// Point d'entree UNIQUE pour afficher un montant en centimes (chantier
+// bilingue FR/EN, 2026-09-30) — remplace 3 implementations qui coexistaient
+// avant (celle-ci, utils/formatPrice.js, et une copie locale dans
+// AtelierGenerateModal.js/TarifsLuxe.js), toutes codees en dur en 'fr-FR'.
+// `locale` par defaut a 'fr-FR' : les ecrans pas encore traduits continuent
+// d'afficher exactement comme avant ; un ecran traduit passe simplement
+// `locale={i18n.language === 'en' ? 'en-US' : 'fr-FR'}` (voir useTranslation).
+export const formatPriceCents = (value, currency = 'EUR', locale = 'fr-FR') => {
   const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0;
-  return new Intl.NumberFormat('fr-FR', {
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency
   }).format(safeValue / 100);
+};
+
+// Meme mise en forme, avec le signe +/- explicite — pour les indications
+// breves de variation de prix ("+2,20 €", "-2,20 €" / "+€2.20", "-€2.20").
+export const formatPriceCentsDelta = (value, currency = 'EUR', locale = 'fr-FR') => {
+  const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0;
+  const sign = safeValue > 0 ? '+' : safeValue < 0 ? '-' : '';
+  return `${sign}${formatPriceCents(Math.abs(safeValue), currency, locale)}`;
 };

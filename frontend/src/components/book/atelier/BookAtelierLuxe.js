@@ -26,7 +26,7 @@ import {
   movePage,
   updateContentItem
 } from '../../../services/compositionApi';
-import { formatEuros, formatEurosDelta } from '../../../utils/formatPrice';
+import { formatPriceCents as formatEuros, formatPriceCentsDelta as formatEurosDelta } from '../../../utils/orderWorkflow';
 import AtelierSidebar from './AtelierSidebar';
 import AtelierBookView from './AtelierBookView';
 import AtelierLayoutPanel from './AtelierLayoutPanel';

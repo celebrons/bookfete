@@ -1,13 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ATELIER_MOODS } from './atelierMoods';
-
-// Prix en euros, meme presentation que partout ailleurs (voir
-// utils/orderWorkflow.formatPriceCents) — recopie ici plutot
-// qu'importee pour ne pas faire dependre une fenetre de l'atelier du
-// vocabulaire des commandes.
-const formatEuro = (cents) => new Intl.NumberFormat('fr-FR', {
-  style: 'currency', currency: 'EUR'
-}).format((Number(cents) || 0) / 100);
+import { formatPriceCents as formatEuro } from '../../../utils/orderWorkflow';
 
 // Point d'entree de la generation automatique depuis l'atelier (remplace le
 // role de l'etape 4 de l'ancien assistant /composer) : choisir une ambiance

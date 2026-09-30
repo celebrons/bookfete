@@ -1,8 +1,10 @@
 // C:\Users\USER\bookfete\frontend\src\components\layout\HeaderLuxe.js
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import { checkIsAdmin } from '../../services/adminApi';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 import '../../styles/luxe-theme.css';
 import './HeaderLuxe.css';
 
@@ -44,6 +46,7 @@ const IconBurger = ({ open }) => (
 // poussait "Deconnexion" hors de l'ecran et creait un defilement lateral sur
 // TOUTES les pages du site (mesure le 2026-09-14).
 const HeaderLuxe = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = React.useState(null);
@@ -119,7 +122,7 @@ const HeaderLuxe = () => {
           onClick={() => setMenuOpen((previous) => !previous)}
           aria-expanded={menuOpen}
           aria-controls="site-nav"
-          aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+          aria-label={menuOpen ? t('header.closeMenu') : t('header.openMenu')}
         >
           <IconBurger open={menuOpen} />
         </button>
@@ -128,27 +131,29 @@ const HeaderLuxe = () => {
             toujours la, quel que soit l'etat du menu. */}
         <nav id="site-nav" className="site-nav" hidden={compact && !menuOpen}>
           <Link to="/how-it-works" className="site-nav-link">
-            Comment ça marche
+            {t('header.howItWorks')}
           </Link>
 
           {user ? (
             <>
               <Link to="/dashboard" className="site-nav-link">
-                Tableau de bord
+                {t('header.dashboard')}
               </Link>
               {/* Lien vers l'espace d'administration, affiche UNIQUEMENT aux
                   administrateurs (le serveur repond oui/non, voir
                   adminApi.checkIsAdmin). Ce n'est pas une protection — chaque
                   route admin est gardee independamment cote serveur — juste
-                  de quoi ne pas avoir a retenir l'URL. */}
+                  de quoi ne pas avoir a retenir l'URL. Reste volontairement
+                  en francais quelle que soit la langue choisie : seul le
+                  fondateur (francophone) voit jamais ce lien. */}
               {isAdmin && (
                 <Link to="/admin" className="site-nav-link is-admin" title="Espace d'administration">
                   Administration
                 </Link>
               )}
-              <Link to="/account" className="site-nav-icon" title="Espace client" aria-label="Espace client">
+              <Link to="/account" className="site-nav-icon" title={t('header.accountSpace')} aria-label={t('header.accountSpace')}>
                 <IconGear />
-                <span className="site-nav-icon-label">Espace client</span>
+                <span className="site-nav-icon-label">{t('header.accountSpace')}</span>
               </Link>
               {/* QUI est connecte. Sans cette indication, rien ne
                   distinguait deux comptes a l'ecran — genant des qu'on
@@ -162,18 +167,20 @@ const HeaderLuxe = () => {
                   c'est justement l'etat ou il faut penser a s'inscrire. */}
               <span
                 className={`site-nav-user${user.is_anonymous ? ' is-anonyme' : ''}`}
-                title={user.email || 'Vous composez sans compte : creez-en un pour retrouver votre livre'}
+                title={user.email || t('header.noAccountTitle')}
               >
-                {user.email || 'Sans compte'}
+                {user.email || t('header.noAccount')}
               </span>
+              <LanguageSwitcher />
               <button onClick={handleLogout} className="btn btn-outline">
-                Déconnexion
+                {t('header.logout')}
               </button>
             </>
           ) : (
             <>
+              <LanguageSwitcher />
               <Link to="/login" className="btn btn-outline">
-                Connexion
+                {t('header.login')}
               </Link>
               {/* VERS LA CREATION, PAS VERS L INSCRIPTION (2026-09-20).
                   Ce bouton est la premiere promesse du produit : composer
@@ -182,7 +189,7 @@ const HeaderLuxe = () => {
                   sait faire depuis le demarrage sans compte. Les liens de
                   la page d accueil, eux, pointaient deja au bon endroit. */}
               <Link to="/create-book" className="btn btn-primary">
-                Créer un livre
+                {t('header.createBook')}
               </Link>
             </>
           )}

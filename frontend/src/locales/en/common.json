@@ -1,0 +1,33 @@
+{
+  "brand": "Célébrons",
+  "header": {
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "howItWorks": "How it works",
+    "dashboard": "Dashboard",
+    "accountSpace": "My account",
+    "noAccountTitle": "You're working without an account — create one to find your book again",
+    "noAccount": "No account",
+    "logout": "Log out",
+    "login": "Log in",
+    "createBook": "Create a book"
+  },
+  "footer": {
+    "tagline": "Create unique, collaborative, beautiful memory books for your most precious moments.",
+    "product": "Product",
+    "howItWorks": "How it works",
+    "pricing": "Pricing",
+    "examples": "Examples",
+    "faq": "FAQ",
+    "legal": "Legal",
+    "cgv": "Terms of sale",
+    "privacy": "Privacy",
+    "legalNotice": "Legal notice",
+    "contact": "Contact",
+    "location": "Paris, France",
+    "copyright": "© {{year}} Célébrons. All rights reserved."
+  },
+  "language": {
+    "switchLabel": "Language"
+  }
+}

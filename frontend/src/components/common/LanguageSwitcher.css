@@ -1,0 +1,33 @@
+/* Selecteur FR/EN (chantier bilingue, 2026-09-30) — meme langage visuel
+   (pilule, bordure fine, or au survol/actif) que les autres petits
+   controles du site (.orders-qty-stepper, .dashboard-mini-action). */
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(184, 146, 74, 0.35);
+  border-radius: 999px;
+  padding: 2px;
+  flex: none;
+}
+
+.language-switcher button {
+  border: none;
+  background: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-light, var(--ink));
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.language-switcher button:hover {
+  color: var(--gold);
+}
+
+.language-switcher button.is-active {
+  background: var(--gold);
+  color: #fff;
+}

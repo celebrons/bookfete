@@ -1,6 +1,7 @@
 // C:\Users\USER\bookfete\frontend\src\components\layout\FooterLuxe.js
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import '../../styles/luxe-theme.css';
 import './FooterLuxe.css';
 
@@ -18,19 +19,21 @@ import './FooterLuxe.css';
 // "Comment ça marche" et "FAQ" pointent vers la page /how-it-works deja
 // existante (qui porte deja sa propre section FAQ, id="faq") plutot que de
 // dupliquer son contenu dans une page a part.
-const PRODUIT = [
-  { label: 'Comment ça marche', to: '/how-it-works' },
-  { label: 'Tarifs', to: '/tarifs' },
-  { label: 'Exemples', to: '/exemples' },
-  { label: 'FAQ', to: '/how-it-works#faq' }
-];
-const LEGAL = [
-  { label: 'CGV', to: '/cgv' },
-  { label: 'Confidentialité', to: '/confidentialite' },
-  { label: 'Mentions légales', to: '/mentions-legales' }
-];
-
 const FooterLuxe = () => {
+  const { t } = useTranslation();
+
+  const PRODUIT = [
+    { label: t('footer.howItWorks'), to: '/how-it-works' },
+    { label: t('footer.pricing'), to: '/tarifs' },
+    { label: t('footer.examples'), to: '/exemples' },
+    { label: t('footer.faq'), to: '/how-it-works#faq' }
+  ];
+  const LEGAL = [
+    { label: t('footer.cgv'), to: '/cgv' },
+    { label: t('footer.privacy'), to: '/confidentialite' },
+    { label: t('footer.legalNotice'), to: '/mentions-legales' }
+  ];
+
   return (
     <footer className="site-footer">
       <div className="container-luxe">
@@ -41,19 +44,17 @@ const FooterLuxe = () => {
               Célébrons<span className="site-footer-brand-dot">.</span>
             </span>
             <p className="body-text" style={{ color: 'var(--text-light)' }}>
-              Créez des livres de souvenirs uniques,
-              collaboratifs et magnifiques pour vos
-              événements les plus précieux.
+              {t('footer.tagline')}
             </p>
             <div className="separator-gold" style={{ marginTop: 'var(--space-lg)' }} />
           </div>
 
           {/* Colonne 2 - Produit */}
           <div>
-            <span className="label-gold">Produit</span>
+            <span className="label-gold">{t('footer.product')}</span>
             <ul className="site-footer-list">
               {PRODUIT.map((item) => (
-                <li key={item.label}>
+                <li key={item.to}>
                   <Link to={item.to} className="site-footer-link">
                     {item.label}
                   </Link>
@@ -64,10 +65,10 @@ const FooterLuxe = () => {
 
           {/* Colonne 3 - Légal */}
           <div>
-            <span className="label-gold">Légal</span>
+            <span className="label-gold">{t('footer.legal')}</span>
             <ul className="site-footer-list">
               {LEGAL.map((item) => (
-                <li key={item.label}>
+                <li key={item.to}>
                   <Link to={item.to} className="site-footer-link">
                     {item.label}
                   </Link>
@@ -78,7 +79,7 @@ const FooterLuxe = () => {
 
           {/* Colonne 4 - Contact */}
           <div>
-            <span className="label-gold">Contact</span>
+            <span className="label-gold">{t('footer.contact')}</span>
             <ul className="site-footer-list">
               <li>
                 <a href="mailto:bonjour@celebrons.com" className="site-footer-link">
@@ -87,7 +88,7 @@ const FooterLuxe = () => {
               </li>
               <li>
                 <span className="body-text" style={{ fontSize: '14px', color: 'var(--text-light)' }}>
-                  Paris, France
+                  {t('footer.location')}
                 </span>
               </li>
             </ul>
@@ -98,7 +99,7 @@ const FooterLuxe = () => {
         <div className="separator" style={{ margin: 'var(--space-xl) 0 var(--space-md)' }} />
         <div className="site-footer-bottom">
           <span className="body-text" style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-            © {new Date().getFullYear()} Célébrons. Tous droits réservés.
+            {t('footer.copyright', { year: new Date().getFullYear() })}
             {' '}
             <span style={{ color: 'var(--gold)' }}>· build test-deploy</span>
           </span>

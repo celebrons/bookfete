@@ -8,12 +8,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listPrintFormats } from '../../services/ordersApi';
+import { formatPriceCents as formatEuros } from '../../utils/orderWorkflow';
 import '../../styles/luxe-theme.css';
 import './TarifsLuxe.css';
-
-const formatEuros = (cents) => (
-  Number.isFinite(cents) ? `${(cents / 100).toFixed(2).replace('.', ',')} €` : '—'
-);
 
 // Increment par tranche de 2 pages : backend/services/pricing/pricingConfig.js
 // (PRICING_CONFIG.<format>.pricePer2PagesCents) — pas expose par

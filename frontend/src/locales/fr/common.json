@@ -1,0 +1,33 @@
+{
+  "brand": "Célébrons",
+  "header": {
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu",
+    "howItWorks": "Comment ça marche",
+    "dashboard": "Tableau de bord",
+    "accountSpace": "Espace client",
+    "noAccountTitle": "Vous composez sans compte : créez-en un pour retrouver votre livre",
+    "noAccount": "Sans compte",
+    "logout": "Déconnexion",
+    "login": "Connexion",
+    "createBook": "Créer un livre"
+  },
+  "footer": {
+    "tagline": "Créez des livres de souvenirs uniques, collaboratifs et magnifiques pour vos événements les plus précieux.",
+    "product": "Produit",
+    "howItWorks": "Comment ça marche",
+    "pricing": "Tarifs",
+    "examples": "Exemples",
+    "faq": "FAQ",
+    "legal": "Légal",
+    "cgv": "CGV",
+    "privacy": "Confidentialité",
+    "legalNotice": "Mentions légales",
+    "contact": "Contact",
+    "location": "Paris, France",
+    "copyright": "© {{year}} Célébrons. Tous droits réservés."
+  },
+  "language": {
+    "switchLabel": "Langue"
+  }
+}

@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { supabase } from './services/supabaseClient';
 import { wakeUpBackend } from './services/httpClient';
 import { linkAnonymousBooksAfterLogin } from './services/anonymousSession';
+import { initLanguagePreferenceSync } from './services/languagePreference';
 import AdminBooksLuxe from './components/admin/AdminBooksLuxe';
 
 
@@ -100,6 +101,11 @@ function App() {
     // anonyme au compte qui vient de se connecter. Sans jeton anonyme en
     // attente, l'appel ne fait rien (voir services/anonymousSession.js).
     linkAnonymousBooksAfterLogin();
+    // Chantier bilingue (2026-09-30) : synchronise la langue d'affichage
+    // avec celle enregistree sur le compte, des la connexion (voir
+    // services/languagePreference.js) — une seule fois pour toute
+    // l'application, jamais par ecran.
+    return initLanguagePreferenceSync();
   }, []);
 
   return (

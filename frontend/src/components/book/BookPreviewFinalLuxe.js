@@ -10,7 +10,7 @@ import {
 } from '../../services/compositionApi';
 import { listPrintFormats } from '../../services/ordersApi';
 import { applyLifecycleStatus } from '../../utils/bookLifecycle';
-import { formatEurosDelta } from '../../utils/formatPrice';
+import { formatPriceCentsDelta as formatEurosDelta } from '../../utils/orderWorkflow';
 import { PageZoomStage, ZoomControls } from '../common/PageZoomStage';
 import FadeInFrame from '../common/FadeInFrame';
 import PrintQualityRecapModal from '../common/PrintQualityRecapModal';
