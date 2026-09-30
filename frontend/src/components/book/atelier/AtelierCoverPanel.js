@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import '../BookLuxe.css';
 
 // Controle manuel LEGER sur la couverture automatique (coverComposer.js),
@@ -24,9 +25,9 @@ import '../BookLuxe.css';
 // une page unique (contrairement a une double-page interieure).
 
 const PHRASE_MODES = [
-  { id: 'auto', label: 'Automatique' },
-  { id: 'custom', label: 'Personnalisee' },
-  { id: 'none', label: 'Aucune' }
+  { id: 'auto' },
+  { id: 'custom' },
+  { id: 'none' }
 ];
 
 // Meme 3 modes pour le kicker (petite ligne au-dessus du titre, ex. "Fin de
@@ -49,16 +50,16 @@ const KICKER_MODES = PHRASE_MODES;
 // (vert anglais, bordeaux, bleu paon) et un rose poudre — la palette reste
 // FERMEE, et chaque teinte a ete verifiee au contraste cote backend.
 const COVER_COLORS = [
-  { token: 'ivoire', label: 'Ivoire', hex: '#fffdf8' },
-  { token: 'blanc', label: 'Blanc', hex: '#ffffff' },
-  { token: 'lin', label: 'Lin', hex: '#ede6d6' },
-  { token: 'grege', label: 'Grege', hex: '#d6cfc2' },
-  { token: 'poudre', label: 'Poudre', hex: '#e3cfc7' },
-  { token: 'vert', label: 'Vert foret', hex: '#2f4739' },
-  { token: 'bordeaux', label: 'Bordeaux', hex: '#5b2233' },
-  { token: 'paon', label: 'Bleu paon', hex: '#1c4a5a' },
-  { token: 'encre', label: 'Encre', hex: '#241f18' },
-  { token: 'nuit', label: 'Nuit', hex: '#1f2a33' }
+  { token: 'ivoire', hex: '#fffdf8' },
+  { token: 'blanc', hex: '#ffffff' },
+  { token: 'lin', hex: '#ede6d6' },
+  { token: 'grege', hex: '#d6cfc2' },
+  { token: 'poudre', hex: '#e3cfc7' },
+  { token: 'vert', hex: '#2f4739' },
+  { token: 'bordeaux', hex: '#5b2233' },
+  { token: 'paon', hex: '#1c4a5a' },
+  { token: 'encre', hex: '#241f18' },
+  { token: 'nuit', hex: '#1f2a33' }
 ];
 
 // LE STYLE DE L ALBUM (2026-09-25) : comment les photos se separent les
@@ -66,26 +67,26 @@ const COVER_COLORS = [
 // couleur de couverture juste au-dessus, meme mecanique de miroir avec le
 // backend (services/composition/albumStyle.js).
 const ALBUM_STYLES = [
-  { token: 'nu', label: 'Nu' },
-  { token: 'filet', label: 'Filet' },
-  { token: 'encadre', label: 'Encadre' }
+  { token: 'nu' },
+  { token: 'filet' },
+  { token: 'encadre' }
 ];
 
 const FRONT_FORMATS = [
-  { id: 'AUTO', label: 'Automatique' },
-  { id: 'COVER_PHOTO', label: 'Photo et bandeau', shape: 'photo-band' },
-  { id: 'COVER_PHOTO_TITLE', label: 'Photo pleine page', shape: 'photo-full' },
-  { id: 'COVER_MINIMAL', label: 'Texte seul', shape: 'text-only' },
-  { id: 'COVER_MULTI_PHOTO', label: 'Trio de photos', shape: 'photo-trio' },
-  { id: 'COVER_SPLIT', label: 'Duo cote a cote', shape: 'split' },
-  { id: 'COVER_FRAMED', label: 'Photo encadree', shape: 'framed' }
+  { id: 'AUTO' },
+  { id: 'COVER_PHOTO', shape: 'photo-band' },
+  { id: 'COVER_PHOTO_TITLE', shape: 'photo-full' },
+  { id: 'COVER_MINIMAL', shape: 'text-only' },
+  { id: 'COVER_MULTI_PHOTO', shape: 'photo-trio' },
+  { id: 'COVER_SPLIT', shape: 'split' },
+  { id: 'COVER_FRAMED', shape: 'framed' }
 ];
 
 const BACK_FORMATS = [
-  { id: 'AUTO', label: 'Automatique' },
-  { id: 'BACK_MINIMAL', label: 'Phrase seule', shape: 'back-minimal' },
-  { id: 'BACK_STATS', label: 'Phrase et chiffres', shape: 'back-stats' },
-  { id: 'BACK_PHOTO_STATS', label: 'Photo et chiffres', shape: 'back-photo' }
+  { id: 'AUTO' },
+  { id: 'BACK_MINIMAL', shape: 'back-minimal' },
+  { id: 'BACK_STATS', shape: 'back-stats' },
+  { id: 'BACK_PHOTO_STATS', shape: 'back-photo' }
 ];
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -106,6 +107,7 @@ const COVER_RATIO_BY_FORMAT = {
 const normalizeText = (value) => (value === null || value === undefined ? '' : String(value).trim());
 
 function CoverFormatMiniPreview({ shape, ratio }) {
+  const { t } = useTranslation('atelier');
   const pageStyle = ratio ? { aspectRatio: ratio } : undefined;
   switch (shape) {
     case 'photo-band':
@@ -189,13 +191,14 @@ function CoverFormatMiniPreview({ shape, ratio }) {
     default:
       return (
         <div className="cvrmini-page cvrmini-auto" style={pageStyle}>
-          <span>Auto</span>
+          <span>{t('coverPanel.autoPreviewLabel')}</span>
         </div>
       );
   }
 }
 
-function FormatGallery({ formats, selectedId, onSelect, ratio }) {
+function FormatGallery({ formats, selectedId, onSelect, ratio, labelNamespace }) {
+  const { t } = useTranslation('atelier');
   return (
     <div className="coverlite-format-grid">
       {formats.map((format) => (
@@ -206,7 +209,7 @@ function FormatGallery({ formats, selectedId, onSelect, ratio }) {
           onClick={() => onSelect(format.id)}
         >
           <CoverFormatMiniPreview shape={format.shape} ratio={ratio} />
-          <span className="coverlite-format-label">{format.label}</span>
+          <span className="coverlite-format-label">{t(`coverPanel.${labelNamespace}.${format.id}`)}</span>
         </button>
       ))}
     </div>
@@ -220,9 +223,9 @@ function FormatGallery({ formats, selectedId, onSelect, ratio }) {
 // ajoute plus tard apparaitra donc par defaut, sans qu'il faille corriger
 // les livres existants.
 const BACK_STATS = [
-  { id: 'contributeurs', label: 'Nombre de contributeurs' },
-  { id: 'souvenirs', label: 'Nombre de souvenirs' },
-  { id: 'photos', label: 'Nombre de photos' }
+  { id: 'contributeurs' },
+  { id: 'souvenirs' },
+  { id: 'photos' }
 ];
 
 const normalizeHiddenStats = (value) => (
@@ -274,6 +277,7 @@ const buildInitialState = (book) => {
 const getStateSignature = (state) => JSON.stringify(state);
 
 function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) {
+  const { t } = useTranslation('atelier');
   const coverRatio = COVER_RATIO_BY_FORMAT[book?.print_format] || COVER_RATIO_BY_FORMAT.standard;
   const [formState, setFormState] = useState(() => buildInitialState(book));
   const [savedSignature, setSavedSignature] = useState(() => getStateSignature(buildInitialState(book)));
@@ -342,13 +346,9 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateSignature]);
 
-  const saveStatusLabel = {
-    idle: '',
-    pending: 'Modification en cours...',
-    saving: 'Enregistrement...',
-    saved: '✓ Enregistre',
-    error: "Erreur d'enregistrement"
-  }[saveStatus];
+  const saveStatusLabel = saveStatus === 'idle' ? '' : (
+    saveStatus === 'saved' ? `✓ ${t('coverPanel.saveStatus.saved')}` : t(`coverPanel.saveStatus.${saveStatus}`)
+  );
 
   return (
     <aside className="atelier-layout-panel atelier-cover-panel">
@@ -376,7 +376,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
           que les vrais reglages en dessous, pour une action secondaire. */}
       {onSwitchFace && (
         <button type="button" className="coverlite-face-switch" onClick={onSwitchFace}>
-          {face === 'front' ? 'Voir la 4e de couverture →' : '← Revenir à la couverture'}
+          {face === 'front' ? `${t('coverPanel.switchToBack')} →` : `← ${t('coverPanel.switchToFront')}`}
         </button>
       )}
 
@@ -389,13 +389,13 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               cover_overrides, voir buildInitialState), meme colonne que
               Configuration : peu importe l'ecran utilise en dernier. */}
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Titre du livre</span>
+            <span className="coverlite-group-label">{t('coverPanel.bookTitleLabel')}</span>
             <input
               type="text"
               className="input-luxe"
               value={formState.title}
               onChange={(event) => updateField('title', event.target.value)}
-              placeholder="Ex : Notre ete 2019"
+              placeholder={t('coverPanel.bookTitlePlaceholder')}
               maxLength={180}
             />
           </div>
@@ -408,15 +408,15 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               (voir backend coverTheme.applyCoverColor), donc un titre
               illisible est impossible. */}
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Couleur de la couverture</span>
-            <div className="coverlite-colors" role="group" aria-label="Couleur de la couverture">
+            <span className="coverlite-group-label">{t('coverPanel.coverColorLabel')}</span>
+            <div className="coverlite-colors" role="group" aria-label={t('coverPanel.coverColorGroupLabel')}>
               <button
                 type="button"
                 className={`coverlite-color is-auto ${!formState.coverColor ? 'is-active' : ''}`}
                 onClick={() => updateField('coverColor', '')}
-                title="Laisser Celebrons choisir selon le style et le format"
+                title={t('coverPanel.autoColorTitle')}
               >
-                Auto
+                {t('coverPanel.autoColorLabel')}
               </button>
               {COVER_COLORS.map((color) => (
                 <button
@@ -425,13 +425,13 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
                   className={`coverlite-color ${formState.coverColor === color.token ? 'is-active' : ''}`}
                   style={{ background: color.hex }}
                   onClick={() => updateField('coverColor', color.token)}
-                  title={color.label}
-                  aria-label={color.label}
+                  title={t(`coverPanel.coverColors.${color.token}`)}
+                  aria-label={t(`coverPanel.coverColors.${color.token}`)}
                 />
               ))}
             </div>
             <p className="coverlite-hint">
-              S'applique a la couverture, au dos et a la 4e — un livre n'a qu'une seule matiere.
+              {t('coverPanel.coverColorHint')}
             </p>
           </div>
 
@@ -439,8 +439,8 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               page par page (2026-09-25) : un choix qui changerait a chaque
               page ne ferait plus un album, mais une collection de pages. */}
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Style de l'album</span>
-            <div className="coverlite-colors" role="group" aria-label="Style de l'album">
+            <span className="coverlite-group-label">{t('coverPanel.albumStyleLabel')}</span>
+            <div className="coverlite-colors" role="group" aria-label={t('coverPanel.albumStyleGroupLabel')}>
               {ALBUM_STYLES.map((style) => (
                 <button
                   key={style.token}
@@ -451,25 +451,26 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
                   className={`coverlite-color is-auto ${formState.albumStyle === style.token ? 'is-active' : ''}`}
                   onClick={() => updateField('albumStyle', style.token)}
                 >
-                  {style.label}
+                  {t(`coverPanel.albumStyles.${style.token}`)}
                 </button>
               ))}
             </div>
             <p className="coverlite-hint">
-              {formState.albumStyle === 'filet' && 'Un filet dore fin separe les photos d\'une meme page.'}
-              {formState.albumStyle === 'encadre' && 'Chaque photo est cernee d\'un filet, sur un fond creme.'}
-              {formState.albumStyle === 'nu' && 'Les photos se touchent, sans separation.'}
-              {' '}S'applique a tout le livre.
+              {formState.albumStyle === 'filet' && t('coverPanel.albumStyleHintFilet')}
+              {formState.albumStyle === 'encadre' && t('coverPanel.albumStyleHintEncadre')}
+              {formState.albumStyle === 'nu' && t('coverPanel.albumStyleHintNu')}
+              {' '}{t('coverPanel.albumStyleHintSuffix')}
             </p>
           </div>
 
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Format de couverture</span>
+            <span className="coverlite-group-label">{t('coverPanel.frontFormatLabel')}</span>
             <FormatGallery
               formats={FRONT_FORMATS}
               selectedId={formState.frontVariant}
               onSelect={(id) => updateField('frontVariant', id)}
               ratio={coverRatio}
+              labelNamespace="frontFormats"
             />
           </div>
 
@@ -484,14 +485,14 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               du titre, ne justifiait pas le meme poids visuel que le
               format de couverture ou la phrase de 4e). */}
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Libelle au-dessus du titre</span>
+            <span className="coverlite-group-label">{t('coverPanel.kickerLabel')}</span>
             <select
               className="input-luxe"
               value={formState.kickerMode}
               onChange={(event) => updateField('kickerMode', event.target.value)}
             >
               {KICKER_MODES.map((mode) => (
-                <option key={mode.id} value={mode.id}>{mode.label}</option>
+                <option key={mode.id} value={mode.id}>{t(`coverPanel.phraseModes.${mode.id}`)}</option>
               ))}
             </select>
             {formState.kickerMode === 'custom' && (
@@ -500,32 +501,32 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
                 className="input-luxe"
                 value={formState.kickerText}
                 onChange={(event) => updateField('kickerText', event.target.value)}
-                placeholder="Ex : Anniversaire de mariage"
+                placeholder={t('coverPanel.kickerPlaceholder')}
                 maxLength={60}
               />
             )}
           </div>
 
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Sous-titre (optionnel)</span>
+            <span className="coverlite-group-label">{t('coverPanel.subtitleLabel')}</span>
             <input
               type="text"
               className="input-luxe"
               value={formState.subtitle}
               onChange={(event) => updateField('subtitle', event.target.value)}
-              placeholder="Ex : Les souvenirs de ceux qui l'aiment"
+              placeholder={t('coverPanel.subtitlePlaceholder')}
               maxLength={220}
             />
           </div>
 
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Date (optionnel)</span>
+            <span className="coverlite-group-label">{t('coverPanel.dateLabel')}</span>
             <input
               type="text"
               className="input-luxe"
               value={formState.dateLabel}
               onChange={(event) => updateField('dateLabel', event.target.value)}
-              placeholder="Ex : 2026 ou Ete 2019"
+              placeholder={t('coverPanel.datePlaceholder')}
               maxLength={20}
             />
           </div>
@@ -533,17 +534,18 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
       ) : (
         <>
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Format de 4e de couverture</span>
+            <span className="coverlite-group-label">{t('coverPanel.backFormatLabel')}</span>
             <FormatGallery
               formats={BACK_FORMATS}
               selectedId={formState.backVariant}
               onSelect={(id) => updateField('backVariant', id)}
               ratio={coverRatio}
+              labelNamespace="backFormats"
             />
           </div>
 
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Phrase de 4e de couverture</span>
+            <span className="coverlite-group-label">{t('coverPanel.closingPhraseLabel')}</span>
             {/* <select> plutot que 3 boutons — meme simplification et meme
                 raison que le libelle au-dessus du titre plus haut (retour
                 utilisateur : "pas besoin de 3 boutons"). */}
@@ -553,7 +555,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               onChange={(event) => updateField('closingPhraseMode', event.target.value)}
             >
               {PHRASE_MODES.map((mode) => (
-                <option key={mode.id} value={mode.id}>{mode.label}</option>
+                <option key={mode.id} value={mode.id}>{t(`coverPanel.phraseModes.${mode.id}`)}</option>
               ))}
             </select>
             {formState.closingPhraseMode === 'custom' && (
@@ -561,7 +563,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
                 className="input-luxe coverlite-textarea"
                 value={formState.closingPhraseText}
                 onChange={(event) => updateField('closingPhraseText', event.target.value)}
-                placeholder="Ecrivez votre phrase de cloture..."
+                placeholder={t('coverPanel.closingPhrasePlaceholder')}
                 maxLength={300}
                 rows={3}
               />
@@ -574,7 +576,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
               sens. */}
           {formState.backVariant !== 'BACK_MINIMAL' && (
           <div className="coverlite-group">
-            <span className="coverlite-group-label">Chiffres affiches en 4e</span>
+            <span className="coverlite-group-label">{t('coverPanel.backStatsLabel')}</span>
             <div className="coverlite-checks">
               {BACK_STATS.map((stat) => {
                 const masque = formState.backStatsHidden.includes(stat.id);
@@ -590,14 +592,13 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
                           : [...formState.backStatsHidden, stat.id]
                       )}
                     />
-                    <span>{stat.label}</span>
+                    <span>{t(`coverPanel.backStats.${stat.id}`)}</span>
                   </label>
                 );
               })}
             </div>
             <p className="coverlite-hint">
-              Un chiffre decoche n'apparait pas sur la 4e de couverture. Un chiffre a zero
-              n'est de toute facon jamais affiche.
+              {t('coverPanel.backStatsHint')}
             </p>
           </div>
           )}

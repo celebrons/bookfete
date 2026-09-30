@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getOverlayGeometry, getOverlayInsetPct, getPageMetrics } from './atelierLayoutGeometry';
 import { makeSlotHandlers } from './atelierSlotInteractions';
 import { slotAcceptsItem } from './atelierLayouts';
@@ -27,18 +28,6 @@ import PhotoFitBadge from '../../common/PhotoFitBadge';
 // 'Ajouter une photo'"). Le detail du geste (glisser OU choisir) ne
 // disparait pas : il vit desormais dans le `title` (infobulle au survol,
 // voir plus bas), pas dans un texte affiche en permanence.
-const SLOT_LABELS = {
-  photo: 'Ajouter une photo',
-  text: 'Ajouter un souvenir',
-  title: 'Ajouter un titre'
-};
-
-const SLOT_HINTS = {
-  photo: 'Glissez une photo ici, ou cliquez pour choisir dans votre bibliothèque',
-  text: 'Glissez un souvenir ici, ou cliquez pour écrire',
-  title: 'Glissez un titre ici, ou cliquez pour écrire'
-};
-
 function XIcon() {
   return (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
@@ -96,6 +85,7 @@ function AtelierPageOverlay({
   // selection prealable dans "Mes photos") — aucun appelant existant cassé.
   onOpenPhotoPicker
 }) {
+  const { t } = useTranslation('atelier');
   // Index de l'emplacement en cours d'edition, et largeur REELLE de
   // l'incrustation en pixels : celle-ci sert a convertir les points
   // typographiques en pixels ecran a la bonne echelle (WYSIWYG, §1).
@@ -301,25 +291,25 @@ function AtelierPageOverlay({
               }}
               title={item
                 ? (isPending
-                  ? 'Cliquer a nouveau pour confirmer le retrait'
+                  ? t('pageOverlay.clickToConfirmRemove')
                   : (selectedSidebarItem
                     ? undefined
                     : (slotType === 'photo'
-                      ? 'Cliquer pour ajuster le cadrage'
-                      : (onSaveText ? 'Cliquer pour modifier le texte' : undefined))))
+                      ? t('pageOverlay.clickToAdjust')
+                      : (onSaveText ? t('pageOverlay.clickToEditText') : undefined))))
                 // Emplacement vide : le detail du geste (glisser OU choisir/
                 // ecrire) vit ici, au survol — le libelle visible en
-                // permanence reste court (voir SLOT_LABELS, §6 de la
-                // refonte 2026-09-26).
-                : (SLOT_HINTS[slotType] || undefined)}
+                // permanence reste court (voir pageOverlay.slotLabels, §6 de
+                // la refonte 2026-09-26).
+                : (t(`pageOverlay.slotHints.${slotType}`, { defaultValue: '' }) || undefined)}
             >
-              {!item && <span className="atelier-overlay-slot-label">{SLOT_LABELS[slotType] || 'Emplacement'}</span>}
+              {!item && <span className="atelier-overlay-slot-label">{t(`pageOverlay.slotLabels.${slotType}`, { defaultValue: t('pageOverlay.slotLabels.empty') })}</span>}
               {!isPending && (
                 <span className="atelier-overlay-slot-quality">
                   <PhotoFitBadge fit={fit} size="sm" />
                 </span>
               )}
-              {item && isPending && <span className="atelier-overlay-slot-confirm">Confirmer le retrait ?</span>}
+              {item && isPending && <span className="atelier-overlay-slot-confirm">{t('pageOverlay.confirmRemove')}</span>}
               {item && !isPending && (
                 <div className="atelier-overlay-slot-actions">
                   {slotType === 'photo' && onSaveCaption && (
@@ -334,8 +324,8 @@ function AtelierPageOverlay({
                         setCaptionColor(existante?.couleur === 'noir' ? 'noir' : 'blanc');
                         setCaptionIndex(index);
                       }}
-                      title={photoCaptions?.[item.id] ? 'Modifier la légende' : 'Ajouter une légende'}
-                      aria-label={photoCaptions?.[item.id] ? 'Modifier la légende' : 'Ajouter une légende'}
+                      title={photoCaptions?.[item.id] ? t('pageOverlay.editCaption') : t('pageOverlay.addCaption')}
+                      aria-label={photoCaptions?.[item.id] ? t('pageOverlay.editCaption') : t('pageOverlay.addCaption')}
                     >
                       <CaptionIcon />
                     </button>
@@ -360,8 +350,8 @@ function AtelierPageOverlay({
                         setPendingRemoveIndex(null);
                         onOpenPhotoPicker(index);
                       }}
-                      title="Choisir une autre photo pour cet emplacement"
-                      aria-label="Changer la photo"
+                      title={t('pageOverlay.changePhotoTitle')}
+                      aria-label={t('pageOverlay.changePhotoLabel')}
                     >
                       <ChangeIcon />
                     </button>
@@ -376,8 +366,8 @@ function AtelierPageOverlay({
                         // d'ecran, pas l'original.
                         setViewingUrl(item.metadata?.previewUrl || item.url);
                       }}
-                      title="Voir la photo en taille réelle"
-                      aria-label="Voir la photo en taille réelle"
+                      title={t('pageOverlay.viewFullSize')}
+                      aria-label={t('pageOverlay.viewFullSize')}
                     >
                       <EyeIcon />
                     </button>
@@ -386,8 +376,8 @@ function AtelierPageOverlay({
                     type="button"
                     className="atelier-overlay-slot-icon-btn atelier-overlay-slot-remove-btn"
                     onClick={(event) => handleRequestRemove(event, index)}
-                    title="Retirer"
-                    aria-label="Retirer"
+                    title={t('pageOverlay.remove')}
+                    aria-label={t('pageOverlay.remove')}
                   >
                     <XIcon />
                   </button>
@@ -412,7 +402,7 @@ function AtelierPageOverlay({
                     autoFocus
                     maxLength={140}
                     value={captionDraft}
-                    placeholder="Légende de la photo"
+                    placeholder={t('pageOverlay.captionPlaceholder')}
                     onChange={(event) => setCaptionDraft(event.target.value)}
                     onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setCaptionIndex(null); } }}
                   />
@@ -420,10 +410,10 @@ function AtelierPageOverlay({
                       (texte clair sur fond sombre, texte sombre sur fond
                       clair) plutot qu'un simple carre de couleur : c'est le
                       contraste qu'on choisit, pas la teinte. */}
-                  <span className="atelier-overlay-caption-colors" role="group" aria-label="Couleur de la légende">
+                  <span className="atelier-overlay-caption-colors" role="group" aria-label={t('pageOverlay.captionColorGroupLabel')}>
                     {[
-                      { id: 'blanc', libelle: 'Texte blanc' },
-                      { id: 'noir', libelle: 'Texte noir' }
+                      { id: 'blanc', libelle: t('pageOverlay.captionColorWhite') },
+                      { id: 'noir', libelle: t('pageOverlay.captionColorBlack') }
                     ].map((choix) => (
                       <button
                         key={choix.id}
@@ -438,7 +428,7 @@ function AtelierPageOverlay({
                       </button>
                     ))}
                   </span>
-                  <button type="submit" className="atelier-overlay-caption-ok">OK</button>
+                  <button type="submit" className="atelier-overlay-caption-ok">{t('pageOverlay.ok')}</button>
                 </form>
               )}
             </div>

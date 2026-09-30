@@ -135,6 +135,112 @@
     "resetCrop": "Réinitialiser le cadrage",
     "save": "Enregistrer"
   },
+  "coverPanel": {
+    "phraseModes": {
+      "auto": "Automatique",
+      "custom": "Personnalisée",
+      "none": "Aucune"
+    },
+    "coverColors": {
+      "ivoire": "Ivoire",
+      "blanc": "Blanc",
+      "lin": "Lin",
+      "grege": "Grège",
+      "poudre": "Poudre",
+      "vert": "Vert forêt",
+      "bordeaux": "Bordeaux",
+      "paon": "Bleu paon",
+      "encre": "Encre",
+      "nuit": "Nuit"
+    },
+    "albumStyles": {
+      "nu": "Nu",
+      "filet": "Filet",
+      "encadre": "Encadré"
+    },
+    "frontFormats": {
+      "AUTO": "Automatique",
+      "COVER_PHOTO": "Photo et bandeau",
+      "COVER_PHOTO_TITLE": "Photo pleine page",
+      "COVER_MINIMAL": "Texte seul",
+      "COVER_MULTI_PHOTO": "Trio de photos",
+      "COVER_SPLIT": "Duo côte à côte",
+      "COVER_FRAMED": "Photo encadrée"
+    },
+    "backFormats": {
+      "AUTO": "Automatique",
+      "BACK_MINIMAL": "Phrase seule",
+      "BACK_STATS": "Phrase et chiffres",
+      "BACK_PHOTO_STATS": "Photo et chiffres"
+    },
+    "backStats": {
+      "contributeurs": "Nombre de contributeurs",
+      "souvenirs": "Nombre de souvenirs",
+      "photos": "Nombre de photos"
+    },
+    "autoPreviewLabel": "Auto",
+    "switchToBack": "Voir la 4e de couverture",
+    "switchToFront": "Revenir à la couverture",
+    "bookTitleLabel": "Titre du livre",
+    "bookTitlePlaceholder": "Ex : Notre été 2019",
+    "coverColorLabel": "Couleur de la couverture",
+    "coverColorGroupLabel": "Couleur de la couverture",
+    "autoColorLabel": "Auto",
+    "autoColorTitle": "Laisser Célébrons choisir selon le style et le format",
+    "coverColorHint": "S'applique à la couverture, au dos et à la 4e — un livre n'a qu'une seule matière.",
+    "albumStyleLabel": "Style de l'album",
+    "albumStyleGroupLabel": "Style de l'album",
+    "albumStyleHintFilet": "Un filet doré fin sépare les photos d'une même page.",
+    "albumStyleHintEncadre": "Chaque photo est cernée d'un filet, sur un fond crème.",
+    "albumStyleHintNu": "Les photos se touchent, sans séparation.",
+    "albumStyleHintSuffix": "S'applique à tout le livre.",
+    "frontFormatLabel": "Format de couverture",
+    "kickerLabel": "Libellé au-dessus du titre",
+    "kickerPlaceholder": "Ex : Anniversaire de mariage",
+    "subtitleLabel": "Sous-titre (optionnel)",
+    "subtitlePlaceholder": "Ex : Les souvenirs de ceux qui l'aiment",
+    "dateLabel": "Date (optionnel)",
+    "datePlaceholder": "Ex : 2026 ou Été 2019",
+    "backFormatLabel": "Format de 4e de couverture",
+    "closingPhraseLabel": "Phrase de 4e de couverture",
+    "closingPhrasePlaceholder": "Écrivez votre phrase de clôture...",
+    "backStatsLabel": "Chiffres affichés en 4e",
+    "backStatsHint": "Un chiffre décoché n'apparaît pas sur la 4e de couverture. Un chiffre à zéro n'est de toute façon jamais affiché.",
+    "saveStatus": {
+      "pending": "Modification en cours...",
+      "saving": "Enregistrement...",
+      "saved": "Enregistré",
+      "error": "Erreur d'enregistrement"
+    }
+  },
+  "pageOverlay": {
+    "slotLabels": {
+      "photo": "Ajouter une photo",
+      "text": "Ajouter un souvenir",
+      "title": "Ajouter un titre",
+      "empty": "Emplacement"
+    },
+    "slotHints": {
+      "photo": "Glissez une photo ici, ou cliquez pour choisir dans votre bibliothèque",
+      "text": "Glissez un souvenir ici, ou cliquez pour écrire",
+      "title": "Glissez un titre ici, ou cliquez pour écrire"
+    },
+    "clickToConfirmRemove": "Cliquer à nouveau pour confirmer le retrait",
+    "clickToAdjust": "Cliquer pour ajuster le cadrage",
+    "clickToEditText": "Cliquer pour modifier le texte",
+    "confirmRemove": "Confirmer le retrait ?",
+    "editCaption": "Modifier la légende",
+    "addCaption": "Ajouter une légende",
+    "changePhotoTitle": "Choisir une autre photo pour cet emplacement",
+    "changePhotoLabel": "Changer la photo",
+    "viewFullSize": "Voir la photo en taille réelle",
+    "remove": "Retirer",
+    "captionPlaceholder": "Légende de la photo",
+    "captionColorGroupLabel": "Couleur de la légende",
+    "captionColorWhite": "Texte blanc",
+    "captionColorBlack": "Texte noir",
+    "ok": "OK"
+  },
   "sidebar": {
     "tabPhotosSolo": "Photos",
     "tabPhotosMine": "Mes photos",

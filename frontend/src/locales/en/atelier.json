@@ -135,6 +135,112 @@
     "resetCrop": "Reset framing",
     "save": "Save"
   },
+  "coverPanel": {
+    "phraseModes": {
+      "auto": "Automatic",
+      "custom": "Custom",
+      "none": "None"
+    },
+    "coverColors": {
+      "ivoire": "Ivory",
+      "blanc": "White",
+      "lin": "Linen",
+      "grege": "Greige",
+      "poudre": "Powder pink",
+      "vert": "Forest green",
+      "bordeaux": "Burgundy",
+      "paon": "Peacock blue",
+      "encre": "Ink",
+      "nuit": "Night"
+    },
+    "albumStyles": {
+      "nu": "Bare",
+      "filet": "Hairline",
+      "encadre": "Framed"
+    },
+    "frontFormats": {
+      "AUTO": "Automatic",
+      "COVER_PHOTO": "Photo and band",
+      "COVER_PHOTO_TITLE": "Full-page photo",
+      "COVER_MINIMAL": "Text only",
+      "COVER_MULTI_PHOTO": "Photo trio",
+      "COVER_SPLIT": "Side-by-side duo",
+      "COVER_FRAMED": "Framed photo"
+    },
+    "backFormats": {
+      "AUTO": "Automatic",
+      "BACK_MINIMAL": "Sentence only",
+      "BACK_STATS": "Sentence and numbers",
+      "BACK_PHOTO_STATS": "Photo and numbers"
+    },
+    "backStats": {
+      "contributeurs": "Number of contributors",
+      "souvenirs": "Number of memories",
+      "photos": "Number of photos"
+    },
+    "autoPreviewLabel": "Auto",
+    "switchToBack": "See the back cover",
+    "switchToFront": "Back to the cover",
+    "bookTitleLabel": "Book title",
+    "bookTitlePlaceholder": "E.g. Our summer 2019",
+    "coverColorLabel": "Cover color",
+    "coverColorGroupLabel": "Cover color",
+    "autoColorLabel": "Auto",
+    "autoColorTitle": "Let Célébrons choose based on style and format",
+    "coverColorHint": "Applies to the front, spine, and back cover — a book has only one material.",
+    "albumStyleLabel": "Album style",
+    "albumStyleGroupLabel": "Album style",
+    "albumStyleHintFilet": "A thin gold hairline separates photos on the same page.",
+    "albumStyleHintEncadre": "Each photo is outlined with a hairline, on a cream background.",
+    "albumStyleHintNu": "Photos touch each other, with no separation.",
+    "albumStyleHintSuffix": "Applies to the whole book.",
+    "frontFormatLabel": "Cover format",
+    "kickerLabel": "Label above the title",
+    "kickerPlaceholder": "E.g. Wedding anniversary",
+    "subtitleLabel": "Subtitle (optional)",
+    "subtitlePlaceholder": "E.g. Memories from those who love her",
+    "dateLabel": "Date (optional)",
+    "datePlaceholder": "E.g. 2026 or Summer 2019",
+    "backFormatLabel": "Back cover format",
+    "closingPhraseLabel": "Back cover sentence",
+    "closingPhrasePlaceholder": "Write your closing sentence...",
+    "backStatsLabel": "Numbers shown on the back cover",
+    "backStatsHint": "An unchecked number won't appear on the back cover. A number at zero is never shown anyway.",
+    "saveStatus": {
+      "pending": "Change in progress...",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "error": "Save error"
+    }
+  },
+  "pageOverlay": {
+    "slotLabels": {
+      "photo": "Add a photo",
+      "text": "Add a memory",
+      "title": "Add a title",
+      "empty": "Slot"
+    },
+    "slotHints": {
+      "photo": "Drag a photo here, or click to choose from your library",
+      "text": "Drag a memory here, or click to write",
+      "title": "Drag a title here, or click to write"
+    },
+    "clickToConfirmRemove": "Click again to confirm removal",
+    "clickToAdjust": "Click to adjust framing",
+    "clickToEditText": "Click to edit the text",
+    "confirmRemove": "Confirm removal?",
+    "editCaption": "Edit caption",
+    "addCaption": "Add a caption",
+    "changePhotoTitle": "Choose a different photo for this slot",
+    "changePhotoLabel": "Change photo",
+    "viewFullSize": "View photo at full size",
+    "remove": "Remove",
+    "captionPlaceholder": "Photo caption",
+    "captionColorGroupLabel": "Caption color",
+    "captionColorWhite": "White text",
+    "captionColorBlack": "Black text",
+    "ok": "OK"
+  },
   "sidebar": {
     "tabPhotosSolo": "Photos",
     "tabPhotosMine": "My photos",
