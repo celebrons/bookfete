@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   fetchCollective,
@@ -117,36 +117,28 @@ function InviteForm({ bookId, onAdded }) {
 
 function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) {
   const [copied, setCopied] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [emailDraft, setEmailDraft] = useState(participant.email);
   const [busy, setBusy] = useState(false);
+  const shareWrapRef = useRef(null);
   const meta = STATUS_META[participant.status] || STATUS_META.invited;
   const link = `${window.location.origin}/collectif/${participant.invite_token}`;
+  const texteInvitation = settings?.message
+    || `Vous êtes invité·e à contribuer${settings?.eventTitle ? ` au livre « ${settings.eventTitle} »` : ' à ce livre souvenir'}.`;
 
-  // PARTAGE DIRECT (retour utilisateur, 2026-09-30) : "il copie le lien
-  // puis l'envoie par WhatsApp ou par email au lieu d'envoyer directement
-  // par mail" — l'invitation nominative garde son email de suivi (qui a
-  // contribue reste fiable, voir routes/collective.js), mais son ENVOI
-  // n'a plus besoin de passer par l'email automatique du serveur : l'API
-  // de partage native ouvre directement WhatsApp/Mail/SMS avec le lien
-  // deja pret. Repli sur la copie presse-papiers (comportement d'avant) la
-  // ou le partage natif n'existe pas — desktop, navigateurs plus anciens.
-  const handleShare = async (event) => {
-    event.stopPropagation();
-    const texte = settings?.message
-      || `Vous êtes invité·e à contribuer${settings?.eventTitle ? ` au livre « ${settings.eventTitle} »` : ' à ce livre souvenir'}.`;
+  // Ferme le menu de partage des qu'on clique ailleurs — meme principe que
+  // les autres menus "···" du site (OrdersLuxe.js, BookCardLuxe.js).
+  useEffect(() => {
+    if (!shareMenuOpen) return undefined;
+    const onClickOutside = (event) => {
+      if (!shareWrapRef.current?.contains(event.target)) setShareMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [shareMenuOpen]);
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: settings?.eventTitle || 'Invitation à contribuer', text: texte, url: link });
-        return;
-      } catch (err) {
-        // L'utilisateur a ferme la feuille de partage sans rien choisir :
-        // ce n'est pas un echec, rien a signaler ni a retenter.
-        if (err?.name === 'AbortError') return;
-      }
-    }
-
+  const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
@@ -155,6 +147,59 @@ function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) 
       // Presse-papiers indisponible : pas bloquant, meme repli deja etabli
       // pour "Partager le lien" (BookCardLuxe.js).
     }
+  };
+
+  // PARTAGE, COMME ON VEUT (retour utilisateur, 2026-09-30) : "il copie le
+  // lien puis l'envoie par WhatsApp ou par email au lieu d'envoyer
+  // directement par mail". Deux chemins concrets plutot qu'un seul pari sur
+  // l'API de partage native :
+  //  - sur mobile (Android/iOS), navigator.share existe : un tap ouvre la
+  //    feuille systeme avec TOUTES les apps installees, la meilleure
+  //    experience possible, aucun menu maison necessaire ;
+  //  - partout ailleurs (desktop, ou meme un mobile qui refuse l'appel —
+  //    l'echec silencieux constate en testant est reel), un petit menu
+  //    propose explicitement WhatsApp et Email : les deux canaux nommes
+  //    par le retour utilisateur, plus la copie en repli ultime. Jamais
+  //    besoin de deviner ce que le navigateur sait faire.
+  // L'invitation reste nominative (email de suivi conserve, voir
+  // routes/collective.js) — seul le canal d'ENVOI change.
+  const handleShareClick = async (event) => {
+    event.stopPropagation();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: settings?.eventTitle || 'Invitation à contribuer', text: texteInvitation, url: link });
+        return;
+      } catch (err) {
+        // Partage annule par la personne : rien a faire, jamais retomber
+        // sur le menu dans ce cas precis (elle a deja choisi de ne pas
+        // partager). Toute AUTRE erreur (API presente mais qui refuse
+        // silencieusement, constate en testant) ouvre le menu explicite.
+        if (err?.name === 'AbortError') return;
+      }
+    }
+    setShareMenuOpen((v) => !v);
+  };
+
+  const handleWhatsapp = (event) => {
+    event.stopPropagation();
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${texteInvitation}\n\n${link}`)}`, '_blank', 'noopener');
+    setShareMenuOpen(false);
+  };
+
+  const handleEmail = (event) => {
+    event.stopPropagation();
+    const sujet = settings?.eventTitle ? `Invitation : ${settings.eventTitle}` : 'Invitation à contribuer';
+    const corps = `${texteInvitation}\n\n${link}`;
+    // Destinataire pre-rempli : l'invitation est nominative, on connait
+    // deja son email — autant lui epargner la saisie.
+    window.location.href = `mailto:${participant.email || ''}?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}`;
+    setShareMenuOpen(false);
+  };
+
+  const handleMenuCopy = (event) => {
+    event.stopPropagation();
+    copyLink();
+    setShareMenuOpen(false);
   };
 
   const handleRemind = async (event) => {
@@ -214,9 +259,24 @@ function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) 
         </span>
       </button>
       <div className="collective-participant-actions">
-        <button type="button" className="btn btn-outline" onClick={handleShare}>
-          {copied ? 'Copié !' : (navigator.share ? 'Partager' : 'Copier le lien')}
-        </button>
+        <div className="collective-share-wrap" ref={shareWrapRef}>
+          <button type="button" className="btn btn-outline" onClick={handleShareClick}>
+            {copied ? 'Copié !' : 'Partager'}
+          </button>
+          {shareMenuOpen && (
+            <div className="collective-share-menu" onClick={(event) => event.stopPropagation()}>
+              <button type="button" onClick={handleWhatsapp}>
+                <span aria-hidden="true">💬</span> WhatsApp
+              </button>
+              <button type="button" onClick={handleEmail}>
+                <span aria-hidden="true">✉️</span> Email
+              </button>
+              <button type="button" onClick={handleMenuCopy}>
+                <span aria-hidden="true">🔗</span> Copier le lien
+              </button>
+            </div>
+          )}
+        </div>
         {participant.status !== 'completed' && (
           <button type="button" className="btn btn-outline" onClick={handleRemind} disabled={busy}>
             Relancer
