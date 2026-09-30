@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import SupprimerMonCompte from './SupprimerMonCompte';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
-import { listOrders, getEmailStatus, sendTestEmail } from '../../services/ordersApi';
+import { listOrders } from '../../services/ordersApi';
 import { getOrderStatusConfig } from '../../utils/orderWorkflow';
 import AddressAutocomplete from '../common/AddressAutocomplete';
 import '../../styles/luxe-theme.css';
@@ -34,29 +34,6 @@ const AccountSpaceLuxe = () => {
   const [savingAddress, setSavingAddress] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [notice, setNotice] = useState(null);
-
-  // Etat de l'envoi d'emails. Lu SANS envoyer quoi que ce soit : on doit
-  // pouvoir dire « configure » ou « pas encore » sans bruler un email pour le
-  // savoir.
-  const [emailStatus, setEmailStatus] = useState(null);
-  const [sendingTest, setSendingTest] = useState(false);
-
-  useEffect(() => {
-    getEmailStatus().then(setEmailStatus).catch(() => setEmailStatus(null));
-  }, []);
-
-  const handleTestEmail = async () => {
-    setSendingTest(true);
-    setNotice(null);
-    try {
-      const resultat = await sendTestEmail();
-      setNotice({ type: 'success', message: `Email envoyé à ${resultat.to}. Vérifiez votre boîte de réception (et les indésirables).` });
-    } catch (error) {
-      setNotice({ type: 'error', message: error.message });
-    } finally {
-      setSendingTest(false);
-    }
-  };
 
   useEffect(() => {
     const loadAccountData = async () => {
@@ -440,50 +417,6 @@ const AccountSpaceLuxe = () => {
                 {savingAddress ? 'Enregistrement...' : 'Enregistrer adresse'}
               </button>
             </form>
-          </article>
-
-          {/* Envoi d'emails : etat reel + essai declenche a la main.
-              Un envoi est irreversible et sort du produit — il ne part donc
-              JAMAIS tout seul, et jamais vers une autre adresse que celle de
-              ce compte (le serveur refuse toute adresse libre : ce serait un
-              relais ouvert). */}
-          <article className="account-panel">
-            <div className="account-panel-head">
-              <h2>Emails</h2>
-            </div>
-
-            {emailStatus?.enabled ? (
-              <>
-                <p className="account-address-saved-hint">
-                  L'envoi d'emails est actif{emailStatus.from ? ` (expéditeur : ${emailStatus.from})` : ''}.
-                  Envoyez-vous un message d'essai pour vérifier qu'il arrive bien.
-                </p>
-                <button type="button" className="btn btn-outline" onClick={handleTestEmail} disabled={sendingTest}>
-                  {sendingTest ? 'Envoi…' : `Envoyer un email de test à ${emailStatus.suggestedTo || 'mon adresse'}`}
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="account-address-saved-hint">
-                  L'envoi d'emails n'est pas encore configuré. Les confirmations de commande et les liens pour
-                  retrouver un livre ne partent donc pas.
-                </p>
-                <ol className="account-email-setup">
-                  <li>Créez un compte gratuit sur <strong>brevo.com</strong> (aucune carte bancaire demandée, 300 emails/jour).</li>
-                  <li>Vérifiez un expéditeur : menu <strong>Expéditeurs, domaines et IP dédiée</strong> → Expéditeurs → ajoutez votre adresse et confirmez le lien reçu par email.</li>
-                  <li>Générez une clé API : menu <strong>Paramètres</strong> → <strong>SMTP &amp; API</strong> → Clés API (elle commence par <code>xkeysib-</code>).</li>
-                  <li>
-                    Posez-la dans <code>backend/.env</code> : <code>BREVO_API_KEY=xkeysib-…</code> et
-                    <code>EMAIL_FROM=Célébrons &lt;votre-adresse-vérifiée&gt;</code>, puis redémarrez le backend.
-                  </li>
-                </ol>
-                <p className="account-address-saved-hint">
-                  Contrairement à d'autres offres gratuites, Brevo n'exige pas de domaine vérifié pour écrire à de
-                  vraies adresses — un expéditeur vérifié suffit. Ce bouton n'envoie qu'à vous-même ; pour tester
-                  plusieurs adresses réelles à la fois, demandez-le.
-                </p>
-              </>
-            )}
           </article>
 
           <article className="account-panel">
