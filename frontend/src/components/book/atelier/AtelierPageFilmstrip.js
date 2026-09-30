@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Bande de vignettes en bas de l'atelier — navigation directe vers
 // n'importe quelle page sans repasser par precedente/suivante (retour
@@ -26,8 +27,6 @@ const FORMAT_DIMENSIONS_MM = {
   luxe: { widthMm: 210, heightMm: 280 }
 };
 
-const STATUS_LABEL = { complete: 'Page complete', partial: 'Page en cours', empty: 'Page vide', cover: '' };
-
 // Type de donnee PROPRE au deplacement de page. Volontairement distinct de
 // l'`application/json` utilise par la barre laterale pour glisser un souvenir
 // (AtelierSidebar) : sans ca, lacher une photo sur le filmstrip aurait ete
@@ -42,6 +41,7 @@ function FilmstripCell({
   // couverture ne se deplace pas), d'ou `onMove` absent sur les autres.
   onMove, dropSide, onDragOverCell, onDragLeaveCell, isDragging
 }) {
+  const { t } = useTranslation('atelier');
   const ref = useRef(null);
 
   // Fait defiler la bande pour garder la vignette active visible, y compris
@@ -73,14 +73,16 @@ function FilmstripCell({
   }, [isActive]);
 
   const movable = Boolean(onMove);
+  const statusText = status ? t(`pageFilmstrip.status.${status}`) : '';
   // L'avertissement passe AVANT le reste dans l'infobulle : c'est la seule
   // information qui demande une action.
   const alerte = qualityWarnings > 0
-    ? ` — ⚠️ ${qualityWarnings} photo${qualityWarnings > 1 ? 's' : ''} peu nette${qualityWarnings > 1 ? 's' : ''}`
+    ? ` — ⚠️ ${t('pageFilmstrip.qualityWarning', { count: qualityWarnings })}`
     : '';
+  const base = movable ? t('pageFilmstrip.pagePrefix', { label }) : String(label);
   const title = movable
-    ? `Page ${label}${STATUS_LABEL[status] ? ` — ${STATUS_LABEL[status]}` : ''}${alerte} — glisser pour la déplacer`
-    : (STATUS_LABEL[status] ? `${label} — ${STATUS_LABEL[status]}${alerte}` : `${label}${alerte}`);
+    ? `${base}${statusText ? ` — ${statusText}` : ''}${alerte} — ${t('pageFilmstrip.dragToMove')}`
+    : (statusText ? `${base} — ${statusText}${alerte}` : `${base}${alerte}`);
 
   return (
     <button
@@ -156,6 +158,7 @@ function AtelierPageFilmstrip({
   onMovePage,
   movingPage
 }) {
+  const { t } = useTranslation('atelier');
   const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
   const aspectRatio = `${dims.widthMm} / ${dims.heightMm}`;
 
@@ -196,7 +199,7 @@ function AtelierPageFilmstrip({
           dediee plutot qu'un statut trompeur. */}
       <FilmstripCell
         target="cover"
-        label="Cvr"
+        label={t('pageFilmstrip.coverLabel')}
         status="cover"
         isActive={activeTarget === 'cover'}
         aspectRatio={aspectRatio}
@@ -231,8 +234,8 @@ function AtelierPageFilmstrip({
           onClick={onRemovePages}
           disabled={removingPages || !canRemovePages}
           title={canRemovePages
-            ? 'Retirer les 2 dernieres pages du livre'
-            : `Minimum ${minPages} pages : impossible d'en retirer davantage`}
+            ? t('pageFilmstrip.removeTitleEnabled')
+            : t('pageFilmstrip.removeTitleDisabled', { min: minPages })}
         >
           {removingPages ? '…' : '−2'}
         </button>
@@ -244,7 +247,7 @@ function AtelierPageFilmstrip({
           style={{ aspectRatio }}
           onClick={onAddPages}
           disabled={addingPages}
-          title="Ajouter 2 pages vides a la fin du livre"
+          title={t('pageFilmstrip.addTitle')}
         >
           {addingPages ? '…' : '+2'}
         </button>
@@ -252,7 +255,7 @@ function AtelierPageFilmstrip({
       <div className="atelier-filmstrip-sep" aria-hidden="true" />
       <FilmstripCell
         target="back-cover"
-        label="4e"
+        label={t('pageFilmstrip.backCoverLabel')}
         status="cover"
         isActive={activeTarget === 'back-cover'}
         aspectRatio={aspectRatio}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import AtelierPhotoLightbox from './AtelierPhotoLightbox';
 
 // Colonne gauche de l'atelier : "Mes souvenirs" — photos et souvenirs
@@ -92,6 +93,7 @@ function AtelierSidebar({
   // Un livre solo n a pas de contributeurs : pas d onglet « Recues ».
   estSolo = false
 }) {
+  const { t } = useTranslation('atelier');
   // { url, rect } de la photo survolee, null sinon. `rect` est fige au moment
   // du survol : l'apercu ne suit pas la souris, il reste ancre a sa vignette.
   const [apercu, setApercu] = useState(null);
@@ -224,7 +226,7 @@ function AtelierSidebar({
           className={`atelier-sidebar-tab ${activeTab === 'photos' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('photos')}
         >
-          {estSolo ? 'Photos' : 'Mes photos'} ({mesPhotos.length})
+          {estSolo ? t('sidebar.tabPhotosSolo') : t('sidebar.tabPhotosMine')} ({mesPhotos.length})
         </button>
         {ongletRecuesDisponible && (
           <button
@@ -232,7 +234,7 @@ function AtelierSidebar({
             className={`atelier-sidebar-tab ${activeTab === 'recues' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('recues')}
           >
-            Reçues ({recues.length})
+            {t('sidebar.tabReceived')} ({recues.length})
           </button>
         )}
         {ongletSouvenirsDisponible && (
@@ -241,7 +243,7 @@ function AtelierSidebar({
             className={`atelier-sidebar-tab ${activeTab === 'souvenirs' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('souvenirs')}
           >
-            Souvenirs ({mesSouvenirs.length})
+            {t('sidebar.tabMemories')} ({mesSouvenirs.length})
           </button>
         )}
       </div>
@@ -252,11 +254,11 @@ function AtelierSidebar({
           choisir de ne voir que ce qui manque encore, ou l'inverse.
           N'apparait que s'il y a quelque chose a filtrer. */}
       {nombreUtilises > 0 && (
-        <div className="atelier-sidebar-filters" role="group" aria-label="Filtrer">
+        <div className="atelier-sidebar-filters" role="group" aria-label={t('sidebar.filterLabel')}>
           {[
-            { id: 'toutes', label: 'Toutes' },
-            { id: 'disponibles', label: `Disponibles (${items.length - nombreUtilises})` },
-            { id: 'utilisees', label: `Utilisées (${nombreUtilises})` }
+            { id: 'toutes', label: t('sidebar.filterAll') },
+            { id: 'disponibles', label: t('sidebar.filterAvailable', { count: items.length - nombreUtilises }) },
+            { id: 'utilisees', label: t('sidebar.filterUsed', { count: nombreUtilises }) }
           ].map((choix) => (
             <button
               key={choix.id}
@@ -275,7 +277,7 @@ function AtelierSidebar({
         {activeTab === 'photos' ? (
           <>
             <label className={`atelier-sidebar-add-btn ${uploadingPhotos ? 'is-disabled' : ''}`}>
-              {uploadingPhotos ? 'Ajout en cours...' : '+ Ajouter des photos'}
+              {uploadingPhotos ? t('sidebar.uploading') : `+ ${t('sidebar.addPhotos')}`}
               <input
                 type="file"
                 accept="image/*"
@@ -293,9 +295,9 @@ function AtelierSidebar({
             {uploadProgress && (
               <div className="atelier-upload-progress">
                 <div className="atelier-upload-progress-head">
-                  <span>{uploadProgress.done} / {uploadProgress.total} photos</span>
+                  <span>{t('sidebar.uploadCount', { done: uploadProgress.done, total: uploadProgress.total })}</span>
                   {uploadProgress.failed > 0 && (
-                    <span className="atelier-upload-progress-failed">{uploadProgress.failed} échec{uploadProgress.failed > 1 ? 's' : ''}</span>
+                    <span className="atelier-upload-progress-failed">{t('sidebar.uploadFailed', { count: uploadProgress.failed })}</span>
                   )}
                 </div>
                 <div className="atelier-upload-progress-bar">
@@ -322,21 +324,24 @@ function AtelierSidebar({
             disabled={deletingAll || uploadingPhotos}
           >
             {deletingAll
-              ? 'Suppression...'
-              : `Tout supprimer (${items.length} ${activeTab === 'photos' ? 'photos' : 'souvenirs'})`}
+              ? t('sidebar.deleting')
+              : t('sidebar.deleteAll', {
+                count: items.length,
+                kind: activeTab === 'photos' ? t('sidebar.deleteAllKindPhotos') : t('sidebar.deleteAllKindMemories')
+              })}
           </button>
         )}
       </div>
 
       {items.length === 0 ? (
         <p className="atelier-sidebar-empty">
-          {activeTab === 'photos' ? 'Aucune photo pour le moment.' : 'Aucun souvenir pour le moment.'}
+          {activeTab === 'photos' ? t('sidebar.emptyPhotos') : t('sidebar.emptyMemories')}
         </p>
       ) : itemsAffiches.length === 0 ? (
         // Le filtre cache tout : distinct du cas "rien du tout" — il y a
         // bien du contenu, juste pas dans l'etat filtre en ce moment.
         <p className="atelier-sidebar-empty">
-          {filtre === 'utilisees' ? "Rien n'est encore placé dans le livre." : 'Tout est déjà placé dans le livre.'}
+          {filtre === 'utilisees' ? t('sidebar.emptyFilterUsed') : t('sidebar.emptyFilterAvailable')}
         </p>
       ) : (
         <>
@@ -379,9 +384,9 @@ function AtelierSidebar({
                   onMouseLeave={quitter}
                   className={`atelier-sidebar-item ${selectedItem?.id === item.id ? 'is-selected' : ''} ${isUsed ? 'is-used' : ''}`}
                   title={[
-                    item.kind === 'photo' ? 'Photo' : item.text,
-                    estRecue ? (auteur ? `Envoyee par ${auteur}` : 'Recue par le lien de partage') : null,
-                    isUsed ? 'Deja utilisee sur une page' : null
+                    item.kind === 'photo' ? t('sidebar.titlePhoto') : item.text,
+                    estRecue ? (auteur ? t('sidebar.sentBy', { name: auteur }) : t('sidebar.receivedViaLink')) : null,
+                    isUsed ? t('sidebar.alreadyUsed') : null
                   ].filter(Boolean).join(' — ')}
                 >
                   {item.kind === 'photo' ? (
@@ -391,7 +396,7 @@ function AtelierSidebar({
                   )}
                   {estRecue && (
                     <span className="atelier-sidebar-item-recue-badge">
-                      {auteur ? `♥ ${auteur}` : '♥ reçue'}
+                      {auteur ? `♥ ${auteur}` : t('sidebar.receivedBadgeAnonymous')}
                     </span>
                   )}
                   {/* Point discret plutot qu'un bandeau de texte (§5 :
@@ -415,8 +420,8 @@ function AtelierSidebar({
                       // l'original pese cinq fois plus (2026-09-20).
                       setPhotoOuverte(item.metadata?.previewUrl || item.url);
                     }}
-                    aria-label="Voir la photo en grand"
-                    title="Voir la photo en grand"
+                    aria-label={t('sidebar.viewLarge')}
+                    title={t('sidebar.viewLarge')}
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                       <circle cx="10.5" cy="10.5" r="6.5" />
@@ -429,8 +434,8 @@ function AtelierSidebar({
                   type="button"
                   className="atelier-sidebar-item-remove"
                   onClick={(event) => { event.stopPropagation(); onDeleteItem(item.id); }}
-                  aria-label="Supprimer"
-                  title="Supprimer"
+                  aria-label={t('sidebar.remove')}
+                  title={t('sidebar.remove')}
                 >
                   ×
                 </button>

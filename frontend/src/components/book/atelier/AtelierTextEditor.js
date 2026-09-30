@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  ROLE_LABELS,
   TEXT_ROLES,
   fitTextToSlot,
   normalizeRole,
   screenStyleForRole,
-  selectableColorsForRole
+  selectableColorsForRole,
+  getRoleLabel,
+  getTextColorLabel
 } from './typography';
 import './AtelierTextEditor.css';
 
@@ -60,6 +62,7 @@ function AtelierTextEditor({
   onSave,
   onCancel
 }) {
+  const { t } = useTranslation('atelier');
   const safeRole = normalizeRole(role);
   const [draft, setDraft] = useState(item?.text || '');
   const [currentRole, setCurrentRole] = useState(safeRole);
@@ -229,7 +232,7 @@ function AtelierTextEditor({
         style={fieldStyle}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
-        aria-label={`Modifier le texte (${ROLE_LABELS[currentRole]})`}
+        aria-label={t('textEditor.editFieldLabel', { role: getRoleLabel(currentRole, t) })}
       />
 
       {/* Barre + alertes regroupees : elles doivent rester du MEME cote du
@@ -248,15 +251,15 @@ function AtelierTextEditor({
             reglage le plus important de la barre — il decide police, taille,
             graisse et interligne — donc il doit se nommer. */}
         <label className="atelier-text-toolbar-field">
-          <span className="atelier-text-toolbar-label">Style</span>
+          <span className="atelier-text-toolbar-label">{t('textEditor.styleLabel')}</span>
           <select
             className="atelier-text-toolbar-role"
             value={currentRole}
             onChange={(event) => setCurrentRole(event.target.value)}
-            title="Style du texte : choisit automatiquement la police, la taille et la graisse"
+            title={t('textEditor.styleTitle')}
           >
             {TEXT_ROLES.map((value) => (
-              <option key={value} value={value}>{ROLE_LABELS[value]}</option>
+              <option key={value} value={value}>{getRoleLabel(value, t)}</option>
             ))}
           </select>
         </label>
@@ -266,7 +269,7 @@ function AtelierTextEditor({
             dizaine de pixels : c'est petit, mais c'est JUSTE (§1 WYSIWYG).
             L'afficher evite de croire a un defaut d'affichage — et rappelle
             que la loupe du livre permet de travailler en plus grand. */}
-        <span className="atelier-text-toolbar-size" title="Taille reelle a l'impression">
+        <span className="atelier-text-toolbar-size" title={t('textEditor.realPrintSize')}>
           {fit.fontSizePt} pt
         </span>
 
@@ -274,7 +277,7 @@ function AtelierTextEditor({
             limite au lieu de la decouvrir d'un coup. */}
         <span
           className={`atelier-text-fill ${isAtLimit ? 'is-at-limit' : ''} ${isNearLimit ? 'is-near-limit' : ''}`}
-          title="Place occupee dans l'emplacement"
+          title={t('textEditor.fillGaugeTitle')}
         >
           <span className="atelier-text-fill-bar">
             <span className="atelier-text-fill-level" style={{ width: `${Math.min(100, fillPct)}%` }} />
@@ -284,7 +287,7 @@ function AtelierTextEditor({
 
         <span className="atelier-text-toolbar-sep" aria-hidden="true" />
 
-        <div className="atelier-text-toolbar-group" role="group" aria-label="Alignement">
+        <div className="atelier-text-toolbar-group" role="group" aria-label={t('textEditor.alignmentGroupLabel')}>
           {['left', 'center', 'right', 'justify'].map((mode) => (
             <button
               key={mode}
@@ -292,8 +295,8 @@ function AtelierTextEditor({
               className={`atelier-text-toolbar-btn ${(overrides.align || fit.align) === mode ? 'is-active' : ''}`}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setOverrides((prev) => ({ ...prev, align: mode }))}
-              title={`Aligner : ${mode}`}
-              aria-label={`Aligner : ${mode}`}
+              title={t('textEditor.alignLabel', { mode: t(`textEditor.alignModes.${mode}`) })}
+              aria-label={t('textEditor.alignLabel', { mode: t(`textEditor.alignModes.${mode}`) })}
             >
               <AlignIcon mode={mode} />
             </button>
@@ -302,7 +305,7 @@ function AtelierTextEditor({
 
         <span className="atelier-text-toolbar-sep" aria-hidden="true" />
 
-        <div className="atelier-text-toolbar-group" role="group" aria-label="Couleur">
+        <div className="atelier-text-toolbar-group" role="group" aria-label={t('textEditor.colorGroupLabel')}>
           {colors.map((color) => (
             <button
               key={color.token}
@@ -311,8 +314,8 @@ function AtelierTextEditor({
               style={{ background: color.hex }}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setOverrides((prev) => ({ ...prev, color: color.token }))}
-              title={color.label}
-              aria-label={color.label}
+              title={getTextColorLabel(color.token, t)}
+              aria-label={getTextColorLabel(color.token, t)}
             />
           ))}
         </div>
@@ -328,9 +331,9 @@ function AtelierTextEditor({
           className="atelier-text-save-btn"
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onSave({ text: draft, role: currentRole, styleOverrides: overrides })}
-          title="Enregistrer (ou cliquez simplement en dehors du cadre)"
+          title={t('textEditor.saveTitle')}
         >
-          Enregistrer
+          {t('textEditor.save')}
         </button>
       </div>
 
@@ -338,26 +341,26 @@ function AtelierTextEditor({
           surtout pas le texte en silence. */}
       {isAtLimit && (
         <p className="atelier-text-alert is-error">
-          <strong>Limite atteinte — arretez ici.</strong>{' '}
+          <strong>{t('textEditor.limitReachedTitle')}</strong>{' '}
           {atSmallestSize
-            ? 'Le texte est deja a la plus petite taille imprimable : ce qui suit ne tiendra pas sur la page.'
-            : 'Ce texte ne rentre plus dans son emplacement.'}{' '}
-          Raccourcissez-le, ou choisissez une mise en page plus genereuse.
+            ? t('textEditor.atSmallestSize')
+            : t('textEditor.doesNotFit')}{' '}
+          {t('textEditor.shortenOrChangeLayout')}
         </p>
       )}
       {isNearLimit && (
         <p className="atelier-text-alert is-warning">
-          Vous approchez du bas de l'emplacement ({fillPct} % occupe).
+          {t('textEditor.nearLimit', { percent: fillPct })}
         </p>
       )}
       {!isAtLimit && fit.status === 'reduced' && (
         <p className="atelier-text-alert">
-          Texte reduit automatiquement pour tenir dans l'emplacement.
+          {t('textEditor.reducedAuto')}
         </p>
       )}
       {isMagnified && (
         <p className="atelier-text-alert is-info">
-          Affiche en plus grand pour ecrire. Taille reelle a l'impression : {fit.fontSizePt} pt.
+          {t('textEditor.magnifiedInfo', { size: fit.fontSizePt })}
         </p>
       )}
       </div>

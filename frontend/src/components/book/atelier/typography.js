@@ -17,14 +17,10 @@ export const DEFAULT_TEXT_ROLE = 'body';
 // Libelles utilisateur. Le cahier des charges interdit un editeur de type
 // Canva (§2) : l'utilisateur ne choisit donc jamais une police, il choisit
 // un ROLE, et le role decide de tout le reste.
-export const ROLE_LABELS = {
-  title: 'Titre',
-  subtitle: 'Sous-titre',
-  // "Texte" seul etait ambigu dans une liste ou tout est du texte.
-  body: 'Texte courant',
-  caption: 'Legende',
-  quote: 'Citation'
-};
+//
+// Traduit a l'affichage (chantier bilingue, 2026-09-30), jamais fige a
+// l'import — meme raison qu'atelierLayouts.js/atelierMoods.js.
+export const getRoleLabel = (role, t) => t(`textEditor.roleLabels.${role}`);
 
 export const FONT_STACKS = {
   serif: "'Cormorant Garamond', Georgia, 'Times New Roman', serif",
@@ -62,18 +58,22 @@ export const FORMAT_TYPOGRAPHY = {
 const DEFAULT_FORMAT_TYPOGRAPHY_ID = 'standard';
 
 export const TEXT_COLORS = {
-  ink: { label: 'Noir', hex: '#241f18' },
-  graphite: { label: 'Gris fonce', hex: '#4a4335' },
-  softGrey: { label: 'Gris doux', hex: '#6d6252' },
-  white: { label: 'Blanc', hex: '#ffffff', onDark: true },
-  ivory: { label: 'Ivoire', hex: '#fffdf8', onDark: true },
-  beige: { label: 'Beige', hex: '#efe8d8', onDark: true },
-  taupe: { label: 'Taupe', hex: '#8f8a7c' },
+  ink: { hex: '#241f18' },
+  graphite: { hex: '#4a4335' },
+  softGrey: { hex: '#6d6252' },
+  white: { hex: '#ffffff', onDark: true },
+  ivory: { hex: '#fffdf8', onDark: true },
+  beige: { hex: '#efe8d8', onDark: true },
+  taupe: { hex: '#8f8a7c' },
   // Or de TEXTE (plus sombre que l'or decoratif #c9a35f, illisible en texte
   // sur papier ivoire) — voir typographySystem.js cote backend.
-  accent: { label: 'Or subtil', hex: '#8a6a1f', accentOnly: true }
+  accent: { hex: '#8a6a1f', accentOnly: true }
 };
 export const DEFAULT_TEXT_COLOR = 'ink';
+
+// Libelle traduit (chantier bilingue, 2026-09-30) : meme raison que
+// getRoleLabel plus haut.
+export const getTextColorLabel = (token, t) => t(`textEditor.colorLabels.${token}`);
 
 // Luminance relative WCAG puis rapport de contraste — miroir exact du
 // backend (typographySystem.js). Sert ici a ne proposer que des couleurs
@@ -111,7 +111,7 @@ export function selectableColorsForRole(role, { backgroundHex = PAGE_PAPER_HEX }
   return Object.entries(TEXT_COLORS)
     .filter(([, value]) => (allowAccent ? true : !value.accentOnly))
     .filter(([, value]) => contrastRatio(value.hex, backgroundHex) >= PALETTE_MIN_CONTRAST)
-    .map(([token, value]) => ({ token, label: value.label, hex: value.hex }));
+    .map(([token, value]) => ({ token, hex: value.hex }));
 }
 
 export function resolveTextColor(token) {
