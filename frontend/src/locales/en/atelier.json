@@ -135,6 +135,32 @@
     "resetCrop": "Reset framing",
     "save": "Save"
   },
+  "bookView": {
+    "coverPhotoOverlay": {
+      "useThisPhoto": "Click to use this photo",
+      "clickToChoosePhoto": "Click to choose a photo",
+      "changePhotoTitle": "Choose a different photo",
+      "changePhoto": "Change photo",
+      "adjustTitle": "Adjust this photo's framing",
+      "adjust": "Adjust framing",
+      "resetToAuto": "Return to automatic photo choice"
+    },
+    "clickToEditPage": "Click to edit this page",
+    "clickToEdit": "Click to edit",
+    "previewTitle": "Preview — print proportions and dimensions respected",
+    "preview": "Preview",
+    "loadingPage": "Loading page...",
+    "coverLabel": "Cover",
+    "backCoverLabel": "Back cover",
+    "insideCoverLabel": "Inside cover",
+    "pageLabel": "Page {{number}}",
+    "goToCover": "Go to the cover",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "goToBackCover": "Go to the back cover",
+    "close": "Close",
+    "dimensionsRespectedHint": "Print proportions and dimensions respected"
+  },
   "coverPanel": {
     "phraseModes": {
       "auto": "Automatic",

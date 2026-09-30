@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PageZoomStage, ZoomControls } from '../../common/PageZoomStage';
 import FadeInFrame from '../../common/FadeInFrame';
 
@@ -51,6 +52,7 @@ function ExpandIcon() {
 // jamais aucune. Absent (undefined) -> true, pour ne rien casser d'un
 // appelant qui ne le passerait pas.
 function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, onOpenPicker, onRemove, hasPhotoSlot = true }) {
+  const { t } = useTranslation('atelier');
   if (!onAssign || !hasPhotoSlot) return null;
   const isPhotoSelected = selectedSidebarItem?.kind === 'photo';
   // Meme mecanique qu'un emplacement de page interieure vide (retour
@@ -72,8 +74,8 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
   // message — en afficher un second, superpose au meme endroit, ferait
   // double emploi plutot que d'aider.
   const hint = isPhotoSelected
-    ? 'Cliquer pour utiliser cette photo'
-    : (hasPhoto ? null : 'Cliquer pour choisir une photo');
+    ? t('bookView.coverPhotoOverlay.useThisPhoto')
+    : (hasPhoto ? null : t('bookView.coverPhotoOverlay.clickToChoosePhoto'));
   return (
     <div
       className={`atelier-cover-photo-overlay ${isPhotoSelected ? 'is-armed' : ''}`}
@@ -102,10 +104,10 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
               type="button"
               className="atelier-cover-action-btn"
               onClick={(event) => { event.stopPropagation(); onOpenPicker(); }}
-              title="Choisir une autre photo"
+              title={t('bookView.coverPhotoOverlay.changePhotoTitle')}
             >
               <ChangeIcon />
-              Changer la photo
+              {t('bookView.coverPhotoOverlay.changePhoto')}
             </button>
           )}
           {onAdjust && (
@@ -113,10 +115,10 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
               type="button"
               className="atelier-cover-action-btn"
               onClick={(event) => { event.stopPropagation(); onAdjust(); }}
-              title="Ajuster le cadrage de cette photo"
+              title={t('bookView.coverPhotoOverlay.adjustTitle')}
             >
               <CropIcon />
-              Ajuster le cadrage
+              {t('bookView.coverPhotoOverlay.adjust')}
             </button>
           )}
         </div>
@@ -134,8 +136,8 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
           type="button"
           className="atelier-cover-remove-btn"
           onClick={(event) => { event.stopPropagation(); onRemove(); }}
-          title="Revenir au choix automatique de la photo"
-          aria-label="Revenir au choix automatique de la photo"
+          title={t('bookView.coverPhotoOverlay.resetToAuto')}
+          aria-label={t('bookView.coverPhotoOverlay.resetToAuto')}
         >
           <XIcon />
         </button>
@@ -185,12 +187,13 @@ function EyeIcon() {
 // deliberee (badge + assombrissement de l'autre page) pour qu'il soit
 // impossible de deposer par erreur sur la mauvaise page d'un double-page.
 function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, aspectRatio, onExpand, actions }) {
+  const { t } = useTranslation('atelier');
   const isInactive = selectable && !isSelected;
   return (
     <div
       className={`atelier-page-pane ${selectable ? 'is-selectable' : ''} ${isSelected ? 'is-selected' : ''} ${isInactive ? 'is-inactive' : ''}`}
       onClick={selectable ? onSelect : undefined}
-      title={isInactive ? 'Cliquer pour modifier cette page' : undefined}
+      title={isInactive ? t('bookView.clickToEditPage') : undefined}
       style={aspectRatio ? { aspectRatio } : undefined}
     >
       {html ? (
@@ -210,8 +213,8 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
           type="button"
           className="atelier-book-stage-eye"
           onClick={(event) => { event.stopPropagation(); onExpand(); }}
-          title="Prévisualiser — proportions et dimensions d'impression respectées"
-          aria-label="Prévisualiser"
+          title={t('bookView.previewTitle')}
+          aria-label={t('bookView.preview')}
         >
           <EyeIcon />
         </button>
@@ -228,7 +231,7 @@ function PagePane({ html, pageLabel, isSelected, onSelect, selectable, overlay, 
           le fin contour or de .is-selected suffit desormais a le montrer,
           sans texte permanent superpose au livre. */}
       {isInactive && (
-        <span className="atelier-page-pane-inactive-hint">Cliquer pour modifier</span>
+        <span className="atelier-page-pane-inactive-hint">{t('bookView.clickToEdit')}</span>
       )}
       <span className="atelier-page-pane-label">{pageLabel}</span>
     </div>
@@ -316,6 +319,7 @@ function AtelierBookView({
   backHasPhotoSlot,
   selectedSidebarItem
 }) {
+  const { t } = useTranslation('atelier');
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const [zoom, setZoom] = useState('fit');
   const formatDimensions = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
@@ -390,12 +394,12 @@ function AtelierBookView({
             deux acces au meme calque, l'un explicite en bas, l'un rapide et
             discret sur la page elle-meme. */}
 
-        {loading && <p className="atelier-hint atelier-book-loading">Chargement de la page...</p>}
+        {loading && <p className="atelier-hint atelier-book-loading">{t('bookView.loadingPage')}</p>}
 
         {viewKind === 'cover' && (
           <PagePane
             html={singleHtml}
-            pageLabel="Couverture"
+            pageLabel={t('bookView.coverLabel')}
             selectable={false}
             aspectRatio={pageAspectRatio}
             onExpand={() => setIsFullscreenOpen(true)}
@@ -416,7 +420,7 @@ function AtelierBookView({
         {viewKind === 'back-cover' && (
           <PagePane
             html={singleHtml}
-            pageLabel="4e de couverture"
+            pageLabel={t('bookView.backCoverLabel')}
             selectable={false}
             aspectRatio={pageAspectRatio}
             onExpand={() => setIsFullscreenOpen(true)}
@@ -446,13 +450,13 @@ function AtelierBookView({
                 du meme coup POURQUOI le livre commence a droite. */}
             {leftPageNumber == null && (
               <div className="atelier-page-pane is-contreplat" style={pageAspectRatio ? { aspectRatio: pageAspectRatio } : undefined}>
-                <span className="atelier-page-pane-label">Intérieur de couverture</span>
+                <span className="atelier-page-pane-label">{t('bookView.insideCoverLabel')}</span>
               </div>
             )}
             {leftPageNumber != null && (
               <PagePane
                 html={leftHtml}
-                pageLabel={`Page ${leftPageNumber}`}
+                pageLabel={t('bookView.pageLabel', { number: leftPageNumber })}
                 selectable
                 isSelected={selectedSide === 'left'}
                 onSelect={() => onSelectSide('left')}
@@ -465,7 +469,7 @@ function AtelierBookView({
             {rightPageNumber != null && (
               <PagePane
                 html={rightHtml}
-                pageLabel={`Page ${rightPageNumber}`}
+                pageLabel={t('bookView.pageLabel', { number: rightPageNumber })}
                 selectable
                 isSelected={selectedSide === 'right'}
                 onSelect={() => onSelectSide('right')}
@@ -498,8 +502,8 @@ function AtelierBookView({
               className="atelier-book-nav-jump"
               onClick={onGoToCover}
               disabled={!canGoPrevious}
-              title="Aller à la couverture"
-              aria-label="Aller à la couverture"
+              title={t('bookView.goToCover')}
+              aria-label={t('bookView.goToCover')}
             >
               ⇤
             </button>
@@ -509,7 +513,7 @@ function AtelierBookView({
             className="atelier-book-nav-arrow"
             onClick={onPrevious}
             disabled={!canGoPrevious}
-            aria-label="Page précédente"
+            aria-label={t('bookView.previousPage')}
           >
             ‹
           </button>
@@ -521,7 +525,7 @@ function AtelierBookView({
             className="atelier-book-nav-arrow"
             onClick={onNext}
             disabled={!canGoNext}
-            aria-label="Page suivante"
+            aria-label={t('bookView.nextPage')}
           >
             ›
           </button>
@@ -531,8 +535,8 @@ function AtelierBookView({
               className="atelier-book-nav-jump"
               onClick={onGoToBackCover}
               disabled={!canGoNext}
-              title="Aller à la 4e de couverture"
-              aria-label="Aller à la 4e de couverture"
+              title={t('bookView.goToBackCover')}
+              aria-label={t('bookView.goToBackCover')}
             >
               ⇥
             </button>
@@ -549,10 +553,10 @@ function AtelierBookView({
             className="atelier-realsize-toggle-btn"
             onClick={() => setIsFullscreenOpen(true)}
             disabled={!hasContentToExpand}
-            title="Prévisualiser — proportions et dimensions d'impression respectées"
+            title={t('bookView.previewTitle')}
           >
             <ExpandIcon />
-            <span>Prévisualiser</span>
+            <span>{t('bookView.preview')}</span>
           </button>
         </div>
       </div>
@@ -580,17 +584,17 @@ function AtelierBookView({
           <div className="atelier-realsize-panel">
             <div className="atelier-realsize-head">
               <span>
-                {navLabel} — Prévisualiser
+                {navLabel} — {t('bookView.preview')}
                 {/* Cahier des charges §3 : "taille reelle" est trompeur sur
                     ecran (22cm CSS != 22cm physiques selon le DPI) — cette
                     formule remplace l'ancien affichage brut des mm. */}
-                <span className="atelier-realsize-hint"> · Proportions et dimensions d'impression respectées</span>
+                <span className="atelier-realsize-hint"> · {t('bookView.dimensionsRespectedHint')}</span>
               </span>
               <button
                 type="button"
                 className="atelier-modal-close"
                 onClick={() => setIsFullscreenOpen(false)}
-                aria-label="Fermer"
+                aria-label={t('bookView.close')}
               >
                 ×
               </button>
@@ -610,7 +614,7 @@ function AtelierBookView({
                   <div className="atelier-zoom-spread atelier-zoom-page-change" key={pageChangeKey}>
                     {leftPageNumber != null && (
                       leftHtml ? (
-                        <FadeInFrame title={`Page ${leftPageNumber}`} srcDoc={leftHtml} className="atelier-zoom-frame" />
+                        <FadeInFrame title={t('bookView.pageLabel', { number: leftPageNumber })} srcDoc={leftHtml} className="atelier-zoom-frame" />
                       ) : (
                         <div className="atelier-page-placeholder" />
                       )
@@ -618,7 +622,7 @@ function AtelierBookView({
                     {isSpreadWithBothPages && <span className="atelier-zoom-spine" aria-hidden="true" />}
                     {rightPageNumber != null && (
                       rightHtml ? (
-                        <FadeInFrame title={`Page ${rightPageNumber}`} srcDoc={rightHtml} className="atelier-zoom-frame" />
+                        <FadeInFrame title={t('bookView.pageLabel', { number: rightPageNumber })} srcDoc={rightHtml} className="atelier-zoom-frame" />
                       ) : (
                         <div className="atelier-page-placeholder" />
                       )
@@ -628,7 +632,7 @@ function AtelierBookView({
                   <div className="atelier-zoom-single atelier-zoom-page-change" key={pageChangeKey}>
                     {singleHtml ? (
                       <FadeInFrame
-                        title={viewKind === 'cover' ? 'Couverture' : '4e de couverture'}
+                        title={viewKind === 'cover' ? t('bookView.coverLabel') : t('bookView.backCoverLabel')}
                         srcDoc={singleHtml}
                         className="atelier-zoom-frame"
                       />
@@ -662,8 +666,8 @@ function AtelierBookView({
                   className="atelier-realsize-jump"
                   onClick={onGoToCover}
                   disabled={!canGoPrevious}
-                  title="Aller à la couverture"
-                  aria-label="Aller à la couverture"
+                  title={t('bookView.goToCover')}
+                  aria-label={t('bookView.goToCover')}
                 >
                   ⇤
                 </button>
@@ -673,7 +677,7 @@ function AtelierBookView({
                 className="atelier-realsize-nav-arrow"
                 onClick={onPrevious}
                 disabled={!canGoPrevious}
-                aria-label="Page précédente"
+                aria-label={t('bookView.previousPage')}
               >
                 ‹
               </button>
@@ -683,7 +687,7 @@ function AtelierBookView({
                 className="atelier-realsize-nav-arrow"
                 onClick={onNext}
                 disabled={!canGoNext}
-                aria-label="Page suivante"
+                aria-label={t('bookView.nextPage')}
               >
                 ›
               </button>
@@ -693,8 +697,8 @@ function AtelierBookView({
                   className="atelier-realsize-jump"
                   onClick={onGoToBackCover}
                   disabled={!canGoNext}
-                  title="Aller à la 4e de couverture"
-                  aria-label="Aller à la 4e de couverture"
+                  title={t('bookView.goToBackCover')}
+                  aria-label={t('bookView.goToBackCover')}
                 >
                   ⇥
                 </button>

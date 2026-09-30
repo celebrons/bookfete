@@ -135,6 +135,32 @@
     "resetCrop": "Réinitialiser le cadrage",
     "save": "Enregistrer"
   },
+  "bookView": {
+    "coverPhotoOverlay": {
+      "useThisPhoto": "Cliquer pour utiliser cette photo",
+      "clickToChoosePhoto": "Cliquer pour choisir une photo",
+      "changePhotoTitle": "Choisir une autre photo",
+      "changePhoto": "Changer la photo",
+      "adjustTitle": "Ajuster le cadrage de cette photo",
+      "adjust": "Ajuster le cadrage",
+      "resetToAuto": "Revenir au choix automatique de la photo"
+    },
+    "clickToEditPage": "Cliquer pour modifier cette page",
+    "clickToEdit": "Cliquer pour modifier",
+    "previewTitle": "Prévisualiser — proportions et dimensions d'impression respectées",
+    "preview": "Prévisualiser",
+    "loadingPage": "Chargement de la page...",
+    "coverLabel": "Couverture",
+    "backCoverLabel": "4e de couverture",
+    "insideCoverLabel": "Intérieur de couverture",
+    "pageLabel": "Page {{number}}",
+    "goToCover": "Aller à la couverture",
+    "previousPage": "Page précédente",
+    "nextPage": "Page suivante",
+    "goToBackCover": "Aller à la 4e de couverture",
+    "close": "Fermer",
+    "dimensionsRespectedHint": "Proportions et dimensions d'impression respectées"
+  },
   "coverPanel": {
     "phraseModes": {
       "auto": "Automatique",
