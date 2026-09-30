@@ -1,0 +1,198 @@
+{
+  "hero": {
+    "eyebrow": "NO-AI LAYOUT",
+    "titleLine1": "Turn your memories",
+    "titleLine2": "into a one-of-a-kind book",
+    "subtitle": "Add your photos and text, pick a style: your memory book takes shape right before your eyes.",
+    "createCta": "Create my book",
+    "howItWorksCta": "How does it work?"
+  },
+  "eventsSection": {
+    "eyebrow": "FOR EVERY OCCASION",
+    "title": "For all your events",
+    "subtitle": "9 paths available, from the classic to the wide open.",
+    "discover": "Discover →"
+  },
+  "events": {
+    "anniversaire": {
+      "title": "Birthday",
+      "description": "Create a warm book to celebrate an age, a personality, and every shared memory."
+    },
+    "retraite": {
+      "title": "Retirement",
+      "description": "Gather voices from colleagues, family, or both, to mark a major milestone."
+    },
+    "depart": {
+      "title": "Farewell",
+      "description": "Accompany a life change — a new job, a move, or a big leap forward."
+    },
+    "mariage": {
+      "title": "Wedding",
+      "description": "Bring loved ones together to tell the story of a meeting, a bond, and a promise."
+    },
+    "naissance": {
+      "title": "New baby",
+      "description": "Gather loved ones' words around an eagerly awaited arrival, or a pregnancy already full of love."
+    },
+    "voyage": {
+      "title": "Travel / vacation",
+      "description": "Turn a trip into a collective story with photos, anecdotes, and unexpected moments."
+    },
+    "finProjet": {
+      "title": "Project wrap-up",
+      "description": "Preserve a team's journey, a challenge overcome, and everything the project changed."
+    },
+    "famille": {
+      "title": "Family reunion",
+      "description": "Capture the rituals, the legends, and what's passed down that holds a family together over time."
+    },
+    "choixLibre": {
+      "title": "Open choice",
+      "description": "A flexible path for events that don't fit any category."
+    }
+  },
+  "processSection": {
+    "eyebrow": "THE PROCESS",
+    "title": "How does it work?"
+  },
+  "steps": {
+    "step1": {
+      "title": "Create your project",
+      "description": "Choose your event and give your book a title."
+    },
+    "step2": {
+      "title": "Add your photos and text",
+      "description": "Import your photos and write your memories directly in the editor."
+    },
+    "step3": {
+      "title": "Choose the style",
+      "description": "Pick a layout and a page count — the preview updates live."
+    },
+    "step4": {
+      "title": "Receive your book",
+      "description": "Order your book and have it delivered to you."
+    }
+  },
+  "finalCta": {
+    "eyebrow": "READY TO CREATE?",
+    "title": "Create unforgettable memories",
+    "subtitle": "Join thousands of families who have already created their memory book.",
+    "cta": "Create my book",
+    "statBooks": "BOOKS CREATED",
+    "statPages": "PAGES COMPOSED",
+    "statSatisfaction": "SATISFACTION"
+  },
+  "howItWorks": {
+    "hero": {
+      "eyebrow": "DISCOVER",
+      "title": "✨ How does it work?",
+      "description": "Create a unique book in 4 simple steps, alone or with others, with no technical skills needed. Your photos, your words, your format."
+    },
+    "timeline": {
+      "eyebrow": "THE PROCESS",
+      "title": "📋 4 steps, and your book comes to life",
+      "subtitle": "From idea to finished book, follow the guide",
+      "step1": {
+        "title": "Create your project, alone or with others",
+        "description": "Choose your occasion (birthday, wedding, farewell...), give your book a title, and decide whether to compose it alone or in collective mode.",
+        "time": "1 minute",
+        "highlight": "No sign-up required to get started"
+      },
+      "step2": {
+        "title": "Gather your memories",
+        "description": "Import your photos and write your text directly in the editor. In collective mode, invite loved ones by email: each one gets an individual link to add their own memories, no account needed.",
+        "time": "10 minutes",
+        "highlight": "You stay in control of every word and every image"
+      },
+      "step3": {
+        "title": "Compose your book",
+        "description": "Choose a layout for each page in the editor, or let automatic composition handle it. The preview updates live, matching the final result exactly.",
+        "time": "10 minutes",
+        "highlight": "Automatic or manual layout, no AI"
+      },
+      "step4": {
+        "title": "Choose the format and order",
+        "description": "Compare the 3 formats (Booklet, Standard, Luxe) with a real preview and the live price shown, confirm your order, and receive your book at home (estimated delivery of 1 to 2 weeks depending on production load).",
+        "time": "5 minutes",
+        "highlight": "Price shown immediately, no surprises"
+      }
+    },
+    "features": {
+      "eyebrow": "THE EXPERIENCE",
+      "title": "🌟 What makes your book unique",
+      "subtitle": "An automatic layout engine for a professional result",
+      "collective": {
+        "title": "Create together",
+        "description": "Invite loved ones by email: each one gets an individual link to add their photos and memories without creating an account, and you can track who has contributed."
+      },
+      "photos": {
+        "title": "High-quality photos",
+        "description": "Import your photos — they're optimized for printing and placed harmoniously throughout the book."
+      },
+      "formats": {
+        "title": "Three formats, each with its own identity",
+        "description": "Booklet, Standard, or Luxe: each format has its own size, paper, and layout, from the simplest to the most premium — not just the same page resized."
+      },
+      "author": {
+        "title": "You stay the author",
+        "description": "No text is ever generated for you: whether you write alone or loved ones contribute, it's always you who writes."
+      },
+      "preview": {
+        "title": "Live preview",
+        "description": "See your book take shape as you compose it, at true scale, and adjust the layout or format before ordering."
+      },
+      "formats2": {
+        "title": "Print or PDF version",
+        "description": "When ordering, choose to receive your book printed, as a digital PDF, or both."
+      }
+    },
+    "testimonials": {
+      "eyebrow": "REAL BOOKS, COMING SOON",
+      "title": "💬 You'll be among the first",
+      "text": "Célébrons just launched: we'd rather show you real books and real feedback than make up numbers or testimonials. In the meantime, the best way to judge is to compose your own — the preview is at true scale from the very start.",
+      "cta": "See the Examples page"
+    },
+    "faq": {
+      "eyebrow": "FREQUENTLY ASKED QUESTIONS",
+      "title": "❓ FAQ",
+      "subtitle": "Everything you need to know",
+      "delivery": {
+        "question": "📦 How long does it take to receive the book?",
+        "answer": "Expect generally 1 to 2 weeks between ordering and receiving (production then shipping). This is an estimate, not a contractual commitment: it depends on current production load. Production and shipping tracking is visible at any time from your order space."
+      },
+      "photos": {
+        "question": "📸 Can I add photos?",
+        "answer": "Yes, you can import as many photos as you like. They're automatically optimized for perfect print quality."
+      },
+      "collective": {
+        "question": "👥 How can my loved ones contribute?",
+        "answer": "Turn on collective mode: enter your loved ones' email addresses, and each one automatically receives an invitation with their own personal link to add photos and memories, no account needed. You can also copy the link yourself to share it another way. You can track who has contributed, send reminders to latecomers, and set a participation deadline."
+      },
+      "author": {
+        "question": "🖊️ Who writes the text in the book?",
+        "answer": "You — and your loved ones if they contribute. No content is ever generated automatically: the engine only handles the layout of what you write."
+      },
+      "payment": {
+        "question": "💳 How does payment work?",
+        "answer": "You pay online by card (secure payment via Stripe). The book is only printed once your order is confirmed."
+      },
+      "editing": {
+        "question": "📝 Can I make changes after confirming?",
+        "answer": "Yes, freely, as long as the order isn't paid: photos, text, layout, and format all remain editable at any time. Once the order is paid, the book is locked — that's what guarantees the printed version matches exactly what you confirmed."
+      },
+      "withdrawal": {
+        "question": "↩️ Can I cancel after placing my order?",
+        "answer": "No: since your book is composed from your own photos and text, it's a personalized item, excluded from the 14-day right of withdrawal (Article L221-28 of the French Consumer Code). You're informed of this and explicitly accept it before paying, when confirming your order."
+      },
+      "blurryPhoto": {
+        "question": "📷 One of my photos looks blurry, what should I do?",
+        "answer": "Before ordering, a summary screen automatically flags any photo whose resolution is too low for a sharp print at the chosen format. You can then replace it with a larger version, change its layout, or choose to order as-is, knowingly."
+      }
+    },
+    "cta": {
+      "title": "Ready to create unforgettable memories?",
+      "button": "✨ Create my book for free",
+      "note": "No commitment, you only pay when you order"
+    }
+  }
+}

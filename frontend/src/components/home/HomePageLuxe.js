@@ -1,10 +1,12 @@
 // C:\Users\USER\bookfete\frontend\src\components\home\HomePageLuxe.js
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import '../../styles/luxe-theme.css';
 import './HomeLuxe.css';
 
 const HomePageLuxe = () => {
+  const { t } = useTranslation('home');
   // Références pour les animations
   const sectionsRef = useRef([]);
 
@@ -199,56 +201,56 @@ const events = [
   // Étapes avec chiffres stylisés (version luxe)
 const homepageEvents = events.slice(0, 0).concat([
   {
-    title: 'Anniversaire',
-    description: 'Creez un livre chaleureux pour celebrer un age, une personnalite et tous les souvenirs partages.',
+    title: t('events.anniversaire.title'),
+    description: t('events.anniversaire.description'),
     icon: <IconAnniversaire />,
     link: '/create-book?event=anniversaire'
   },
   {
-    title: 'Retraite',
-    description: 'Rassemblez les voix des collegues, de la famille ou des deux pour marquer un grand passage.',
+    title: t('events.retraite.title'),
+    description: t('events.retraite.description'),
     icon: <IconRetraite />,
     link: '/create-book?event=retraite'
   },
   {
-    title: 'Depart',
-    description: 'Accompagnez un changement de vie, un nouveau poste, un demenagement ou un grand envol.',
+    title: t('events.depart.title'),
+    description: t('events.depart.description'),
     icon: <IconDeparture />,
     link: '/create-book?event=depart'
   },
   {
-    title: 'Mariage / union',
-    description: 'Faites participer les proches pour raconter une rencontre, une complicite et une promesse.',
+    title: t('events.mariage.title'),
+    description: t('events.mariage.description'),
     icon: <IconWedding />,
     link: '/create-book?event=mariage'
   },
   {
-    title: 'Naissance',
-    description: 'Rassemblez les mots des proches autour d une arrivee attendue ou d une grossesse deja pleine d amour.',
+    title: t('events.naissance.title'),
+    description: t('events.naissance.description'),
     icon: <IconBirth />,
     link: '/create-book?event=naissance'
   },
   {
-    title: 'Voyage / vacances',
-    description: 'Transformez un voyage en recit collectif avec photos, anecdotes et moments inattendus.',
+    title: t('events.voyage.title'),
+    description: t('events.voyage.description'),
     icon: <IconVacances />,
     link: '/create-book?event=voyage'
   },
   {
-    title: 'Fin de projet',
-    description: 'Immortalisez une aventure d equipe, un defi surmonte et tout ce que le projet a change.',
+    title: t('events.finProjet.title'),
+    description: t('events.finProjet.description'),
     icon: <IconRocket />,
     link: '/create-book?event=fin-projet'
   },
   {
-    title: 'Reunion de famille',
-    description: 'Capturez les rituels, les legendes et les transmissions qui soudent une famille au fil du temps.',
+    title: t('events.famille.title'),
+    description: t('events.famille.description'),
     icon: <IconFamily />,
     link: '/create-book?event=famille'
   },
   {
-    title: 'Choix libre',
-    description: 'Un parcours souple pour les evenements qui ne rentrent dans aucune case.',
+    title: t('events.choixLibre.title'),
+    description: t('events.choixLibre.description'),
     icon: <IconSpark />,
     link: '/create-book?event=choix-libre'
   }
@@ -257,23 +259,23 @@ const homepageEvents = events.slice(0, 0).concat([
   const steps = [
     {
       number: '01',
-      title: 'Créez votre projet',
-      description: 'Choisissez votre événement et donnez un titre à votre livre.'
+      title: t('steps.step1.title'),
+      description: t('steps.step1.description')
     },
     {
       number: '02',
-      title: 'Ajoutez vos photos et textes',
-      description: 'Importez vos photos et écrivez vos souvenirs directement dans l\'éditeur.'
+      title: t('steps.step2.title'),
+      description: t('steps.step2.description')
     },
     {
       number: '03',
-      title: 'Choisissez le style',
-      description: 'Sélectionnez une mise en page et le nombre de pages, l\'aperçu se met à jour en direct.'
+      title: t('steps.step3.title'),
+      description: t('steps.step3.description')
     },
     {
       number: '04',
-      title: 'Recevez votre livre',
-      description: 'Commandez votre livre et recevez-le chez vous.'
+      title: t('steps.step4.title'),
+      description: t('steps.step4.description')
     }
   ];
 
@@ -295,7 +297,7 @@ const homepageEvents = events.slice(0, 0).concat([
         <div className="container-luxe">
           <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
             <span className="label-gold" style={{ marginBottom: 'var(--space-md)' }}>
-              MISE EN PAGE SANS IA
+              {t('hero.eyebrow')}
             </span>
 
             <h1 style={{
@@ -306,7 +308,7 @@ const homepageEvents = events.slice(0, 0).concat([
               marginBottom: 'var(--space-lg)',
               color: 'var(--ink)'
             }}>
-              Transformez vos souvenirs<br />en un livre unique
+              {t('hero.titleLine1')}<br />{t('hero.titleLine2')}
             </h1>
 
             <p style={{
@@ -318,9 +320,9 @@ const homepageEvents = events.slice(0, 0).concat([
               marginRight: 'auto',
               lineHeight: '1.6'
             }}>
-              Ajoutez vos photos et vos textes, choisissez un style : votre livre souvenir prend forme sous vos yeux.
+              {t('hero.subtitle')}
             </p>
-            
+
             <div style={{
               display: 'flex',
               gap: 'var(--space-md)',
@@ -329,13 +331,13 @@ const homepageEvents = events.slice(0, 0).concat([
             }}>
               <Link to="/create-book" style={{ textDecoration: 'none' }}>
                 <button className="btn btn-primary" style={{ padding: '16px 40px' }}>
-                  Créer mon livre
+                  {t('hero.createCta')}
                 </button>
               </Link>
 
               <Link to="/how-it-works" style={{ textDecoration: 'none' }}>
                 <button className="btn btn-outline" style={{ padding: '16px 40px' }}>
-                  Comment ça marche ?
+                  {t('hero.howItWorksCta')}
                 </button>
               </Link>
             </div>
@@ -359,7 +361,7 @@ const homepageEvents = events.slice(0, 0).concat([
       >
         <div className="container-luxe">
           <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
-            <span className="label-gold">POUR TOUS MOMENTS</span>
+            <span className="label-gold">{t('eventsSection.eyebrow')}</span>
             <h2 style={{
               fontSize: 'clamp(32px, 6vw, 48px)',
               fontWeight: '600',
@@ -367,14 +369,14 @@ const homepageEvents = events.slice(0, 0).concat([
               marginTop: 'var(--space-sm)',
               color: 'var(--ink)'
             }}>
-              Pour tous vos événements
+              {t('eventsSection.title')}
             </h2>
             <p style={{
               marginTop: 'var(--space-sm)',
               color: 'var(--text-light)',
               fontSize: '15px'
             }}>
-              9 parcours disponibles, du plus classique au plus libre.
+              {t('eventsSection.subtitle')}
             </p>
           </div>
 
@@ -423,7 +425,7 @@ const homepageEvents = events.slice(0, 0).concat([
                     textTransform: 'uppercase',
                     letterSpacing: '1px'
                   }}>
-                    Découvrir →
+                    {t('eventsSection.discover')}
                   </div>
                 </div>
               </Link>
@@ -445,7 +447,7 @@ const homepageEvents = events.slice(0, 0).concat([
       >
         <div className="container-luxe">
           <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
-            <span className="label-gold">LE PROCESSUS</span>
+            <span className="label-gold">{t('processSection.eyebrow')}</span>
             <h2 style={{
               fontSize: 'clamp(32px, 6vw, 48px)',
               fontWeight: '600',
@@ -453,7 +455,7 @@ const homepageEvents = events.slice(0, 0).concat([
               marginTop: 'var(--space-sm)',
               color: 'var(--ink)'
             }}>
-              Comment ça marche ?
+              {t('processSection.title')}
             </h2>
           </div>
 
@@ -555,13 +557,13 @@ const homepageEvents = events.slice(0, 0).concat([
         }}
       >
         <div className="container-luxe" style={{ maxWidth: '800px', textAlign: 'center' }}>
-          <span className="label-gold" style={{ 
+          <span className="label-gold" style={{
             color: 'var(--gold)',
             marginBottom: 'var(--space-md)'
           }}>
-            PRÊT À CRÉER ?
+            {t('finalCta.eyebrow')}
           </span>
-          
+
           <h2 style={{
             fontSize: 'clamp(32px, 6vw, 48px)',
             fontWeight: '600',
@@ -569,18 +571,18 @@ const homepageEvents = events.slice(0, 0).concat([
             marginBottom: 'var(--space-md)',
             color: 'var(--white)'
           }}>
-            Créez vos souvenirs inoubliables
+            {t('finalCta.title')}
           </h2>
-          
+
           <p style={{
             fontSize: '18px',
             color: 'var(--mist)',
             marginBottom: 'var(--space-xl)',
             lineHeight: '1.6'
           }}>
-            Rejoignez des milliers de familles qui ont déjà créé leur livre de souvenirs.
+            {t('finalCta.subtitle')}
           </p>
-          
+
           <Link to="/create-book" style={{ textDecoration: 'none' }}>
             <button className="btn btn-primary" style={{
               padding: '16px 48px',
@@ -588,7 +590,7 @@ const homepageEvents = events.slice(0, 0).concat([
               border: 'none',
               fontSize: '14px'
             }}>
-              Créer mon livre
+              {t('finalCta.cta')}
             </button>
           </Link>
 
@@ -604,15 +606,15 @@ const homepageEvents = events.slice(0, 0).concat([
           }}>
             <div>
               <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--gold)' }}>10k+</div>
-              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>LIVRES CRÉÉS</div>
+              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>{t('finalCta.statBooks')}</div>
             </div>
             <div>
               <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--gold)' }}>50k+</div>
-              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>PAGES COMPOSÉES</div>
+              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>{t('finalCta.statPages')}</div>
             </div>
             <div>
               <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--gold)' }}>4.9★</div>
-              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>SATISFACTION</div>
+              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>{t('finalCta.statSatisfaction')}</div>
             </div>
           </div>
         </div>

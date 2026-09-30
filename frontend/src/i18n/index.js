@@ -6,6 +6,8 @@ import commonFr from '../locales/fr/common.json';
 import commonEn from '../locales/en/common.json';
 import authFr from '../locales/fr/auth.json';
 import authEn from '../locales/en/auth.json';
+import homeFr from '../locales/fr/home.json';
+import homeEn from '../locales/en/home.json';
 
 // Chantier bilingue (2026-09-30) : un namespace par grand domaine de l'app
 // (mirroring frontend/src/components/<dossier>) plutot qu'un fichier de
@@ -15,8 +17,8 @@ import authEn from '../locales/en/auth.json';
 // chaque phase suivante ajoute le sien (checkout, atelier, collective,
 // legal...) sans jamais toucher a celui-ci.
 const resources = {
-  fr: { common: commonFr, auth: authFr },
-  en: { common: commonEn, auth: authEn }
+  fr: { common: commonFr, auth: authFr, home: homeFr },
+  en: { common: commonEn, auth: authEn, home: homeEn }
 };
 
 i18n
@@ -31,7 +33,7 @@ i18n
     // pour 'en-US'/'en-GB'.
     nonExplicitSupportedLngs: true,
     load: 'languageOnly',
-    ns: ['common', 'auth'],
+    ns: ['common', 'auth', 'home'],
     defaultNS: 'common',
     detection: {
       // localStorage d'abord (dernier choix explicite fait sur CE

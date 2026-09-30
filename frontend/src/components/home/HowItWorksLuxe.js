@@ -1,106 +1,108 @@
 // C:\Users\USER\bookfete\frontend\src\components\home\HowItWorksLuxe.js
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import '../../styles/luxe-theme.css';
 import './HowItWorksLuxe.css';
 
 const HowItWorksLuxe = () => {
+  const { t } = useTranslation('home');
   const steps = [
     {
       number: '1️⃣',
-      title: 'Créez votre projet, seul ou à plusieurs',
-      description: 'Choisissez votre occasion (anniversaire, mariage, départ...), donnez un titre à votre livre, et décidez si vous le composez seul ou en mode collectif.',
-      time: '1 minute',
-      highlight: 'Aucune inscription requise pour commencer'
+      title: t('howItWorks.timeline.step1.title'),
+      description: t('howItWorks.timeline.step1.description'),
+      time: t('howItWorks.timeline.step1.time'),
+      highlight: t('howItWorks.timeline.step1.highlight')
     },
     {
       number: '2️⃣',
-      title: 'Réunissez vos souvenirs',
-      description: 'Importez vos photos et écrivez vos textes directement dans l\'atelier. En mode collectif, invitez vos proches par email : chacun reçoit un lien individuel pour ajouter ses souvenirs, sans créer de compte.',
-      time: '10 minutes',
-      highlight: 'Vous gardez la main sur chaque mot et chaque image'
+      title: t('howItWorks.timeline.step2.title'),
+      description: t('howItWorks.timeline.step2.description'),
+      time: t('howItWorks.timeline.step2.time'),
+      highlight: t('howItWorks.timeline.step2.highlight')
     },
     {
       number: '3️⃣',
-      title: 'Composez votre livre',
-      description: 'Choisissez une mise en page pour chaque page dans l\'atelier, ou laissez la composition automatique s\'en charger. L\'aperçu se met à jour en direct, à l\'identique du rendu final.',
-      time: '10 minutes',
-      highlight: 'Mise en page automatique ou manuelle, sans IA'
+      title: t('howItWorks.timeline.step3.title'),
+      description: t('howItWorks.timeline.step3.description'),
+      time: t('howItWorks.timeline.step3.time'),
+      highlight: t('howItWorks.timeline.step3.highlight')
     },
     {
       number: '4️⃣',
-      title: 'Choisissez le format et commandez',
-      description: 'Comparez les 3 formats (Livret, Standard, Luxe) avec un aperçu réel et le prix affiché en direct, validez votre commande, et recevez votre livre chez vous (délai indicatif de 1 à 2 semaines selon la charge de production).',
-      time: '5 minutes',
-      highlight: 'Prix affiché immédiatement, sans surprise'
+      title: t('howItWorks.timeline.step4.title'),
+      description: t('howItWorks.timeline.step4.description'),
+      time: t('howItWorks.timeline.step4.time'),
+      highlight: t('howItWorks.timeline.step4.highlight')
     }
   ];
 
   const features = [
     {
       icon: '👥',
-      title: 'Créez à plusieurs',
-      description: 'Invitez vos proches par email : chacun reçoit un lien individuel pour ajouter ses photos et ses souvenirs sans créer de compte, et vous suivez qui a contribué.'
+      title: t('howItWorks.features.collective.title'),
+      description: t('howItWorks.features.collective.description')
     },
     {
       icon: '📸',
-      title: 'Photos de qualité',
-      description: 'Importez vos photos, elles sont optimisées pour l\'impression et placées harmonieusement dans le livre.'
+      title: t('howItWorks.features.photos.title'),
+      description: t('howItWorks.features.photos.description')
     },
     {
       icon: '✨',
-      title: 'Trois formats, une vraie identité chacun',
-      description: 'Livret, Standard ou Luxe : chaque format a sa propre taille, son papier et sa mise en page, du plus simple au plus premium — pas juste une même page redimensionnée.'
+      title: t('howItWorks.features.formats.title'),
+      description: t('howItWorks.features.formats.description')
     },
     {
       icon: '🖊️',
-      title: 'Vous restez l\'auteur',
-      description: 'Aucun texte n\'est généré à votre place : que vous écriviez seul ou que vos proches contribuent, c\'est toujours vous qui écrivez.'
+      title: t('howItWorks.features.author.title'),
+      description: t('howItWorks.features.author.description')
     },
     {
       icon: '👁️',
-      title: 'Aperçu en direct',
-      description: 'Visualisez votre livre au fil de la composition, à l\'échelle réelle, et ajustez la mise en page ou le format avant de commander.'
+      title: t('howItWorks.features.preview.title'),
+      description: t('howItWorks.features.preview.description')
     },
     {
       icon: '📄',
-      title: 'Impression ou version PDF',
-      description: 'Au moment de la commande, choisissez de recevoir votre livre imprimé, en PDF numérique, ou les deux.'
+      title: t('howItWorks.features.formats2.title'),
+      description: t('howItWorks.features.formats2.description')
     }
   ];
 
   const faqs = [
     {
-      question: "📦 Combien de temps pour recevoir le livre ?",
-      answer: "Comptez généralement 1 à 2 semaines entre la commande et la réception (fabrication puis expédition). Ce délai est donné à titre indicatif, pas contractuel : il dépend de la charge de production du moment. Le suivi de fabrication et d'expédition est visible à tout moment depuis votre espace de commande."
+      question: t('howItWorks.faq.delivery.question'),
+      answer: t('howItWorks.faq.delivery.answer')
     },
     {
-      question: "📸 Peut-on ajouter des photos ?",
-      answer: "Oui, vous pouvez importer autant de photos que vous le souhaitez. Elles sont optimisées automatiquement pour une qualité d'impression parfaite."
+      question: t('howItWorks.faq.photos.question'),
+      answer: t('howItWorks.faq.photos.answer')
     },
     {
-      question: "👥 Comment mes proches peuvent-ils contribuer ?",
-      answer: "Activez le mode collectif : indiquez les adresses email de vos proches, chacun reçoit automatiquement une invitation avec son lien personnel pour ajouter ses photos et ses souvenirs, sans créer de compte. Vous pouvez aussi copier le lien vous-même pour le transmettre autrement. Vous suivez qui a contribué, relancez les retardataires, et pouvez fixer une date limite de participation."
+      question: t('howItWorks.faq.collective.question'),
+      answer: t('howItWorks.faq.collective.answer')
     },
     {
-      question: "🖊️ Qui écrit les textes du livre ?",
-      answer: "Vous — et vos proches s'ils contribuent. Aucun contenu n'est généré automatiquement : le moteur se charge uniquement de la mise en page de ce que vous écrivez."
+      question: t('howItWorks.faq.author.question'),
+      answer: t('howItWorks.faq.author.answer')
     },
     {
-      question: "💳 Comment fonctionne le paiement ?",
-      answer: "Vous payez en ligne par carte bancaire (paiement sécurisé Stripe). Le livre n'est imprimé qu'après validation de votre commande."
+      question: t('howItWorks.faq.payment.question'),
+      answer: t('howItWorks.faq.payment.answer')
     },
     {
-      question: "📝 Peut-on modifier après validation ?",
-      answer: "Oui, librement, tant que la commande n'est pas payée : photos, textes, mise en page et format restent modifiables à tout moment. Une fois la commande payée, le livre est verrouillé — c'est ce qui garantit que la version imprimée correspond exactement à celle que vous avez validée."
+      question: t('howItWorks.faq.editing.question'),
+      answer: t('howItWorks.faq.editing.answer')
     },
     {
-      question: "↩️ Puis-je me rétracter après ma commande ?",
-      answer: "Non : votre livre étant composé à partir de vos propres photos et textes, il s'agit d'un bien personnalisé, exclu du droit de rétractation de 14 jours (article L221-28 du Code de la consommation). Vous en êtes informé et vous l'acceptez explicitement avant de payer, au moment de valider votre commande."
+      question: t('howItWorks.faq.withdrawal.question'),
+      answer: t('howItWorks.faq.withdrawal.answer')
     },
     {
-      question: "📷 Une de mes photos apparaît floue, que faire ?",
-      answer: "Avant de commander, un écran récapitulatif vous signale automatiquement toute photo dont la résolution est trop faible pour une impression nette au format choisi. Vous pouvez alors la remplacer par une version plus grande, changer sa mise en page, ou choisir de commander tel quel en connaissance de cause."
+      question: t('howItWorks.faq.blurryPhoto.question'),
+      answer: t('howItWorks.faq.blurryPhoto.answer')
     }
   ];
 
@@ -109,10 +111,10 @@ const HowItWorksLuxe = () => {
       {/* Hero section */}
       <section className="how-hero">
         <div className="container-luxe">
-          <span className="label-gold">DÉCOUVRIR</span>
-          <h1>✨ Comment ça marche ?</h1>
+          <span className="label-gold">{t('howItWorks.hero.eyebrow')}</span>
+          <h1>{t('howItWorks.hero.title')}</h1>
           <p className="hero-description">
-            Créez un livre unique en 4 étapes simples, seul ou à plusieurs, sans aucune compétence technique. Vos photos, vos textes, votre format.
+            {t('howItWorks.hero.description')}
           </p>
         </div>
       </section>
@@ -121,9 +123,9 @@ const HowItWorksLuxe = () => {
       <section className="timeline-section">
         <div className="container-luxe">
           <div className="section-header">
-            <span className="label-gold">LE PROCESSUS</span>
-            <h2>📋 En 4 étapes, votre livre prend vie</h2>
-            <p className="section-subtitle">De l'idée à la réalisation, suivez le guide</p>
+            <span className="label-gold">{t('howItWorks.timeline.eyebrow')}</span>
+            <h2>{t('howItWorks.timeline.title')}</h2>
+            <p className="section-subtitle">{t('howItWorks.timeline.subtitle')}</p>
           </div>
 
           <div className="timeline-grid">
@@ -149,9 +151,9 @@ const HowItWorksLuxe = () => {
       <section className="features-section">
         <div className="container-luxe">
           <div className="section-header">
-            <span className="label-gold">L'EXPÉRIENCE</span>
-            <h2>🌟 Ce qui rend votre livre unique</h2>
-            <p className="section-subtitle">Un moteur de mise en page automatique pour un résultat professionnel</p>
+            <span className="label-gold">{t('howItWorks.features.eyebrow')}</span>
+            <h2>{t('howItWorks.features.title')}</h2>
+            <p className="section-subtitle">{t('howItWorks.features.subtitle')}</p>
           </div>
 
           <div className="features-grid">
@@ -172,15 +174,12 @@ const HowItWorksLuxe = () => {
           un contenu honnete a deux endroits. */}
       <section className="testimonials-section">
         <div className="container-luxe testimonials-honest">
-          <span className="label-gold">DE VRAIS LIVRES, BIENTÔT</span>
-          <h2>💬 Vous serez parmi les premiers</h2>
+          <span className="label-gold">{t('howItWorks.testimonials.eyebrow')}</span>
+          <h2>{t('howItWorks.testimonials.title')}</h2>
           <p className="section-subtitle">
-            Célébrons vient de démarrer : nous préférons vous montrer de vrais livres et de vrais
-            retours plutôt que d'inventer des chiffres ou des témoignages. La meilleure façon de
-            juger, en attendant, reste de composer le vôtre — l'aperçu est à l'échelle réelle dès
-            le début.
+            {t('howItWorks.testimonials.text')}
           </p>
-          <Link to="/exemples" className="btn btn-outline">Voir la page Exemples</Link>
+          <Link to="/exemples" className="btn btn-outline">{t('howItWorks.testimonials.cta')}</Link>
         </div>
       </section>
 
@@ -188,9 +187,9 @@ const HowItWorksLuxe = () => {
       <section className="faq-section" id="faq">
         <div className="container-luxe">
           <div className="section-header">
-            <span className="label-gold">QUESTIONS FRÉQUENTES</span>
-            <h2>❓ FAQ</h2>
-            <p className="section-subtitle">Tout ce que vous devez savoir</p>
+            <span className="label-gold">{t('howItWorks.faq.eyebrow')}</span>
+            <h2>{t('howItWorks.faq.title')}</h2>
+            <p className="section-subtitle">{t('howItWorks.faq.subtitle')}</p>
           </div>
 
           <div className="faq-grid">
@@ -207,14 +206,14 @@ const HowItWorksLuxe = () => {
       {/* Appel à l'action */}
       <section className="how-cta">
         <div className="container-luxe">
-          <h2>Prêt à créer des souvenirs inoubliables ?</h2>
+          <h2>{t('howItWorks.cta.title')}</h2>
           <Link to="/create-book" className="cta-button">
             <button className="btn btn-primary" style={{ padding: '16px 48px' }}>
-              ✨ Créer mon livre gratuitement
+              {t('howItWorks.cta.button')}
             </button>
           </Link>
           <p className="cta-note">
-            Sans engagement, vous ne payez qu'à la commande
+            {t('howItWorks.cta.note')}
           </p>
         </div>
       </section>

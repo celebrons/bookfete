@@ -1,0 +1,198 @@
+{
+  "hero": {
+    "eyebrow": "MISE EN PAGE SANS IA",
+    "titleLine1": "Transformez vos souvenirs",
+    "titleLine2": "en un livre unique",
+    "subtitle": "Ajoutez vos photos et vos textes, choisissez un style : votre livre souvenir prend forme sous vos yeux.",
+    "createCta": "Créer mon livre",
+    "howItWorksCta": "Comment ça marche ?"
+  },
+  "eventsSection": {
+    "eyebrow": "POUR TOUS MOMENTS",
+    "title": "Pour tous vos événements",
+    "subtitle": "9 parcours disponibles, du plus classique au plus libre.",
+    "discover": "Découvrir →"
+  },
+  "events": {
+    "anniversaire": {
+      "title": "Anniversaire",
+      "description": "Créez un livre chaleureux pour célébrer un âge, une personnalité et tous les souvenirs partagés."
+    },
+    "retraite": {
+      "title": "Retraite",
+      "description": "Rassemblez les voix des collègues, de la famille ou des deux pour marquer un grand passage."
+    },
+    "depart": {
+      "title": "Départ",
+      "description": "Accompagnez un changement de vie, un nouveau poste, un déménagement ou un grand envol."
+    },
+    "mariage": {
+      "title": "Mariage / union",
+      "description": "Faites participer les proches pour raconter une rencontre, une complicité et une promesse."
+    },
+    "naissance": {
+      "title": "Naissance",
+      "description": "Rassemblez les mots des proches autour d'une arrivée attendue ou d'une grossesse déjà pleine d'amour."
+    },
+    "voyage": {
+      "title": "Voyage / vacances",
+      "description": "Transformez un voyage en récit collectif avec photos, anecdotes et moments inattendus."
+    },
+    "finProjet": {
+      "title": "Fin de projet",
+      "description": "Immortalisez une aventure d'équipe, un défi surmonté et tout ce que le projet a changé."
+    },
+    "famille": {
+      "title": "Réunion de famille",
+      "description": "Capturez les rituels, les légendes et les transmissions qui soudent une famille au fil du temps."
+    },
+    "choixLibre": {
+      "title": "Choix libre",
+      "description": "Un parcours souple pour les événements qui ne rentrent dans aucune case."
+    }
+  },
+  "processSection": {
+    "eyebrow": "LE PROCESSUS",
+    "title": "Comment ça marche ?"
+  },
+  "steps": {
+    "step1": {
+      "title": "Créez votre projet",
+      "description": "Choisissez votre événement et donnez un titre à votre livre."
+    },
+    "step2": {
+      "title": "Ajoutez vos photos et textes",
+      "description": "Importez vos photos et écrivez vos souvenirs directement dans l'éditeur."
+    },
+    "step3": {
+      "title": "Choisissez le style",
+      "description": "Sélectionnez une mise en page et le nombre de pages, l'aperçu se met à jour en direct."
+    },
+    "step4": {
+      "title": "Recevez votre livre",
+      "description": "Commandez votre livre et recevez-le chez vous."
+    }
+  },
+  "finalCta": {
+    "eyebrow": "PRÊT À CRÉER ?",
+    "title": "Créez vos souvenirs inoubliables",
+    "subtitle": "Rejoignez des milliers de familles qui ont déjà créé leur livre de souvenirs.",
+    "cta": "Créer mon livre",
+    "statBooks": "LIVRES CRÉÉS",
+    "statPages": "PAGES COMPOSÉES",
+    "statSatisfaction": "SATISFACTION"
+  },
+  "howItWorks": {
+    "hero": {
+      "eyebrow": "DÉCOUVRIR",
+      "title": "✨ Comment ça marche ?",
+      "description": "Créez un livre unique en 4 étapes simples, seul ou à plusieurs, sans aucune compétence technique. Vos photos, vos textes, votre format."
+    },
+    "timeline": {
+      "eyebrow": "LE PROCESSUS",
+      "title": "📋 En 4 étapes, votre livre prend vie",
+      "subtitle": "De l'idée à la réalisation, suivez le guide",
+      "step1": {
+        "title": "Créez votre projet, seul ou à plusieurs",
+        "description": "Choisissez votre occasion (anniversaire, mariage, départ...), donnez un titre à votre livre, et décidez si vous le composez seul ou en mode collectif.",
+        "time": "1 minute",
+        "highlight": "Aucune inscription requise pour commencer"
+      },
+      "step2": {
+        "title": "Réunissez vos souvenirs",
+        "description": "Importez vos photos et écrivez vos textes directement dans l'atelier. En mode collectif, invitez vos proches par email : chacun reçoit un lien individuel pour ajouter ses souvenirs, sans créer de compte.",
+        "time": "10 minutes",
+        "highlight": "Vous gardez la main sur chaque mot et chaque image"
+      },
+      "step3": {
+        "title": "Composez votre livre",
+        "description": "Choisissez une mise en page pour chaque page dans l'atelier, ou laissez la composition automatique s'en charger. L'aperçu se met à jour en direct, à l'identique du rendu final.",
+        "time": "10 minutes",
+        "highlight": "Mise en page automatique ou manuelle, sans IA"
+      },
+      "step4": {
+        "title": "Choisissez le format et commandez",
+        "description": "Comparez les 3 formats (Livret, Standard, Luxe) avec un aperçu réel et le prix affiché en direct, validez votre commande, et recevez votre livre chez vous (délai indicatif de 1 à 2 semaines selon la charge de production).",
+        "time": "5 minutes",
+        "highlight": "Prix affiché immédiatement, sans surprise"
+      }
+    },
+    "features": {
+      "eyebrow": "L'EXPÉRIENCE",
+      "title": "🌟 Ce qui rend votre livre unique",
+      "subtitle": "Un moteur de mise en page automatique pour un résultat professionnel",
+      "collective": {
+        "title": "Créez à plusieurs",
+        "description": "Invitez vos proches par email : chacun reçoit un lien individuel pour ajouter ses photos et ses souvenirs sans créer de compte, et vous suivez qui a contribué."
+      },
+      "photos": {
+        "title": "Photos de qualité",
+        "description": "Importez vos photos, elles sont optimisées pour l'impression et placées harmonieusement dans le livre."
+      },
+      "formats": {
+        "title": "Trois formats, une vraie identité chacun",
+        "description": "Livret, Standard ou Luxe : chaque format a sa propre taille, son papier et sa mise en page, du plus simple au plus premium — pas juste une même page redimensionnée."
+      },
+      "author": {
+        "title": "Vous restez l'auteur",
+        "description": "Aucun texte n'est généré à votre place : que vous écriviez seul ou que vos proches contribuent, c'est toujours vous qui écrivez."
+      },
+      "preview": {
+        "title": "Aperçu en direct",
+        "description": "Visualisez votre livre au fil de la composition, à l'échelle réelle, et ajustez la mise en page ou le format avant de commander."
+      },
+      "formats2": {
+        "title": "Impression ou version PDF",
+        "description": "Au moment de la commande, choisissez de recevoir votre livre imprimé, en PDF numérique, ou les deux."
+      }
+    },
+    "testimonials": {
+      "eyebrow": "DE VRAIS LIVRES, BIENTÔT",
+      "title": "💬 Vous serez parmi les premiers",
+      "text": "Célébrons vient de démarrer : nous préférons vous montrer de vrais livres et de vrais retours plutôt que d'inventer des chiffres ou des témoignages. La meilleure façon de juger, en attendant, reste de composer le vôtre — l'aperçu est à l'échelle réelle dès le début.",
+      "cta": "Voir la page Exemples"
+    },
+    "faq": {
+      "eyebrow": "QUESTIONS FRÉQUENTES",
+      "title": "❓ FAQ",
+      "subtitle": "Tout ce que vous devez savoir",
+      "delivery": {
+        "question": "📦 Combien de temps pour recevoir le livre ?",
+        "answer": "Comptez généralement 1 à 2 semaines entre la commande et la réception (fabrication puis expédition). Ce délai est donné à titre indicatif, pas contractuel : il dépend de la charge de production du moment. Le suivi de fabrication et d'expédition est visible à tout moment depuis votre espace de commande."
+      },
+      "photos": {
+        "question": "📸 Peut-on ajouter des photos ?",
+        "answer": "Oui, vous pouvez importer autant de photos que vous le souhaitez. Elles sont optimisées automatiquement pour une qualité d'impression parfaite."
+      },
+      "collective": {
+        "question": "👥 Comment mes proches peuvent-ils contribuer ?",
+        "answer": "Activez le mode collectif : indiquez les adresses email de vos proches, chacun reçoit automatiquement une invitation avec son lien personnel pour ajouter ses photos et ses souvenirs, sans créer de compte. Vous pouvez aussi copier le lien vous-même pour le transmettre autrement. Vous suivez qui a contribué, relancez les retardataires, et pouvez fixer une date limite de participation."
+      },
+      "author": {
+        "question": "🖊️ Qui écrit les textes du livre ?",
+        "answer": "Vous — et vos proches s'ils contribuent. Aucun contenu n'est généré automatiquement : le moteur se charge uniquement de la mise en page de ce que vous écrivez."
+      },
+      "payment": {
+        "question": "💳 Comment fonctionne le paiement ?",
+        "answer": "Vous payez en ligne par carte bancaire (paiement sécurisé Stripe). Le livre n'est imprimé qu'après validation de votre commande."
+      },
+      "editing": {
+        "question": "📝 Peut-on modifier après validation ?",
+        "answer": "Oui, librement, tant que la commande n'est pas payée : photos, textes, mise en page et format restent modifiables à tout moment. Une fois la commande payée, le livre est verrouillé — c'est ce qui garantit que la version imprimée correspond exactement à celle que vous avez validée."
+      },
+      "withdrawal": {
+        "question": "↩️ Puis-je me rétracter après ma commande ?",
+        "answer": "Non : votre livre étant composé à partir de vos propres photos et textes, il s'agit d'un bien personnalisé, exclu du droit de rétractation de 14 jours (article L221-28 du Code de la consommation). Vous en êtes informé et vous l'acceptez explicitement avant de payer, au moment de valider votre commande."
+      },
+      "blurryPhoto": {
+        "question": "📷 Une de mes photos apparaît floue, que faire ?",
+        "answer": "Avant de commander, un écran récapitulatif vous signale automatiquement toute photo dont la résolution est trop faible pour une impression nette au format choisi. Vous pouvez alors la remplacer par une version plus grande, changer sa mise en page, ou choisir de commander tel quel en connaissance de cause."
+      }
+    },
+    "cta": {
+      "title": "Prêt à créer des souvenirs inoubliables ?",
+      "button": "✨ Créer mon livre gratuitement",
+      "note": "Sans engagement, vous ne payez qu'à la commande"
+    }
+  }
+}
