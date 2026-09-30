@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { formatPriceCents, includesPrint } from '../../../utils/orderWorkflow';
 import EmailOtpForm from '../../auth/EmailOtpForm';
 
@@ -7,11 +8,7 @@ import EmailOtpForm from '../../auth/EmailOtpForm';
 // Le recapitulatif est la raison d'etre de cet ecran : c'est le dernier
 // moment ou l'utilisateur verifie ce qu'il achete et ou il sera livre, avant
 // d'etre redirige vers Stripe.
-const TYPE_LABELS = {
-  pdf: 'PDF seul',
-  print: 'Livre imprime',
-  pack: 'Pack PDF + imprime'
-};
+const TYPE_KEYS = ['pdf', 'print', 'pack'];
 
 function StepPayment({
   orderType,
@@ -37,11 +34,13 @@ function StepPayment({
   cgvAccepted = false,
   onToggleCgv
 }) {
+  const { t } = useTranslation('checkout');
   const withPrint = includesPrint(orderType);
+  const typeLabel = TYPE_KEYS.includes(orderType) ? t(`stepPayment.typeLabels.${orderType}`) : orderType;
 
   return (
     <article className="orders-panel">
-      <h2>Recapitulatif et paiement</h2>
+      <h2>{t('stepPayment.title')}</h2>
 
       {/* UN SEUL BLOC (retour utilisateur, 2026-09-30, piste "Commande &
           compte") : livre + produit + quantite + total tenaient avant sur
@@ -53,14 +52,14 @@ function StepPayment({
       <div className="orders-recap-compact">
         <div>
           <span className="orders-recap-compact-title">
-            {TYPE_LABELS[orderType] || orderType} · {bookTitle || 'Sans titre'}
+            {typeLabel} · {bookTitle || t('flow.bookUntitled')}
           </span>
           <span className="orders-recap-compact-sub">
-            {quantity} exemplaire{quantity > 1 ? 's' : ''}
-            {quantity > 1 && Number.isFinite(unitCents) ? ` · ${formatPriceCents(unitCents)} l'unité` : ''}
+            {t('stepProduct.qty.unit', { count: quantity })}
+            {quantity > 1 && Number.isFinite(unitCents) ? ` · ${t('stepProduct.qty.perUnitPrice', { price: formatPriceCents(unitCents) })}` : ''}
             {withPrint
-              ? (Number.isFinite(shippingCents) ? ` · livraison ${formatPriceCents(shippingCents)}` : ' · livraison à domicile')
-              : ' · téléchargement uniquement'}
+              ? (Number.isFinite(shippingCents) ? ` · ${t('stepProduct.qty.shipping', { price: formatPriceCents(shippingCents) })}` : ` · ${t('stepPayment.shippingHome')}`)
+              : ` · ${t('stepPayment.downloadOnly')}`}
           </span>
         </div>
         <span className="orders-recap-compact-total">{formatPriceCents(totalCents)}</span>
@@ -68,7 +67,7 @@ function StepPayment({
 
       {withPrint && (
         <div className="orders-recap-address">
-          <span>Livraison</span>
+          <span>{t('stepPayment.delivery')}</span>
           <p>
             {address?.fullName}<br />
             {address?.line1}{address?.line2 ? <>, {address.line2}</> : null}<br />
@@ -85,13 +84,9 @@ function StepPayment({
           bloquee la, sans lien (signale le 2026-09-19). */}
       {isAnonymous ? (
         <div className="orders-account-gate">
-          <strong>Une dernière chose : votre adresse e-mail</strong>
+          <strong>{t('stepPayment.accountGate.title')}</strong>
           <p>
-            Elle vous permettra de retrouver ce livre, de suivre sa fabrication et de
-            revenir sur votre commande — y compris depuis un autre appareil. Nous vous
-            envoyons un code par e-mail : <strong>pas de mot de passe à inventer</strong>.
-            Votre livre est déjà enregistré, rien n’est perdu et vous ne quittez pas
-            cette page.
+            {t('stepPayment.accountGate.bodyPrefix')}<strong>{t('stepPayment.accountGate.bodyBold')}</strong>{t('stepPayment.accountGate.bodySuffix')}
           </p>
           {/* EN PLACE, jamais une redirection : le livre et la commande en
               cours vivent dans cet ecran. Aller-retour vers une page
@@ -99,7 +94,7 @@ function StepPayment({
               exactement ce qui ne renvoyait nulle part avant le 2026-09-20. */}
           <EmailOtpForm
             emailInitial={emailPropose}
-            libelleAction="Valider et continuer"
+            libelleAction={t('stepPayment.accountGate.continueAction')}
             onSuccess={onAccountReady}
           />
         </div>
@@ -117,11 +112,11 @@ function StepPayment({
               disabled={submitting}
             />
             <span>
-              J'accepte les{' '}
-              <Link to="/cgv" target="_blank" rel="noreferrer">conditions générales de vente</Link>
+              {t('stepPayment.cgv.accept')}{' '}
+              <Link to="/cgv" target="_blank" rel="noreferrer">{t('stepPayment.cgv.terms')}</Link>
               {withPrint && (
                 <>
-                  {' '}et reconnais que mon livre, personnalisé, n'est pas soumis au droit de rétractation
+                  {' '}{t('stepPayment.cgv.printClause')}
                 </>
               )}
               .
@@ -135,16 +130,16 @@ function StepPayment({
             onClick={onPay}
           >
             {submitting
-              ? 'Traitement...'
+              ? t('stepPayment.pay.processing')
               : hasPendingPaymentOrder
-                ? 'Payer la commande en attente'
-                : 'Payer avec Stripe (test)'}
+                ? t('stepPayment.pay.payPending')
+                : t('stepPayment.pay.payStripe')}
           </button>
 
           <p className="orders-disclaimer">
             {stripeEnabled
-              ? 'Stripe Checkout en mode test. Utilisez une carte de test Stripe.'
-              : 'Le paiement est temporairement indisponible: activez Stripe pour lancer la commande.'}
+              ? t('stepPayment.stripeNote.enabled')
+              : t('stepPayment.stripeNote.disabled')}
           </p>
         </>
       )}

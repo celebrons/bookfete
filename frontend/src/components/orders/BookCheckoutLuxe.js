@@ -29,15 +29,17 @@ import StepProduct from './checkout/StepProduct';
 import StepAddress from './checkout/StepAddress';
 import StepPayment from './checkout/StepPayment';
 import StepTracking from './checkout/StepTracking';
+import i18n from '../../i18n';
 import '../../styles/luxe-theme.css';
 import './OrdersLuxe.css';
 
-// Fabriquer un PDF demande plusieurs minutes de rendu haute resolution. Le
-// travail se poursuit cote serveur meme si l'onglet est ferme, et un email
-// annonce la fin (backend : notifierPdfPret) : on peut donc le dire
-// franchement, plutot que de retenir l'utilisateur devant un ecran d'attente.
-const MESSAGE_PDF_EN_COURS = 'Votre PDF sera disponible dans quelques minutes. '
-  + 'Vous serez informé par email dès qu’il sera prêt : vous pouvez fermer cette page.';
+// Chantier bilingue (2026-09-30) : i18n.t() directement plutot que le hook
+// useTranslation — ce composant ecrit la plupart de ses messages depuis des
+// callbacks asynchrones (apres un sondage, un webhook Stripe...), pas
+// seulement pendant le rendu ; lire la langue COURANTE au moment de l'appel
+// est donc plus sur qu'une fermeture sur un `t` capture au rendu precedent.
+// Raccourci local : evite de repeter le prefixe de namespace partout.
+const t = (key, options) => i18n.t(`checkout:${key}`, options);
 
 const DEFAULT_ADDRESS = {
   // Porte par la COMMANDE, pas seulement par le compte : c'est ce qui permet
@@ -109,7 +111,7 @@ const fetchJsonWithTimeout = async (url, options = {}, timeoutMs = NETWORK_TIMEO
     return { response, payload };
   } catch (error) {
     if (error?.name === 'AbortError') {
-      throw new Error('Le serveur met trop de temps a repondre. Reessayez dans quelques instants.');
+      throw new Error(t('flow.errors.timeoutRetry'));
     }
     throw error;
   } finally {
@@ -240,8 +242,8 @@ const BookCheckoutLuxe = () => {
     setNotice({
       type: 'success',
       message: Number(resultat?.transferred) > 0
-        ? 'Adresse verifiee. Votre livre a bien ete rattache a votre compte.'
-        : 'Adresse verifiee. Vous pouvez finaliser votre commande.'
+        ? t('flow.notices.addressVerifiedTransferred')
+        : t('flow.notices.addressVerified')
     });
   }, []);
 
@@ -284,10 +286,10 @@ const BookCheckoutLuxe = () => {
   // Etapes affichees : l'adresse disparait completement pour une commande
   // PDF (rien a livrer) — jamais une etape grisee qu'on n'atteindra pas.
   const steps = useMemo(() => {
-    const list = [{ key: 'product', label: 'Produit' }];
-    if (includesPrint(effectiveOrderType)) list.push({ key: 'address', label: 'Livraison' });
-    list.push({ key: 'payment', label: 'Paiement' });
-    list.push({ key: 'tracking', label: 'Suivi' });
+    const list = [{ key: 'product', label: t('flow.steps.product') }];
+    if (includesPrint(effectiveOrderType)) list.push({ key: 'address', label: t('flow.steps.delivery') });
+    list.push({ key: 'payment', label: t('flow.steps.payment') });
+    list.push({ key: 'tracking', label: t('flow.steps.tracking') });
     return list;
   }, [effectiveOrderType]);
 
@@ -337,7 +339,7 @@ const BookCheckoutLuxe = () => {
           .single();
 
         if (bookError || !bookData) {
-          throw new Error('Livre introuvable');
+          throw new Error(t('flow.errors.bookNotFound'));
         }
 
         setBook(bookData);
@@ -373,7 +375,7 @@ const BookCheckoutLuxe = () => {
             latestBookOrder = rattrapee;
             setNotice({
               type: 'success',
-              message: 'Votre paiement a bien ete enregistre. Votre commande est en cours de traitement.'
+              message: t('flow.notices.paymentRecovered')
             });
           }
         }
@@ -489,7 +491,7 @@ const BookCheckoutLuxe = () => {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     if (!token) {
-      throw new Error('Session invalide. Reconnectez-vous.');
+      throw new Error(t('flow.errors.sessionInvalid'));
     }
 
     return {
@@ -550,7 +552,7 @@ const BookCheckoutLuxe = () => {
       PDF_START_TIMEOUT_MS
     );
     if (!response.ok) {
-      throw new Error(payload?.error || 'Impossible de lancer la generation PDF');
+      throw new Error(payload?.error || t('flow.errors.pdfStartFailed'));
     }
     return payload;
   };
@@ -565,7 +567,7 @@ const BookCheckoutLuxe = () => {
     try {
       const job = await startPdfExportWithRetry(latestOrder?.id || '', 2, true);
       setPdfJob(job);
-      setNotice({ type: 'success', message: MESSAGE_PDF_EN_COURS });
+      setNotice({ type: 'success', message: t('flow.pdfBuilding') });
       await pollPdfJobUntilReady(job.jobId);
     } catch (error) {
       setNotice({ type: 'error', message: error.message });
@@ -604,7 +606,7 @@ const BookCheckoutLuxe = () => {
         await wait(1200 * attempt);
       }
     }
-    throw lastError || new Error('Impossible de lancer la generation PDF');
+    throw lastError || new Error(t('flow.errors.pdfStartFailed'));
   };
 
   const pollPdfJobUntilReady = async (jobId) => {
@@ -630,7 +632,7 @@ const BookCheckoutLuxe = () => {
         PDF_START_TIMEOUT_MS
       );
       if (!response.ok) {
-        const errorMessage = String(payload?.error || 'Erreur pendant le suivi PDF');
+        const errorMessage = String(payload?.error || t('flow.errors.pdfTrackingFailed'));
         const normalizedError = errorMessage.toLowerCase();
         const canRetryOnPaymentPropagation = (
           normalizedError.includes('uniquement apres paiement')
@@ -652,7 +654,7 @@ const BookCheckoutLuxe = () => {
       }
 
       if (payload.status === 'failed') {
-        throw new Error(payload.error || 'La generation PDF a echoue');
+        throw new Error(payload.error || t('flow.errors.pdfGenerationFailed'));
       }
 
       // eslint-disable-next-line no-await-in-loop
@@ -662,10 +664,7 @@ const BookCheckoutLuxe = () => {
     // La fabrication N'EST PAS annulee : seul le suivi dans cet onglet
     // s'arrete. Le dire, sinon l'utilisateur relance un rendu de plusieurs
     // minutes alors que le premier va aboutir.
-    throw new Error(
-      'La fabrication prend plus de temps que prevu. Elle continue de notre cote : '
-      + 'vous recevrez un email des que le PDF sera pret.'
-    );
+    throw new Error(t('flow.errors.pdfStillWorking'));
   };
 
   const fetchPdfDownloadBlob = async ({ jobId, kind, headers }) => {
@@ -676,7 +675,7 @@ const BookCheckoutLuxe = () => {
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
-      throw new Error(payload?.error || 'Telechargement impossible');
+      throw new Error(payload?.error || t('flow.errors.downloadFailed'));
     }
 
     const blob = await response.blob();
@@ -721,7 +720,7 @@ const BookCheckoutLuxe = () => {
       if (!jobIdToUse) {
         setNotice({
           type: 'warning',
-          message: 'Aucun PDF n\'a encore ete fabrique pour cette commande. Lancez la generation, puis revenez telecharger.'
+          message: t('flow.errors.noPdfYet')
         });
         return;
       }
@@ -735,7 +734,7 @@ const BookCheckoutLuxe = () => {
         }
         setNotice({
           type: 'warning',
-          message: 'Ce PDF n\'est plus disponible sur le serveur. Relancez la generation depuis cette page : elle prend une minute environ.'
+          message: t('flow.errors.pdfGone')
         });
         return;
       }
@@ -793,7 +792,7 @@ const BookCheckoutLuxe = () => {
         // Lecture ratee (reveil d'instance, reseau) : on retente au tour suivant.
       }
     }
-    setGelatoError("L'envoi est toujours en cours apres 15 minutes. Rechargez la page pour voir ou il en est.");
+    setGelatoError(t('flow.errors.gelatoStillRunning'));
   };
 
   // Suivi reel : charge a l'affichage de l'ecran de suivi, rafraichi a la
@@ -862,7 +861,7 @@ const BookCheckoutLuxe = () => {
       }
       await pollGelatoTestResult(latestOrder.id);
     } catch (err) {
-      setGelatoError(err?.message || "L'envoi de test a l'imprimeur a echoue.");
+      setGelatoError(err?.message || t('flow.errors.gelatoTestFailed'));
     } finally {
       setGelatoSending(false);
     }
@@ -881,7 +880,7 @@ const BookCheckoutLuxe = () => {
     if (!latestOrder?.id || deletingOrder) return;
     const label = latestOrder.order_number ? ` ${latestOrder.order_number}` : '';
     // eslint-disable-next-line no-restricted-globals
-    if (!window.confirm(`Supprimer definitivement la commande${label} et repartir de zero ?`)) return;
+    if (!window.confirm(t('flow.reset.confirm', { label }))) return;
 
     setDeletingOrder(true);
     setDeleteError('');
@@ -896,7 +895,7 @@ const BookCheckoutLuxe = () => {
       setGelatoProgress(null);
       setManualStep(0);
     } catch (err) {
-      setDeleteError(err?.message || 'Impossible de supprimer cette commande.');
+      setDeleteError(err?.message || t('flow.errors.deleteOrderFailed'));
     } finally {
       setDeletingOrder(false);
     }
@@ -908,16 +907,16 @@ const BookCheckoutLuxe = () => {
       setNotice(null);
 
       if (!canOrder) {
-        throw new Error('Le livre doit etre finalise avant la commande.');
+        throw new Error(t('flow.errors.bookNotFinalized'));
       }
       if (!stripeTestEnabled) {
-        throw new Error('Le paiement Stripe doit etre active pour lancer la commande.');
+        throw new Error(t('flow.errors.stripeDisabled'));
       }
       // Defense en profondeur : le bouton est deja desactive sans la case
       // cochee (voir StepPayment.js), mais un appel direct a cette fonction
       // ne doit jamais pouvoir la contourner.
       if (!cgvAccepted) {
-        throw new Error("Veuillez accepter les conditions générales de vente avant de payer.");
+        throw new Error(t('flow.errors.cgvRequired'));
       }
 
       const createdOrder = await createOrder({
@@ -957,7 +956,7 @@ const BookCheckoutLuxe = () => {
 
       const checkoutSession = await createStripeCheckoutSession(createdOrder.id);
       if (!checkoutSession?.checkoutUrl) {
-        throw new Error('Impossible d ouvrir Stripe Checkout');
+        throw new Error(t('flow.errors.stripeOpenFailed'));
       }
       window.location.assign(checkoutSession.checkoutUrl);
       return;
@@ -979,18 +978,18 @@ const BookCheckoutLuxe = () => {
       setNotice(null);
 
       if (!stripeTestEnabled) {
-        throw new Error('Le paiement Stripe doit etre active pour lancer la commande.');
+        throw new Error(t('flow.errors.stripeDisabled'));
       }
       if (!cgvAccepted) {
-        throw new Error("Veuillez accepter les conditions générales de vente avant de payer.");
+        throw new Error(t('flow.errors.cgvRequired'));
       }
       if (!latestOrder?.id || String(latestOrder.status || '').toLowerCase() !== 'awaiting_payment') {
-        throw new Error('Aucune commande en attente de paiement.');
+        throw new Error(t('flow.errors.noPendingOrder'));
       }
 
       const checkoutSession = await createStripeCheckoutSession(latestOrder.id);
       if (!checkoutSession?.checkoutUrl) {
-        throw new Error('Impossible d ouvrir Stripe Checkout');
+        throw new Error(t('flow.errors.stripeOpenFailed'));
       }
       window.location.assign(checkoutSession.checkoutUrl);
     } catch (error) {
@@ -1012,7 +1011,7 @@ const BookCheckoutLuxe = () => {
     const resumeKey = `${orderId || ''}:${sessionId || ''}`;
 
     if (payment === 'cancel') {
-      setNotice({ type: 'warning', message: 'Paiement annule. Vous pouvez relancer la commande.' });
+      setNotice({ type: 'warning', message: t('flow.notices.paymentCancelled') });
       navigate(`/book/${bookId}/checkout`, { replace: true });
       return;
     }
@@ -1026,7 +1025,7 @@ const BookCheckoutLuxe = () => {
     const resumeAfterStripe = async () => {
       try {
         setSubmitting(true);
-        setNotice({ type: 'info', message: 'Paiement recu. Finalisation de la commande en cours...' });
+        setNotice({ type: 'info', message: t('flow.notices.paymentReceived') });
 
         let currentOrder = await confirmStripePayment(orderId, sessionId);
         setLatestOrder(currentOrder);
@@ -1034,7 +1033,7 @@ const BookCheckoutLuxe = () => {
         // doit pas attendre la fabrication du PDF/l'envoi a l'imprimeur
         // (qui peuvent echouer/prendre du temps) pour s'afficher.
         setJustPaid(true);
-        let finalNotice = { type: 'success', message: 'Paiement confirme. Commande mise a jour.' };
+        let finalNotice = { type: 'success', message: t('flow.notices.paymentConfirmed') };
 
         if (includesPdf(currentOrder.type) && ['paid', 'pdf_generating'].includes(currentOrder.status)) {
           if (currentOrder.status === 'paid') {
@@ -1078,7 +1077,7 @@ const BookCheckoutLuxe = () => {
               setLatestOrder(currentOrder);
               finalNotice = {
                 type: 'success',
-                message: 'Paiement valide. Le PDF final est genere et telechargeable.'
+                message: t('flow.notices.pdfReady')
               };
             } catch (_pollError) {
               // Retour utilisateur (2026-09-27) : "pas un echec silencieux".
@@ -1098,24 +1097,24 @@ const BookCheckoutLuxe = () => {
               }
               const echecReel = refreshedOrder?.metadata?.pdfError;
               finalNotice = echecReel
-                ? { type: 'error', message: `La generation du PDF a echoue : ${echecReel}` }
-                : { type: 'warning', message: MESSAGE_PDF_EN_COURS };
+                ? { type: 'error', message: t('flow.notices.pdfFailedWithReason', { reason: echecReel }) }
+                : { type: 'warning', message: t('flow.pdfBuilding') };
             }
           } else {
             finalNotice = {
               type: 'warning',
-              message: 'Paiement valide. La generation PDF demarre en arriere-plan et sera disponible sous peu.'
+              message: t('flow.notices.pdfStartingBackground')
             };
           }
         } else if (includesPrint(currentOrder.type) && currentOrder.status === 'paid') {
           currentOrder = await updateOrderStatus(currentOrder.id, 'print_queued');
           setLatestOrder(currentOrder);
-          finalNotice = { type: 'success', message: 'Paiement valide. Production lancee.' };
+          finalNotice = { type: 'success', message: t('flow.notices.productionStarted') };
         }
 
         setNotice(finalNotice);
       } catch (error) {
-        setNotice({ type: 'error', message: error.message || 'Erreur apres paiement Stripe.' });
+        setNotice({ type: 'error', message: error.message || t('flow.errors.afterStripeGeneric') });
       } finally {
         setSubmitting(false);
         navigate(`/book/${bookId}/checkout`, { replace: true });
@@ -1161,7 +1160,7 @@ const BookCheckoutLuxe = () => {
         if (isPdfReady(freshOrder)) {
           setNotice({
             type: 'success',
-            message: 'Paiement valide. Le PDF final est genere et telechargeable.'
+            message: t('flow.notices.pdfReady')
           });
           return;
         }
@@ -1227,7 +1226,7 @@ const BookCheckoutLuxe = () => {
         setPdfJob(readyJob);
         setNotice({
           type: 'success',
-          message: 'Paiement valide. Le PDF final est genere et telechargeable.'
+          message: t('flow.notices.pdfReady')
         });
         return;
       } catch (error) {
@@ -1251,8 +1250,8 @@ const BookCheckoutLuxe = () => {
           if (refreshedOrder) setLatestOrder(refreshedOrder);
           const echecReel = refreshedOrder?.metadata?.pdfError;
           setNotice(echecReel
-            ? { type: 'error', message: `La generation du PDF a echoue : ${echecReel}` }
-            : { type: 'warning', message: MESSAGE_PDF_EN_COURS });
+            ? { type: 'error', message: t('flow.notices.pdfFailedWithReason', { reason: echecReel }) }
+            : { type: 'warning', message: t('flow.pdfBuilding') });
           return;
         }
       }
@@ -1260,7 +1259,7 @@ const BookCheckoutLuxe = () => {
       try {
         setNotice({
           type: 'info',
-          message: 'Paiement valide. Relance automatique de la generation PDF...'
+          message: t('flow.notices.pdfAutoRetrying')
         });
         const restartedJob = await startPdfExportWithRetry(latestOrder.id);
         if (!active) return;
@@ -1276,13 +1275,13 @@ const BookCheckoutLuxe = () => {
         setLatestOrder(updatedOrder);
         setNotice({
           type: 'warning',
-          message: MESSAGE_PDF_EN_COURS
+          message: t('flow.pdfBuilding')
         });
       } catch (_restartError) {
         if (!active) return;
         setNotice({
           type: 'warning',
-          message: 'Paiement valide. Le PDF est en cours de preparation. Revenez dans quelques instants.'
+          message: t('flow.notices.pdfPreparing')
         });
       }
     };
@@ -1327,7 +1326,7 @@ const BookCheckoutLuxe = () => {
       try {
         setNotice({
           type: 'info',
-          message: 'Paiement valide. Relance de la generation PDF en cours...'
+          message: t('flow.notices.pdfRetryingResume')
         });
 
         let currentOrder = latestOrder;
@@ -1350,7 +1349,7 @@ const BookCheckoutLuxe = () => {
         setLatestOrder(currentOrder);
         setNotice({
           type: 'warning',
-          message: MESSAGE_PDF_EN_COURS
+          message: t('flow.pdfBuilding')
         });
       } catch (_error) {
         if (!active) return;
@@ -1358,8 +1357,8 @@ const BookCheckoutLuxe = () => {
         setNotice({
           type: 'warning',
           message: errorMessage
-            ? `Paiement valide, mais la relance automatique a echoue: ${errorMessage}`
-            : 'Paiement valide. Le PDF sera disponible sous peu.'
+            ? t('flow.notices.pdfRetryFailedWithReason', { reason: errorMessage })
+            : t('flow.notices.pdfSoon')
         });
       } finally {
         autoRecoverInFlightRef.current = false;
@@ -1383,7 +1382,7 @@ const BookCheckoutLuxe = () => {
     return (
       <div className="orders-page">
         <div className="container-luxe orders-shell">
-          <p>Chargement du checkout...</p>
+          <p>{t('flow.loading')}</p>
         </div>
       </div>
     );
@@ -1401,13 +1400,13 @@ const BookCheckoutLuxe = () => {
             inquietait sans informer (retour utilisateur 2026-09-19). */}
         <header className="orders-hero">
           <div>
-            <h1>Finaliser votre commande</h1>
-            <p>{book?.title || 'Sans titre'}{book?.page_count ? ` · ${book.page_count} pages` : ''}</p>
+            <h1>{t('flow.header.title')}</h1>
+            <p>{book?.title || t('flow.bookUntitled')}{book?.page_count ? ` · ${t('flow.pagesCount', { count: book.page_count })}` : ''}</p>
           </div>
           <div className="orders-hero-links">
-            <Link to={`/book/${bookId}`} className="orders-hero-link">← Retour au livre</Link>
-            <Link to={`/book/${bookId}/apercu`} className="orders-hero-link">Aperçu</Link>
-            <Link to="/orders" className="orders-hero-link">Mes commandes</Link>
+            <Link to={`/book/${bookId}`} className="orders-hero-link">{t('flow.header.backToBook')}</Link>
+            <Link to={`/book/${bookId}/apercu`} className="orders-hero-link">{t('flow.header.preview')}</Link>
+            <Link to="/orders" className="orders-hero-link">{t('flow.header.myOrders')}</Link>
           </div>
         </header>
 
@@ -1427,12 +1426,12 @@ const BookCheckoutLuxe = () => {
 
         {!canOrder && (
           <div className="orders-notice is-warning">
-            Ce livre n est pas encore finalise. Terminez l apercu/PDF final avant la commande.
+            {t('flow.warnings.bookNotFinalized')}
           </div>
         )}
         {checkoutFormLocked && (
           <div className="orders-notice is-info">
-            Une commande est deja en attente de paiement. La creation d une nouvelle commande est temporairement bloquee.
+            {t('flow.warnings.orderPendingLocked')}
           </div>
         )}
 
@@ -1517,7 +1516,7 @@ const BookCheckoutLuxe = () => {
             <div className="orders-step-nav">
               {derivedStep > 0 && (
                 <button type="button" className="btn btn-outline" onClick={() => setManualStep(derivedStep - 1)}>
-                  Retour
+                  {t('flow.nav.back')}
                 </button>
               )}
               {currentStepKey !== 'payment' && (
@@ -1527,7 +1526,7 @@ const BookCheckoutLuxe = () => {
                   disabled={currentStepKey === 'address' && (!addressComplete || !billingComplete)}
                   onClick={() => setManualStep(derivedStep + 1)}
                 >
-                  Continuer
+                  {t('flow.nav.continue')}
                 </button>
               )}
             </div>
@@ -1544,11 +1543,10 @@ const BookCheckoutLuxe = () => {
                 onClick={deleteCurrentOrder}
                 disabled={deletingOrder}
               >
-                {deletingOrder ? 'Suppression...' : 'Supprimer cette commande et recommencer'}
+                {deletingOrder ? t('flow.reset.submitting') : t('flow.reset.submit')}
               </button>
               <p className="orders-disclaimer">
-                Supprime aussi les brouillons deposes chez l'imprimeur. Une commande reellement
-                payee ou deja partie en production ne peut pas etre supprimee.
+                {t('flow.reset.note')}
               </p>
               {deleteError && <p className="orders-error">{deleteError}</p>}
             </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Barre de progression d'une fabrication longue (plusieurs minutes).
 //
@@ -8,33 +9,24 @@ import React from 'react';
 // — { phase, done, total, updatedAt }. Deux barres distinctes auraient
 // diverge au premier ajustement.
 
-// Libelle de chaque phase. Le rendu des pages est de loin la plus longue :
-// c'est la seule qui a une progression chiffree, les autres sont annoncees
-// pour que la barre ne reste jamais figee sans explication.
-const PROGRESS_LABELS = {
-  starting: 'Preparation...',
-  cover: 'Rendu de la couverture...',
-  pages: 'Rendu des pages',
-  photos: 'Préparation des photos',
-  // Phases du fichier d'impression. Aucune n'a de decompte : la barre se
-  // met en mouvement indetermine, ce qui est honnete — un chiffre fige a
-  // 0/32 pendant des minutes est pire que pas de chiffre du tout.
-  preparation: 'Préparation du livre…',
-  ecriture: 'Écriture du fichier d’impression…',
-  televersement: 'Envoi du fichier à l’imprimeur…',
-  assembling: 'Assemblage du PDF...',
-  uploading: 'Envoi du fichier a l\'imprimeur...',
-  submitting: 'Creation de la commande chez Gelato...'
-};
+// Ces cles correspondent aux valeurs de `phase` envoyees par le serveur
+// (backend/routes/orders.js) : ne pas les renommer, seul leur libelle est
+// traduit (checkout:generationProgress.phases.*).
+const PROGRESS_PHASE_KEYS = [
+  'starting', 'cover', 'pages', 'photos',
+  'preparation', 'ecriture', 'televersement', 'assembling', 'uploading', 'submitting'
+];
 
 // Phases dont on connait un DECOMPTE, et le nom de ce qu on compte.
 //
 // Le rendu par captures comptait des pages ; le rendu par impression
 // (2026-09-19) n a plus de boucle page par page et compte des photos. Les
-// deux alimentent la meme barre, avec le bon mot.
+// deux alimentent la meme barre, avec le bon mot (identique en francais et
+// en anglais, pas besoin de traduction).
 const PHASES_CHIFFREES = { pages: 'pages', photos: 'photos' };
 
 function GenerationProgress({ progress, label }) {
+  const { t } = useTranslation('checkout');
   // Premier point de mesure de la phase "pages", garde d'un rendu a
   // l'autre. Il sert a deduire la CADENCE REELLE de la machine qui rend le
   // livre : elle n'a rien a voir en local et sur Render (CPU bien plus
@@ -74,15 +66,19 @@ function GenerationProgress({ progress, label }) {
     if (secondsPerPage > 0) {
       const remainingMin = Math.round(((total - done) * secondsPerPage) / 60);
       remainingLabel = remainingMin >= 1
-        ? `Environ ${remainingMin} min restantes.`
-        : 'Plus que quelques secondes.';
+        ? t('generationProgress.remainingMinutes', { count: remainingMin })
+        : t('generationProgress.remainingSeconds');
     }
   }
+
+  const phaseLabel = PROGRESS_PHASE_KEYS.includes(phase)
+    ? t(`generationProgress.phases.${phase}`)
+    : '';
 
   return (
     <div className="gelato-progress">
       <div className="gelato-progress-head">
-        <span>{PROGRESS_LABELS[phase] || label || 'Generation en cours...'}</span>
+        <span>{phaseLabel || label || t('generationProgress.fallbackLabel')}</span>
         {hasCount && <span className="gelato-progress-count">{done} / {total} {unite}</span>}
       </div>
       <div className={`gelato-progress-bar ${percent === null ? 'is-indeterminate' : ''}`}>

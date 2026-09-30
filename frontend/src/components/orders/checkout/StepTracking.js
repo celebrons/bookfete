@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ORDER_STATUS_SEQUENCE, getOrderStatusConfig, includesPdf, includesPrint, isOrderPaid, isPdfReady, pdfJobIdOf } from '../../../utils/orderWorkflow';
 import GenerationProgress from './GenerationProgress';
 import InvoiceDownloadLink from './InvoiceDownloadLink';
@@ -57,27 +58,27 @@ function buildPrintTimeline(currentStatus) {
 // Un « Pack » n'a pas un etat, il en a deux : le fichier peut etre pret
 // pendant que le livre est encore sous presse. Un statut unique en haut de
 // page devait donc choisir lequel mentir.
-const statutDuPdf = ({ pret, enCours, echec }) => {
-  if (pret) return { label: 'Disponible', tone: 'is-ready' };
+const statutDuPdf = ({ pret, enCours, echec }, t) => {
+  if (pret) return { label: t('stepTracking.pdfStatus.available'), tone: 'is-ready' };
   // AVANT le statut "en fabrication" : un echec definitif (deux tentatives
   // automatiques deja epuisees cote serveur) ne doit jamais continuer a
   // s'afficher comme si la fabrication etait toujours en cours (retour
   // utilisateur, 2026-09-27 - "pas un echec silencieux").
-  if (echec) return { label: 'Échec', tone: 'is-error' };
-  if (enCours) return { label: 'En fabrication', tone: 'is-progress' };
-  return { label: 'En attente', tone: 'is-muted' };
+  if (echec) return { label: t('stepTracking.pdfStatus.failed'), tone: 'is-error' };
+  if (enCours) return { label: t('stepTracking.pdfStatus.inProgress'), tone: 'is-progress' };
+  return { label: t('stepTracking.pdfStatus.pending'), tone: 'is-muted' };
 };
 
-const statutDeLImpression = ({ statut, gelatoOrderId, echec }) => {
-  if (echec) return { label: 'Envoi à reprendre', tone: 'is-error' };
+const statutDeLImpression = ({ statut, gelatoOrderId, echec }, t) => {
+  if (echec) return { label: t('stepTracking.printStatus.toResend'), tone: 'is-error' };
   const affiche = etapeAffichee(statut);
   if (['printed', 'shipped', 'delivered', 'cancelled', 'failed'].includes(affiche)) {
     return getOrderStatusConfig(affiche);
   }
   if (affiche === 'sent_to_printer' || gelatoOrderId) {
-    return { label: "Chez l'imprimeur", tone: 'is-progress' };
+    return { label: t('stepTracking.printStatus.atPrinter'), tone: 'is-progress' };
   }
-  return { label: 'Envoi en cours', tone: 'is-progress' };
+  return { label: t('stepTracking.printStatus.sending'), tone: 'is-progress' };
 };
 
 // Icones : demandees explicitement (2026-09-20) pour que l'action se
@@ -105,38 +106,33 @@ function IconeRegenerer() {
 }
 
 // Date lisible, sans bibliotheque : « 20 septembre à 14:32 ».
-function formaterDate(valeur) {
+function formaterDate(valeur, locale) {
   if (!valeur) return null;
   const date = new Date(valeur);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString('fr-FR', {
+  return date.toLocaleDateString(locale, {
     day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
   });
 }
 
-function formaterJour(valeur) {
+function formaterJour(valeur, locale) {
   if (!valeur) return null;
   const date = new Date(valeur);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 }
 
 // Ce qui se passe ensuite, adapte a ce qui a reellement ete achete — jamais
 // une phrase generique qui mentionnerait une expedition pour un PDF seul,
 // ou resterait muette sur le PDF d'un pack.
-function messageApresCommande({ pdfAchete, isPrint }) {
+function messageApresCommande({ pdfAchete, isPrint }, t) {
   if (pdfAchete && isPrint) {
-    return "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande. "
-      + "Votre PDF est en cours de fabrication et votre livre part en production chez notre imprimeur — "
-      + 'vous pouvez suivre chaque étape juste en dessous.';
+    return t('stepTracking.thanksMessage.pdfAndPrint');
   }
   if (pdfAchete) {
-    return "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande, "
-      + 'puis un second e-mail dès que votre PDF sera prêt à télécharger.';
+    return t('stepTracking.thanksMessage.pdfOnly');
   }
-  return "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande. "
-    + 'Votre livre part en fabrication chez notre imprimeur, puis vous sera expédié — '
-    + 'vous pouvez suivre chaque étape juste en dessous.';
+  return t('stepTracking.thanksMessage.printOnly');
 }
 
 function StepTracking({
@@ -167,6 +163,8 @@ function StepTracking({
   gelatoError,
   onSendGelatoTest
 }) {
+  const { t, i18n } = useTranslation('checkout');
+  const locale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
   if (!order) return null;
 
   const status = tracking?.status || order.status;
@@ -217,15 +215,15 @@ function StepTracking({
   );
 
   const gelatoOrderId = tracking?.gelatoOrderId || order?.metadata?.gelatoOrderId || null;
-  const envoyeLe = formaterDate(tracking?.gelatoSubmittedAt || order?.metadata?.gelatoSubmittedAt);
+  const envoyeLe = formaterDate(tracking?.gelatoSubmittedAt || order?.metadata?.gelatoSubmittedAt, locale);
   const echecEnvoi = tracking?.gelatoError || order?.metadata?.gelatoError || null;
-  const livraisonMin = formaterJour(tracking?.delivery?.minDate);
-  const livraisonMax = formaterJour(tracking?.delivery?.maxDate);
-  const verifieLe = formaterDate(tracking?.updatedAt);
+  const livraisonMin = formaterJour(tracking?.delivery?.minDate, locale);
+  const livraisonMax = formaterJour(tracking?.delivery?.maxDate, locale);
+  const verifieLe = formaterDate(tracking?.updatedAt, locale);
   const deuxVolets = pdfAchete && isPrint;
 
-  const infoPdf = statutDuPdf({ pret: pdfReady, enCours: pdfEnCours, echec: pdfFailed });
-  const infoImpression = statutDeLImpression({ statut: status, gelatoOrderId, echec: echecEnvoi });
+  const infoPdf = statutDuPdf({ pret: pdfReady, enCours: pdfEnCours, echec: pdfFailed }, t);
+  const infoImpression = statutDeLImpression({ statut: status, gelatoOrderId, echec: echecEnvoi }, t);
 
   return (
     <article className="orders-panel">
@@ -233,31 +231,31 @@ function StepTracking({
           juste apres le paiement — pas a chaque consultation du suivi. */}
       {justPaid && (
         <div className="tracking-thanks">
-          <p className="tracking-thanks-title">Merci pour votre commande&nbsp;! 💛</p>
-          <p className="tracking-thanks-text">{messageApresCommande({ pdfAchete, isPrint })}</p>
+          <p className="tracking-thanks-title">{t('stepTracking.thanks.title')}&nbsp;! 💛</p>
+          <p className="tracking-thanks-text">{messageApresCommande({ pdfAchete, isPrint }, t)}</p>
           <div className="tracking-thanks-actions">
-            <Link to="/dashboard" className="btn btn-outline">Continuer mes achats</Link>
-            <Link to="/orders" className="btn btn-outline">Mes commandes</Link>
+            <Link to="/dashboard" className="btn btn-outline">{t('stepTracking.thanks.continueShopping')}</Link>
+            <Link to="/orders" className="btn btn-outline">{t('stepTracking.thanks.myOrders')}</Link>
           </div>
         </div>
       )}
 
-      <h2>Votre commande</h2>
+      <h2>{t('stepTracking.title')}</h2>
 
       <div className="orders-result-grid">
         <div>
-          <span>Numéro</span>
+          <span>{t('stepTracking.orderNumber')}</span>
           <strong>{order.order_number}</strong>
         </div>
         {pdfAchete && (
           <div>
-            <span>{isPrint ? 'Statut PDF' : 'Statut'}</span>
+            <span>{isPrint ? t('stepTracking.statusPdf') : t('stepTracking.statusGeneric')}</span>
             <strong className={infoPdf.tone}>{infoPdf.label}</strong>
           </div>
         )}
         {isPrint && (
           <div>
-            <span>{pdfAchete ? 'Statut impression' : 'Statut'}</span>
+            <span>{pdfAchete ? t('stepTracking.statusPrint') : t('stepTracking.statusGeneric')}</span>
             <strong className={infoImpression.tone}>{infoImpression.label}</strong>
           </div>
         )}
@@ -269,7 +267,7 @@ function StepTracking({
         {/* ----------------------------- VOLET PDF ----------------------- */}
         {pdfAchete && (
           <section className="tracking-pane">
-            <h3 className="tracking-pane-title">Votre PDF</h3>
+            <h3 className="tracking-pane-title">{t('stepTracking.pdfPane.title')}</h3>
 
             {/* Echec DEFINITIF (retour utilisateur, 2026-09-27) : le serveur
                 a deja tente deux fois automatiquement (voir routes/books.js)
@@ -281,8 +279,7 @@ function StepTracking({
             {pdfFailed && (
               <>
                 <p className="tracking-sent is-failed">
-                  La fabrication du PDF a échoué : {order.metadata.pdfError}. Vous pouvez relancer
-                  une nouvelle tentative ci-dessous — votre commande n’est pas perdue.
+                  {t('stepTracking.pdfPane.failedMessage', { reason: order.metadata.pdfError })}
                 </p>
                 {onRegeneratePdf && (
                   <button
@@ -292,7 +289,7 @@ function StepTracking({
                     disabled={regeneratingPdf}
                   >
                     <IconeRegenerer />
-                    {regeneratingPdf ? 'Relance…' : 'Relancer la fabrication'}
+                    {regeneratingPdf ? t('stepTracking.pdfPane.relaunching') : t('stepTracking.pdfPane.relaunch')}
                   </button>
                 )}
               </>
@@ -305,11 +302,10 @@ function StepTracking({
                     que le serveur, plutot qu'un blanc. */}
                 <GenerationProgress
                   progress={pdfJob?.progress || { phase: 'starting', done: 0, total: 0 }}
-                  label="Fabrication du PDF..."
+                  label={t('stepTracking.pdfPane.buildingLabel')}
                 />
                 <p className="orders-disclaimer">
-                  Il sera disponible dans quelques minutes. <strong>Vous serez informé par email</strong> dès
-                  qu’il sera prêt : vous pouvez fermer cette page, la fabrication continue de notre côté.
+                  {t('stepTracking.pdfPane.buildingNotePrefix')}<strong>{t('stepTracking.pdfPane.buildingNoteBold')}</strong>{t('stepTracking.pdfPane.buildingNoteSuffix')}
                 </p>
                 {onRegeneratePdf && (
                   <button
@@ -317,10 +313,10 @@ function StepTracking({
                     className="btn btn-outline pdf-build-relaunch"
                     onClick={onRegeneratePdf}
                     disabled={regeneratingPdf}
-                    title="Repart de zero si la fabrication semble arretee"
+                    title={t('stepTracking.pdfPane.relaunchTitle')}
                   >
                     <IconeRegenerer />
-                    {regeneratingPdf ? 'Relance…' : 'Relancer la fabrication'}
+                    {regeneratingPdf ? t('stepTracking.pdfPane.relaunching') : t('stepTracking.pdfPane.relaunch')}
                   </button>
                 )}
               </>
@@ -330,7 +326,7 @@ function StepTracking({
               <>
                 <p className="tracking-ready">
                   <span className="tracking-ready-dot" aria-hidden="true" />
-                  PDF disponible
+                  {t('stepTracking.pdfPane.ready')}
                 </p>
                 <div className="tracking-pane-actions">
                   <button
@@ -340,7 +336,7 @@ function StepTracking({
                     disabled={downloadingKind === 'final'}
                   >
                     <IconeTelecharger />
-                    {downloadingKind === 'final' ? 'Téléchargement…' : 'Télécharger'}
+                    {downloadingKind === 'final' ? t('stepTracking.pdfPane.downloading') : t('stepTracking.pdfPane.download')}
                   </button>
                   {onRegeneratePdf && (
                     <button
@@ -348,10 +344,10 @@ function StepTracking({
                       className="btn btn-outline"
                       onClick={onRegeneratePdf}
                       disabled={regeneratingPdf}
-                      title="Refabrique le PDF a partir de votre livre actuel"
+                      title={t('stepTracking.pdfPane.regenerateTitle')}
                     >
                       <IconeRegenerer />
-                      {regeneratingPdf ? 'Régénération…' : 'Régénérer'}
+                      {regeneratingPdf ? t('stepTracking.pdfPane.regenerating') : t('stepTracking.pdfPane.regenerate')}
                     </button>
                   )}
                 </div>
@@ -360,7 +356,7 @@ function StepTracking({
 
             {!pdfEnCours && !pdfReady && !pdfFailed && (
               <p className="orders-disclaimer">
-                La fabrication démarre dès le paiement validé.
+                {t('stepTracking.pdfPane.notStarted')}
               </p>
             )}
           </section>
@@ -369,7 +365,7 @@ function StepTracking({
         {/* ------------------------- VOLET IMPRESSION -------------------- */}
         {isPrint && (
           <section className="tracking-pane">
-            <h3 className="tracking-pane-title">Votre livre imprimé</h3>
+            <h3 className="tracking-pane-title">{t('stepTracking.printPane.title')}</h3>
 
             {/* DIRE QUE C'EST PARTI, ET SOUS QUEL NUMERO (2026-09-20).
                 L'envoi a l'imprimeur se declenche tout seul apres le
@@ -384,24 +380,23 @@ function StepTracking({
             {status === 'cancelled' || status === 'failed' ? (
               <p className="tracking-sent">
                 {status === 'cancelled'
-                  ? 'Cette commande a été annulée.'
-                  : "L'impression de cette commande a échoué."} Contactez-nous si vous avez besoin d’aide.
+                  ? t('stepTracking.printPane.cancelled')
+                  : t('stepTracking.printPane.failed')} {t('stepTracking.printPane.contactUs')}
               </p>
             ) : echecEnvoi ? (
               <p className="tracking-sent is-failed">
-                L’envoi à l’imprimeur a échoué : {echecEnvoi}. Notre équipe le relance,
-                votre commande n’est pas perdue.
+                {t('stepTracking.printPane.sendFailed', { reason: echecEnvoi })}
               </p>
             ) : gelatoOrderId ? (
               <p className="tracking-sent">
                 <span className="tracking-ready-dot" aria-hidden="true" />
-                Reçu par l’imprimeur{envoyeLe ? ` le ${envoyeLe}` : ''}
-                <span className="tracking-sent-ref">n° {gelatoOrderId}</span>
+                {t('stepTracking.printPane.receivedPrefix')}{envoyeLe ? t('stepTracking.printPane.receivedOnDate', { date: envoyeLe }) : ''}
+                <span className="tracking-sent-ref">{t('stepTracking.printPane.receivedRef', { id: gelatoOrderId })}</span>
               </p>
             ) : (
               <p className="tracking-sent is-pending">
                 <span className="tracking-spinner" aria-hidden="true" />
-                Transmission à l’imprimeur en cours… cette page se met à jour toute seule.
+                {t('stepTracking.printPane.sendingInProgress')}
               </p>
             )}
 
@@ -422,7 +417,7 @@ function StepTracking({
             {/* Numero de suivi : n'apparait que quand le transporteur en a fourni un. */}
             {tracking?.tracking?.code && (
               <p className="tracking-carrier">
-                Colis {tracking.tracking.carrier ? `(${tracking.tracking.carrier})` : ''} :{' '}
+                {t('stepTracking.printPane.parcelPrefix')} {tracking.tracking.carrier ? `(${tracking.tracking.carrier})` : ''} :{' '}
                 {tracking.tracking.url ? (
                   <a href={tracking.tracking.url} target="_blank" rel="noreferrer">{tracking.tracking.code}</a>
                 ) : (
@@ -436,12 +431,12 @@ function StepTracking({
                 faussement rassurant. */}
             {tracking?.stale && (
               <p className="orders-disclaimer">
-                L'imprimeur est momentanément injoignable : voici le dernier état connu.
+                {t('stepTracking.printPane.staleNotice')}
               </p>
             )}
             {tracking?.gelatoStatusUnknown && (
               <p className="orders-disclaimer">
-                Etat renvoye par l'imprimeur : <strong>{tracking.gelatoStatus}</strong> (non traduit).
+                {t('stepTracking.printPane.unknownStatusPrefix')}<strong>{tracking.gelatoStatus}</strong>{t('stepTracking.printPane.unknownStatusSuffix')}
               </p>
             )}
 
@@ -452,11 +447,11 @@ function StepTracking({
                 faire soi-meme. */}
             <p className="tracking-freshness">
               {loadingTracking
-                ? 'Vérification auprès de l’imprimeur…'
-                : verifieLe ? `Vérifié le ${verifieLe}` : 'Mise à jour automatique'}
+                ? t('stepTracking.printPane.checking')
+                : verifieLe ? t('stepTracking.printPane.checkedOn', { date: verifieLe }) : t('stepTracking.printPane.autoUpdate')}
               {' · '}
               <button type="button" className="tracking-refresh" onClick={onRefreshTracking} disabled={loadingTracking}>
-                Vérifier maintenant
+                {t('stepTracking.printPane.checkNow')}
               </button>
             </p>
           </section>
@@ -473,15 +468,14 @@ function StepTracking({
         <p className="tracking-delais">
           {livraisonMin || livraisonMax ? (
             <>
-              <strong>Livraison annoncée par l’imprimeur : </strong>
+              <strong>{t('stepTracking.delivery.announcedBy')}</strong>
               {livraisonMin && livraisonMax
-                ? `entre le ${livraisonMin} et le ${livraisonMax}`
-                : `à partir du ${livraisonMin || livraisonMax}`}
+                ? t('stepTracking.delivery.between', { min: livraisonMin, max: livraisonMax })
+                : t('stepTracking.delivery.from', { date: livraisonMin || livraisonMax })}
               {tracking?.tracking?.carrier ? ` — ${tracking.tracking.carrier}` : ''}
             </>
           ) : (
-            <>L’imprimeur n’a pas encore communiqué de date de livraison. Elle apparaîtra ici
-            dès qu’il l’aura fixée, avec le numéro de colis.</>
+            <>{t('stepTracking.delivery.notYetAnnounced')}</>
           )}
         </p>
       )}
@@ -490,14 +484,12 @@ function StepTracking({
           cree la commande de production sans passer par un paiement. */}
       {gelatoTestAvailable && isPrint && (
         <div className="tracking-test-block">
-          <h3>Envoi de test a l'imprimeur</h3>
+          <h3>{t('stepTracking.gelatoTest.title')}</h3>
           <p className="orders-disclaimer">
-            Envoie ce livre a Gelato en <strong>brouillon</strong> : le vrai fichier d'impression est genere et
-            depose chez l'imprimeur, mais rien n'est facture ni imprime. La generation prend plusieurs minutes
-            (chaque page est rendue en haute resolution) : laissez cette page ouverte.
+            {t('stepTracking.gelatoTest.descPrefix')}<strong>{t('stepTracking.gelatoTest.descBold')}</strong>{t('stepTracking.gelatoTest.descSuffix')}
           </p>
           <button type="button" className="btn btn-outline" disabled={gelatoSending} onClick={onSendGelatoTest}>
-            {gelatoSending ? 'Generation en cours...' : 'Envoyer a Gelato (test)'}
+            {gelatoSending ? t('stepTracking.gelatoTest.sending') : t('stepTracking.gelatoTest.send')}
           </button>
           {gelatoSending && <GenerationProgress progress={gelatoProgress} />}
           {gelatoResult && (
@@ -506,14 +498,13 @@ function StepTracking({
                 // Ne peut plus arriver que pour une VRAIE commande (chemin
                 // paiement) : un brouillon de test est desormais rejouable,
                 // notamment apres un changement de format.
-                ? `Cette commande a deja ete envoyee en production (${gelatoResult.gelatoOrderId}) : elle ne peut pas etre renvoyee.`
-                : `Brouillon cree chez Gelato : ${gelatoResult.gelatoOrderId}.`}
+                ? t('stepTracking.gelatoTest.alreadySent', { id: gelatoResult.gelatoOrderId })
+                : t('stepTracking.gelatoTest.draftCreated', { id: gelatoResult.gelatoOrderId })}
             </p>
           )}
           {gelatoResult && !gelatoResult.skipped && (
             <p className="orders-disclaimer">
-              Vous pouvez relancer un envoi apres avoir change de format ou modifie le livre : le brouillon
-              precedent est remplace chez l'imprimeur.
+              {t('stepTracking.gelatoTest.resendNote')}
             </p>
           )}
           {gelatoError && <p className="orders-error">{gelatoError}</p>}

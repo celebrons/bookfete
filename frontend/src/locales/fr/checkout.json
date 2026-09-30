@@ -13,5 +13,302 @@
     "cancelled": "Annulée",
     "failed": "Échec",
     "unknown": "Inconnu"
+  },
+  "flow": {
+    "loading": "Chargement du checkout...",
+    "bookUntitled": "Sans titre",
+    "pagesCount": "{{count}} pages",
+    "header": {
+      "title": "Finaliser votre commande",
+      "backToBook": "← Retour au livre",
+      "preview": "Aperçu",
+      "myOrders": "Mes commandes"
+    },
+    "steps": {
+      "product": "Produit",
+      "delivery": "Livraison",
+      "payment": "Paiement",
+      "tracking": "Suivi"
+    },
+    "warnings": {
+      "bookNotFinalized": "Ce livre n'est pas encore finalisé. Terminez l'aperçu/PDF final avant la commande.",
+      "orderPendingLocked": "Une commande est déjà en attente de paiement. La création d'une nouvelle commande est temporairement bloquée."
+    },
+    "nav": {
+      "back": "Retour",
+      "continue": "Continuer"
+    },
+    "reset": {
+      "submit": "Supprimer cette commande et recommencer",
+      "submitting": "Suppression...",
+      "note": "Supprime aussi les brouillons déposés chez l'imprimeur. Une commande réellement payée ou déjà partie en production ne peut pas être supprimée.",
+      "confirm": "Supprimer définitivement la commande{{label}} et repartir de zéro ?"
+    },
+    "errors": {
+      "bookNotFound": "Livre introuvable",
+      "sessionInvalid": "Session invalide. Reconnectez-vous.",
+      "timeoutRetry": "Le serveur met trop de temps à répondre. Réessayez dans quelques instants.",
+      "pdfStartFailed": "Impossible de lancer la génération PDF",
+      "pdfTrackingFailed": "Erreur pendant le suivi PDF",
+      "pdfGenerationFailed": "La génération PDF a échoué",
+      "pdfStillWorking": "La fabrication prend plus de temps que prévu. Elle continue de notre côté : vous recevrez un email dès que le PDF sera prêt.",
+      "downloadFailed": "Téléchargement impossible",
+      "noPdfYet": "Aucun PDF n'a encore été fabriqué pour cette commande. Lancez la génération, puis revenez télécharger.",
+      "pdfGone": "Ce PDF n'est plus disponible sur le serveur. Relancez la génération depuis cette page : elle prend une minute environ.",
+      "gelatoTestFailed": "L'envoi de test à l'imprimeur a échoué.",
+      "gelatoStillRunning": "L'envoi est toujours en cours après 15 minutes. Rechargez la page pour voir où il en est.",
+      "deleteOrderFailed": "Impossible de supprimer cette commande.",
+      "bookNotFinalized": "Le livre doit être finalisé avant la commande.",
+      "stripeDisabled": "Le paiement Stripe doit être activé pour lancer la commande.",
+      "cgvRequired": "Veuillez accepter les conditions générales de vente avant de payer.",
+      "stripeOpenFailed": "Impossible d'ouvrir Stripe Checkout",
+      "noPendingOrder": "Aucune commande en attente de paiement.",
+      "afterStripeGeneric": "Erreur après paiement Stripe."
+    },
+    "notices": {
+      "addressVerifiedTransferred": "Adresse vérifiée. Votre livre a bien été rattaché à votre compte.",
+      "addressVerified": "Adresse vérifiée. Vous pouvez finaliser votre commande.",
+      "paymentRecovered": "Votre paiement a bien été enregistré. Votre commande est en cours de traitement.",
+      "paymentCancelled": "Paiement annulé. Vous pouvez relancer la commande.",
+      "paymentReceived": "Paiement reçu. Finalisation de la commande en cours...",
+      "paymentConfirmed": "Paiement confirmé. Commande mise à jour.",
+      "pdfReady": "Paiement validé. Le PDF final est généré et téléchargeable.",
+      "pdfFailedWithReason": "La génération du PDF a échoué : {{reason}}",
+      "pdfStartingBackground": "Paiement validé. La génération PDF démarre en arrière-plan et sera disponible sous peu.",
+      "productionStarted": "Paiement validé. Production lancée.",
+      "pdfAutoRetrying": "Paiement validé. Relance automatique de la génération PDF...",
+      "pdfPreparing": "Paiement validé. Le PDF est en cours de préparation. Revenez dans quelques instants.",
+      "pdfRetryingResume": "Paiement validé. Relance de la génération PDF en cours...",
+      "pdfRetryFailedWithReason": "Paiement validé, mais la relance automatique a échoué : {{reason}}",
+      "pdfSoon": "Paiement validé. Le PDF sera disponible sous peu."
+    },
+    "pdfBuilding": "Votre PDF sera disponible dans quelques minutes. Vous serez informé par email dès qu'il sera prêt : vous pouvez fermer cette page."
+  },
+  "generationProgress": {
+    "phases": {
+      "starting": "Préparation...",
+      "cover": "Rendu de la couverture...",
+      "pages": "Rendu des pages",
+      "photos": "Préparation des photos",
+      "preparation": "Préparation du livre…",
+      "ecriture": "Écriture du fichier d'impression…",
+      "televersement": "Envoi du fichier à l'imprimeur…",
+      "assembling": "Assemblage du PDF...",
+      "uploading": "Envoi du fichier à l'imprimeur...",
+      "submitting": "Création de la commande chez Gelato..."
+    },
+    "fallbackLabel": "Génération en cours...",
+    "remainingMinutes": "Environ {{count}} min restantes.",
+    "remainingSeconds": "Plus que quelques secondes."
+  },
+  "invoice": {
+    "download": "Télécharger la facture ({{number}})"
+  },
+  "stepProduct": {
+    "titleLocked": "Commande en attente",
+    "titleChoose": "Choix du produit",
+    "perUnit": "par exemplaire",
+    "savings": "Vous économisez {{amount}} par rapport aux deux achetés séparément",
+    "products": {
+      "pdf": {
+        "title": "PDF seul",
+        "note": "Rien n'est expédié",
+        "details": [
+          "Le livre entier en fichier PDF haute définition",
+          "Téléchargeable dès le paiement, autant de fois que vous voulez",
+          "À garder ou à faire imprimer où vous voulez"
+        ]
+      },
+      "print": {
+        "title": "Livre imprimé",
+        "note": "Imprimé et livré chez vous",
+        "details": [
+          "Votre livre imprimé et relié par notre imprimeur",
+          "Livré à l'adresse indiquée à l'étape suivante",
+          "Le fichier PDF n'est pas inclus"
+        ]
+      },
+      "pack": {
+        "title": "Pack PDF + imprimé",
+        "note": "Les deux à la fois",
+        "details": [
+          "Le livre imprimé, livré chez vous",
+          "ET le PDF téléchargeable dès le paiement"
+        ]
+      }
+    },
+    "qty": {
+      "decrease": "Réduire la quantité",
+      "increase": "Augmenter la quantité",
+      "unit_one": "{{count}} exemplaire",
+      "unit_other": "{{count}} exemplaires",
+      "perUnitPrice": "{{price}} l'unité",
+      "shipping": "livraison {{price}}"
+    },
+    "disclaimerPrint": "Livraison à l'adresse indiquée à l'étape suivante.",
+    "disclaimerPdf": "Aucune livraison : le PDF est téléchargeable dès le paiement validé."
+  },
+  "stepAddress": {
+    "title": "Adresse de livraison",
+    "fields": {
+      "email": "Votre adresse e-mail",
+      "fullName": "Nom complet",
+      "line1": "Adresse",
+      "line2": "Complément",
+      "postalCode": "Code postal",
+      "city": "Ville",
+      "country": "Pays",
+      "phone": "Téléphone"
+    },
+    "emailNote": "Nous utiliserons votre adresse e-mail pour confirmer votre commande, vous envoyer les mises à jour et vous permettre de retrouver votre livre.",
+    "incompleteWarning": "Nom, adresse, code postal, ville et pays sont nécessaires pour l'expédition.",
+    "billingSameLabel": "Adresse de facturation identique à l'adresse de livraison",
+    "billingTitle": "Adresse de facturation",
+    "billingIncompleteWarning": "Nom, adresse, code postal, ville et pays sont nécessaires pour la facturation."
+  },
+  "stepPayment": {
+    "title": "Récapitulatif et paiement",
+    "typeLabels": {
+      "pdf": "PDF seul",
+      "print": "Livre imprimé",
+      "pack": "Pack PDF + imprimé"
+    },
+    "delivery": "Livraison",
+    "shippingHome": "livraison à domicile",
+    "downloadOnly": "téléchargement uniquement",
+    "accountGate": {
+      "title": "Une dernière chose : votre adresse e-mail",
+      "bodyPrefix": "Elle vous permettra de retrouver ce livre, de suivre sa fabrication et de revenir sur votre commande — y compris depuis un autre appareil. Nous vous envoyons un code par e-mail : ",
+      "bodyBold": "pas de mot de passe à inventer",
+      "bodySuffix": ". Votre livre est déjà enregistré, rien n'est perdu et vous ne quittez pas cette page.",
+      "continueAction": "Valider et continuer"
+    },
+    "cgv": {
+      "accept": "J'accepte les",
+      "terms": "conditions générales de vente",
+      "printClause": "et reconnais que mon livre, personnalisé, n'est pas soumis au droit de rétractation"
+    },
+    "pay": {
+      "processing": "Traitement...",
+      "payPending": "Payer la commande en attente",
+      "payStripe": "Payer avec Stripe (test)"
+    },
+    "stripeNote": {
+      "enabled": "Stripe Checkout en mode test. Utilisez une carte de test Stripe.",
+      "disabled": "Le paiement est temporairement indisponible : activez Stripe pour lancer la commande."
+    }
+  },
+  "stepTracking": {
+    "pdfStatus": {
+      "available": "Disponible",
+      "failed": "Échec",
+      "inProgress": "En fabrication",
+      "pending": "En attente"
+    },
+    "printStatus": {
+      "toResend": "Envoi à reprendre",
+      "atPrinter": "Chez l'imprimeur",
+      "sending": "Envoi en cours"
+    },
+    "thanksMessage": {
+      "pdfAndPrint": "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande. Votre PDF est en cours de fabrication et votre livre part en production chez notre imprimeur — vous pouvez suivre chaque étape juste en dessous.",
+      "pdfOnly": "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande, puis un second e-mail dès que votre PDF sera prêt à télécharger.",
+      "printOnly": "Vous allez recevoir un e-mail de confirmation avec le récapitulatif de votre commande. Votre livre part en fabrication chez notre imprimeur, puis vous sera expédié — vous pouvez suivre chaque étape juste en dessous."
+    },
+    "thanks": {
+      "title": "Merci pour votre commande",
+      "continueShopping": "Continuer mes achats",
+      "myOrders": "Mes commandes"
+    },
+    "title": "Votre commande",
+    "orderNumber": "Numéro",
+    "statusPdf": "Statut PDF",
+    "statusGeneric": "Statut",
+    "statusPrint": "Statut impression",
+    "pdfPane": {
+      "title": "Votre PDF",
+      "failedMessage": "La fabrication du PDF a échoué : {{reason}}. Vous pouvez relancer une nouvelle tentative ci-dessous — votre commande n'est pas perdue.",
+      "relaunching": "Relance…",
+      "relaunch": "Relancer la fabrication",
+      "buildingLabel": "Fabrication du PDF...",
+      "buildingNotePrefix": "Il sera disponible dans quelques minutes. ",
+      "buildingNoteBold": "Vous serez informé par email",
+      "buildingNoteSuffix": " dès qu'il sera prêt : vous pouvez fermer cette page, la fabrication continue de notre côté.",
+      "relaunchTitle": "Repart de zéro si la fabrication semble arrêtée",
+      "ready": "PDF disponible",
+      "downloading": "Téléchargement…",
+      "download": "Télécharger",
+      "regenerating": "Régénération…",
+      "regenerate": "Régénérer",
+      "regenerateTitle": "Refabrique le PDF à partir de votre livre actuel",
+      "notStarted": "La fabrication démarre dès le paiement validé."
+    },
+    "printPane": {
+      "title": "Votre livre imprimé",
+      "cancelled": "Cette commande a été annulée.",
+      "failed": "L'impression de cette commande a échoué.",
+      "contactUs": "Contactez-nous si vous avez besoin d'aide.",
+      "sendFailed": "L'envoi à l'imprimeur a échoué : {{reason}}. Notre équipe le relance, votre commande n'est pas perdue.",
+      "receivedPrefix": "Reçu par l'imprimeur",
+      "receivedOnDate": " le {{date}}",
+      "receivedRef": "n° {{id}}",
+      "sendingInProgress": "Transmission à l'imprimeur en cours… cette page se met à jour toute seule.",
+      "parcelPrefix": "Colis",
+      "staleNotice": "L'imprimeur est momentanément injoignable : voici le dernier état connu.",
+      "unknownStatusPrefix": "État renvoyé par l'imprimeur : ",
+      "unknownStatusSuffix": " (non traduit).",
+      "checking": "Vérification auprès de l'imprimeur…",
+      "checkedOn": "Vérifié le {{date}}",
+      "autoUpdate": "Mise à jour automatique",
+      "checkNow": "Vérifier maintenant"
+    },
+    "delivery": {
+      "announcedBy": "Livraison annoncée par l'imprimeur : ",
+      "between": "entre le {{min}} et le {{max}}",
+      "from": "à partir du {{date}}",
+      "notYetAnnounced": "L'imprimeur n'a pas encore communiqué de date de livraison. Elle apparaîtra ici dès qu'il l'aura fixée, avec le numéro de colis."
+    },
+    "gelatoTest": {
+      "title": "Envoi de test à l'imprimeur",
+      "descPrefix": "Envoie ce livre à Gelato en ",
+      "descBold": "brouillon",
+      "descSuffix": " : le vrai fichier d'impression est généré et déposé chez l'imprimeur, mais rien n'est facturé ni imprimé. La génération prend plusieurs minutes (chaque page est rendue en haute résolution) : laissez cette page ouverte.",
+      "sending": "Génération en cours...",
+      "send": "Envoyer à Gelato (test)",
+      "alreadySent": "Cette commande a déjà été envoyée en production ({{id}}) : elle ne peut pas être renvoyée.",
+      "draftCreated": "Brouillon créé chez Gelato : {{id}}.",
+      "resendNote": "Vous pouvez relancer un envoi après avoir changé de format ou modifié le livre : le brouillon précédent est remplacé chez l'imprimeur."
+    }
+  },
+  "ordersList": {
+    "loading": "Chargement des commandes...",
+    "loadFailed": "Impossible de charger vos commandes.",
+    "title": "Mes commandes",
+    "subtitle": "Suivez vos commandes PDF et imprimées en temps réel.",
+    "backToAccount": "← Espace client",
+    "empty": "Aucune commande pour le moment.",
+    "untitledBook": "Livre sans titre",
+    "menu": {
+      "otherActions": "Autres actions",
+      "backToBook": "Retour au livre",
+      "viewInvoiceOpening": "Ouverture...",
+      "viewInvoice": "Voir la facture",
+      "deleting": "Suppression...",
+      "delete": "Supprimer"
+    },
+    "deleteConfirm": "Supprimer définitivement la commande {{number}} ?",
+    "deleteSuccess": "Commande supprimée.",
+    "invoiceUnavailable": "Facture indisponible pour le moment.",
+    "invoiceOpenFailed": "Impossible d'ouvrir la facture.",
+    "stripeOpenFailed": "Impossible d'ouvrir Stripe Checkout",
+    "actions": {
+      "pay": "Payer",
+      "payRedirecting": "Redirection...",
+      "followPdf": "Suivre la génération PDF",
+      "getPdf": "Récupérer le PDF",
+      "followDelivery": "Suivre la livraison",
+      "finalizePdf": "Finaliser le PDF",
+      "backToBook": "Retour au livre"
+    }
   }
 }

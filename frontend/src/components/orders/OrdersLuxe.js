@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   getOrderStatusConfig,
@@ -24,7 +25,7 @@ function resolveActionPrincipale(order) {
   return 'retour_livre';
 }
 
-const LIBELLE_TYPE = { pdf: 'PDF', print: 'Livre imprimé', pack: 'Pack PDF + imprimé' };
+const TYPE_KEYS = ['pdf', 'print', 'pack'];
 
 // L'avance MANUELLE du statut d'impression a ete retiree le 2026-09-18.
 //
@@ -45,6 +46,7 @@ const LIBELLE_TYPE = { pdf: 'PDF', print: 'Livre imprimé', pack: 'Pack PDF + im
 const ETATS_TERMINAUX = ['delivered', 'cancelled', 'failed'];
 
 const OrdersLuxe = () => {
+  const { t, i18n } = useTranslation('checkout');
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
@@ -61,7 +63,7 @@ const OrdersLuxe = () => {
       setOrders(liste);
       rafraichirDepuisImprimeur(liste);
     } catch (error) {
-      setNotice({ type: 'error', message: error.message });
+      setNotice({ type: 'error', message: error.message || t('ordersList.loadFailed') });
     } finally {
       setLoading(false);
     }
@@ -117,14 +119,14 @@ const OrdersLuxe = () => {
   const removeOrder = async (order) => {
     if (!order?.id || deletingOrderId) return;
     // eslint-disable-next-line no-restricted-globals
-    if (!window.confirm(`Supprimer definitivement la commande ${order.order_number || ''} ?`)) return;
+    if (!window.confirm(t('ordersList.deleteConfirm', { number: order.order_number || '' }))) return;
 
     try {
       setDeletingOrderId(order.id);
       setNotice(null);
       await deleteOrder(order.id);
       setOrders((prev) => prev.filter((item) => item.id !== order.id));
-      setNotice({ type: 'success', message: 'Commande supprimee.' });
+      setNotice({ type: 'success', message: t('ordersList.deleteSuccess') });
     } catch (error) {
       setNotice({ type: 'error', message: error.message });
     } finally {
@@ -141,10 +143,10 @@ const OrdersLuxe = () => {
       setFetchingInvoiceId(order.id);
       setNotice(null);
       const invoice = await getOrderInvoice(order.id);
-      if (!invoice?.url) throw new Error('Facture indisponible pour le moment.');
+      if (!invoice?.url) throw new Error(t('ordersList.invoiceUnavailable'));
       window.open(invoice.url, '_blank', 'noopener');
     } catch (error) {
-      setNotice({ type: 'error', message: error.message || "Impossible d'ouvrir la facture." });
+      setNotice({ type: 'error', message: error.message || t('ordersList.invoiceOpenFailed') });
     } finally {
       setFetchingInvoiceId('');
     }
@@ -157,7 +159,7 @@ const OrdersLuxe = () => {
       setNotice(null);
       const checkoutSession = await createStripeCheckoutSession(order.id);
       if (!checkoutSession?.checkoutUrl) {
-        throw new Error('Impossible d ouvrir Stripe Checkout');
+        throw new Error(t('ordersList.stripeOpenFailed'));
       }
       window.location.assign(checkoutSession.checkoutUrl);
     } catch (error) {
@@ -170,7 +172,7 @@ const OrdersLuxe = () => {
     return (
       <div className="orders-page">
         <div className="container-luxe orders-shell">
-          <p>Chargement des commandes...</p>
+          <p>{t('ordersList.loading')}</p>
         </div>
       </div>
     );
@@ -181,11 +183,11 @@ const OrdersLuxe = () => {
       <div className="container-luxe orders-shell">
         <header className="orders-hero">
           <div>
-            <h1>Mes commandes</h1>
-            <p>Suivez vos commandes PDF et imprimées en temps réel.</p>
+            <h1>{t('ordersList.title')}</h1>
+            <p>{t('ordersList.subtitle')}</p>
           </div>
           <div className="orders-hero-links">
-            <Link to="/account" className="orders-hero-link">← Espace client</Link>
+            <Link to="/account" className="orders-hero-link">{t('ordersList.backToAccount')}</Link>
           </div>
         </header>
 
@@ -197,7 +199,7 @@ const OrdersLuxe = () => {
 
         {orders.length === 0 ? (
           <div className="orders-panel">
-            <p className="orders-empty">Aucune commande pour le moment.</p>
+            <p className="orders-empty">{t('ordersList.empty')}</p>
           </div>
         ) : (
           <div className="orders-list orders-list-full">
@@ -224,7 +226,7 @@ const OrdersLuxe = () => {
                         onClick={() => setOpenMenuOrderId(menuOuvert ? '' : order.id)}
                         aria-haspopup="true"
                         aria-expanded={menuOuvert}
-                        aria-label="Autres actions"
+                        aria-label={t('ordersList.menu.otherActions')}
                       >
                         ···
                       </button>
@@ -232,7 +234,7 @@ const OrdersLuxe = () => {
                         <div className="orders-card-menu-panel">
                           {actionPrincipale !== 'retour_livre' && (
                             <button type="button" onClick={() => { setOpenMenuOrderId(''); navigate(`/book/${bookId}`); }}>
-                              Retour au livre
+                              {t('ordersList.menu.backToBook')}
                             </button>
                           )}
                           {order.status !== 'awaiting_payment' && (
@@ -241,7 +243,7 @@ const OrdersLuxe = () => {
                               disabled={fetchingInvoiceId === order.id}
                               onClick={() => { setOpenMenuOrderId(''); voirLaFacture(order); }}
                             >
-                              {fetchingInvoiceId === order.id ? 'Ouverture...' : 'Voir la facture'}
+                              {fetchingInvoiceId === order.id ? t('ordersList.menu.viewInvoiceOpening') : t('ordersList.menu.viewInvoice')}
                             </button>
                           )}
                           <button
@@ -250,7 +252,7 @@ const OrdersLuxe = () => {
                             disabled={deletingOrderId === order.id}
                             onClick={() => { setOpenMenuOrderId(''); removeOrder(order); }}
                           >
-                            {deletingOrderId === order.id ? 'Suppression...' : 'Supprimer'}
+                            {deletingOrderId === order.id ? t('ordersList.menu.deleting') : t('ordersList.menu.delete')}
                           </button>
                         </div>
                       )}
@@ -258,8 +260,8 @@ const OrdersLuxe = () => {
                   </div>
 
                   <div className="orders-card-body">
-                    <h3>{order.book_title || 'Livre sans titre'}</h3>
-                    <p className="orders-card-type">{LIBELLE_TYPE[order.type] || order.type}</p>
+                    <h3>{order.book_title || t('ordersList.untitledBook')}</h3>
+                    <p className="orders-card-type">{TYPE_KEYS.includes(order.type) ? t(`stepPayment.typeLabels.${order.type}`) : order.type}</p>
                   </div>
 
                   {/* Une seule ligne de meta-donnees (retour utilisateur,
@@ -269,7 +271,7 @@ const OrdersLuxe = () => {
                   <p className="orders-card-summary">
                     {formatPriceCents(order.total_cents, order.currency || 'EUR')}
                     {' · '}
-                    {new Date(order.created_at).toLocaleDateString('fr-FR')}
+                    {new Date(order.created_at).toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'fr-FR')}
                     {' · '}
                     {order.order_number}
                   </p>
@@ -282,17 +284,17 @@ const OrdersLuxe = () => {
                         disabled={startingPaymentOrderId === order.id}
                         onClick={() => startStripePayment(order)}
                       >
-                        {startingPaymentOrderId === order.id ? 'Redirection...' : 'Payer'}
+                        {startingPaymentOrderId === order.id ? t('ordersList.actions.payRedirecting') : t('ordersList.actions.pay')}
                       </button>
                     )}
                     {actionPrincipale === 'suivre_pdf' && (
                       <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}/checkout`)}>
-                        Suivre la génération PDF
+                        {t('ordersList.actions.followPdf')}
                       </button>
                     )}
                     {actionPrincipale === 'recuperer_pdf' && (
                       <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}/checkout`)}>
-                        Récupérer le PDF
+                        {t('ordersList.actions.getPdf')}
                       </button>
                     )}
                     {/* Le detail du suivi (frise de production, numero de
@@ -300,17 +302,17 @@ const OrdersLuxe = () => {
                         commande : on y renvoie plutot que de le dupliquer. */}
                     {actionPrincipale === 'suivre_livraison' && (
                       <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}/checkout`)}>
-                        Suivre la livraison
+                        {t('ordersList.actions.followDelivery')}
                       </button>
                     )}
                     {actionPrincipale === 'finaliser_pdf' && (
                       <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}/checkout`)}>
-                        Finaliser le PDF
+                        {t('ordersList.actions.finalizePdf')}
                       </button>
                     )}
                     {actionPrincipale === 'retour_livre' && (
                       <button type="button" className="orders-card-primary-btn" onClick={() => navigate(`/book/${bookId}`)}>
-                        Retour au livre
+                        {t('ordersList.actions.backToBook')}
                       </button>
                     )}
                   </div>

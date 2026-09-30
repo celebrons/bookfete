@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getOrderInvoice } from '../../../services/ordersApi';
 
 // Lien de telechargement de la facture, sur l'ecran de suivi (StepTracking.js).
@@ -14,6 +15,7 @@ import { getOrderInvoice } from '../../../services/ordersApi';
 // backend/services/invoicing/invoiceService.js) : ce composant lit
 // seulement ; un 404 veut dire "pas encore prete", pas une erreur a afficher.
 function InvoiceDownloadLink({ orderId }) {
+  const { t } = useTranslation('checkout');
   const [etat, setEtat] = useState({ chargement: true, invoice: null });
 
   useEffect(() => {
@@ -44,7 +46,7 @@ function InvoiceDownloadLink({ orderId }) {
   return (
     <div className="tracking-invoice">
       <a href={etat.invoice.url} target="_blank" rel="noreferrer" className="tracking-invoice-link">
-        📄 Télécharger la facture ({etat.invoice.invoiceNumber})
+        📄 {t('invoice.download', { number: etat.invoice.invoiceNumber })}
       </a>
     </div>
   );

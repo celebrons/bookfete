@@ -13,5 +13,302 @@
     "cancelled": "Cancelled",
     "failed": "Failed",
     "unknown": "Unknown"
+  },
+  "flow": {
+    "loading": "Loading checkout...",
+    "bookUntitled": "Untitled",
+    "pagesCount": "{{count}} pages",
+    "header": {
+      "title": "Complete your order",
+      "backToBook": "← Back to book",
+      "preview": "Preview",
+      "myOrders": "My orders"
+    },
+    "steps": {
+      "product": "Product",
+      "delivery": "Delivery",
+      "payment": "Payment",
+      "tracking": "Tracking"
+    },
+    "warnings": {
+      "bookNotFinalized": "This book isn't finalized yet. Finish the preview/final PDF before ordering.",
+      "orderPendingLocked": "An order is already awaiting payment. Creating a new order is temporarily blocked."
+    },
+    "nav": {
+      "back": "Back",
+      "continue": "Continue"
+    },
+    "reset": {
+      "submit": "Delete this order and start over",
+      "submitting": "Deleting...",
+      "note": "Also removes any drafts submitted to the printer. A genuinely paid order, or one already in production, cannot be deleted.",
+      "confirm": "Permanently delete order{{label}} and start over?"
+    },
+    "errors": {
+      "bookNotFound": "Book not found",
+      "sessionInvalid": "Invalid session. Please log in again.",
+      "timeoutRetry": "The server is taking too long to respond. Try again in a moment.",
+      "pdfStartFailed": "Unable to start PDF generation",
+      "pdfTrackingFailed": "Error while tracking the PDF",
+      "pdfGenerationFailed": "PDF generation failed",
+      "pdfStillWorking": "Production is taking longer than expected. It's continuing on our end: you'll receive an email as soon as the PDF is ready.",
+      "downloadFailed": "Download failed",
+      "noPdfYet": "No PDF has been produced for this order yet. Start generation, then come back to download.",
+      "pdfGone": "This PDF is no longer available on the server. Restart generation from this page: it takes about a minute.",
+      "gelatoTestFailed": "The test send to the printer failed.",
+      "gelatoStillRunning": "The send is still in progress after 15 minutes. Reload the page to see where it stands.",
+      "deleteOrderFailed": "Unable to delete this order.",
+      "bookNotFinalized": "The book must be finalized before ordering.",
+      "stripeDisabled": "Stripe payment must be enabled to place the order.",
+      "cgvRequired": "Please accept the terms of sale before paying.",
+      "stripeOpenFailed": "Unable to open Stripe Checkout",
+      "noPendingOrder": "No order awaiting payment.",
+      "afterStripeGeneric": "Error after Stripe payment."
+    },
+    "notices": {
+      "addressVerifiedTransferred": "Address verified. Your book has been linked to your account.",
+      "addressVerified": "Address verified. You can now finalize your order.",
+      "paymentRecovered": "Your payment was successfully recorded. Your order is being processed.",
+      "paymentCancelled": "Payment cancelled. You can restart the order.",
+      "paymentReceived": "Payment received. Finalizing your order...",
+      "paymentConfirmed": "Payment confirmed. Order updated.",
+      "pdfReady": "Payment confirmed. The final PDF has been generated and is downloadable.",
+      "pdfFailedWithReason": "PDF generation failed: {{reason}}",
+      "pdfStartingBackground": "Payment confirmed. PDF generation is starting in the background and will be available shortly.",
+      "productionStarted": "Payment confirmed. Production started.",
+      "pdfAutoRetrying": "Payment confirmed. Automatically retrying PDF generation...",
+      "pdfPreparing": "Payment confirmed. The PDF is being prepared. Check back in a moment.",
+      "pdfRetryingResume": "Payment confirmed. Retrying PDF generation...",
+      "pdfRetryFailedWithReason": "Payment confirmed, but the automatic retry failed: {{reason}}",
+      "pdfSoon": "Payment confirmed. The PDF will be available shortly."
+    },
+    "pdfBuilding": "Your PDF will be available in a few minutes. You'll be notified by email as soon as it's ready: you can close this page."
+  },
+  "generationProgress": {
+    "phases": {
+      "starting": "Preparing...",
+      "cover": "Rendering the cover...",
+      "pages": "Rendering pages",
+      "photos": "Preparing photos",
+      "preparation": "Preparing the book…",
+      "ecriture": "Writing the print file…",
+      "televersement": "Sending the file to the printer…",
+      "assembling": "Assembling the PDF...",
+      "uploading": "Sending file to printer...",
+      "submitting": "Creating the order with Gelato..."
+    },
+    "fallbackLabel": "Generating...",
+    "remainingMinutes": "About {{count}} min remaining.",
+    "remainingSeconds": "Just a few seconds left."
+  },
+  "invoice": {
+    "download": "Download invoice ({{number}})"
+  },
+  "stepProduct": {
+    "titleLocked": "Order awaiting payment",
+    "titleChoose": "Choose your product",
+    "perUnit": "per copy",
+    "savings": "You save {{amount}} compared to buying both separately",
+    "products": {
+      "pdf": {
+        "title": "PDF only",
+        "note": "Nothing is shipped",
+        "details": [
+          "The entire book as a high-definition PDF file",
+          "Downloadable as soon as you pay, as many times as you like",
+          "Keep it or have it printed wherever you like"
+        ]
+      },
+      "print": {
+        "title": "Printed book",
+        "note": "Printed and delivered to you",
+        "details": [
+          "Your book printed and bound by our printer",
+          "Delivered to the address given in the next step",
+          "The PDF file is not included"
+        ]
+      },
+      "pack": {
+        "title": "PDF + printed pack",
+        "note": "Both at once",
+        "details": [
+          "The printed book, delivered to you",
+          "AND the PDF downloadable as soon as you pay"
+        ]
+      }
+    },
+    "qty": {
+      "decrease": "Decrease quantity",
+      "increase": "Increase quantity",
+      "unit_one": "{{count}} copy",
+      "unit_other": "{{count}} copies",
+      "perUnitPrice": "{{price}} each",
+      "shipping": "shipping {{price}}"
+    },
+    "disclaimerPrint": "Delivered to the address given in the next step.",
+    "disclaimerPdf": "No delivery: the PDF is downloadable as soon as payment is confirmed."
+  },
+  "stepAddress": {
+    "title": "Delivery address",
+    "fields": {
+      "email": "Your email address",
+      "fullName": "Full name",
+      "line1": "Address",
+      "line2": "Additional info",
+      "postalCode": "Postal code",
+      "city": "City",
+      "country": "Country",
+      "phone": "Phone"
+    },
+    "emailNote": "We'll use your email address to confirm your order, send you updates, and let you find your book again.",
+    "incompleteWarning": "Name, address, postal code, city and country are required for shipping.",
+    "billingSameLabel": "Billing address same as shipping address",
+    "billingTitle": "Billing address",
+    "billingIncompleteWarning": "Name, address, postal code, city and country are required for billing."
+  },
+  "stepPayment": {
+    "title": "Summary and payment",
+    "typeLabels": {
+      "pdf": "PDF only",
+      "print": "Printed book",
+      "pack": "PDF + printed pack"
+    },
+    "delivery": "Delivery",
+    "shippingHome": "home delivery",
+    "downloadOnly": "download only",
+    "accountGate": {
+      "title": "One last thing: your email address",
+      "bodyPrefix": "It'll let you find this book again, track its production, and come back to your order — even from another device. We'll send you a code by email: ",
+      "bodyBold": "no password to invent",
+      "bodySuffix": ". Your book is already saved, nothing is lost, and you don't leave this page.",
+      "continueAction": "Confirm and continue"
+    },
+    "cgv": {
+      "accept": "I accept the",
+      "terms": "terms of sale",
+      "printClause": "and acknowledge that my personalized book is not subject to the right of withdrawal"
+    },
+    "pay": {
+      "processing": "Processing...",
+      "payPending": "Pay the pending order",
+      "payStripe": "Pay with Stripe (test)"
+    },
+    "stripeNote": {
+      "enabled": "Stripe Checkout in test mode. Use a Stripe test card.",
+      "disabled": "Payment is temporarily unavailable: enable Stripe to place the order."
+    }
+  },
+  "stepTracking": {
+    "pdfStatus": {
+      "available": "Available",
+      "failed": "Failed",
+      "inProgress": "In production",
+      "pending": "Pending"
+    },
+    "printStatus": {
+      "toResend": "Send to retry",
+      "atPrinter": "At the printer",
+      "sending": "Sending in progress"
+    },
+    "thanksMessage": {
+      "pdfAndPrint": "You'll receive a confirmation email with your order summary. Your PDF is being produced and your book is going into production at our printer — you can follow each step just below.",
+      "pdfOnly": "You'll receive a confirmation email with your order summary, then a second email as soon as your PDF is ready to download.",
+      "printOnly": "You'll receive a confirmation email with your order summary. Your book is going into production at our printer, then will be shipped to you — you can follow each step just below."
+    },
+    "thanks": {
+      "title": "Thank you for your order",
+      "continueShopping": "Continue shopping",
+      "myOrders": "My orders"
+    },
+    "title": "Your order",
+    "orderNumber": "Number",
+    "statusPdf": "PDF status",
+    "statusGeneric": "Status",
+    "statusPrint": "Printing status",
+    "pdfPane": {
+      "title": "Your PDF",
+      "failedMessage": "PDF generation failed: {{reason}}. You can start a new attempt below — your order isn't lost.",
+      "relaunching": "Restarting…",
+      "relaunch": "Restart generation",
+      "buildingLabel": "Building the PDF...",
+      "buildingNotePrefix": "It'll be available in a few minutes. ",
+      "buildingNoteBold": "You'll be notified by email",
+      "buildingNoteSuffix": " as soon as it's ready: you can close this page, production continues on our end.",
+      "relaunchTitle": "Starts over if generation seems stuck",
+      "ready": "PDF available",
+      "downloading": "Downloading…",
+      "download": "Download",
+      "regenerating": "Regenerating…",
+      "regenerate": "Regenerate",
+      "regenerateTitle": "Rebuilds the PDF from your current book",
+      "notStarted": "Production starts as soon as payment is confirmed."
+    },
+    "printPane": {
+      "title": "Your printed book",
+      "cancelled": "This order has been cancelled.",
+      "failed": "Printing this order has failed.",
+      "contactUs": "Contact us if you need help.",
+      "sendFailed": "Sending to the printer failed: {{reason}}. Our team is retrying it, your order isn't lost.",
+      "receivedPrefix": "Received by the printer",
+      "receivedOnDate": " on {{date}}",
+      "receivedRef": "#{{id}}",
+      "sendingInProgress": "Transmission to the printer in progress… this page updates on its own.",
+      "parcelPrefix": "Parcel",
+      "staleNotice": "The printer is momentarily unreachable: here's the last known status.",
+      "unknownStatusPrefix": "Status returned by the printer: ",
+      "unknownStatusSuffix": " (untranslated).",
+      "checking": "Checking with the printer…",
+      "checkedOn": "Checked on {{date}}",
+      "autoUpdate": "Updates automatically",
+      "checkNow": "Check now"
+    },
+    "delivery": {
+      "announcedBy": "Delivery announced by the printer: ",
+      "between": "between {{min}} and {{max}}",
+      "from": "from {{date}}",
+      "notYetAnnounced": "The printer hasn't announced a delivery date yet. It will appear here once set, along with the parcel number."
+    },
+    "gelatoTest": {
+      "title": "Test send to the printer",
+      "descPrefix": "Sends this book to Gelato as a ",
+      "descBold": "draft",
+      "descSuffix": ": the actual print file is generated and deposited with the printer, but nothing is billed or printed. Generation takes several minutes (each page is rendered in high resolution): leave this page open.",
+      "sending": "Generating...",
+      "send": "Send to Gelato (test)",
+      "alreadySent": "This order has already been sent to production ({{id}}): it cannot be sent again.",
+      "draftCreated": "Draft created with Gelato: {{id}}.",
+      "resendNote": "You can resend after changing the format or editing the book: the previous draft is replaced with the printer."
+    }
+  },
+  "ordersList": {
+    "loading": "Loading orders...",
+    "loadFailed": "Unable to load your orders.",
+    "title": "My orders",
+    "subtitle": "Track your PDF and printed orders in real time.",
+    "backToAccount": "← My account",
+    "empty": "No orders yet.",
+    "untitledBook": "Untitled book",
+    "menu": {
+      "otherActions": "Other actions",
+      "backToBook": "Back to book",
+      "viewInvoiceOpening": "Opening...",
+      "viewInvoice": "View invoice",
+      "deleting": "Deleting...",
+      "delete": "Delete"
+    },
+    "deleteConfirm": "Permanently delete order {{number}}?",
+    "deleteSuccess": "Order deleted.",
+    "invoiceUnavailable": "Invoice unavailable at the moment.",
+    "invoiceOpenFailed": "Unable to open the invoice.",
+    "stripeOpenFailed": "Unable to open Stripe Checkout",
+    "actions": {
+      "pay": "Pay",
+      "payRedirecting": "Redirecting...",
+      "followPdf": "Track PDF generation",
+      "getPdf": "Get the PDF",
+      "followDelivery": "Track delivery",
+      "finalizePdf": "Finalize the PDF",
+      "backToBook": "Back to book"
+    }
   }
 }
