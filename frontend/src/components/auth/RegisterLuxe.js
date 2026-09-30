@@ -3,8 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import {
   convertAnonymousToAccount,
-  isCurrentlyAnonymous,
-  rememberAnonymousTokenBeforeLogin
+  isCurrentlyAnonymous
 } from '../../services/anonymousSession';
 import '../../styles/luxe-theme.css';
 import './AuthLuxe.css';
@@ -47,18 +46,6 @@ const RegisterLuxe = () => {
     const cible = localStorage.getItem('returnTo');
     localStorage.removeItem('returnTo');
     return cible || '/dashboard';
-  };
-
-  const handleOAuth = async (provider) => {
-    setError(null);
-    // L'aller-retour OAuth remplace la session anonyme : on met son jeton de
-    // cote pour pouvoir rattacher les livres commences au retour (App.js).
-    await rememberAnonymousTokenBeforeLogin();
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}${returnTarget()}` }
-    });
-    if (oauthError) setError(oauthError.message);
   };
 
   const handleRegister = async (event) => {
@@ -191,19 +178,6 @@ const RegisterLuxe = () => {
         </div>
 
         {error && <div className="auth-error">{error}</div>}
-
-        <div className="auth-oauth">
-          <button type="button" className="btn btn-outline auth-oauth-btn" onClick={() => handleOAuth('google')} disabled={loading}>
-            Continuer avec Google
-          </button>
-          <button type="button" className="btn btn-outline auth-oauth-btn" onClick={() => handleOAuth('apple')} disabled={loading}>
-            Continuer avec Apple
-          </button>
-        </div>
-
-        <div className="auth-divider">
-          <span>OU CREER UN COMPTE AVEC EMAIL</span>
-        </div>
 
         <form onSubmit={handleRegister} className="auth-form">
           <div className="auth-field">

@@ -94,29 +94,6 @@ const LoginLuxe = () => {
     await runLogin(TEST1_CREDENTIALS.email, TEST1_CREDENTIALS.password);
   };
 
-  // signInWithOAuth fait un aller-retour plein-page vers le fournisseur : on
-  // choisit explicitement ou revenir plutot que de compter sur un
-  // comportement par defaut. Reprend le meme `returnTo` que le login par
-  // mot de passe (pose par CreateBookSansIA.js avant de rediriger ici) —
-  // /create-book relit alors son brouillon et, session presente, cree le
-  // livre automatiquement. Sans returnTo (visite normale de /login), on va
-  // simplement au tableau de bord, jamais vers un ecran de creation non lie.
-  const handleOAuth = async (provider) => {
-    setError(null);
-    // Meme raison que dans runLogin : l'aller-retour OAuth remplacera la
-    // session anonyme, son jeton doit donc etre mis de cote maintenant. Le
-    // rattachement des livres se fera au retour, au chargement de l'app
-    // (voir App.js) — ce composant ne sera plus monte.
-    await rememberAnonymousTokenBeforeLogin();
-    const returnTo = localStorage.getItem('returnTo') || '/dashboard';
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}${returnTo}` }
-    });
-    if (oauthError) setError(oauthError.message);
-  };
-
-
   return (
     <div className="auth-container">
       <div className="auth-card">
@@ -131,19 +108,6 @@ const LoginLuxe = () => {
             {error === 'Invalid login credentials' ? 'Email ou mot de passe incorrect' : error}
           </div>
         )}
-
-        <div className="auth-oauth">
-          <button type="button" className="btn btn-outline auth-oauth-btn" onClick={() => handleOAuth('google')} disabled={loading}>
-            Continuer avec Google
-          </button>
-          <button type="button" className="btn btn-outline auth-oauth-btn" onClick={() => handleOAuth('apple')} disabled={loading}>
-            Continuer avec Apple
-          </button>
-        </div>
-
-        <div className="auth-divider">
-          <span>OU PAR EMAIL</span>
-        </div>
 
         <form onSubmit={handleLogin} className="auth-form">
           <div className="auth-field">

@@ -175,18 +175,6 @@
   cursor: not-allowed;
 }
 
-/* ===== OAUTH (Google/Apple) ===== */
-.auth-oauth {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: var(--space-sm);
-}
-
-.auth-oauth-btn {
-  width: 100%;
-}
-
 /* ===== SÉPARATEUR ===== */
 .auth-divider {
   position: relative;
