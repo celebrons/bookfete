@@ -8,6 +8,8 @@ import authFr from '../locales/fr/auth.json';
 import authEn from '../locales/en/auth.json';
 import homeFr from '../locales/fr/home.json';
 import homeEn from '../locales/en/home.json';
+import createBookFr from '../locales/fr/createBook.json';
+import createBookEn from '../locales/en/createBook.json';
 
 // Chantier bilingue (2026-09-30) : un namespace par grand domaine de l'app
 // (mirroring frontend/src/components/<dossier>) plutot qu'un fichier de
@@ -17,8 +19,8 @@ import homeEn from '../locales/en/home.json';
 // chaque phase suivante ajoute le sien (checkout, atelier, collective,
 // legal...) sans jamais toucher a celui-ci.
 const resources = {
-  fr: { common: commonFr, auth: authFr, home: homeFr },
-  en: { common: commonEn, auth: authEn, home: homeEn }
+  fr: { common: commonFr, auth: authFr, home: homeFr, createBook: createBookFr },
+  en: { common: commonEn, auth: authEn, home: homeEn, createBook: createBookEn }
 };
 
 i18n
@@ -33,7 +35,7 @@ i18n
     // pour 'en-US'/'en-GB'.
     nonExplicitSupportedLngs: true,
     load: 'languageOnly',
-    ns: ['common', 'auth', 'home'],
+    ns: ['common', 'auth', 'home', 'createBook'],
     defaultNS: 'common',
     detection: {
       // localStorage d'abord (dernier choix explicite fait sur CE

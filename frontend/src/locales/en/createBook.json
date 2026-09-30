@@ -1,0 +1,26 @@
+{
+  "newBookBadge": "New book",
+  "errorChooseFormat": "Choose a format to continue.",
+  "errorCreation": "Error creating the book.",
+  "typeStep": {
+    "title": "How would you like to create your book?",
+    "soloTitle": "👤 My album",
+    "soloSubtitle": "I'm creating my book with my own photos and memories.",
+    "collectiveTitle": "👥 Collaborative album",
+    "collectiveSubtitle": "I'll share a link and my loved ones will add their photos and memories."
+  },
+  "formatStep": {
+    "back": "← Back",
+    "title": "Which format for your book?",
+    "hint": "The format determines your book's size and how your photos are laid out. You can change it later.",
+    "recommended": "★ Recommended",
+    "hardcover": "hardcover",
+    "softcover": "softcover",
+    "coverLabel": "Cover",
+    "startingFrom": "From",
+    "forPages": "for {{count}} pages",
+    "loadingFormats": "Loading formats…",
+    "submit": "Start my book →",
+    "submitting": "Creating…"
+  }
+}

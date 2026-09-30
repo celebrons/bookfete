@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import { createBook, listTemplates } from '../../services/compositionApi';
 import { listPrintFormats } from '../../services/ordersApi';
 import { ensureSession } from '../../services/anonymousSession';
+import { formatPriceCents } from '../../utils/orderWorkflow';
 import FormatMockup from './FormatMockup';
 import './CreateBookSansIA.css';
 
@@ -28,6 +30,7 @@ const DRAFT_KEY = 'createBookDraftSansIA';
 //    coup revenait a recomposer un livre deja fait. Prix affiche des cet
 //    ecran : on doit savoir ce qu'on fabrique.
 export default function CreateBookSansIA() {
+  const { t } = useTranslation('createBook');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -114,7 +117,7 @@ export default function CreateBookSansIA() {
       localStorage.removeItem(DRAFT_KEY);
       navigate(livre?.id ? `/book/${livre.id}/atelier` : '/dashboard');
     } catch (err) {
-      setError(err.message || 'Erreur a la creation du livre.');
+      setError(err.message || t('errorCreation'));
       setCreating(false);
     }
   }
@@ -175,7 +178,7 @@ export default function CreateBookSansIA() {
 
   async function handleCreate() {
     if (!printFormat) {
-      setError('Choisissez un format pour continuer.');
+      setError(t('errorChooseFormat'));
       return;
     }
     setError('');
@@ -206,24 +209,24 @@ export default function CreateBookSansIA() {
       <div className="wizard-card">
         <header className="wizard-header">
           <div className="ab-header-top">
-            <span className="event-badge">Nouveau livre</span>
+            <span className="event-badge">{t('newBookBadge')}</span>
           </div>
         </header>
 
         <section className="wizard-content">
           {step === 'type' && (
             <div className="ab-step">
-              <h2 className="form-title">Comment souhaitez-vous créer votre livre ?</h2>
+              <h2 className="form-title">{t('typeStep.title')}</h2>
 
               <div className="create-mode-grid">
                 <button type="button" className="ab-select-card" onClick={() => chooseMode('solo')}>
-                  <span className="ab-select-title">👤 Mon album</span>
-                  <span className="ab-select-subtitle">Je crée mon livre avec mes propres photos et souvenirs.</span>
+                  <span className="ab-select-title">{t('typeStep.soloTitle')}</span>
+                  <span className="ab-select-subtitle">{t('typeStep.soloSubtitle')}</span>
                 </button>
                 <button type="button" className="ab-select-card" onClick={() => chooseMode('open')}>
-                  <span className="ab-select-title">👥 Album collaboratif</span>
+                  <span className="ab-select-title">{t('typeStep.collectiveTitle')}</span>
                   <span className="ab-select-subtitle">
-                    Je partage un lien et mes proches ajoutent leurs photos et souvenirs.
+                    {t('typeStep.collectiveSubtitle')}
                   </span>
                 </button>
               </div>
@@ -242,12 +245,11 @@ export default function CreateBookSansIA() {
                 className="ab-back-link"
                 onClick={() => setStep('type')}
               >
-                ← Retour
+                {t('formatStep.back')}
               </button>
-              <h2 className="form-title">Quel format pour votre livre ?</h2>
+              <h2 className="form-title">{t('formatStep.title')}</h2>
               <p className="ab-step-hint">
-                Le format décide de la taille de votre livre et de la place de vos photos. Vous pourrez en changer
-                plus tard.
+                {t('formatStep.hint')}
               </p>
 
               {error ? <div className="wizard-error">{error}</div> : null}
@@ -261,23 +263,27 @@ export default function CreateBookSansIA() {
                     onClick={() => { setPrintFormat(format.formatId); setError(''); }}
                     aria-pressed={printFormat === format.formatId}
                   >
-                    {format.recommande && <span className="format-choice-badge">★ Recommandé</span>}
+                    {format.recommande && <span className="format-choice-badge">{t('formatStep.recommended')}</span>}
                     <FormatMockup widthMm={format.widthMm} heightMm={format.heightMm} reliure={format.reliure} />
+                    {/* format.nom/accroche viennent du catalogue serveur
+                        (GET /orders/formats), pas de ce fichier : ils
+                        restent en francais tant que le catalogue lui-meme
+                        n'est pas traduit (hors perimetre de cette phase). */}
                     <span className="format-choice-name">{format.nom}</span>
                     <span className="format-choice-size">
-                      {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm · Couverture {format.reliure === 'rigide' ? 'rigide' : 'souple'}
+                      {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm · {t('formatStep.coverLabel')} {format.reliure === 'rigide' ? t('formatStep.hardcover') : t('formatStep.softcover')}
                     </span>
                     <span className="format-choice-pitch">{format.accroche}</span>
                     <span className="format-choice-price">
-                      À partir de {(format.startingPriceCents / 100).toFixed(2).replace('.', ',')} €
-                      <small>pour {format.minPages} pages</small>
+                      {t('formatStep.startingFrom')} {formatPriceCents(format.startingPriceCents)}
+                      <small>{t('formatStep.forPages', { count: format.minPages })}</small>
                     </span>
                   </button>
                 ))}
               </div>
 
               {formats.length === 0 && (
-                <p className="ab-step-hint">Chargement des formats…</p>
+                <p className="ab-step-hint">{t('formatStep.loadingFormats')}</p>
               )}
 
               <button
@@ -286,7 +292,7 @@ export default function CreateBookSansIA() {
                 onClick={handleCreate}
                 disabled={creating || !printFormat}
               >
-                {creating ? 'Création…' : 'Commencer mon livre →'}
+                {creating ? t('formatStep.submitting') : t('formatStep.submit')}
               </button>
             </div>
           )}

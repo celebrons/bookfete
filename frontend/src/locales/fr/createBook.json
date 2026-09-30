@@ -1,0 +1,26 @@
+{
+  "newBookBadge": "Nouveau livre",
+  "errorChooseFormat": "Choisissez un format pour continuer.",
+  "errorCreation": "Erreur à la création du livre.",
+  "typeStep": {
+    "title": "Comment souhaitez-vous créer votre livre ?",
+    "soloTitle": "👤 Mon album",
+    "soloSubtitle": "Je crée mon livre avec mes propres photos et souvenirs.",
+    "collectiveTitle": "👥 Album collaboratif",
+    "collectiveSubtitle": "Je partage un lien et mes proches ajoutent leurs photos et souvenirs."
+  },
+  "formatStep": {
+    "back": "← Retour",
+    "title": "Quel format pour votre livre ?",
+    "hint": "Le format décide de la taille de votre livre et de la place de vos photos. Vous pourrez en changer plus tard.",
+    "recommended": "★ Recommandé",
+    "hardcover": "rigide",
+    "softcover": "souple",
+    "coverLabel": "Couverture",
+    "startingFrom": "À partir de",
+    "forPages": "pour {{count}} pages",
+    "loadingFormats": "Chargement des formats…",
+    "submit": "Commencer mon livre →",
+    "submitting": "Création…"
+  }
+}
