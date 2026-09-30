@@ -1,0 +1,73 @@
+{
+  "formats": {
+    "livret": {
+      "label": "Booklet",
+      "tagline": "Simple & elegant",
+      "description": "A square, lightweight format to keep your memories.",
+      "coverLabel": "soft cover"
+    },
+    "standard": {
+      "label": "Standard",
+      "tagline": "The memory book",
+      "description": "The best balance between quality and price.",
+      "coverLabel": "soft cover"
+    },
+    "luxe": {
+      "label": "Luxe",
+      "tagline": "Premium & timeless",
+      "description": "A high-end finish for a book to keep or to give.",
+      "coverLabel": "hard cover"
+    }
+  },
+  "errors": {
+    "bookNotFound": "Book not found.",
+    "loadFailed": "Loading error.",
+    "formatChangeFailed": "Unable to change the format.",
+    "checkoutFailed": "Unable to continue to checkout."
+  },
+  "loading": "Loading your book...",
+  "header": {
+    "backToEdit": "Edit my book",
+    "title": "Your book is ready",
+    "subtitle": "Flip through your book before choosing its format."
+  },
+  "stage": {
+    "loadingPage": "Loading page...",
+    "previewTitle": "Preview: the book at full size, real proportions",
+    "preview": "Preview",
+    "leftPage": "Left page",
+    "rightPage": "Right page",
+    "cover": "Preview"
+  },
+  "nav": {
+    "goToCover": "Go to the cover",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "goToBackCover": "Go to the back cover"
+  },
+  "sidebar": {
+    "yourBook": "Your book",
+    "untitledBook": "Untitled book",
+    "stats": "📖 {{pages}} pages · 📷 {{photos}} photos · ✍️ {{memories}} memories",
+    "yourFormat": "Your format",
+    "pagesCount": "{{count}} pages",
+    "yourBookLine": "Your book",
+    "delivery": "Delivery",
+    "total": "Total",
+    "ordering": "One moment...",
+    "orderButton": "Order my book"
+  },
+  "priceDelta": {
+    "formatLabel": "{{format}} format"
+  },
+  "fullscreen": {
+    "close": "Close",
+    "fullscreenPreview": "Full-screen preview"
+  },
+  "viewLabel": {
+    "cover": "Cover",
+    "backCover": "Back cover",
+    "spreadPages": "Pages {{left}}-{{right}} / {{total}}",
+    "singlePage": "Page {{page}} / {{total}}"
+  }
+}

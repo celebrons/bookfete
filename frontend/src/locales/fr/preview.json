@@ -1,0 +1,73 @@
+{
+  "formats": {
+    "livret": {
+      "label": "Livret",
+      "tagline": "Simple & élégant",
+      "description": "Un format carré et léger pour conserver vos souvenirs.",
+      "coverLabel": "couverture souple"
+    },
+    "standard": {
+      "label": "Standard",
+      "tagline": "Le livre souvenir",
+      "description": "Le meilleur équilibre entre qualité et prix.",
+      "coverLabel": "couverture souple"
+    },
+    "luxe": {
+      "label": "Luxe",
+      "tagline": "Premium & intemporel",
+      "description": "Une finition haut de gamme pour un livre à conserver ou à offrir.",
+      "coverLabel": "couverture rigide"
+    }
+  },
+  "errors": {
+    "bookNotFound": "Livre introuvable.",
+    "loadFailed": "Erreur de chargement.",
+    "formatChangeFailed": "Impossible de changer le format.",
+    "checkoutFailed": "Impossible de continuer vers la commande."
+  },
+  "loading": "Chargement de votre livre...",
+  "header": {
+    "backToEdit": "Modifier mon livre",
+    "title": "Votre livre est prêt",
+    "subtitle": "Feuilletez votre livre avant de choisir son format."
+  },
+  "stage": {
+    "loadingPage": "Chargement de la page...",
+    "previewTitle": "Prévisualiser : le livre en grand, proportions réelles",
+    "preview": "Prévisualiser",
+    "leftPage": "Page gauche",
+    "rightPage": "Page droite",
+    "cover": "Aperçu"
+  },
+  "nav": {
+    "goToCover": "Aller à la couverture",
+    "previousPage": "Page précédente",
+    "nextPage": "Page suivante",
+    "goToBackCover": "Aller à la 4e de couverture"
+  },
+  "sidebar": {
+    "yourBook": "Votre livre",
+    "untitledBook": "Livre sans titre",
+    "stats": "📖 {{pages}} pages · 📷 {{photos}} photos · ✍️ {{memories}} souvenirs",
+    "yourFormat": "Votre format",
+    "pagesCount": "{{count}} pages",
+    "yourBookLine": "Votre livre",
+    "delivery": "Livraison",
+    "total": "Total",
+    "ordering": "Un instant...",
+    "orderButton": "Commander mon livre"
+  },
+  "priceDelta": {
+    "formatLabel": "Format {{format}}"
+  },
+  "fullscreen": {
+    "close": "Fermer",
+    "fullscreenPreview": "Aperçu plein écran"
+  },
+  "viewLabel": {
+    "cover": "Couverture",
+    "backCover": "4e de couverture",
+    "spreadPages": "Pages {{left}}-{{right}} / {{total}}",
+    "singlePage": "Page {{page}} / {{total}}"
+  }
+}

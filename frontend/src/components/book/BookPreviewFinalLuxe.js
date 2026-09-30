@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import {
   listContentItems,
@@ -10,7 +11,7 @@ import {
 } from '../../services/compositionApi';
 import { listPrintFormats } from '../../services/ordersApi';
 import { applyLifecycleStatus } from '../../utils/bookLifecycle';
-import { formatPriceCentsDelta as formatEurosDelta } from '../../utils/orderWorkflow';
+import { formatPriceCents, formatPriceCentsDelta as formatEurosDelta } from '../../utils/orderWorkflow';
 import { PageZoomStage, ZoomControls } from '../common/PageZoomStage';
 import FadeInFrame from '../common/FadeInFrame';
 import PrintQualityRecapModal from '../common/PrintQualityRecapModal';
@@ -43,9 +44,9 @@ import './BookPreviewFinalLuxe.css';
 // spine/coverLabel mis a jour en consequence : Standard redevient "souple"
 // (etait etiquete "rigide" avant que la vraie distinction imprimeur existe).
 const PRINT_FORMATS = [
-  { id: 'livret', label: 'Livret', tagline: 'Simple & élégant', description: 'Un format carré et léger pour conserver vos souvenirs.', dimensions: '20 × 20 cm', widthMm: 200, heightMm: 200, spine: 'soft', coverLabel: 'couverture souple' },
-  { id: 'standard', label: 'Standard', badge: '⭐', tagline: 'Le livre souvenir', description: 'Le meilleur équilibre entre qualité et prix.', dimensions: '21 × 28 cm', widthMm: 210, heightMm: 280, spine: 'soft', coverLabel: 'couverture souple' },
-  { id: 'luxe', label: 'Luxe', tagline: 'Premium & intemporel', description: 'Une finition haut de gamme pour un livre à conserver ou à offrir.', dimensions: '21 × 28 cm', widthMm: 210, heightMm: 280, spine: 'premium', coverLabel: 'couverture rigide' }
+  { id: 'livret', dimensions: '20 × 20 cm', widthMm: 200, heightMm: 200, spine: 'soft' },
+  { id: 'standard', badge: '⭐', dimensions: '21 × 28 cm', widthMm: 210, heightMm: 280, spine: 'soft' },
+  { id: 'luxe', dimensions: '21 × 28 cm', widthMm: 210, heightMm: 280, spine: 'premium' }
 ];
 
 const normalizePrintFormat = (value) => (
@@ -150,11 +151,10 @@ function ScaledPageFrame({ html, title, naturalWidthPx, naturalHeightPx, wrapCla
   );
 }
 
-const formatEuro = (cents) => (
-  cents == null ? '—' : (Number(cents) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-);
-
 export default function BookPreviewFinalLuxe() {
+  const { t, i18n } = useTranslation('preview');
+  const locale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
+  const formatEuro = (cents) => (cents == null ? '—' : formatPriceCents(cents, 'EUR', locale));
   const { bookId } = useParams();
   const navigate = useNavigate();
 
@@ -203,11 +203,11 @@ export default function BookPreviewFinalLuxe() {
         supabase.from('books').select('*').eq('id', bookId).single(),
         listContentItems(bookId)
       ]);
-      if (bookError) throw new Error(bookError.message || 'Livre introuvable.');
+      if (bookError) throw new Error(bookError.message || t('errors.bookNotFound'));
       setBook(bookRow);
       setItems(itemList || []);
     } catch (err) {
-      setError(err.message || 'Erreur de chargement.');
+      setError(err.message || t('errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -415,15 +415,15 @@ export default function BookPreviewFinalLuxe() {
     };
     const before = totalFor(currentFormat);
     const after = totalFor(formatId);
-    const formatLabel = PRINT_FORMATS.find((format) => format.id === formatId)?.label || formatId;
+    const formatLabel = PRINT_FORMATS.some((format) => format.id === formatId) ? t(`formats.${formatId}.label`) : formatId;
     try {
       const { book: updatedBook } = await changeFormatOnly(bookId, formatId);
       setBook((previous) => ({ ...previous, ...updatedBook }));
       if (Number.isFinite(before) && Number.isFinite(after) && before !== after) {
-        showPriceDelta({ label: `Format ${formatLabel}`, priceCents: after - before });
+        showPriceDelta({ label: t('priceDelta.formatLabel', { format: formatLabel }), priceCents: after - before });
       }
     } catch (err) {
-      setError(err?.message || 'Impossible de changer le format.');
+      setError(err?.message || t('errors.formatChangeFailed'));
     } finally {
       setSwitchingFormat(false);
     }
@@ -438,7 +438,7 @@ export default function BookPreviewFinalLuxe() {
       await applyLifecycleStatus('finalized', { book, onUpdateBook: handleUpdateBook });
       navigate(`/book/${bookId}/checkout`);
     } catch (_err) {
-      setError('Impossible de continuer vers la commande.');
+      setError(t('errors.checkoutFailed'));
       setOrdering(false);
     }
   };
@@ -481,12 +481,12 @@ export default function BookPreviewFinalLuxe() {
   };
 
   const viewLabel = viewKind === 'cover'
-    ? 'Couverture'
+    ? t('viewLabel.cover')
     : viewKind === 'back-cover'
-      ? '4e de couverture'
+      ? t('viewLabel.backCover')
       : (leftPageIndex != null && rightPageIndex != null)
-        ? `Pages ${leftPageIndex + 1}-${rightPageIndex + 1} / ${totalPages}`
-        : `Page ${(leftPageIndex != null ? leftPageIndex : rightPageIndex) + 1} / ${totalPages}`;
+        ? t('viewLabel.spreadPages', { left: leftPageIndex + 1, right: rightPageIndex + 1, total: totalPages })
+        : t('viewLabel.singlePage', { page: (leftPageIndex != null ? leftPageIndex : rightPageIndex) + 1, total: totalPages });
   const hasCurrentContent = viewKind === 'spread' ? Boolean(leftHtml || rightHtml) : Boolean(singleHtml);
   // Total = livre + livraison du format actuel (§3 : jamais un montant
   // "livraison incluse" sans le detail juste au-dessus, mais un total unique
@@ -514,19 +514,19 @@ export default function BookPreviewFinalLuxe() {
   const fullscreenPageChangeKey = `${currentFormat}-${viewKind}-${viewIndex}`;
 
   if (loading) {
-    return <div className="atelier-loading">Chargement de votre livre...</div>;
+    return <div className="atelier-loading">{t('loading')}</div>;
   }
   if (!book) {
-    return <div className="atelier-loading">{error || 'Livre introuvable.'}</div>;
+    return <div className="atelier-loading">{error || t('errors.bookNotFound')}</div>;
   }
 
   return (
     <div className="preview-final-container">
       <header className="preview-final-header">
-        <Link to={`/book/${bookId}/atelier`} className="preview-final-back-link">← Modifier mon livre</Link>
+        <Link to={`/book/${bookId}/atelier`} className="preview-final-back-link">← {t('header.backToEdit')}</Link>
         <div>
-          <h1 className="preview-final-title">Votre livre est prêt</h1>
-          <p className="preview-final-subtitle">Feuilletez votre livre avant de choisir son format.</p>
+          <h1 className="preview-final-title">{t('header.title')}</h1>
+          <p className="preview-final-subtitle">{t('header.subtitle')}</p>
         </div>
       </header>
 
@@ -534,15 +534,15 @@ export default function BookPreviewFinalLuxe() {
 
       <div className="preview-final-layout">
         <div className="preview-final-stage">
-          {loadingPage && <p className="preview-final-loading">Chargement de la page...</p>}
+          {loadingPage && <p className="preview-final-loading">{t('stage.loadingPage')}</p>}
           <button
             type="button"
             className="preview-final-fullscreen-btn"
             onClick={() => setIsFullscreen(true)}
             disabled={!hasCurrentContent}
-            title="Prévisualiser : le livre en grand, proportions réelles"
+            title={t('stage.previewTitle')}
           >
-            ⛶ <span>Prévisualiser</span>
+            ⛶ <span>{t('stage.preview')}</span>
           </button>
           {viewKind === 'spread' ? (
             <div className="preview-final-spread">
@@ -552,7 +552,7 @@ export default function BookPreviewFinalLuxe() {
                 <ScaledPageFrame
                   key={`${currentFormat}-left`}
                   html={leftHtml}
-                  title="Page gauche"
+                  title={t('stage.leftPage')}
                   naturalWidthPx={naturalPageWidthPx}
                   naturalHeightPx={naturalPageHeightPx}
                   wrapClassName="preview-final-frame-wrap"
@@ -564,7 +564,7 @@ export default function BookPreviewFinalLuxe() {
                 <ScaledPageFrame
                   key={`${currentFormat}-right`}
                   html={rightHtml}
-                  title="Page droite"
+                  title={t('stage.rightPage')}
                   naturalWidthPx={naturalPageWidthPx}
                   naturalHeightPx={naturalPageHeightPx}
                   wrapClassName="preview-final-frame-wrap"
@@ -577,7 +577,7 @@ export default function BookPreviewFinalLuxe() {
             <ScaledPageFrame
               key={`${currentFormat}-single`}
               html={singleHtml}
-              title="Aperçu"
+              title={t('stage.cover')}
               naturalWidthPx={naturalPageWidthPx}
               naturalHeightPx={naturalPageHeightPx}
               wrapClassName="preview-final-frame-wrap preview-final-frame-wrap-single"
@@ -595,16 +595,16 @@ export default function BookPreviewFinalLuxe() {
               className="preview-final-nav-jump"
               onClick={goToCover}
               disabled={!canGoPrevious}
-              title="Aller à la couverture"
-              aria-label="Aller à la couverture"
+              title={t('nav.goToCover')}
+              aria-label={t('nav.goToCover')}
             >
               ⇤
             </button>
-            <button type="button" className="preview-final-nav-arrow" onClick={goPrevious} disabled={!canGoPrevious} aria-label="Page précédente">
+            <button type="button" className="preview-final-nav-arrow" onClick={goPrevious} disabled={!canGoPrevious} aria-label={t('nav.previousPage')}>
               ‹
             </button>
             <span className="preview-final-nav-label">{viewLabel}</span>
-            <button type="button" className="preview-final-nav-arrow" onClick={goNext} disabled={!canGoNext} aria-label="Page suivante">
+            <button type="button" className="preview-final-nav-arrow" onClick={goNext} disabled={!canGoNext} aria-label={t('nav.nextPage')}>
               ›
             </button>
             <button
@@ -612,8 +612,8 @@ export default function BookPreviewFinalLuxe() {
               className="preview-final-nav-jump"
               onClick={goToBackCover}
               disabled={!canGoNext}
-              title="Aller à la 4e de couverture"
-              aria-label="Aller à la 4e de couverture"
+              title={t('nav.goToBackCover')}
+              aria-label={t('nav.goToBackCover')}
             >
               ⇥
             </button>
@@ -622,15 +622,15 @@ export default function BookPreviewFinalLuxe() {
 
         <aside className="preview-final-sidebar">
           <div className="preview-final-sidebar-section">
-            <span className="preview-final-sidebar-label">Votre livre</span>
-            <p className="preview-final-book-title">{book.title || 'Livre sans titre'}</p>
+            <span className="preview-final-sidebar-label">{t('sidebar.yourBook')}</span>
+            <p className="preview-final-book-title">{book.title || t('sidebar.untitledBook')}</p>
             <p className="preview-final-book-stats">
-              📖 {totalPages} pages · 📷 {photosCount} photos · ✍️ {souvenirsCount} souvenirs
+              {t('sidebar.stats', { pages: totalPages, photos: photosCount, memories: souvenirsCount })}
             </p>
           </div>
 
           <div className="preview-final-sidebar-section">
-            <span className="preview-final-sidebar-label">Votre format</span>
+            <span className="preview-final-sidebar-label">{t('sidebar.yourFormat')}</span>
             {/* Pagination IDENTIQUE pour les 3 formats desormais (retour
                 utilisateur, 2026-09-27, §9) : changer de format ne recompose
                 plus rien, book.page_count ne bouge jamais d'une carte a
@@ -650,14 +650,14 @@ export default function BookPreviewFinalLuxe() {
                     style={{ '--spine-thickness': `${Math.min(10, 2 + (totalPages || 16) / 8)}px` }}
                     aria-hidden="true"
                   />
-                  <span className="preview-final-format-name">{format.label} {format.badge || ''}</span>
-                  <span className="preview-final-format-tagline">{format.tagline}</span>
-                  <span className="preview-final-format-description">{format.description}</span>
-                  <span className="preview-final-format-dimensions">{format.dimensions} · {format.coverLabel}</span>
+                  <span className="preview-final-format-name">{t(`formats.${format.id}.label`)} {format.badge || ''}</span>
+                  <span className="preview-final-format-tagline">{t(`formats.${format.id}.tagline`)}</span>
+                  <span className="preview-final-format-description">{t(`formats.${format.id}.description`)}</span>
+                  <span className="preview-final-format-dimensions">{format.dimensions} · {t(`formats.${format.id}.coverLabel`)}</span>
                   {/* Meme pagination pour les 3 cartes (retour utilisateur,
                       §9) — affichee quand meme sur chacune : confirme
                       visuellement qu'elle ne bouge pas d'un format a l'autre. */}
-                  <span className="preview-final-format-pagecount">{totalPages} pages</span>
+                  <span className="preview-final-format-pagecount">{t('sidebar.pagesCount', { count: totalPages })}</span>
                   <span className="preview-final-format-price">{formatEuro(formatPricing[format.id]?.bookPriceCents)}</span>
                 </button>
               ))}
@@ -670,25 +670,25 @@ export default function BookPreviewFinalLuxe() {
           <div className="preview-final-sidebar-section preview-final-total">
             {priceDelta && (
               <p className="preview-final-price-delta">
-                {priceDelta.label} · {formatEurosDelta(priceDelta.priceCents)}
+                {priceDelta.label} · {formatEurosDelta(priceDelta.priceCents, 'EUR', locale)}
               </p>
             )}
             <div className="preview-final-price-line">
-              <span>Votre livre</span>
+              <span>{t('sidebar.yourBookLine')}</span>
               <span>{formatEuro(currentBookPriceCents)}</span>
             </div>
             <div className="preview-final-price-line">
-              <span>Livraison</span>
+              <span>{t('sidebar.delivery')}</span>
               <span>{formatEuro(currentShippingCents)}</span>
             </div>
             <div className="preview-final-price-line preview-final-price-line-total">
-              <span className="preview-final-sidebar-label">Total</span>
+              <span className="preview-final-sidebar-label">{t('sidebar.total')}</span>
               <p className="preview-final-total-price">{formatEuro(currentTotalCents)}</p>
             </div>
           </div>
 
           <button type="button" className="btn btn-primary preview-final-order-btn" onClick={handleOrder} disabled={ordering}>
-            {ordering ? 'Un instant...' : `Commander mon livre → ${formatEuro(currentTotalCents)}`}
+            {ordering ? t('sidebar.ordering') : `${t('sidebar.orderButton')} → ${formatEuro(currentTotalCents)}`}
           </button>
         </aside>
       </div>
@@ -727,10 +727,10 @@ export default function BookPreviewFinalLuxe() {
                   position de page (deja affichee en bas) — le livre est le
                   centre de l'experience, pas la chrome (cahier des charges
                   §6 : "reduire fortement les elements d'interface"). */}
-              <span>Votre livre est prêt</span>
-              <button type="button" className="atelier-modal-close" onClick={() => setIsFullscreen(false)} aria-label="Fermer">×</button>
+              <span>{t('header.title')}</span>
+              <button type="button" className="atelier-modal-close" onClick={() => setIsFullscreen(false)} aria-label={t('fullscreen.close')}>×</button>
             </div>
-            {loadingPage && <p className="preview-final-loading is-on-dark">Chargement de la page...</p>}
+            {loadingPage && <p className="preview-final-loading is-on-dark">{t('stage.loadingPage')}</p>}
 
             <div className="preview-final-fullscreen-stage-wrap">
               <PageZoomStage
@@ -746,7 +746,7 @@ export default function BookPreviewFinalLuxe() {
                   <div className="preview-final-zoom-spread preview-final-zoom-page-change" key={fullscreenPageChangeKey}>
                     {leftPageIndex != null && (
                       leftHtml ? (
-                        <FadeInFrame title="Page gauche" srcDoc={leftHtml} className="preview-final-zoom-frame" />
+                        <FadeInFrame title={t('stage.leftPage')} srcDoc={leftHtml} className="preview-final-zoom-frame" />
                       ) : (
                         <div className="atelier-page-placeholder" />
                       )
@@ -754,7 +754,7 @@ export default function BookPreviewFinalLuxe() {
                     {isFullscreenSpreadWithBothPages && <span className="preview-final-zoom-spine" aria-hidden="true" />}
                     {rightPageIndex != null && (
                       rightHtml ? (
-                        <FadeInFrame title="Page droite" srcDoc={rightHtml} className="preview-final-zoom-frame" />
+                        <FadeInFrame title={t('stage.rightPage')} srcDoc={rightHtml} className="preview-final-zoom-frame" />
                       ) : (
                         <div className="atelier-page-placeholder" />
                       )
@@ -763,7 +763,7 @@ export default function BookPreviewFinalLuxe() {
                 ) : (
                   <div className="preview-final-zoom-single preview-final-zoom-page-change" key={fullscreenPageChangeKey}>
                     {singleHtml ? (
-                      <FadeInFrame title="Aperçu plein écran" srcDoc={singleHtml} className="preview-final-zoom-frame" />
+                      <FadeInFrame title={t('fullscreen.fullscreenPreview')} srcDoc={singleHtml} className="preview-final-zoom-frame" />
                     ) : (
                       <div className="atelier-page-placeholder" />
                     )}
@@ -782,17 +782,17 @@ export default function BookPreviewFinalLuxe() {
                 le bloc : sans lui, cliquer une fleche ou "+" fermerait aussi
                 le calque. */}
             <div className="preview-final-realsize-footer" onClick={(event) => event.stopPropagation()}>
-              <button type="button" className="preview-final-realsize-jump" onClick={goToCover} disabled={!canGoPrevious} title="Aller à la couverture" aria-label="Aller à la couverture">
+              <button type="button" className="preview-final-realsize-jump" onClick={goToCover} disabled={!canGoPrevious} title={t('nav.goToCover')} aria-label={t('nav.goToCover')}>
                 ⇤
               </button>
-              <button type="button" className="preview-final-realsize-nav-arrow" onClick={goPrevious} disabled={!canGoPrevious} aria-label="Page précédente">
+              <button type="button" className="preview-final-realsize-nav-arrow" onClick={goPrevious} disabled={!canGoPrevious} aria-label={t('nav.previousPage')}>
                 ‹
               </button>
               <span className="preview-final-fullscreen-nav-label">{viewLabel}</span>
-              <button type="button" className="preview-final-realsize-nav-arrow" onClick={goNext} disabled={!canGoNext} aria-label="Page suivante">
+              <button type="button" className="preview-final-realsize-nav-arrow" onClick={goNext} disabled={!canGoNext} aria-label={t('nav.nextPage')}>
                 ›
               </button>
-              <button type="button" className="preview-final-realsize-jump" onClick={goToBackCover} disabled={!canGoNext} title="Aller à la 4e de couverture" aria-label="Aller à la 4e de couverture">
+              <button type="button" className="preview-final-realsize-jump" onClick={goToBackCover} disabled={!canGoNext} title={t('nav.goToBackCover')} aria-label={t('nav.goToBackCover')}>
                 ⇥
               </button>
               <span className="preview-final-realsize-footer-divider" aria-hidden="true" />
