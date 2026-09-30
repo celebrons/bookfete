@@ -490,7 +490,12 @@ router.post('/api/public/share/:token/text', resolveBookByShareToken, async (req
       return res.status(400).json({ error: 'Texte manquant.' });
     }
     const contributorName = typeof req.body?.contributorName === 'string' ? req.body.contributorName.trim() : '';
+    const contributorEmail = typeof req.body?.contributorEmail === 'string' ? req.body.contributorEmail.trim() : '';
     const contributionId = typeof req.body?.contributionId === 'string' ? req.body.contributionId : null;
+
+    const metadata = {};
+    if (contributorName) metadata.contributor_name = contributorName;
+    if (contributorEmail) metadata.contributor_email = contributorEmail;
 
     const displayOrder = await nextDisplayOrder(req.book.id);
     const data = await bookContentService.createContentItem(req.book.id, {
@@ -499,7 +504,7 @@ router.post('/api/public/share/:token/text', resolveBookByShareToken, async (req
       text,
       contribution_id: contributionId,
       display_order: displayOrder,
-      metadata: contributorName ? { contributor_name: contributorName } : {}
+      metadata
     });
     res.status(201).json(data);
   } catch (error) {
@@ -527,9 +532,12 @@ router.post(
       }
 
       const contributorName = typeof req.body?.contributorName === 'string' ? req.body.contributorName.trim() : '';
+      const contributorEmail = typeof req.body?.contributorEmail === 'string' ? req.body.contributorEmail.trim() : '';
       const contributionId = typeof req.body?.contributionId === 'string' ? req.body.contributionId : null;
 
-      const metadata = contributorName ? { contributor_name: contributorName } : {};
+      const metadata = {};
+      if (contributorName) metadata.contributor_name = contributorName;
+      if (contributorEmail) metadata.contributor_email = contributorEmail;
       if (uploadResult.orientation) metadata.orientation = uploadResult.orientation;
       if (uploadResult.ratio) metadata.ratio = uploadResult.ratio;
       if (uploadResult.width) metadata.width = uploadResult.width;

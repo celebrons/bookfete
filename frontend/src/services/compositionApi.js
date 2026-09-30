@@ -413,15 +413,16 @@ export const getPrintQualityCheck = (bookId) => request(`/books/${bookId}/print-
 
 export const fetchShareInfo = (token) => publicRequest(`/public/share/${token}`);
 
-export const submitShareText = (token, { text, contributorName, contributionId }) => publicRequest(
+export const submitShareText = (token, { text, contributorName, contributorEmail, contributionId }) => publicRequest(
   `/public/share/${token}/text`,
-  { method: 'POST', body: JSON.stringify({ text, contributorName, contributionId }) }
+  { method: 'POST', body: JSON.stringify({ text, contributorName, contributorEmail, contributionId }) }
 );
 
-export const submitSharePhoto = async (token, file, { contributorName, contributionId }) => {
+export const submitSharePhoto = async (token, file, { contributorName, contributorEmail, contributionId }) => {
   const formData = new FormData();
   formData.append('photo', file);
   if (contributorName) formData.append('contributorName', contributorName);
+  if (contributorEmail) formData.append('contributorEmail', contributorEmail);
   if (contributionId) formData.append('contributionId', contributionId);
 
   const response = await publicRawRequest(`/public/share/${token}/photo`, {
