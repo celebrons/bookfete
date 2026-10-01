@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import Loading from '../common/Loading';
 import ContributionAmorceBlock from './ContributionAmorceBlock';
@@ -16,6 +17,7 @@ const buildApiUrl = (token) => {
 };
 
 const TokenContributePageLuxe = () => {
+  const { t } = useTranslation('collective');
   const { token } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -42,7 +44,7 @@ const TokenContributePageLuxe = () => {
 
   useEffect(() => {
     if (!token) {
-      setError('Token manquant');
+      setError(t('tokenContribute.missingToken'));
       setLoading(false);
       return;
     }
@@ -53,7 +55,7 @@ const TokenContributePageLuxe = () => {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || 'Lien invalide ou expire');
+          throw new Error(data.error || t('tokenContribute.invalidOrExpiredLink'));
         }
 
         setInvitation(data);
@@ -152,14 +154,14 @@ const TokenContributePageLuxe = () => {
     const files = Array.from(event.target.files || []);
 
     if (photos.length + files.length > 2) {
-      alert('Maximum 2 photos');
+      alert(t('tokenContribute.maxPhotos'));
       return;
     }
 
     const validFiles = files.filter((file) => {
       const isValid = file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024;
       if (!isValid) {
-        alert(`${file.name} : format invalide ou trop volumineux (max 5MB)`);
+        alert(t('tokenContribute.invalidFileFormat', { name: file.name }));
       }
       return isValid;
     });
@@ -196,7 +198,7 @@ const TokenContributePageLuxe = () => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Erreur lors de l envoi');
+      throw new Error(data.error || t('tokenContribute.sendFailed'));
     }
 
     return data;
@@ -238,7 +240,7 @@ const TokenContributePageLuxe = () => {
   };
 
   if (loading) {
-    return <Loading message="Chargement de votre contribution..." />;
+    return <Loading message={t('tokenContribute.loading')} />;
   }
 
   if (error) {
@@ -246,12 +248,12 @@ const TokenContributePageLuxe = () => {
       <div className="invitation-container">
         <div className="invitation-card" style={{ textAlign: 'center' }}>
           <div className="empty-state-icon">•</div>
-          <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-md)' }}>Oups !</h2>
+          <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-md)' }}>{t('tokenContribute.oopsTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-xl)' }}>
             {error}
           </p>
           <button onClick={() => navigate('/')} className="btn btn-primary">
-            Retour a l accueil
+            {t('tokenContribute.backHome')}
           </button>
         </div>
       </div>
@@ -263,12 +265,12 @@ const TokenContributePageLuxe = () => {
       <div className="invitation-container">
         <div className="invitation-card" style={{ textAlign: 'center' }}>
           <div className="empty-state-icon">*</div>
-          <h2 style={{ color: 'var(--gold)', marginBottom: 'var(--space-md)' }}>Merci !</h2>
+          <h2 style={{ color: 'var(--gold)', marginBottom: 'var(--space-md)' }}>{t('tokenContribute.thanksTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-sm)' }}>
-            Votre contribution a ete envoyee avec succes.
+            {t('tokenContribute.thanksBody')}
           </p>
           <p className="body-text" style={{ color: 'var(--text-light)' }}>
-            {invitation?.organizerName || "L'organisateur"} la validera prochainement.
+            {t('tokenContribute.organizerWillValidate', { organizer: invitation?.organizerName || t('tokenContribute.defaultOrganizer') })}
           </p>
         </div>
       </div>
@@ -279,12 +281,12 @@ const TokenContributePageLuxe = () => {
     <div className="invitation-container">
       <div className="invitation-card">
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
-          <span className="label-gold">VOTRE CONTRIBUTION</span>
+          <span className="label-gold">{t('tokenContribute.yourContribution')}</span>
           <h1 style={{ fontSize: '32px', fontWeight: '600', color: 'var(--ink)', marginTop: 'var(--space-sm)' }}>
             {invitation?.bookTitle}
           </h1>
           <p style={{ color: 'var(--text-light)', fontSize: '16px' }}>
-            Chapitre : <strong>{invitation?.chapterTitle}</strong>
+            {t('tokenContribute.chapterLabel')}<strong>{invitation?.chapterTitle}</strong>
           </p>
         </div>
 
@@ -297,19 +299,19 @@ const TokenContributePageLuxe = () => {
               marginBottom: 'var(--space-lg)'
             }}
           >
-            <p style={{ fontWeight: '600', marginBottom: 'var(--space-xs)' }}>Demande de modification :</p>
+            <p style={{ fontWeight: '600', marginBottom: 'var(--space-xs)' }}>{t('tokenContribute.revisionRequestTitle')}</p>
             <p style={{ fontStyle: 'italic', color: 'var(--ink)' }}>"{moderationFeedback}"</p>
           </div>
         ) : null}
 
         <form onSubmit={(event) => event.preventDefault()}>
           <div className="form-group">
-            <label className="label-gold">Votre nom</label>
+            <label className="label-gold">{t('tokenContribute.yourNameLabel')}</label>
             <input
               type="text"
               value={formData.name}
               onChange={(event) => setFormData((prev) => ({ ...prev, name: event.target.value }))}
-              placeholder="Comment souhaitez-vous etre nomme ?"
+              placeholder={t('tokenContribute.namePlaceholder')}
               className="input-luxe"
             />
           </div>
@@ -323,11 +325,11 @@ const TokenContributePageLuxe = () => {
 
           {existingPhotoUrls.length > 0 ? (
             <div className="form-group">
-              <label className="label-gold">Photos deja envoyees</label>
+              <label className="label-gold">{t('tokenContribute.existingPhotosLabel')}</label>
               <div className="photo-grid">
                 {existingPhotoUrls.map((url, index) => (
                   <div key={index} className="photo-item">
-                    <img src={url} alt={`Illustration ${index + 1}`} />
+                    <img src={url} alt={t('tokenContribute.illustration', { number: index + 1 })} />
                     <button
                       type="button"
                       onClick={() => {
@@ -346,11 +348,11 @@ const TokenContributePageLuxe = () => {
 
           {uploadedPhotoUrls.length > 0 ? (
             <div className="form-group">
-              <label className="label-gold">Nouvelles photos</label>
+              <label className="label-gold">{t('tokenContribute.newPhotosLabel')}</label>
               <div className="photo-grid">
                 {uploadedPhotoUrls.map((url, index) => (
                   <div key={index} className="photo-item">
-                    <img src={url} alt={`Illustration importee ${index + 1}`} />
+                    <img src={url} alt={t('tokenContribute.importedIllustration', { number: index + 1 })} />
                     <button
                       type="button"
                       onClick={() => {
@@ -369,7 +371,7 @@ const TokenContributePageLuxe = () => {
           ) : null}
 
           <div className="form-group">
-            <label className="label-gold">Ajouter une photo</label>
+            <label className="label-gold">{t('tokenContribute.addPhotoLabel')}</label>
             <input
               type="file"
               accept="image/*"
@@ -391,10 +393,10 @@ const TokenContributePageLuxe = () => {
                 }}
               >
                 <span style={{ marginRight: 'var(--space-xs)' }}>📷</span>
-                {uploading ? 'Upload...' : 'Choisir des photos'}
+                {uploading ? t('tokenContribute.uploadingShort') : t('tokenContribute.choosePhotos')}
               </label>
               <span className="body-text" style={{ fontSize: '13px' }}>
-                {photos.length}/2 nouvelles photos
+                {t('tokenContribute.newPhotosCount', { count: photos.length })}
               </span>
             </div>
           </div>
@@ -414,7 +416,7 @@ const TokenContributePageLuxe = () => {
               }}
             >
               <span>✓</span>
-              <span>Brouillon sauvegarde</span>
+              <span>{t('tokenContribute.draftSaved')}</span>
             </div>
           ) : null}
 
@@ -433,7 +435,7 @@ const TokenContributePageLuxe = () => {
           >
             <span style={{ fontSize: '20px' }}>⚡</span>
             <p style={{ margin: 0, fontSize: '14px' }}>
-              La validation est definitive. Vous pouvez sauvegarder un brouillon et revenir plus tard.
+              {t('tokenContribute.validationNote')}
             </p>
           </div>
 
@@ -446,7 +448,7 @@ const TokenContributePageLuxe = () => {
               style={{ flex: 1 }}
             >
               <span style={{ marginRight: 'var(--space-xs)' }}>💾</span>
-              {saving ? 'Sauvegarde...' : 'Sauvegarder le brouillon'}
+              {saving ? t('tokenContribute.saving') : t('tokenContribute.saveDraft')}
             </button>
 
             <button
@@ -457,7 +459,7 @@ const TokenContributePageLuxe = () => {
               style={{ flex: 2 }}
             >
               <span style={{ marginRight: 'var(--space-xs)' }}>✦</span>
-              {submitting ? 'Envoi...' : 'Valider definitivement'}
+              {submitting ? t('tokenContribute.sendingShort') : t('tokenContribute.validateDefinitively')}
             </button>
           </div>
 
@@ -471,7 +473,7 @@ const TokenContributePageLuxe = () => {
                 fontStyle: 'italic'
               }}
             >
-              Brouillon sauvegarde - Vous pouvez revenir plus tard avec le meme lien
+              {t('tokenContribute.draftSavedNote')}
             </p>
           ) : null}
         </form>

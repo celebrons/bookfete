@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Loading from '../common/Loading';
 import {
   fetchCollectiveInvite,
@@ -27,6 +28,7 @@ import './InvitationLuxe.css';
 // ne les expose, "Deja envoye" ci-dessous ne liste que les envois de CETTE
 // session.
 const CollectiveParticipateLuxe = () => {
+  const { t, i18n } = useTranslation('collective');
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,7 +43,7 @@ const CollectiveParticipateLuxe = () => {
 
   useEffect(() => {
     if (!token) {
-      setError('Lien invalide.');
+      setError(t('participate.invalidLink'));
       setLoading(false);
       return;
     }
@@ -50,7 +52,7 @@ const CollectiveParticipateLuxe = () => {
         setInvite(info);
         if (info.status === 'completed') setDone(true);
       })
-      .catch((err) => setError(err.message || 'Lien invalide ou expire.'))
+      .catch((err) => setError(err.message || t('participate.invalidOrExpiredLink')))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -63,7 +65,7 @@ const CollectiveParticipateLuxe = () => {
       setSentItems((previous) => [...previous, { kind: 'texte', label: text.slice(0, 60) }]);
       setMessage('');
     } catch (err) {
-      setError(err.message || "L'envoi a echoue.");
+      setError(err.message || t('participate.sendFailed'));
     } finally {
       setSendingText(false);
     }
@@ -86,7 +88,7 @@ const CollectiveParticipateLuxe = () => {
         setSentItems((previous) => [...previous, { kind: 'photo', label: file.name, previewUrl }]);
       }
     } catch (err) {
-      setError(err.message || "L'envoi a echoue.");
+      setError(err.message || t('participate.sendFailed'));
     } finally {
       setUploadingPhotos(false);
       event.target.value = '';
@@ -99,25 +101,25 @@ const CollectiveParticipateLuxe = () => {
       await finishCollectiveContribution(token);
       setDone(true);
     } catch (err) {
-      setError(err.message || "Impossible de terminer pour l'instant.");
+      setError(err.message || t('participate.finishFailed'));
       setFinishing(false);
     }
   };
 
   const formatDeadline = (value) => {
     if (!value) return '';
-    return new Date(`${value}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    return new Date(`${value}T00:00:00`).toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
   if (loading) {
-    return <Loading message="Chargement..." />;
+    return <Loading message={t('participate.loading')} />;
   }
 
   if (error && !invite) {
     return (
       <div className="invitation-container">
         <div className="invitation-card" style={{ textAlign: 'center' }}>
-          <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-md)' }}>Lien invalide</h2>
+          <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-md)' }}>{t('participate.invalidLinkTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)' }}>{error}</p>
         </div>
       </div>
@@ -128,9 +130,9 @@ const CollectiveParticipateLuxe = () => {
     return (
       <div className="invitation-container">
         <div className="invitation-card" style={{ textAlign: 'center' }}>
-          <h2 style={{ color: 'var(--gold)', marginBottom: 'var(--space-md)' }}>Merci ❤️</h2>
+          <h2 style={{ color: 'var(--gold)', marginBottom: 'var(--space-md)' }}>{t('participate.thanksTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)' }}>
-            Votre souvenir a bien été transmis {invite?.eventTitle ? `pour "${invite.eventTitle}"` : `pour "${invite?.bookTitle}"`}.
+            {t('participate.thanksBodyFor', { title: invite?.eventTitle || invite?.bookTitle })}
           </p>
         </div>
       </div>
@@ -145,7 +147,8 @@ const CollectiveParticipateLuxe = () => {
     <div className="invitation-container">
       <div className="invitation-card">
         <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-sm)' }}>
-          {invite?.participantName ? `Bonjour ${invite.participantName} — ` : ''}Participez au livre souvenir{eventTitle ? ` de ${eventTitle}` : ''}
+          {invite?.participantName ? t('participate.greetingWithName', { name: invite.participantName }) : ''}
+          {t('participate.participateIn')}{eventTitle ? t('participate.participateInEventSuffix', { event: eventTitle }) : ''}
         </h2>
         {invite?.message && (
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-sm)', whiteSpace: 'pre-wrap' }}>
@@ -154,12 +157,12 @@ const CollectiveParticipateLuxe = () => {
         )}
         {invite?.deadline && (
           <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-lg)', fontSize: 13 }}>
-            📅 Date limite de participation : {formatDeadline(invite.deadline)}
+            {t('participate.deadlineLabel', { date: formatDeadline(invite.deadline) })}
           </p>
         )}
 
         {invite?.isClosed ? (
-          <div className="wizard-error">La collecte de souvenirs est terminée. Merci de votre intérêt !</div>
+          <div className="wizard-error">{t('participate.collectionClosed')}</div>
         ) : (
           <>
             {error && <div className="wizard-error">{error}</div>}
@@ -168,7 +171,7 @@ const CollectiveParticipateLuxe = () => {
                 souvenir le plus simple a donner en arrivant sur ce lien,
                 avant de demander un texte. */}
             <div className="form-group">
-              <label htmlFor="collective-photos">Une ou plusieurs photos</label>
+              <label htmlFor="collective-photos">{t('participate.photosLabel')}</label>
               <input
                 id="collective-photos"
                 type="file"
@@ -177,7 +180,7 @@ const CollectiveParticipateLuxe = () => {
                 onChange={handleAddPhotos}
                 disabled={uploadingPhotos}
               />
-              {uploadingPhotos && <p className="body-text" style={{ color: 'var(--text-light)' }}>Envoi en cours...</p>}
+              {uploadingPhotos && <p className="body-text" style={{ color: 'var(--text-light)' }}>{t('participate.uploading')}</p>}
 
               {sentPhotos.length > 0 && (
                 <ul className="collective-photo-grid">
@@ -191,14 +194,14 @@ const CollectiveParticipateLuxe = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="collective-message">Un souvenir à raconter</label>
+              <label htmlFor="collective-message">{t('participate.memoryLabel')}</label>
               <textarea
                 id="collective-message"
                 className="input-luxe"
                 rows={4}
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                placeholder="Écrivez votre souvenir ici..."
+                placeholder={t('participate.memoryPlaceholder')}
               />
               <button
                 type="button"
@@ -207,7 +210,7 @@ const CollectiveParticipateLuxe = () => {
                 disabled={sendingText || !message.trim()}
                 style={{ marginTop: 8 }}
               >
-                {sendingText ? 'Envoi...' : 'Ajouter ce souvenir'}
+                {sendingText ? t('participate.sending') : t('participate.addMemory')}
               </button>
 
               {sentTexts.length > 0 && (
@@ -225,7 +228,7 @@ const CollectiveParticipateLuxe = () => {
               onClick={handleFinish}
               disabled={sentItems.length === 0 || finishing}
             >
-              {finishing ? 'Un instant...' : "Partager mon souvenir"}
+              {finishing ? t('participate.oneMoment') : t('participate.shareMyMemory')}
             </button>
           </>
         )}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Loading from '../common/Loading';
 import { fetchShareInfo, submitShareText, submitSharePhoto, deleteShareItem } from '../../services/compositionApi';
 import '../../styles/luxe-theme.css';
@@ -24,6 +25,7 @@ function generateContributionId() {
 }
 
 const BookShareJoinLuxe = () => {
+  const { t } = useTranslation('collective');
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,13 +43,13 @@ const BookShareJoinLuxe = () => {
 
   useEffect(() => {
     if (!token) {
-      setError('Lien invalide.');
+      setError(t('shareJoin.invalidLink'));
       setLoading(false);
       return;
     }
     fetchShareInfo(token)
-      .then((info) => setBookTitle(info.title || 'ce livre'))
-      .catch((err) => setError(err.message || 'Lien invalide ou expire.'))
+      .then((info) => setBookTitle(info.title || t('shareJoin.defaultBookTitle')))
+      .catch((err) => setError(err.message || t('shareJoin.invalidOrExpiredLink')))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -62,7 +64,7 @@ const BookShareJoinLuxe = () => {
       setSentItems((previous) => [...previous, { kind: 'texte', label: text.slice(0, 60) }]);
       setMessage('');
     } catch (err) {
-      setError(err.message || "L'envoi a echoue.");
+      setError(err.message || t('shareJoin.sendFailed'));
     } finally {
       setSendingText(false);
     }
@@ -87,7 +89,7 @@ const BookShareJoinLuxe = () => {
         setSentItems((previous) => [...previous, { id: created?.id, kind: 'photo', label: file.name, previewUrl }]);
       }
     } catch (err) {
-      setError(err.message || "L'envoi a echoue.");
+      setError(err.message || t('shareJoin.sendFailed'));
     } finally {
       setUploadingPhotos(false);
       event.target.value = '';
@@ -107,21 +109,21 @@ const BookShareJoinLuxe = () => {
       await deleteShareItem(token, item.id, contributionId);
       setSentItems((previous) => previous.filter((entry) => entry.id !== item.id));
     } catch (err) {
-      setError(err.message || 'Impossible de retirer cette photo.');
+      setError(err.message || t('shareJoin.removePhotoFailed'));
     } finally {
       setRemovingId('');
     }
   };
 
   if (loading) {
-    return <Loading message="Chargement..." />;
+    return <Loading message={t('shareJoin.loading')} />;
   }
 
   if (error && !bookTitle) {
     return (
       <div className="invitation-container">
         <div className="invitation-card" style={{ textAlign: 'center' }}>
-          <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-md)' }}>Lien invalide</h2>
+          <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-md)' }}>{t('shareJoin.invalidLinkTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)' }}>{error}</p>
         </div>
       </div>
@@ -132,9 +134,9 @@ const BookShareJoinLuxe = () => {
     return (
       <div className="invitation-container">
         <div className="invitation-card" style={{ textAlign: 'center' }}>
-          <h2 style={{ color: 'var(--gold)', marginBottom: 'var(--space-md)' }}>Merci !</h2>
+          <h2 style={{ color: 'var(--gold)', marginBottom: 'var(--space-md)' }}>{t('shareJoin.thanksTitle')}</h2>
           <p className="body-text" style={{ color: 'var(--text-light)' }}>
-            Vos souvenirs ont bien ete ajoutes a "{bookTitle}".
+            {t('shareJoin.thanksBody', { title: bookTitle })}
           </p>
         </div>
       </div>
@@ -144,10 +146,9 @@ const BookShareJoinLuxe = () => {
   return (
     <div className="invitation-container">
       <div className="invitation-card">
-        <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-sm)' }}>Contribuez à "{bookTitle}"</h2>
+        <h2 style={{ color: 'var(--ink)', marginBottom: 'var(--space-sm)' }}>{t('shareJoin.contributeTo', { title: bookTitle })}</h2>
         <p className="body-text" style={{ color: 'var(--text-light)', marginBottom: 'var(--space-lg)' }}>
-          Ajoutez une photo, un souvenir, ou les deux — pas besoin de compte. Vous pouvez ajouter plusieurs
-          souvenirs avant de terminer.
+          {t('shareJoin.intro')}
         </p>
 
         {error && <div className="wizard-error">{error}</div>}
@@ -157,29 +158,29 @@ const BookShareJoinLuxe = () => {
             simple a donner en arrivant sur ce lien — puis le mot ecrit,
             qui demande plus d'effort. Meme ordre que CollectiveParticipateLuxe.js. */}
         <div className="form-group">
-          <label htmlFor="contributor-name">Votre prénom (facultatif)</label>
+          <label htmlFor="contributor-name">{t('shareJoin.firstNameLabel')}</label>
           <input
             id="contributor-name"
             type="text"
             value={contributorName}
             onChange={(event) => setContributorName(event.target.value)}
-            placeholder="Facultatif"
+            placeholder={t('shareJoin.optional')}
           />
         </div>
 
         <div className="form-group">
-          <label htmlFor="contributor-email">Votre email (facultatif)</label>
+          <label htmlFor="contributor-email">{t('shareJoin.emailLabel')}</label>
           <input
             id="contributor-email"
             type="email"
             value={contributorEmail}
             onChange={(event) => setContributorEmail(event.target.value)}
-            placeholder="Facultatif"
+            placeholder={t('shareJoin.optional')}
           />
         </div>
 
         <div className="form-group">
-          <label htmlFor="contributor-photos">Une ou plusieurs photos</label>
+          <label htmlFor="contributor-photos">{t('shareJoin.photosLabel')}</label>
           <input
             id="contributor-photos"
             type="file"
@@ -188,7 +189,7 @@ const BookShareJoinLuxe = () => {
             onChange={handleAddPhotos}
             disabled={uploadingPhotos}
           />
-          {uploadingPhotos && <p className="body-text" style={{ color: 'var(--text-light)' }}>Envoi en cours...</p>}
+          {uploadingPhotos && <p className="body-text" style={{ color: 'var(--text-light)' }}>{t('shareJoin.uploading')}</p>}
 
           {/* Miniatures des photos deja envoyees (retour utilisateur,
               2026-09-30 : "il faut ajouter une miniature ou un apercu") —
@@ -203,8 +204,8 @@ const BookShareJoinLuxe = () => {
                     className="collective-photo-remove"
                     onClick={() => handleRemovePhoto(item)}
                     disabled={!item.id || removingId === item.id}
-                    aria-label={`Retirer ${item.label}`}
-                    title="Retirer cette photo"
+                    aria-label={t('shareJoin.removePhotoAria', { label: item.label })}
+                    title={t('shareJoin.removePhotoTitle')}
                   >
                     {removingId === item.id ? '…' : '✕'}
                   </button>
@@ -215,14 +216,14 @@ const BookShareJoinLuxe = () => {
         </div>
 
         <div className="form-group">
-          <label htmlFor="contributor-message">Un souvenir à raconter</label>
+          <label htmlFor="contributor-message">{t('shareJoin.memoryLabel')}</label>
           <textarea
             id="contributor-message"
             className="input-luxe"
             rows={4}
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder="Écrivez votre souvenir ici..."
+            placeholder={t('shareJoin.memoryPlaceholder')}
           />
           <button
             type="button"
@@ -231,7 +232,7 @@ const BookShareJoinLuxe = () => {
             disabled={sendingText || !message.trim()}
             style={{ marginTop: 8 }}
           >
-            {sendingText ? 'Envoi...' : 'Ajouter ce souvenir'}
+            {sendingText ? t('shareJoin.sending') : t('shareJoin.addMemory')}
           </button>
 
           {sentItems.some((item) => item.kind === 'texte') && (
@@ -249,7 +250,7 @@ const BookShareJoinLuxe = () => {
           onClick={() => setDone(true)}
           disabled={sentItems.length === 0}
         >
-          J'ai terminé
+          {t('shareJoin.finished')}
         </button>
       </div>
     </div>

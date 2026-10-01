@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 const ContributionAmorceBlock = ({
   amorceText = '',
@@ -6,6 +7,7 @@ const ContributionAmorceBlock = ({
   message = '',
   onChangeMessage
 }) => {
+  const { t } = useTranslation('collective');
   const safeTriggers = Array.isArray(triggers) ? triggers.filter(Boolean).slice(0, 4) : [];
   const activeTokens = safeTriggers.filter((trigger) => message.includes(trigger));
 
@@ -31,29 +33,29 @@ const ContributionAmorceBlock = ({
     <>
       {amorceText ? (
         <div className="contribution-amorce-card">
-          <div className="contribution-amorce-label">Amorce du chapitre</div>
+          <div className="contribution-amorce-label">{t('amorceBlock.chapterOpener')}</div>
           <p className="contribution-amorce-text">{amorceText}</p>
         </div>
       ) : null}
 
       <div className="form-group">
-        <label className="label-gold">Votre texte</label>
+        <label className="label-gold">{t('amorceBlock.yourText')}</label>
         <textarea
           value={message}
           onChange={(event) => onChangeMessage(event.target.value)}
           rows="6"
-          placeholder="Continuez a votre facon - une phrase, un paragraphe, tout est bienvenu."
+          placeholder={t('amorceBlock.placeholder')}
           className="input-luxe"
           style={{ resize: 'vertical' }}
         />
         <div className="contribution-char-count">
-          {String(message || '').length} caracteres
+          {t('amorceBlock.charCount', { count: String(message || '').length })}
         </div>
       </div>
 
       {safeTriggers.length > 0 ? (
         <div className="form-group">
-          <div className="contribution-trigger-header">Besoin d un coup de pouce ?</div>
+          <div className="contribution-trigger-header">{t('amorceBlock.needHelp')}</div>
           <div className="contribution-trigger-row">
             {safeTriggers.map((trigger) => {
               const isActive = activeTokens.includes(trigger);

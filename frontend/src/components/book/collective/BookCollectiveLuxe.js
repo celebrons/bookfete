@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   fetchCollective,
   addCollectiveParticipants,
@@ -19,16 +20,16 @@ import './BookCollectiveLuxe.css';
 // Activee depuis BookCardLuxe.js (bouton "Activer le mode collectif" ->
 // CollectiveActivateModal.js) ou "Gérer le collectif" une fois active.
 
-const STATUS_META = {
-  invited: { icon: '○', label: "N'a pas ouvert" },
-  opened: { icon: '🟡', label: "A ouvert l'invitation" },
-  started: { icon: '🟠', label: 'Contribution commencée' },
-  completed: { icon: '✅', label: 'A contribué' }
+const STATUS_ICONS = {
+  invited: '○',
+  opened: '🟡',
+  started: '🟠',
+  completed: '✅'
 };
 
-const formatDate = (value) => {
+const formatDate = (value, locale) => {
   if (!value) return '';
-  return new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(value).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
 const daysRemaining = (deadline) => {
@@ -40,6 +41,8 @@ const daysRemaining = (deadline) => {
 // Bandeau du haut (cahier des charges §9)
 // ============================================================
 function CollectiveHeader({ bookTitle, settings, participants }) {
+  const { t, i18n } = useTranslation('collective');
+  const dateLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
   const total = participants.length;
   const completed = participants.filter((p) => p.status === 'completed').length;
   const openedOrStarted = participants.filter((p) => p.status === 'opened' || p.status === 'started').length;
@@ -49,21 +52,21 @@ function CollectiveHeader({ bookTitle, settings, participants }) {
 
   return (
     <div className="collective-header">
-      <p className="collective-header-eyebrow">Collecte des souvenirs</p>
+      <p className="collective-header-eyebrow">{t('manage.eyebrow')}</p>
       <h1 className="collective-header-title">{settings.eventTitle || bookTitle}</h1>
-      <p className="collective-header-count">{completed} / {total} participant{total > 1 ? 's' : ''}</p>
+      <p className="collective-header-count">{t('manage.participantsCount', { completed, total })}</p>
       <div className="collective-progress-bar">
         <div className="collective-progress-fill" style={{ width: `${progressPct}%` }} />
       </div>
       <div className="collective-header-stats">
-        <span>✅ {completed} ont contribué</span>
-        <span>🟡 {openedOrStarted} ont ouvert</span>
-        <span>○ {notOpened} n'ont pas ouvert</span>
+        <span>{t('manage.contributedStat', { count: completed })}</span>
+        <span>{t('manage.openedStat', { count: openedOrStarted })}</span>
+        <span>{t('manage.notOpenedStat', { count: notOpened })}</span>
       </div>
       {settings.deadline && (
         <p className="collective-header-deadline">
-          📅 Date limite : {formatDate(settings.deadline)}
-          {settings.isClosed ? ' · Collecte terminée' : ` · ⏳ ${remaining} jour${remaining > 1 ? 's' : ''} restant${remaining > 1 ? 's' : ''}`}
+          {t('manage.deadlineLabel', { date: formatDate(settings.deadline, dateLocale) })}
+          {settings.isClosed ? t('manage.collectionEnded') : t('manage.daysRemaining', { count: remaining })}
         </p>
       )}
     </div>
@@ -74,6 +77,7 @@ function CollectiveHeader({ bookTitle, settings, participants }) {
 // Onglet Invités
 // ============================================================
 function InviteForm({ bookId, onAdded }) {
+  const { t } = useTranslation('collective');
   const [emailsText, setEmailsText] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -89,7 +93,7 @@ function InviteForm({ bookId, onAdded }) {
       setEmailsText('');
       onAdded();
     } catch (err) {
-      setError(err.message || "Impossible d'ajouter ces invités.");
+      setError(err.message || t('manage.addParticipantsFailed'));
     } finally {
       setSaving(false);
     }
@@ -98,34 +102,40 @@ function InviteForm({ bookId, onAdded }) {
   return (
     <form className="collective-invite-form" onSubmit={handleSubmit}>
       <label className="modal-form-field">
-        <span>+ Inviter des personnes</span>
+        <span>+ {t('manage.invitePeople')}</span>
         <textarea
           className="input-luxe"
           rows={2}
           value={emailsText}
           onChange={(event) => setEmailsText(event.target.value)}
-          placeholder="marie@email.com, thomas@email.com..."
+          placeholder={t('manage.emailsPlaceholder')}
         />
       </label>
       {error && <p className="wizard-error">{error}</p>}
       <button type="submit" className="btn btn-primary" disabled={saving || !emailsText.trim()}>
-        {saving ? 'Envoi...' : 'Ajouter'}
+        {saving ? t('manage.sending') : t('manage.add')}
       </button>
     </form>
   );
 }
 
 function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) {
+  const { t } = useTranslation('collective');
   const [copied, setCopied] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [emailDraft, setEmailDraft] = useState(participant.email);
   const [busy, setBusy] = useState(false);
   const shareWrapRef = useRef(null);
-  const meta = STATUS_META[participant.status] || STATUS_META.invited;
+  const statusIcon = STATUS_ICONS[participant.status] || STATUS_ICONS.invited;
+  const statusLabel = t(`manage.status.${participant.status || 'invited'}`);
   const link = `${window.location.origin}/collectif/${participant.invite_token}`;
   const texteInvitation = settings?.message
-    || `Vous êtes invité·e à contribuer${settings?.eventTitle ? ` au livre « ${settings.eventTitle} »` : ' à ce livre souvenir'}.`;
+    || t('manage.defaultInviteMessage', {
+      eventPart: settings?.eventTitle
+        ? t('manage.defaultInviteMessageEventPart', { event: settings.eventTitle })
+        : t('manage.defaultInviteMessageNoEventPart')
+    });
 
   // Ferme le menu de partage des qu'on clique ailleurs — meme principe que
   // les autres menus "···" du site (OrdersLuxe.js, BookCardLuxe.js).
@@ -167,7 +177,7 @@ function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) 
     event.stopPropagation();
     if (navigator.share) {
       try {
-        await navigator.share({ title: settings?.eventTitle || 'Invitation à contribuer', text: texteInvitation, url: link });
+        await navigator.share({ title: settings?.eventTitle || t('manage.shareDialogTitle'), text: texteInvitation, url: link });
         return;
       } catch (err) {
         // Partage annule par la personne : rien a faire, jamais retomber
@@ -188,7 +198,7 @@ function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) 
 
   const handleEmail = (event) => {
     event.stopPropagation();
-    const sujet = settings?.eventTitle ? `Invitation : ${settings.eventTitle}` : 'Invitation à contribuer';
+    const sujet = settings?.eventTitle ? t('manage.emailInviteSubject', { event: settings.eventTitle }) : t('manage.shareDialogTitle');
     const corps = `${texteInvitation}\n\n${link}`;
     // Destinataire pre-rempli : l'invitation est nominative, on connait
     // deja son email — autant lui epargner la saisie.
@@ -240,7 +250,7 @@ function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) 
   return (
     <div className="collective-participant-row">
       <button type="button" className="collective-participant-main" onClick={() => onSelect(participant)}>
-        <span className="collective-participant-status" title={meta.label} aria-hidden="true">{meta.icon}</span>
+        <span className="collective-participant-status" title={statusLabel} aria-hidden="true">{statusIcon}</span>
         <span className="collective-participant-identity">
           <span className="collective-participant-name">{participant.name || participant.email}</span>
           {editing ? (
@@ -254,47 +264,47 @@ function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) 
             participant.name && <span className="collective-participant-email">{participant.email}</span>
           )}
           <span className="collective-participant-counts">
-            {meta.label} · {participant.counts.photos} photo{participant.counts.photos > 1 ? 's' : ''} · {participant.counts.souvenirs} souvenir{participant.counts.souvenirs > 1 ? 's' : ''}
+            {statusLabel} · {t('manage.photosCount', { count: participant.counts.photos })} · {t('manage.memoriesCount', { count: participant.counts.souvenirs })}
           </span>
         </span>
       </button>
       <div className="collective-participant-actions">
         <div className="collective-share-wrap" ref={shareWrapRef}>
           <button type="button" className="btn btn-outline" onClick={handleShareClick}>
-            {copied ? 'Copié !' : 'Partager'}
+            {copied ? t('manage.linkCopied') : t('manage.share')}
           </button>
           {shareMenuOpen && (
             <div className="collective-share-menu" onClick={(event) => event.stopPropagation()}>
               <button type="button" onClick={handleWhatsapp}>
-                <span aria-hidden="true">💬</span> WhatsApp
+                <span aria-hidden="true">💬</span> {t('manage.whatsapp')}
               </button>
               <button type="button" onClick={handleEmail}>
-                <span aria-hidden="true">✉️</span> Email
+                <span aria-hidden="true">✉️</span> {t('manage.email')}
               </button>
               <button type="button" onClick={handleMenuCopy}>
-                <span aria-hidden="true">🔗</span> Copier le lien
+                <span aria-hidden="true">🔗</span> {t('manage.copyLink')}
               </button>
             </div>
           )}
         </div>
         {participant.status !== 'completed' && (
           <button type="button" className="btn btn-outline" onClick={handleRemind} disabled={busy}>
-            Relancer
+            {t('manage.remind')}
           </button>
         )}
         {editing ? (
-          <button type="button" className="collective-icon-btn" onClick={handleSaveEmail} disabled={busy} aria-label="Enregistrer l'email">✓</button>
+          <button type="button" className="collective-icon-btn" onClick={handleSaveEmail} disabled={busy} aria-label={t('manage.saveEmailAria')}>✓</button>
         ) : (
           <button
             type="button"
             className="collective-icon-btn"
             onClick={(event) => { event.stopPropagation(); setEditing(true); }}
-            aria-label="Modifier l'email"
+            aria-label={t('manage.editEmailAria')}
           >
             ✎
           </button>
         )}
-        <button type="button" className="collective-icon-btn is-danger" onClick={handleDelete} disabled={busy} aria-label="Supprimer cet invité">
+        <button type="button" className="collective-icon-btn is-danger" onClick={handleDelete} disabled={busy} aria-label={t('manage.deleteParticipantAria')}>
           🗑
         </button>
       </div>
@@ -303,11 +313,12 @@ function ParticipantRow({ bookId, participant, settings, onChanged, onSelect }) 
 }
 
 function InvitesTab({ bookId, participants, settings, onChanged, onSelectParticipant }) {
+  const { t } = useTranslation('collective');
   return (
     <div className="collective-tab-panel">
       <InviteForm bookId={bookId} onAdded={onChanged} />
       {participants.length === 0 ? (
-        <p className="collective-empty">Aucun invité pour l'instant — ajoutez des emails ci-dessus.</p>
+        <p className="collective-empty">{t('manage.noParticipantsYet')}</p>
       ) : (
         <div className="collective-participant-list">
           {participants.map((participant) => (
@@ -330,6 +341,8 @@ function InvitesTab({ bookId, participants, settings, onChanged, onSelectPartici
 // Onglet Contributions
 // ============================================================
 function ContributionsTab({ bookId, participants, selectedId, onSelect }) {
+  const { t, i18n } = useTranslation('collective');
+  const dateLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
   const [items, setItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
 
@@ -351,7 +364,7 @@ function ContributionsTab({ bookId, participants, selectedId, onSelect }) {
   }, [bookId, selectedId, onSelect]);
 
   if (contributed.length === 0) {
-    return <p className="collective-empty">Aucune contribution reçue pour l'instant.</p>;
+    return <p className="collective-empty">{t('manage.noContributionsYet')}</p>;
   }
 
   return (
@@ -361,12 +374,12 @@ function ContributionsTab({ bookId, participants, selectedId, onSelect }) {
           <div key={participant.id} className="collective-contribution-block">
             <button type="button" className="collective-contribution-header" onClick={() => toggle(participant)}>
               <span>{participant.name || participant.email}</span>
-              <span>{participant.counts.photos} photo{participant.counts.photos > 1 ? 's' : ''} · {participant.counts.souvenirs} souvenir{participant.counts.souvenirs > 1 ? 's' : ''}</span>
+              <span>{t('manage.photosCount', { count: participant.counts.photos })} · {t('manage.memoriesCount', { count: participant.counts.souvenirs })}</span>
             </button>
             {selectedId === participant.id && (
               <div className="collective-contribution-detail">
                 {loadingItems ? (
-                  <p className="collective-empty">Chargement...</p>
+                  <p className="collective-empty">{t('manage.loadingShort')}</p>
                 ) : (
                   items.map((item) => (
                     <div key={item.id} className="collective-contribution-item">
@@ -375,7 +388,7 @@ function ContributionsTab({ bookId, participants, selectedId, onSelect }) {
                       ) : (
                         <p className="collective-contribution-text">"{item.text}"</p>
                       )}
-                      <span className="collective-contribution-date">Envoyé le {formatDate(item.created_at)}</span>
+                      <span className="collective-contribution-date">{t('manage.sentOn', { date: formatDate(item.created_at, dateLocale) })}</span>
                     </div>
                   ))
                 )}
@@ -392,6 +405,7 @@ function ContributionsTab({ bookId, participants, selectedId, onSelect }) {
 // Onglet Paramètres
 // ============================================================
 function SettingsTab({ bookId, settings, onSaved }) {
+  const { t } = useTranslation('collective');
   const [eventTitle, setEventTitle] = useState(settings.eventTitle || '');
   const [message, setMessage] = useState(settings.message || '');
   const [deadline, setDeadline] = useState(settings.deadline || '');
@@ -403,7 +417,7 @@ function SettingsTab({ bookId, settings, onSaved }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!deadline) {
-      setError('La date limite de participation est obligatoire.');
+      setError(t('manage.deadlineRequired'));
       return;
     }
     setSaving(true);
@@ -420,7 +434,7 @@ function SettingsTab({ bookId, settings, onSaved }) {
       setTimeout(() => setSaved(false), 2000);
       onSaved();
     } catch (err) {
-      setError(err.message || 'Erreur.');
+      setError(err.message || t('manage.genericError'));
     } finally {
       setSaving(false);
     }
@@ -429,30 +443,30 @@ function SettingsTab({ bookId, settings, onSaved }) {
   return (
     <form className="collective-tab-panel collective-settings-form" onSubmit={handleSubmit}>
       <label className="modal-form-field">
-        <span>Titre de l'événement</span>
+        <span>{t('manage.eventTitleLabel')}</span>
         <input type="text" className="input-luxe" value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} maxLength={120} />
       </label>
       <label className="modal-form-field">
-        <span>Message aux invités</span>
+        <span>{t('manage.guestMessageLabel')}</span>
         <textarea className="input-luxe" rows={3} value={message} onChange={(event) => setMessage(event.target.value)} maxLength={500} />
       </label>
       <label className="modal-form-field">
-        <span>📅 Date limite de participation <em>(obligatoire)</em></span>
+        <span>📅 {t('manage.deadlineFieldLabel')} <em>({t('manage.required')})</em></span>
         <input type="date" className="input-luxe" value={deadline} onChange={(event) => setDeadline(event.target.value)} required />
       </label>
       <label className="modal-checkbox-field">
         <input type="checkbox" checked={remindersEnabled} onChange={(event) => setRemindersEnabled(event.target.checked)} />
-        <span>Activer les relances automatiques (7 puis 2 jours avant la date limite)</span>
+        <span>{t('manage.remindersCheckboxLabel')}</span>
       </label>
       {error && <p className="wizard-error">{error}</p>}
       <button type="submit" className="btn btn-primary" disabled={saving}>
-        {saving ? 'Enregistrement...' : saved ? '✓ Enregistré' : 'Enregistrer'}
+        {saving ? t('manage.saving') : saved ? t('manage.saved') : t('manage.save')}
       </button>
       {/* Transparence deliberee (cahier des charges §8 : jamais d'envoi
           automatique silencieux) — aucun scheduler n'existe encore dans ce
           backend pour declencher les relances toutes seules. */}
       <p className="collective-settings-note">
-        Les relances automatiques ne sont pas encore envoyées toutes seules — utilisez "Relancer" depuis l'onglet Invités en attendant.
+        {t('manage.remindersNote')}
       </p>
     </form>
   );
@@ -462,6 +476,7 @@ function SettingsTab({ bookId, settings, onSaved }) {
 // Page
 // ============================================================
 export default function BookCollectiveLuxe() {
+  const { t } = useTranslation('collective');
   const { bookId } = useParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -478,7 +493,7 @@ export default function BookCollectiveLuxe() {
       setSettings(data.settings);
       setParticipants(data.participants);
     } catch (err) {
-      setError(err.message || 'Erreur de chargement.');
+      setError(err.message || t('manage.loadError'));
     } finally {
       setLoading(false);
     }
@@ -487,27 +502,27 @@ export default function BookCollectiveLuxe() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) {
-    return <div className="collective-loading">Chargement...</div>;
+    return <div className="collective-loading">{t('manage.loadingShort')}</div>;
   }
   if (error || !settings) {
-    return <div className="collective-loading">{error || 'Collectif introuvable.'}</div>;
+    return <div className="collective-loading">{error || t('manage.notFound')}</div>;
   }
 
   return (
     <div className="collective-page">
-      <Link to={`/book/${bookId}/atelier`} className="collective-back-link">← Retour au livre</Link>
+      <Link to={`/book/${bookId}/atelier`} className="collective-back-link">← {t('manage.backToBook')}</Link>
 
       <CollectiveHeader bookTitle={bookTitle} settings={settings} participants={participants} />
 
       <div className="collective-tabs">
         <button type="button" className={tab === 'invites' ? 'is-active' : ''} onClick={() => setTab('invites')}>
-          Invités
+          {t('manage.tabGuests')}
         </button>
         <button type="button" className={tab === 'contributions' ? 'is-active' : ''} onClick={() => setTab('contributions')}>
-          Contributions
+          {t('manage.tabContributions')}
         </button>
         <button type="button" className={tab === 'parametres' ? 'is-active' : ''} onClick={() => setTab('parametres')}>
-          Paramètres
+          {t('manage.tabSettings')}
         </button>
       </div>
 
