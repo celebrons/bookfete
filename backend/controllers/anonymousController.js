@@ -29,6 +29,7 @@
 // livres d'autrui en devinant un uuid.
 
 const supabase = require('../config/supabase');
+const { t } = require('../services/i18n/t');
 
 // Valide un jeton de session anonyme et renvoie son utilisateur, ou null.
 // Trois refus possibles, tous silencieux pour l'appelant (on ne renseigne
@@ -59,7 +60,7 @@ async function resolveAnonymousUser(rawToken, currentUserId) {
 const completeAnonymousSignup = async (req, res) => {
   try {
     if (!req.user?.id) {
-      return res.status(401).json({ error: 'Utilisateur non authentifie' });
+      return res.status(401).json({ error: t(req, 'Utilisateur non authentifie', 'User not authenticated') });
     }
     // Garde-fou : ce qui manque pour creer un profil, c'est une ADRESSE,
     // pas un mot de passe. Depuis l'authentification par code
@@ -69,7 +70,13 @@ const completeAnonymousSignup = async (req, res) => {
     // son adresse vient d'etre verifiee. On se fonde donc sur l'adresse.
     const email = String(req.user.email || '').trim().toLowerCase();
     if (!email) {
-      return res.status(409).json({ error: "Aucune adresse verifiee sur ce compte : la creation du compte n'a pas abouti." });
+      return res.status(409).json({
+        error: t(
+          req,
+          "Aucune adresse verifiee sur ce compte : la creation du compte n'a pas abouti.",
+          'No verified address on this account: account creation did not complete.'
+        )
+      });
     }
     const fullName = String(req.body?.full_name || req.user.user_metadata?.full_name || email.split('@')[0] || '').trim();
 
@@ -102,10 +109,16 @@ const completeAnonymousSignup = async (req, res) => {
 const linkAnonymousBooks = async (req, res) => {
   try {
     if (!req.user?.id) {
-      return res.status(401).json({ error: 'Utilisateur non authentifie' });
+      return res.status(401).json({ error: t(req, 'Utilisateur non authentifie', 'User not authenticated') });
     }
     if (req.user.is_anonymous === true) {
-      return res.status(400).json({ error: 'Connectez-vous a un compte reel pour recuperer vos livres.' });
+      return res.status(400).json({
+        error: t(
+          req,
+          'Connectez-vous a un compte reel pour recuperer vos livres.',
+          'Log in to a real account to recover your books.'
+        )
+      });
     }
 
     const anonymousUser = await resolveAnonymousUser(req.body?.anonymousToken, req.user.id);

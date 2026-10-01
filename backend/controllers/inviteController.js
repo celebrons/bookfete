@@ -2,6 +2,7 @@
 const supabase = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
 const { sendInviteEmail } = require('../services/emailService');
+const { t } = require('../services/i18n/t');
 
 const CHAPTER_STATE_EMAIL = '__chapter_state__@system.local';
 
@@ -236,14 +237,14 @@ const checkInviteToken = async (req, res) => {
 
     if (error || !invite) {
       console.error('❌ Token non trouvé');
-      return res.status(404).json({ error: 'Lien invalide ou expiré' });
+      return res.status(404).json({ error: t(req, 'Lien invalide ou expiré', 'Invalid or expired link') });
     }
 
     const workflowState = await getChapterWorkflowState(invite.chapter_id);
 
     if (areContributionsClosed(workflowState)) {
       return res.status(400).json({
-        error: 'Les contributions pour ce chapitre sont closes'
+        error: t(req, 'Les contributions pour ce chapitre sont closes', 'Contributions for this chapter are closed')
       });
     }
 
@@ -255,7 +256,7 @@ const checkInviteToken = async (req, res) => {
 
     const organizerName = organizerProfile?.full_name
       || organizerProfile?.email?.split('@')[0]
-      || "L'organisateur";
+      || t(req, "L'organisateur", 'The organizer');
 
     // Vérifier la contribution existante
     const { data: existingContribution } = await supabase
@@ -268,15 +269,21 @@ const checkInviteToken = async (req, res) => {
     // Si une contribution existe et qu'elle n'est PAS approuvée, on autorise la modification
     if (existingContribution) {
       if (existingContribution.approved) {
-        return res.status(400).json({ error: 'Cette contribution a déjà été approuvée' });
+        return res.status(400).json({
+          error: t(req, 'Cette contribution a déjà été approuvée', 'This contribution has already been approved')
+        });
       }
 
       if (existingContribution.is_finalized && !existingContribution.needs_revision) {
         return res.status(400).json({
-          error: 'Cette contribution a déjà été envoyée et ne peut plus être modifiée'
+          error: t(
+            req,
+            'Cette contribution a déjà été envoyée et ne peut plus être modifiée',
+            'This contribution has already been sent and can no longer be edited'
+          )
         });
       }
-      
+
       const amorceReady = Boolean(invite.chapter.amorce_validated || invite.chapter.questions_validated);
       return res.json({
         valid: true,
@@ -305,7 +312,7 @@ const checkInviteToken = async (req, res) => {
 
     if (invite.contributed) {
       console.log('⚠️ Token déjà utilisé');
-      return res.status(400).json({ error: 'Vous avez déjà contribué' });
+      return res.status(400).json({ error: t(req, 'Vous avez déjà contribué', 'You have already contributed') });
     }
 
     const amorceReady = Boolean(invite.chapter.amorce_validated || invite.chapter.questions_validated);
@@ -354,14 +361,14 @@ const useInviteToken = async (req, res) => {
       .single();
 
     if (inviteError || !invite) {
-      return res.status(404).json({ error: 'Lien invalide' });
+      return res.status(404).json({ error: t(req, 'Lien invalide', 'Invalid link') });
     }
 
     const workflowState = await getChapterWorkflowState(invite.chapter_id);
 
     if (areContributionsClosed(workflowState)) {
       return res.status(400).json({
-        error: 'Les contributions pour ce chapitre sont closes'
+        error: t(req, 'Les contributions pour ce chapitre sont closes', 'Contributions for this chapter are closed')
       });
     }
 
@@ -376,12 +383,18 @@ const useInviteToken = async (req, res) => {
     if (existingContribution) {
       // Mise à jour de la contribution existante
       if (existingContribution.approved) {
-        return res.status(400).json({ error: 'Cette contribution ne peut plus être modifiée' });
+        return res.status(400).json({
+          error: t(req, 'Cette contribution ne peut plus être modifiée', 'This contribution can no longer be edited')
+        });
       }
 
       if (existingContribution.is_finalized && !existingContribution.needs_revision) {
         return res.status(400).json({
-          error: 'Cette contribution a déjà été envoyée et ne peut plus être modifiée'
+          error: t(
+            req,
+            'Cette contribution a déjà été envoyée et ne peut plus être modifiée',
+            'This contribution has already been sent and can no longer be edited'
+          )
         });
       }
 
@@ -411,8 +424,8 @@ const useInviteToken = async (req, res) => {
       return res.json({
         success: true,
         message: isFinalized
-          ? 'Contribution mise à jour avec succès'
-          : 'Brouillon sauvegardé avec succès',
+          ? t(req, 'Contribution mise à jour avec succès', 'Contribution updated successfully')
+          : t(req, 'Brouillon sauvegardé avec succès', 'Draft saved successfully'),
         contributionId: updatedContribution.id,
         isDraft: !isFinalized
       });
@@ -448,8 +461,8 @@ const useInviteToken = async (req, res) => {
     res.json({
       success: true,
       message: isFinalized
-        ? 'Contribution enregistrée avec succès'
-        : 'Brouillon sauvegardé avec succès',
+        ? t(req, 'Contribution enregistrée avec succès', 'Contribution saved successfully')
+        : t(req, 'Brouillon sauvegardé avec succès', 'Draft saved successfully'),
       contributionId: contribution.id,
       isDraft: !isFinalized
     });

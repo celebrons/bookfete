@@ -30,4 +30,19 @@ describe('resolveLanguage', () => {
     const req = { user: { user_metadata: { language: 'fr' } }, headers: { 'accept-language': 'en-US' } };
     expect(resolveLanguage(req)).toBe('fr');
   });
+
+  it('X-App-Language (choix explicite dans l app) l emporte sur Accept-Language', () => {
+    const req = { headers: { 'x-app-language': 'en', 'accept-language': 'fr-FR,fr;q=0.9' } };
+    expect(resolveLanguage(req)).toBe('en');
+  });
+
+  it('la preference du compte l emporte sur X-App-Language', () => {
+    const req = { user: { user_metadata: { language: 'fr' } }, headers: { 'x-app-language': 'en' } };
+    expect(resolveLanguage(req)).toBe('fr');
+  });
+
+  it('repli sur Accept-Language si X-App-Language est absent ou non supporte', () => {
+    const req = { headers: { 'x-app-language': 'de', 'accept-language': 'en-US' } };
+    expect(resolveLanguage(req)).toBe('en');
+  });
 });

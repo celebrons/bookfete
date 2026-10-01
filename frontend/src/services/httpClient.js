@@ -31,6 +31,18 @@ import i18n from '../i18n';
 const NORMAL_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 20000);
 const COLD_START_TIMEOUT_MS = Number(process.env.REACT_APP_API_COLD_START_TIMEOUT_MS || 60000);
 
+// Langue REELLEMENT choisie dans l'app (chantier bilingue, phase 6) —
+// distincte d'Accept-Language, que le navigateur fixe une fois pour toutes
+// et qui ne bouge jamais quand on clique le selecteur de langue du site.
+// Sans cet en-tete, un visiteur au navigateur francais qui bascule le site
+// en anglais recevrait quand meme les messages d'erreur et emails du
+// backend en francais pour toute route PUBLIQUE (lien de partage,
+// invitation collective) — les routes authentifiees n'ont pas ce probleme
+// (la langue vient de user_metadata), mais ce fichier est commun aux deux.
+export function getLanguageHeader() {
+  return { 'X-App-Language': i18n.language || 'fr' };
+}
+
 // FONCTION, pas une constante figee au chargement du module (chantier
 // bilingue, 2026-09-30) : la langue peut changer en cours de session, ce
 // message doit donc etre lu dans la langue CURRENTE au moment de l'erreur,
@@ -82,7 +94,11 @@ async function fetchWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, {
+      ...options,
+      headers: { ...getLanguageHeader(), ...(options.headers || {}) },
+      signal: controller.signal
+    });
   } finally {
     clearTimeout(timeoutId);
   }

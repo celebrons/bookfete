@@ -1,6 +1,7 @@
 const express = require('express');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const { t } = require('../services/i18n/t');
 const {
   CHAPTER_COUNTS,
   BOOK_CONFIG_COLUMNS,
@@ -137,12 +138,12 @@ function hasValue(value) {
   return String(value).trim().length > 0;
 }
 
-function buildMissingFieldErrors(requiredFields = [], config = {}) {
+function buildMissingFieldErrors(req, requiredFields = [], config = {}) {
   return requiredFields
     .filter((field) => !hasValue(config[field]))
     .map((field) => ({
       field,
-      message: 'Ce champ est obligatoire.'
+      message: t(req, 'Ce champ est obligatoire.', 'This field is required.')
     }));
 }
 
@@ -377,7 +378,7 @@ router.get('/event-types', async (_req, res) => {
       totalSubtypes: rows.length
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message || 'Erreur chargement types.' });
+    return res.status(500).json({ error: error.message || t(req, 'Erreur chargement types.', 'Error loading types.') });
   }
 });
 
@@ -394,23 +395,26 @@ router.get('/schema', async (_req, res) => {
       paperTypes: PAPER_TYPES
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message || 'Erreur chargement schema.' });
+    return res.status(500).json({ error: error.message || t(req, 'Erreur chargement schema.', 'Error loading schema.') });
   }
 });
 
 router.post('/start', authenticate, async (req, res) => {
   try {
     const payload = extractBookConfigPayload(req.body || {});
-    const step1Errors = buildMissingFieldErrors(STEP1_REQUIRED_FIELDS, payload);
+    const step1Errors = buildMissingFieldErrors(req, STEP1_REQUIRED_FIELDS, payload);
     if (step1Errors.length > 0) {
-      return res.status(422).json({ error: 'Champs obligatoires manquants.', fieldErrors: step1Errors });
+      return res.status(422).json({
+        error: t(req, 'Champs obligatoires manquants.', 'Required fields missing.'),
+        fieldErrors: step1Errors
+      });
     }
 
     const eventSubtypeRow = await fetchEventSubtype(payload.event_type, payload.event_subtype);
     if (!eventSubtypeRow) {
       return res.status(422).json({
-        error: 'Type et sous-type invalides.',
-        fieldErrors: [{ field: 'event_subtype', message: 'Sous-type invalide pour ce type.' }]
+        error: t(req, 'Type et sous-type invalides.', 'Invalid type and subtype.'),
+        fieldErrors: [{ field: 'event_subtype', message: t(req, 'Sous-type invalide pour ce type.', 'Invalid subtype for this type.') }]
       });
     }
 
@@ -454,7 +458,7 @@ router.post('/start', authenticate, async (req, res) => {
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
-    return res.status(status).json({ error: error.message || 'Erreur initialisation creation livre.' });
+    return res.status(status).json({ error: error.message || t(req, 'Erreur initialisation creation livre.', 'Error initializing book creation.') });
   }
 });
 
@@ -476,7 +480,7 @@ router.get('/:bookId', authenticate, async (req, res) => {
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
-    return res.status(status).json({ error: error.message || 'Erreur chargement configuration livre.' });
+    return res.status(status).json({ error: error.message || t(req, 'Erreur chargement configuration livre.', 'Error loading book configuration.') });
   }
 });
 
@@ -485,7 +489,7 @@ router.patch('/:bookId/autosave', authenticate, async (req, res) => {
     const book = await getOwnedBookOrThrow(req.params.bookId, req.user.id);
     const currentConfig = await getBookConfig(book.id);
     if (!currentConfig) {
-      return res.status(404).json({ error: 'Configuration livre introuvable.' });
+      return res.status(404).json({ error: t(req, 'Configuration livre introuvable.', 'Book configuration not found.') });
     }
 
     const patch = extractBookConfigPayload(req.body || {});
@@ -497,8 +501,8 @@ router.patch('/:bookId/autosave', authenticate, async (req, res) => {
       const subtypeRow = await fetchEventSubtype(nextEventType, nextEventSubtype);
       if (!subtypeRow) {
         return res.status(422).json({
-          error: 'Type et sous-type invalides.',
-          fieldErrors: [{ field: 'event_subtype', message: 'Sous-type invalide pour ce type.' }]
+          error: t(req, 'Type et sous-type invalides.', 'Invalid type and subtype.'),
+          fieldErrors: [{ field: 'event_subtype', message: t(req, 'Sous-type invalide pour ce type.', 'Invalid subtype for this type.') }]
         });
       }
       Object.assign(patch, getSubtypeDefaults(nextEventSubtype));
@@ -527,7 +531,9 @@ router.patch('/:bookId/autosave', authenticate, async (req, res) => {
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
-    return res.status(status).json({ error: error.message || 'Erreur sauvegarde automatique.' });
+    return res.status(status).json({
+      error: error.message || t(req, 'Erreur sauvegarde automatique.', 'Autosave error.')
+    });
   }
 });
 
@@ -536,46 +542,46 @@ router.post('/:bookId/step3/complete', authenticate, async (req, res) => {
     const book = await getOwnedBookOrThrow(req.params.bookId, req.user.id);
     const currentConfig = await getBookConfig(book.id);
     if (!currentConfig) {
-      return res.status(404).json({ error: 'Configuration livre introuvable.' });
+      return res.status(404).json({ error: t(req, 'Configuration livre introuvable.', 'Book configuration not found.') });
     }
 
     const patch = extractBookConfigPayload(req.body || {});
     if (hasValue(patch.chapter_count) && !isAllowedChapterCount(patch.chapter_count)) {
       return res.status(422).json({
-        error: 'Nombre de chapitres invalide.',
-        fieldErrors: [{ field: 'chapter_count', message: 'Choisissez 4, 6 ou 8 chapitres.' }]
+        error: t(req, 'Nombre de chapitres invalide.', 'Invalid chapter count.'),
+        fieldErrors: [{ field: 'chapter_count', message: t(req, 'Choisissez 4, 6 ou 8 chapitres.', 'Choose 4, 6 or 8 chapters.') }]
       });
     }
     if (hasValue(patch.narrative_style) && !isAllowedNarrativeStyle(patch.narrative_style)) {
       return res.status(422).json({
-        error: 'Style narratif invalide.',
-        fieldErrors: [{ field: 'narrative_style', message: 'Valeur non autorisee.' }]
+        error: t(req, 'Style narratif invalide.', 'Invalid narrative style.'),
+        fieldErrors: [{ field: 'narrative_style', message: t(req, 'Valeur non autorisee.', 'Value not allowed.') }]
       });
     }
     if (hasValue(patch.book_finish) && !isAllowedBookFinish(patch.book_finish)) {
       return res.status(422).json({
-        error: 'Finition invalide.',
-        fieldErrors: [{ field: 'book_finish', message: 'Valeur non autorisee.' }]
+        error: t(req, 'Finition invalide.', 'Invalid finish.'),
+        fieldErrors: [{ field: 'book_finish', message: t(req, 'Valeur non autorisee.', 'Value not allowed.') }]
       });
     }
     if (hasValue(patch.paper_type) && !isAllowedPaperType(patch.paper_type)) {
       return res.status(422).json({
-        error: 'Type de papier invalide.',
-        fieldErrors: [{ field: 'paper_type', message: 'Valeur non autorisee.' }]
+        error: t(req, 'Type de papier invalide.', 'Invalid paper type.'),
+        fieldErrors: [{ field: 'paper_type', message: t(req, 'Valeur non autorisee.', 'Value not allowed.') }]
       });
     }
 
     const config = await upsertBookConfig(book.id, patch);
     if (!hasValue(config.book_finish)) {
       return res.status(422).json({
-        error: 'Choisissez une finition.',
-        fieldErrors: [{ field: 'book_finish', message: 'La finition est obligatoire.' }]
+        error: t(req, 'Choisissez une finition.', 'Choose a finish.'),
+        fieldErrors: [{ field: 'book_finish', message: t(req, 'La finition est obligatoire.', 'The finish is required.') }]
       });
     }
     if (config.book_finish !== 'livret' && !hasValue(config.paper_type)) {
       return res.status(422).json({
-        error: 'Choisissez un papier.',
-        fieldErrors: [{ field: 'paper_type', message: 'Le papier est obligatoire pour cette finition.' }]
+        error: t(req, 'Choisissez un papier.', 'Choose a paper.'),
+        fieldErrors: [{ field: 'paper_type', message: t(req, 'Le papier est obligatoire pour cette finition.', 'Paper is required for this finish.') }]
       });
     }
 
@@ -614,7 +620,7 @@ router.post('/:bookId/step3/complete', authenticate, async (req, res) => {
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
-    return res.status(status).json({ error: error.message || 'Erreur validation etape 3.' });
+    return res.status(status).json({ error: error.message || t(req, 'Erreur validation etape 3.', 'Error validating step 3.') });
   }
 });
 

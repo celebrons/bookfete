@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const { t } = require('../services/i18n/t');
 const upload = require('../middleware/upload');
 const { requireBookNotLocked } = require('../middleware/bookEditLock');
 const storageService = require('../services/storageService');
@@ -208,11 +209,11 @@ async function getBook(bookId) {
 async function requireOwnedBook(req, res, next) {
   const book = await getBook(req.params.bookId);
   if (!book) {
-    return res.status(404).json({ error: 'Livre introuvable.' });
+    return res.status(404).json({ error: t(req, 'Livre introuvable.', 'Book not found.') });
   }
 
   if (book.owner_id !== req.user.id) {
-    return res.status(403).json({ error: 'Acces refuse.' });
+    return res.status(403).json({ error: t(req, 'Acces refuse.', 'Access denied.') });
   }
 
   req.book = book;
@@ -234,7 +235,7 @@ async function resolveBookByShareToken(req, res, next) {
     .maybeSingle();
 
   if (error || !data) {
-    return res.status(404).json({ error: 'Lien invalide ou expire.' });
+    return res.status(404).json({ error: t(req, 'Lien invalide ou expire.', 'Invalid or expired link.') });
   }
 
   req.book = data;
@@ -331,7 +332,7 @@ router.post(
   async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: 'Fichier manquant (champ "photo").' });
+        return res.status(400).json({ error: t(req, 'Fichier manquant (champ "photo").', 'Missing file (field "photo").') });
       }
 
       const uploadResult = await storageService.uploadFile(PHOTO_BUCKET, req.file, req.params.bookId);
@@ -414,11 +415,11 @@ router.delete('/api/books/:bookId/content-items', authenticate, requireOwnedBook
   try {
     const kind = String(req.query.kind || '').trim().toLowerCase();
     if (kind !== 'photo' && kind !== 'texte') {
-      return res.status(400).json({ error: "Precisez ce qu'il faut supprimer (kind=photo ou kind=texte)." });
+      return res.status(400).json({ error: t(req, "Precisez ce qu'il faut supprimer (kind=photo ou kind=texte).", 'Specify what to delete (kind=photo or kind=texte).') });
     }
     if (req.body?.confirm !== true) {
       return res.status(409).json({
-        error: 'Suppression definitive : confirmez explicitement.',
+        error: t(req, 'Suppression definitive : confirmez explicitement.', 'Permanent deletion: please confirm explicitly.'),
         needsConfirmation: true
       });
     }
@@ -487,7 +488,7 @@ router.post('/api/public/share/:token/text', resolveBookByShareToken, async (req
   try {
     const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
     if (!text) {
-      return res.status(400).json({ error: 'Texte manquant.' });
+      return res.status(400).json({ error: t(req, 'Texte manquant.', 'Missing text.') });
     }
     const contributorName = typeof req.body?.contributorName === 'string' ? req.body.contributorName.trim() : '';
     const contributorEmail = typeof req.body?.contributorEmail === 'string' ? req.body.contributorEmail.trim() : '';
@@ -523,7 +524,7 @@ router.post(
   async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: 'Fichier manquant (champ "photo").' });
+        return res.status(400).json({ error: t(req, 'Fichier manquant (champ "photo").', 'Missing file (field "photo").') });
       }
 
       const uploadResult = await storageService.uploadFile(PHOTO_BUCKET, req.file, req.book.id);
@@ -573,7 +574,7 @@ router.delete('/api/public/share/:token/items/:itemId', resolveBookByShareToken,
   try {
     const contributionId = typeof req.body?.contributionId === 'string' ? req.body.contributionId : '';
     if (!contributionId) {
-      return res.status(400).json({ error: 'contributionId manquant.' });
+      return res.status(400).json({ error: t(req, 'contributionId manquant.', 'Missing contributionId.') });
     }
 
     const { data: item, error: itemError } = await supabase
@@ -584,10 +585,10 @@ router.delete('/api/public/share/:token/items/:itemId', resolveBookByShareToken,
       .maybeSingle();
 
     if (itemError || !item) {
-      return res.status(404).json({ error: 'Souvenir introuvable.' });
+      return res.status(404).json({ error: t(req, 'Souvenir introuvable.', 'Memory not found.') });
     }
     if (item.source !== 'contribution' || item.contribution_id !== contributionId) {
-      return res.status(403).json({ error: 'Vous ne pouvez retirer que vos propres envois.' });
+      return res.status(403).json({ error: t(req, 'Vous ne pouvez retirer que vos propres envois.', 'You can only remove your own submissions.') });
     }
 
     await bookContentService.deleteContentItem(req.book.id, req.params.itemId);
@@ -653,7 +654,7 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, requir
     // composition (recommendPageCount, composeBookForFormat) s'en passaient
     // deja sans probleme.
     if (!book.page_count) {
-      return res.status(422).json({ error: 'Choisissez un nombre de pages avant de composer le livre.' });
+      return res.status(422).json({ error: t(req, 'Choisissez un nombre de pages avant de composer le livre.', 'Choose a page count before composing the book.') });
     }
 
     const [template, layouts, allItems, existingPages] = await Promise.all([
@@ -742,7 +743,7 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, requir
     // sans rien mettre a la place.
     if (totalApresGeneration === 0) {
       return res.status(422).json({
-        error: "Il n'y a aucun contenu a mettre en page. Ajoutez des photos ou des souvenirs dans « Mes souvenirs », puis reessayez."
+        error: t(req, "Il n'y a aucun contenu a mettre en page. Ajoutez des photos ou des souvenirs dans « Mes souvenirs », puis reessayez.", 'There is no content to lay out. Add photos or memories in "My memories", then try again.')
       });
     }
 
@@ -751,7 +752,11 @@ router.post('/api/books/:bookId/compose', authenticate, requireOwnedBook, requir
     // qu'au moment d'une vraie commande.
     if (totalApresGeneration > layoutEngine.MAX_PRINTABLE_PAGES) {
       return res.status(422).json({
-        error: `Votre contenu remplit environ ${totalApresGeneration} pages, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`
+        error: t(
+          req,
+          `Votre contenu remplit environ ${totalApresGeneration} pages, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`,
+          `Your content fills about ${totalApresGeneration} pages, above the printable maximum (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Remove some photos or memories, then try again.`
+        )
       });
     }
 
@@ -821,7 +826,7 @@ router.post('/api/books/:bookId/snapshot/restore', authenticate, requireOwnedBoo
   try {
     const restored = await bookContentService.restoreSnapshot(req.book.id);
     if (!restored) {
-      return res.status(404).json({ error: "Il n'y a pas de version precedente a retablir." });
+      return res.status(404).json({ error: t(req, "Il n'y a pas de version precedente a retablir.", 'There is no previous version to restore.') });
     }
     const { data: updatedBook, error: readError } = await supabase
       .from('books').select('*').eq('id', req.book.id).single();
@@ -897,7 +902,7 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, require
     const { book } = req;
     const formatId = req.body?.formatId;
     if (!formatId || !Object.prototype.hasOwnProperty.call(COVER_FORMATS, formatId)) {
-      return res.status(400).json({ error: 'Format inconnu.' });
+      return res.status(400).json({ error: t(req, 'Format inconnu.', 'Unknown format.') });
     }
 
     const [template, items, layouts, existingPages] = await Promise.all([
@@ -923,7 +928,11 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, require
     // minimum imprimable Gelato, sans le moindre avertissement.
     if (pagesImprimees < layoutEngine.MIN_PRINTABLE_PAGES) {
       return res.status(422).json({
-        error: `Il faut atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum avec ce format (votre livre en compte ${pagesImprimees}). Ajoutez des pages ou du contenu, puis reessayez.`
+        error: t(
+          req,
+          `Il faut atteindre ${layoutEngine.MIN_PRINTABLE_PAGES} pages minimum avec ce format (votre livre en compte ${pagesImprimees}). Ajoutez des pages ou du contenu, puis reessayez.`,
+          `You need at least ${layoutEngine.MIN_PRINTABLE_PAGES} pages with this format (your book currently has ${pagesImprimees}). Add pages or content, then try again.`
+        )
       });
     }
 
@@ -931,7 +940,11 @@ router.post('/api/books/:bookId/format', authenticate, requireOwnedBook, require
     // commentaire dans POST /compose ci-dessus).
     if (pagesImprimees > layoutEngine.MAX_PRINTABLE_PAGES) {
       return res.status(422).json({
-        error: `Votre livre compterait ${pagesImprimees} pages avec ce format, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`
+        error: t(
+          req,
+          `Votre livre compterait ${pagesImprimees} pages avec ce format, au dessus du maximum imprimable (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Retirez des photos ou des souvenirs, puis reessayez.`,
+          `Your book would have ${pagesImprimees} pages with this format, above the printable maximum (${layoutEngine.MAX_PRINTABLE_PAGES} pages). Remove some photos or memories, then try again.`
+        )
       });
     }
 
@@ -994,7 +1007,7 @@ router.post('/api/books/:bookId/format-only', authenticate, requireOwnedBook, re
     const { book } = req;
     const formatId = req.body?.formatId;
     if (!formatId || !Object.prototype.hasOwnProperty.call(COVER_FORMATS, formatId)) {
-      return res.status(400).json({ error: 'Format inconnu.' });
+      return res.status(400).json({ error: t(req, 'Format inconnu.', 'Unknown format.') });
     }
 
     if (formatId === book.print_format) {
@@ -1138,7 +1151,7 @@ router.post('/api/books/:bookId/pages/extend', authenticate, requireOwnedBook, r
     const requestedCount = Number(req.body?.count);
     const count = Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : 2;
     if (count % 2 !== 0) {
-      return res.status(400).json({ error: 'Le nombre de pages ajoutees doit etre pair.' });
+      return res.status(400).json({ error: t(req, 'Le nombre de pages ajoutees doit etre pair.', 'The number of added pages must be even.') });
     }
 
     const pages = await bookContentService.appendEmptyPages(book.id, count, book.page_count);
@@ -1177,19 +1190,23 @@ router.post('/api/books/:bookId/pages/shrink', authenticate, requireOwnedBook, r
     const requestedCount = Number(req.body?.count);
     const count = Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : 2;
     if (count % 2 !== 0) {
-      return res.status(400).json({ error: 'Le nombre de pages retirees doit etre pair.' });
+      return res.status(400).json({ error: t(req, 'Le nombre de pages retirees doit etre pair.', 'The number of removed pages must be even.') });
     }
 
     const { totalPages, doomed, nonEmpty, locked } = await bookContentService.inspectTrailingPages(book.id, count, book.page_count);
 
     if (doomed.length < count) {
-      return res.status(400).json({ error: 'Ce livre ne contient pas assez de pages pour en retirer autant.' });
+      return res.status(400).json({ error: t(req, 'Ce livre ne contient pas assez de pages pour en retirer autant.', 'This book does not have enough pages to remove that many.') });
     }
 
     const remaining = totalPages - count;
     if (remaining < layoutEngine.MIN_PRINTABLE_PAGES) {
       return res.status(422).json({
-        error: `Impossible de descendre sous ${layoutEngine.MIN_PRINTABLE_PAGES} pages : c'est le minimum imprimable (votre livre en compte ${totalPages}).`
+        error: t(
+          req,
+          `Impossible de descendre sous ${layoutEngine.MIN_PRINTABLE_PAGES} pages : c'est le minimum imprimable (votre livre en compte ${totalPages}).`,
+          `Cannot go below ${layoutEngine.MIN_PRINTABLE_PAGES} pages: that's the printable minimum (your book currently has ${totalPages}).`
+        )
       });
     }
 
@@ -1251,7 +1268,7 @@ router.post('/api/books/:bookId/pages/move', authenticate, requireOwnedBook, req
     const isValid = (value) => Number.isInteger(value) && value >= 0 && value < totalPages;
     if (!isValid(fromIndex) || !isValid(toIndex)) {
       return res.status(400).json({
-        error: `Position invalide : ce livre compte ${totalPages} pages.`
+        error: t(req, `Position invalide : ce livre compte ${totalPages} pages.`, `Invalid position: this book has ${totalPages} pages.`)
       });
     }
 
@@ -1279,7 +1296,11 @@ router.put('/api/books/:bookId/pages/:pageIndex', authenticate, requireOwnedBook
     // (2026-09-14). La route soeur /manual verifiait deja cette borne.
     if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= Number(book.page_count || 0)) {
       return res.status(400).json({
-        error: `pageIndex invalide : ce livre compte ${Number(book.page_count || 0)} pages.`
+        error: t(
+          req,
+          `pageIndex invalide : ce livre compte ${Number(book.page_count || 0)} pages.`,
+          `Invalid pageIndex: this book has ${Number(book.page_count || 0)} pages.`
+        )
       });
     }
 
@@ -1314,7 +1335,7 @@ router.get('/api/books/:bookId/pages/:pageIndex/preview.html', authenticate, req
     const { book } = req;
     const pageIndex = Number(req.params.pageIndex);
     if (!Number.isInteger(pageIndex) || pageIndex < 0) {
-      return res.status(400).json({ error: 'pageIndex invalide.' });
+      return res.status(400).json({ error: t(req, 'pageIndex invalide.', 'Invalid pageIndex.') });
     }
 
     const [pages, items, layouts] = await Promise.all([
@@ -1363,16 +1384,16 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
     const { book } = req;
     const pageIndex = Number(req.params.pageIndex);
     if (!Number.isInteger(pageIndex) || pageIndex < 0) {
-      return res.status(400).json({ error: 'pageIndex invalide.' });
+      return res.status(400).json({ error: t(req, 'pageIndex invalide.', 'Invalid pageIndex.') });
     }
     if (book.page_count && pageIndex >= book.page_count) {
-      return res.status(400).json({ error: "Cette page n'existe pas dans ce livre." });
+      return res.status(400).json({ error: t(req, "Cette page n'existe pas dans ce livre.", 'This page does not exist in this book.') });
     }
 
     const layoutId = req.body?.layoutId;
     const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : [];
     if (!layoutId || itemIds.length === 0) {
-      return res.status(400).json({ error: 'Format et contenu requis.' });
+      return res.status(400).json({ error: t(req, 'Format et contenu requis.', 'Format and content required.') });
     }
 
     const [layouts, allItems] = await Promise.all([
@@ -1382,7 +1403,7 @@ router.put('/api/books/:bookId/pages/:pageIndex/manual', authenticate, requireOw
 
     const layout = layouts.find((entry) => entry.id === layoutId);
     if (!layout) {
-      return res.status(400).json({ error: 'Format introuvable ou inactif.' });
+      return res.status(400).json({ error: t(req, 'Format introuvable ou inactif.', 'Format not found or inactive.') });
     }
 
     // Items resolus et scopes a CE livre uniquement (listContentItems ne

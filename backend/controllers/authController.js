@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
+const { t } = require('../services/i18n/t');
 
 // UN CLIENT JETABLE POUR CHAQUE CONNEXION.
 //
@@ -23,7 +24,7 @@ const login = async (req, res) => {
     const normalizedEmail = String(email || '').trim().toLowerCase();
 
     if (!normalizedEmail || !password) {
-      return res.status(400).json({ error: 'Email et mot de passe requis' });
+      return res.status(400).json({ error: t(req, 'Email et mot de passe requis', 'Email and password required') });
     }
 
     const { data, error } = await clientJetable().auth.signInWithPassword({
@@ -32,7 +33,7 @@ const login = async (req, res) => {
     });
 
     if (error) {
-      return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+      return res.status(401).json({ error: t(req, 'Email ou mot de passe incorrect', 'Incorrect email or password') });
     }
 
     return res.json({
@@ -56,11 +57,11 @@ const register = async (req, res) => {
     const name = String(full_name || normalizedEmail.split('@')[0] || '').trim();
 
     if (!normalizedEmail || !safePassword) {
-      return res.status(400).json({ error: 'Email et mot de passe requis' });
+      return res.status(400).json({ error: t(req, 'Email et mot de passe requis', 'Email and password required') });
     }
 
     if (safePassword.length < 8) {
-      return res.status(400).json({ error: 'Mot de passe trop court (8 caracteres minimum)' });
+      return res.status(400).json({ error: t(req, 'Mot de passe trop court (8 caracteres minimum)', 'Password too short (8 characters minimum)') });
     }
 
     const { data, error } = await clientJetable().auth.signUp({
@@ -93,7 +94,7 @@ const register = async (req, res) => {
     }
 
     return res.status(201).json({
-      message: 'Inscription reussie',
+      message: t(req, 'Inscription reussie', 'Registration successful'),
       user: {
         id: data?.user?.id,
         email: data?.user?.email || normalizedEmail,
@@ -112,7 +113,7 @@ const logout = async (req, res) => {
     if (error) {
       return res.status(500).json({ error: error.message });
     }
-    return res.json({ message: 'Deconnexion reussie' });
+    return res.json({ message: t(req, 'Deconnexion reussie', 'Logout successful') });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -121,7 +122,7 @@ const logout = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: 'Utilisateur non authentifie' });
+      return res.status(401).json({ error: t(req, 'Utilisateur non authentifie', 'User not authenticated') });
     }
 
     const { data: profile, error } = await supabase
@@ -143,7 +144,7 @@ const getProfile = async (req, res) => {
           .single();
 
         if (insertError) {
-          return res.status(500).json({ error: 'Erreur creation profil' });
+          return res.status(500).json({ error: t(req, 'Erreur creation profil', 'Error creating profile') });
         }
 
         return res.json(newProfile);
@@ -163,7 +164,7 @@ const updateProfile = async (req, res) => {
     const { full_name } = req.body || {};
 
     if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: 'Utilisateur non authentifie' });
+      return res.status(401).json({ error: t(req, 'Utilisateur non authentifie', 'User not authenticated') });
     }
 
     const { data, error } = await supabase

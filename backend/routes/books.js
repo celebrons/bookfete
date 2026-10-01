@@ -10,6 +10,7 @@ const PDFDocument = require('pdfkit');
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const { t } = require('../services/i18n/t');
 const { isBookEditBypassActive } = require('../middleware/bookEditLock');
 // Pipeline sans-IA (phase03/04) reutilisee pour le PDF final post-commande —
 // voir routes/composition.js (preview.pdf) pour l'implementation d'origine ;
@@ -183,7 +184,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Livre introuvable.' });
+        return res.status(404).json({ error: t(req, 'Livre introuvable.', 'Book not found.') });
       }
       throw error;
     }
@@ -239,12 +240,12 @@ router.put('/:id', authenticate, async (req, res) => {
       .single();
 
     if (existingError || !existing) {
-      return res.status(404).json({ error: 'Livre introuvable' });
+      return res.status(404).json({ error: t(req, 'Livre introuvable', 'Book not found') });
     }
 
     if (existing.locked_at && !isBookEditBypassActive()) {
       return res.status(423).json({
-        error: 'Ce livre ne peut plus être modifié : une commande a déjà été payée.',
+        error: t(req, 'Ce livre ne peut plus être modifié : une commande a déjà été payée.', 'This book can no longer be edited: an order has already been paid.'),
         bookLocked: true
       });
     }
@@ -680,7 +681,7 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
       .single();
 
     if (bookError || !book) {
-      return res.status(404).json({ error: 'Livre introuvable' });
+      return res.status(404).json({ error: t(req, 'Livre introuvable', 'Book not found') });
     }
 
     // Note : previewFormat/previewLayoutSettings ci-dessous restent calcules
@@ -757,7 +758,7 @@ router.post('/:id/export-final-pdf', authenticate, async (req, res) => {
 
     if (!hasPaidAccess) {
       return res.status(403).json({
-        error: 'Le PDF final est disponible uniquement apres paiement.'
+        error: t(req, 'Le PDF final est disponible uniquement apres paiement.', 'The final PDF is only available after payment.')
       });
     }
 
@@ -926,7 +927,7 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
     }
 
     if (!job) {
-      return res.status(404).json({ error: 'Job export introuvable' });
+      return res.status(404).json({ error: t(req, 'Job export introuvable', 'Export job not found') });
     }
 
     const hasPaidAccess = await hasPaidPdfAccessForBook({
@@ -937,7 +938,7 @@ router.get('/:id/export-final-pdf/:jobId/status', authenticate, async (req, res)
 
     if (!hasPaidAccess && !job.orderId) {
       return res.status(403).json({
-        error: 'Le PDF final est disponible uniquement apres paiement.'
+        error: t(req, 'Le PDF final est disponible uniquement apres paiement.', 'The final PDF is only available after payment.')
       });
     }
 
@@ -1010,7 +1011,7 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
     }
 
     if (!job) {
-      return res.status(404).json({ error: 'Job export introuvable' });
+      return res.status(404).json({ error: t(req, 'Job export introuvable', 'Export job not found') });
     }
 
     const hasPaidAccess = await hasPaidPdfAccessForBook({
@@ -1021,13 +1022,13 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
 
     if (!hasPaidAccess && !job.orderId) {
       return res.status(403).json({
-        error: 'Le telechargement PDF est disponible uniquement apres paiement.'
+        error: t(req, 'Le telechargement PDF est disponible uniquement apres paiement.', 'PDF download is only available after payment.')
       });
     }
 
     if (job.status !== 'ready') {
       return res.status(409).json({
-        error: 'Le PDF final est en cours de generation',
+        error: t(req, 'Le PDF final est en cours de generation', 'The final PDF is currently being generated'),
         jobId: job.jobId,
         status: job.status
       });
@@ -1035,7 +1036,7 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
 
     const normalizedKind = kind === 'book' ? 'final' : kind;
     if (!['final', 'interior', 'cover'].includes(normalizedKind)) {
-      return res.status(400).json({ error: 'Type de fichier invalide' });
+      return res.status(400).json({ error: t(req, 'Type de fichier invalide', 'Invalid file type') });
     }
 
     const targetFile = (
@@ -1045,7 +1046,7 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
       || job.files?.final
     );
     if (!targetFile?.path || !fs.existsSync(targetFile.path)) {
-      return res.status(404).json({ error: 'Fichier PDF introuvable' });
+      return res.status(404).json({ error: t(req, 'Fichier PDF introuvable', 'PDF file not found') });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -1058,7 +1059,7 @@ router.get('/:id/export-final-pdf/:jobId/download/:kind', authenticate, async (r
     fileStream.on('error', (streamError) => {
       console.error('Erreur lecture fichier PDF:', streamError);
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Impossible de lire le fichier PDF' });
+        res.status(500).json({ error: t(req, 'Impossible de lire le fichier PDF', 'Unable to read the PDF file') });
       } else {
         res.end();
       }

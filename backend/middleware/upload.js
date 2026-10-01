@@ -1,4 +1,5 @@
 const multer = require('multer');
+const { t } = require('../services/i18n/t');
 
 // Configuration de multer pour stocker en mémoire
 const storage = multer.memoryStorage();
@@ -10,7 +11,11 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Format de fichier non supporté. Utilisez JPG, PNG, GIF ou WEBP.'), false);
+    cb(new Error(t(
+      req,
+      'Format de fichier non supporté. Utilisez JPG, PNG, GIF ou WEBP.',
+      'Unsupported file format. Use JPG, PNG, GIF or WEBP.'
+    )), false);
   }
 };
 
@@ -56,26 +61,38 @@ function uploadSinglePhoto(fieldName = 'photo') {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
           res.status(413).json({
-            error: `Photo trop volumineuse (maximum ${MAX_PHOTO_SIZE_MB} Mo). Reduisez sa taille (ex. export/compression depuis votre telephone) puis reessayez.`
+            error: t(
+              req,
+              `Photo trop volumineuse (maximum ${MAX_PHOTO_SIZE_MB} Mo). Reduisez sa taille (ex. export/compression depuis votre telephone) puis reessayez.`,
+              `Photo too large (maximum ${MAX_PHOTO_SIZE_MB} MB). Reduce its size (e.g. export/compression from your phone) then try again.`
+            )
           });
           return;
         }
         if (err.code === 'LIMIT_FILE_COUNT') {
-          res.status(413).json({ error: 'Trop de photos envoyees en une seule fois.' });
+          res.status(413).json({
+            error: t(req, 'Trop de photos envoyees en une seule fois.', 'Too many photos sent at once.')
+          });
           return;
         }
         if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-          res.status(400).json({ error: "Champ de fichier inattendu ('photo' requis)." });
+          res.status(400).json({
+            error: t(req, "Champ de fichier inattendu ('photo' requis).", "Unexpected file field ('photo' required).")
+          });
           return;
         }
-        res.status(400).json({ error: err.message || "Erreur lors de l'envoi de la photo." });
+        res.status(400).json({
+          error: err.message || t(req, "Erreur lors de l'envoi de la photo.", 'Error while sending the photo.')
+        });
         return;
       }
 
       // fileFilter rejette via un Error simple (pas MulterError) pour un
-      // format non supporte — deja un message clair en francais (voir
-      // fileFilter ci-dessus), transmis tel quel.
-      res.status(400).json({ error: err.message || "Erreur lors de l'envoi de la photo." });
+      // format non supporte — deja un message clair (voir fileFilter
+      // ci-dessus, deja traduit via t()), transmis tel quel.
+      res.status(400).json({
+        error: err.message || t(req, "Erreur lors de l'envoi de la photo.", 'Error while sending the photo.')
+      });
     });
   };
 }

@@ -28,6 +28,7 @@
 
 const supabase = require('../config/supabase');
 const { logEvent } = require('../services/events/eventLog');
+const { t } = require('../services/i18n/t');
 
 const PHOTO_BUCKET = 'contribution-photos';
 
@@ -81,7 +82,7 @@ const supprimerMonCompte = async (req, res) => {
   try {
     const ownerId = req.user?.id;
     if (!ownerId) {
-      return res.status(401).json({ error: 'Utilisateur non authentifie' });
+      return res.status(401).json({ error: t(req, 'Utilisateur non authentifie', 'User not authenticated') });
     }
 
     // --- 1. Y a-t-il un livre en cours de fabrication ? -------------------
@@ -94,9 +95,15 @@ const supprimerMonCompte = async (req, res) => {
     if (enProduction.length > 0) {
       const numeros = enProduction.map((c) => c.order_number).join(', ');
       return res.status(409).json({
-        error: `Un livre est actuellement en fabrication chez l'imprimeur (${numeros}). `
-          + 'Nous devons pouvoir le suivre jusqu\'a sa livraison : ecrivez-nous et nous '
-          + 'supprimerons votre compte des qu\'il sera arrive.',
+        error: t(
+          req,
+          `Un livre est actuellement en fabrication chez l'imprimeur (${numeros}). `
+            + 'Nous devons pouvoir le suivre jusqu\'a sa livraison : ecrivez-nous et nous '
+            + 'supprimerons votre compte des qu\'il sera arrive.',
+          `A book is currently being manufactured by the printer (${numeros}). `
+            + 'We need to be able to track it through to delivery: write to us and we will '
+            + 'delete your account as soon as it has arrived.'
+        ),
         ordersInProduction: enProduction.map((c) => c.order_number)
       });
     }
@@ -143,8 +150,13 @@ const supprimerMonCompte = async (req, res) => {
     const { error: erreurCompte } = await supabase.auth.admin.deleteUser(ownerId);
     if (erreurCompte) {
       return res.status(500).json({
-        error: 'Vos donnees ont ete supprimees, mais le compte lui-meme n\'a pas pu l\'etre. '
-          + 'Ecrivez-nous pour terminer la suppression.'
+        error: t(
+          req,
+          'Vos donnees ont ete supprimees, mais le compte lui-meme n\'a pas pu l\'etre. '
+            + 'Ecrivez-nous pour terminer la suppression.',
+          'Your data has been deleted, but the account itself could not be. '
+            + 'Write to us to complete the deletion.'
+        )
       });
     }
 

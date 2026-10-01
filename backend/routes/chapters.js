@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const { t } = require('../services/i18n/t');
 
 async function getBookOwnerId(bookId) {
   const { data, error } = await supabase
@@ -36,16 +37,16 @@ async function getChapterBookId(chapterId) {
 async function requireOwnedBookFromBody(req, res, next) {
   const bookId = req.body?.book_id;
   if (!bookId) {
-    return res.status(400).json({ error: 'book_id requis.' });
+    return res.status(400).json({ error: t(req, 'book_id requis.', 'book_id is required.') });
   }
 
   const ownerId = await getBookOwnerId(bookId);
   if (!ownerId) {
-    return res.status(404).json({ error: 'Livre introuvable.' });
+    return res.status(404).json({ error: t(req, 'Livre introuvable.', 'Book not found.') });
   }
 
   if (ownerId !== req.user.id) {
-    return res.status(403).json({ error: 'Acces refuse.' });
+    return res.status(403).json({ error: t(req, 'Acces refuse.', 'Access denied.') });
   }
 
   return next();
@@ -55,12 +56,12 @@ async function requireOwnedBookFromBody(req, res, next) {
 async function requireOwnedChapter(req, res, next) {
   const bookId = await getChapterBookId(req.params.id);
   if (!bookId) {
-    return res.status(404).json({ error: 'Chapitre introuvable.' });
+    return res.status(404).json({ error: t(req, 'Chapitre introuvable.', 'Chapter not found.') });
   }
 
   const ownerId = await getBookOwnerId(bookId);
   if (!ownerId || ownerId !== req.user.id) {
-    return res.status(403).json({ error: 'Acces refuse.' });
+    return res.status(403).json({ error: t(req, 'Acces refuse.', 'Access denied.') });
   }
 
   return next();

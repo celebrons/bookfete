@@ -17,6 +17,16 @@
 
 const { sendEmail, isEmailEnabled } = require('./brevoClient');
 const gabarits = require('./emailTemplates');
+const { resolveLanguageForUserId } = require('../i18n/resolveLanguageForUserId');
+
+// Langue du DESTINATAIRE de chaque email (chantier bilingue, phase 6) — pas
+// celle de qui declenche l'envoi (souvent personne : webhook Stripe, job de
+// generation PDF en arriere-plan). On resout via owner_id plutot que
+// d'exiger un `req` que la moitie des appelants de ce fichier n'ont pas (voir
+// resolveLanguageForUserId.js pour pourquoi). Mode collectif : la langue
+// retournee est celle de l'ORGANISATEUR (proprietaire du livre), le
+// participant invite n'ayant pas de compte propre.
+const langueProprietaire = (ownerId) => resolveLanguageForUserId(ownerId);
 
 // URL publique du site, pour les liens des emails. Sans elle, on n'ajoute
 // simplement aucun bouton plutot que d'envoyer un lien casse vers localhost.
@@ -74,27 +84,32 @@ async function envoyerLienLivre({ to, book }) {
     console.log('[email] PUBLIC_APP_URL absent — lien de livre non envoye');
     return { sent: false, skipped: 'url_site_absente' };
   }
-  return envoyer(gabarits.retrouverSonLivre({ lien, titreLivre: book?.title }), to, 'lien livre');
+  const lang = await langueProprietaire(book?.owner_id);
+  return envoyer(gabarits.retrouverSonLivre({ lien, titreLivre: book?.title, lang }), to, 'lien livre');
 }
 
 /** Commande creee (avant paiement). */
 async function envoyerCommandeConfirmee({ order, book, ownerEmail, pricing }) {
+  const lang = await langueProprietaire(order?.owner_id || book?.owner_id);
   return envoyer(gabarits.commandeConfirmee({
     numero: order?.order_number || order?.id,
     titreLivre: book?.title,
     format: formatLisible(book?.print_format),
     pages: book?.page_count,
     totalCents: pricing?.totalCents ?? order?.total_cents,
-    lien: lienCommande(order?.id)
+    lien: lienCommande(order?.id),
+    lang
   }), destinataireDe({ order, ownerEmail }), 'commande confirmee');
 }
 
 /** Paiement encaisse. */
 async function envoyerPaiementRecu({ order, ownerEmail }) {
+  const lang = await langueProprietaire(order?.owner_id);
   return envoyer(gabarits.paiementRecu({
     numero: order?.order_number || order?.id,
     totalCents: order?.total_cents,
-    lien: lienCommande(order?.id)
+    lien: lienCommande(order?.id),
+    lang
   }), destinataireDe({ order, ownerEmail }), 'paiement recu');
 }
 
@@ -113,11 +128,13 @@ async function envoyerFacture({ order, invoice, pdfBuffer, ownerEmail }) {
     console.log('[email] aucun destinataire connu (facture) — rien envoye');
     return { sent: false, skipped: 'destinataire_inconnu' };
   }
+  const lang = await langueProprietaire(order?.owner_id);
   const gabarit = gabarits.factureEmise({
     numeroFacture: invoice?.invoice_number,
     numeroCommande: order?.order_number || order?.id,
     totalCents: order?.total_cents,
-    lien: lienCommande(order?.id)
+    lien: lienCommande(order?.id),
+    lang
   });
   return sendEmail({
     to: destinataire,
@@ -134,10 +151,12 @@ async function envoyerFacture({ order, invoice, pdfBuffer, ownerEmail }) {
  * invitation — sans lui, la promesse serait fausse.
  */
 async function envoyerPdfPret({ order, book, ownerEmail }) {
+  const lang = await langueProprietaire(order?.owner_id || book?.owner_id);
   return envoyer(gabarits.pdfPret({
     titreLivre: book?.title,
     pages: book?.page_count,
-    lien: lienTelechargementPdf(book?.id || order?.book_id)
+    lien: lienTelechargementPdf(book?.id || order?.book_id),
+    lang
   }), destinataireDe({ order, ownerEmail }), 'pdf pret');
 }
 
@@ -149,11 +168,13 @@ async function envoyerPdfPret({ order, book, ownerEmail }) {
  * evite d'ecrire a chaque micro-changement d'etat interne.
  */
 async function envoyerEtapeFabrication({ order, ownerEmail, statut, suivi }) {
+  const lang = await langueProprietaire(order?.owner_id);
   const gabarit = gabarits.etapeDeFabrication({
     statut,
     numero: order?.order_number || order?.id,
     lien: lienCommande(order?.id),
-    suivi
+    suivi,
+    lang
   });
   return envoyer(gabarit, destinataireDe({ order, ownerEmail }), `etape ${statut}`);
 }
@@ -182,13 +203,17 @@ async function envoyerInvitationParticipant({ participant, book }) {
     console.log('[email] PUBLIC_APP_URL absent — invitation non envoyee');
     return { sent: false, skipped: 'url_site_absente' };
   }
+  // Langue de l'ORGANISATEUR (le participant invite n'a pas de compte, donc
+  // pas de langue propre — voir langueProprietaire ci-dessus).
+  const lang = await langueProprietaire(book?.owner_id);
   return envoyer(gabarits.invitationParticipant({
     lien,
     titreLivre: book?.title,
     pourQui: book?.recipient_name,
     deLaPart: book?.owner_name,
     message: book?.collective_message,
-    dateLimite: dateLisible(book?.collective_deadline)
+    dateLimite: dateLisible(book?.collective_deadline),
+    lang
   }), participant?.email, 'invitation participant');
 }
 
@@ -199,6 +224,7 @@ async function envoyerRelanceParticipant({ participant, book }) {
     console.log('[email] PUBLIC_APP_URL absent — relance non envoyee');
     return { sent: false, skipped: 'url_site_absente' };
   }
+  const lang = await langueProprietaire(book?.owner_id);
   return envoyer(gabarits.relanceParticipant({
     lien,
     titreLivre: book?.title,
@@ -206,24 +232,29 @@ async function envoyerRelanceParticipant({ participant, book }) {
     dateLimite: dateLisible(book?.collective_deadline),
     // Le message change si la personne a deja commence : lui redire « vous
     // n'avez rien envoye » alors qu'elle a depose deux photos serait vexant.
-    dejaCommence: ['started', 'opened'].includes(participant?.status)
+    dejaCommence: ['started', 'opened'].includes(participant?.status),
+    lang
   }), participant?.email, 'relance participant');
 }
 
 /** Vers le CREATEUR : quelqu'un vient de contribuer a son livre. */
 async function envoyerNouvelleContribution({ to, book, contributeur, photos, souvenirs }) {
+  const lang = await langueProprietaire(book?.owner_id);
   return envoyer(gabarits.nouvelleContribution({
     lien: lienLivre(book?.id),
     titreLivre: book?.title,
     contributeur,
     photos,
-    souvenirs
+    souvenirs,
+    lang
   }), to, 'nouvelle contribution');
 }
 
-/** Email d'essai, declenche explicitement par l'utilisateur. */
-async function envoyerEssai({ to }) {
-  return envoyer(gabarits.essai({ destinataire: to }), to, 'essai');
+/** Email d'essai, declenche explicitement par l'utilisateur. `lang` transmis
+ *  par l'appelant (routes/orders.js) : requete authentifiee, resolveLanguage
+ *  deja disponible sur son propre req, inutile de redemander a Supabase. */
+async function envoyerEssai({ to, lang }) {
+  return envoyer(gabarits.essai({ destinataire: to, lang }), to, 'essai');
 }
 
 // --- Alertes techniques internes (2026-09-27) ------------------------------

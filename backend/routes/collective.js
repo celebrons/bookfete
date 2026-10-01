@@ -21,6 +21,7 @@ const emailsTransactionnels = require('../services/email/transactionalEmails');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const { t } = require('../services/i18n/t');
 const upload = require('../middleware/upload');
 const storageService = require('../services/storageService');
 
@@ -59,8 +60,8 @@ async function getBook(bookId) {
 
 async function requireOwnedBook(req, res, next) {
   const book = await getBook(req.params.bookId);
-  if (!book) return res.status(404).json({ error: 'Livre introuvable.' });
-  if (book.owner_id !== req.user.id) return res.status(403).json({ error: 'Acces refuse.' });
+  if (!book) return res.status(404).json({ error: t(req, 'Livre introuvable.', 'Book not found.') });
+  if (book.owner_id !== req.user.id) return res.status(403).json({ error: t(req, 'Acces refuse.', 'Access denied.') });
   req.book = book;
   return next();
 }
@@ -76,12 +77,12 @@ async function resolveParticipantByToken(req, res, next) {
     .maybeSingle();
 
   if (error || !participant) {
-    return res.status(404).json({ error: 'Lien invalide ou expire.' });
+    return res.status(404).json({ error: t(req, 'Lien invalide ou expire.', 'Invalid or expired link.') });
   }
 
   const book = await getBook(participant.book_id);
   if (!book) {
-    return res.status(404).json({ error: 'Livre introuvable.' });
+    return res.status(404).json({ error: t(req, 'Livre introuvable.', 'Book not found.') });
   }
 
   req.participant = participant;
@@ -121,7 +122,7 @@ async function updateCollectiveSettings(req, res, { markActivated }) {
   try {
     const { eventTitle, message, deadline, remindersEnabled, reminderDaysBefore } = parseCollectiveSettingsPayload(req.body);
     if (!deadline) {
-      return res.status(400).json({ error: 'La date limite de participation est obligatoire.' });
+      return res.status(400).json({ error: t(req, 'La date limite de participation est obligatoire.', 'The participation deadline is required.') });
     }
 
     const update = {
@@ -246,7 +247,7 @@ router.post('/api/books/:bookId/collective/participants', authenticate, requireO
     const rawEmails = Array.isArray(req.body?.emails) ? req.body.emails : [];
     const emails = [...new Set(rawEmails.map(cleanEmail).filter(Boolean))];
     if (emails.length === 0) {
-      return res.status(400).json({ error: 'Au moins une adresse email est requise.' });
+      return res.status(400).json({ error: t(req, 'Au moins une adresse email est requise.', 'At least one email address is required.') });
     }
 
     const rows = emails.map((email) => ({
@@ -293,12 +294,12 @@ router.put('/api/books/:bookId/collective/participants/:participantId', authenti
     const update = {};
     if (typeof req.body?.email === 'string') {
       const email = cleanEmail(req.body.email);
-      if (!email) return res.status(400).json({ error: 'Email invalide.' });
+      if (!email) return res.status(400).json({ error: t(req, 'Email invalide.', 'Invalid email.') });
       update.email = email;
     }
     if (typeof req.body?.name === 'string') update.name = req.body.name.trim() || null;
     if (Object.keys(update).length === 0) {
-      return res.status(400).json({ error: 'Rien a mettre a jour.' });
+      return res.status(400).json({ error: t(req, 'Rien a mettre a jour.', 'Nothing to update.') });
     }
 
     const { data, error } = await supabase
@@ -310,7 +311,7 @@ router.put('/api/books/:bookId/collective/participants/:participantId', authenti
       .maybeSingle();
 
     if (error) throw error;
-    if (!data) return res.status(404).json({ error: 'Participant introuvable.' });
+    if (!data) return res.status(404).json({ error: t(req, 'Participant introuvable.', 'Participant not found.') });
 
     // Anti-doublon (retour utilisateur, 2026-09-28 : voir relanceTropRecente
     // en entete de fichier) : une double requete rapprochee (double-clic,
@@ -370,7 +371,7 @@ router.post('/api/books/:bookId/collective/participants/:participantId/remind', 
       .eq('book_id', req.params.bookId)
       .maybeSingle();
     if (erreurLecture) throw erreurLecture;
-    if (!actuel) return res.status(404).json({ error: 'Participant introuvable.' });
+    if (!actuel) return res.status(404).json({ error: t(req, 'Participant introuvable.', 'Participant not found.') });
 
     if (relanceTropRecente(actuel)) {
       return res.json({ ...actuel, emailSent: false, emailSkipped: 'trop_recent' });
@@ -384,7 +385,7 @@ router.post('/api/books/:bookId/collective/participants/:participantId/remind', 
       .select()
       .maybeSingle();
     if (error) throw error;
-    if (!data) return res.status(404).json({ error: 'Participant introuvable.' });
+    if (!data) return res.status(404).json({ error: t(req, 'Participant introuvable.', 'Participant not found.') });
 
     const envoi = await emailsTransactionnels.envoyerRelanceParticipant({ participant: data, book: req.book });
     res.json({ ...data, emailSent: envoi.sent === true, emailSkipped: envoi.skipped || null });
@@ -442,11 +443,11 @@ router.get('/api/public/collectif/:token', resolveParticipantByToken, async (req
 router.post('/api/public/collectif/:token/text', resolveParticipantByToken, async (req, res) => {
   try {
     if (isDeadlinePassed(req.book)) {
-      return res.status(403).json({ error: 'La collecte de souvenirs est terminee.' });
+      return res.status(403).json({ error: t(req, 'La collecte de souvenirs est terminee.', 'Memory collection has ended.') });
     }
     const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
     if (!text) {
-      return res.status(400).json({ error: 'Texte manquant.' });
+      return res.status(400).json({ error: t(req, 'Texte manquant.', 'Missing text.') });
     }
 
     const displayOrder = await nextDisplayOrder(req.book.id);
@@ -476,10 +477,10 @@ router.post(
   async (req, res) => {
     try {
       if (isDeadlinePassed(req.book)) {
-        return res.status(403).json({ error: 'La collecte de souvenirs est terminee.' });
+        return res.status(403).json({ error: t(req, 'La collecte de souvenirs est terminee.', 'Memory collection has ended.') });
       }
       if (!req.file) {
-        return res.status(400).json({ error: 'Fichier manquant (champ "photo").' });
+        return res.status(400).json({ error: t(req, 'Fichier manquant (champ "photo").', 'Missing file (field "photo").') });
       }
 
       const uploadResult = await storageService.uploadFile(PHOTO_BUCKET, req.file, req.book.id);

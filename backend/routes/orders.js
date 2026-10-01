@@ -3,6 +3,8 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
+const { t } = require('../services/i18n/t');
+const { resolveLanguage } = require('../services/i18n/resolveLanguage');
 const { submitPrintOrderToGelato, isGelatoLiveOrdersEnabled } = require('../services/printing/gelatoOrderService');
 const gelatoClient = require('../services/printing/gelatoClient');
 const { removePrintFilesForOrder } = require('../services/printing/printFileStorage');
@@ -777,13 +779,13 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
   try {
     if (isGelatoLiveOrdersEnabled()) {
       return res.status(409).json({
-        error: "GELATO_LIVE_ORDERS=1 : le mode production est actif, l'envoi de test est desactive pour ne pas creer une vraie commande facturee."
+        error: t(req, "GELATO_LIVE_ORDERS=1 : le mode production est actif, l'envoi de test est desactive pour ne pas creer une vraie commande facturee.", 'GELATO_LIVE_ORDERS=1: production mode is active, the test send is disabled so as not to create a real billed order.')
       });
     }
 
     if (gelatoSubmissionsEnCours.has(req.params.orderId)) {
       return res.status(409).json({
-        error: "Un envoi a l'imprimeur est deja en cours pour cette commande. Attendez qu'il se termine."
+        error: t(req, "Un envoi a l'imprimeur est deja en cours pour cette commande. Attendez qu'il se termine.", 'A submission to the printer is already in progress for this order. Wait for it to finish.')
       });
     }
 
@@ -796,15 +798,15 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
       .single();
 
     if (orderError || !order) {
-      return res.status(404).json({ error: 'Commande introuvable' });
+      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
     const type = String(order.type || '').toLowerCase();
     if (type !== 'print' && type !== 'pack') {
-      return res.status(400).json({ error: "Seules les commandes Impression ou Pack peuvent etre envoyees a l'imprimeur." });
+      return res.status(400).json({ error: t(req, "Seules les commandes Impression ou Pack peuvent etre envoyees a l'imprimeur.", 'Only Print or Pack orders can be sent to the printer.') });
     }
     if (!isAddressValid(order.shipping_address)) {
-      return res.status(400).json({ error: 'Adresse de livraison incomplete : Gelato la refuserait.' });
+      return res.status(400).json({ error: t(req, 'Adresse de livraison incomplete : Gelato la refuserait.', 'Incomplete shipping address: Gelato would reject it.') });
     }
 
     const { data: book, error: bookError } = await db
@@ -813,7 +815,7 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
       .eq('id', order.book_id)
       .single();
     if (bookError || !book) {
-      return res.status(404).json({ error: 'Livre introuvable' });
+      return res.status(404).json({ error: t(req, 'Livre introuvable', 'Book not found') });
     }
 
     // Deja envoye ? L'idempotence de gelatoOrderService est indexee sur la
@@ -1068,7 +1070,7 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
       .single();
 
     if (orderError || !order) {
-      return res.status(404).json({ error: 'Commande introuvable' });
+      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
     const gelatoOrderId = order.metadata?.gelatoOrderId || null;
@@ -1231,7 +1233,7 @@ router.get('/:orderId/invoice', authenticate, async (req, res) => {
       .eq('owner_id', req.user.id)
       .single();
     if (orderError || !order) {
-      return res.status(404).json({ error: 'Commande introuvable' });
+      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
     // RLS (invoices_owner_select) garantit deja qu'on ne peut lire QUE ses
@@ -1243,7 +1245,7 @@ router.get('/:orderId/invoice', authenticate, async (req, res) => {
       .eq('order_id', order.id)
       .maybeSingle();
     if (invoiceError || !invoice || !invoice.storage_path) {
-      return res.status(404).json({ error: 'Aucune facture disponible pour cette commande.' });
+      return res.status(404).json({ error: t(req, 'Aucune facture disponible pour cette commande.', 'No invoice available for this order.') });
     }
 
     const url = await signedInvoiceUrl(invoice.storage_path);
@@ -1557,16 +1559,16 @@ router.post('/email/test', authenticate, async (req, res) => {
   try {
     const destinataire = req.user?.email;
     if (!destinataire) {
-      return res.status(400).json({ error: "Aucune adresse email connue pour ce compte." });
+      return res.status(400).json({ error: t(req, "Aucune adresse email connue pour ce compte.", 'No known email address for this account.') });
     }
     if (!emails.isEmailEnabled()) {
       return res.status(422).json({
-        error: "L'envoi d'emails n'est pas configure : posez BREVO_API_KEY dans le fichier .env du backend, puis redemarrez-le.",
+        error: t(req, "L'envoi d'emails n'est pas configure : posez BREVO_API_KEY dans le fichier .env du backend, puis redemarrez-le.", 'Email sending is not configured: set BREVO_API_KEY in the backend .env file, then restart it.'),
         enabled: false
       });
     }
 
-    const resultat = await emails.envoyerEssai({ to: destinataire });
+    const resultat = await emails.envoyerEssai({ to: destinataire, lang: resolveLanguage(req) });
     if (!resultat.sent) {
       return res.status(502).json({ error: resultat.error || resultat.skipped, to: destinataire });
     }
@@ -1603,10 +1605,19 @@ router.get('/formats', (req, res) => {
 
   // reliure : matiere reelle de la couverture (voir coverFormat.js — Standard
   // et Luxe partagent le MEME format papier, seule la matiere les distingue).
+  // nom : nom de produit, jamais traduit (meme convention que "Célébrons"
+  // lui-meme) — seule l'accroche change de langue (chantier bilingue,
+  // phase 6 : ce catalogue etait reste en francais dans toutes les phases
+  // precedentes, voir le commentaire laisse dans CreateBookSansIA.js).
   const LIBELLES = {
-    livret: { nom: 'Livret', accroche: 'Simple & élégant', reliure: 'souple' },
-    standard: { nom: 'Standard', accroche: 'Le meilleur équilibre entre élégance, qualité et prix', recommande: true, reliure: 'souple' },
-    luxe: { nom: 'Luxe', accroche: 'Premium & intemporel', reliure: 'rigide' }
+    livret: { nom: 'Livret', accroche: t(req, 'Simple & élégant', 'Simple & elegant'), reliure: 'souple' },
+    standard: {
+      nom: 'Standard',
+      accroche: t(req, 'Le meilleur équilibre entre élégance, qualité et prix', 'The best balance of elegance, quality and price'),
+      recommande: true,
+      reliure: 'souple'
+    },
+    luxe: { nom: 'Luxe', accroche: t(req, 'Premium & intemporel', 'Premium & timeless'), reliure: 'rigide' }
   };
 
   const requestedPageCount = Number(req.query.page_count);
@@ -1692,7 +1703,7 @@ router.get('/book/:bookId/price-estimate', authenticate, async (req, res) => {
       .single();
 
     if (error || !book) {
-      return res.status(404).json({ error: 'Livre introuvable' });
+      return res.status(404).json({ error: t(req, 'Livre introuvable', 'Book not found') });
     }
 
     const overriddenPageCount = req.query.page_count !== undefined ? Number(req.query.page_count) : null;
@@ -1800,7 +1811,7 @@ router.get('/:orderId', authenticate, async (req, res) => {
       .single();
 
     if (error || !data) {
-      return res.status(404).json({ error: 'Commande introuvable' });
+      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
     // Ouvrir la commande suffit a rattraper un paiement que le navigateur
@@ -1844,13 +1855,13 @@ router.delete('/:orderId', authenticate, async (req, res) => {
       .single();
 
     if (orderError || !order) {
-      return res.status(404).json({ error: 'Commande introuvable' });
+      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
     const gelatoOrderType = order.metadata?.gelatoOrderType || null;
     if (gelatoOrderType === 'order') {
       return res.status(409).json({
-        error: "Cette commande est partie en production chez l'imprimeur : elle ne peut pas etre supprimee."
+        error: t(req, "Cette commande est partie en production chez l'imprimeur : elle ne peut pas etre supprimee.", 'This order has gone into production at the printer: it cannot be deleted.')
       });
     }
 
@@ -1871,7 +1882,7 @@ router.delete('/:orderId', authenticate, async (req, res) => {
         typeChezGelato = gelatoTracking.readGelatoOrderType(distant);
       } catch (error) {
         return res.status(409).json({
-          error: "Impossible de verifier aupres de l'imprimeur si cette commande est partie en production. Par prudence, elle n'est pas supprimee. Reessayez plus tard."
+          error: t(req, "Impossible de verifier aupres de l'imprimeur si cette commande est partie en production. Par prudence, elle n'est pas supprimee. Reessayez plus tard.", 'Unable to check with the printer whether this order has gone into production. As a precaution, it has not been deleted. Try again later.')
         });
       }
 
@@ -1884,7 +1895,7 @@ router.delete('/:orderId', authenticate, async (req, res) => {
           .eq('id', order.id);
 
         return res.status(409).json({
-          error: "Cette commande est partie en production chez l'imprimeur : elle ne peut pas etre supprimee."
+          error: t(req, "Cette commande est partie en production chez l'imprimeur : elle ne peut pas etre supprimee.", 'This order has gone into production at the printer: it cannot be deleted.')
         });
       }
     }
@@ -1892,7 +1903,11 @@ router.delete('/:orderId', authenticate, async (req, res) => {
     const status = String(order.status || '').toLowerCase();
     if (ORDER_STATUS_PAID_OR_AFTER.has(status) && isStripeLiveMode()) {
       return res.status(409).json({
-        error: 'Cette commande a ete reellement payee (Stripe en mode live) : elle ne peut pas etre supprimee.'
+        error: t(
+          req,
+          'Cette commande a ete reellement payee (Stripe en mode live) : elle ne peut pas etre supprimee.',
+          'This order has actually been paid (Stripe live mode): it cannot be deleted.'
+        )
       });
     }
 
@@ -1935,7 +1950,7 @@ router.delete('/:orderId', authenticate, async (req, res) => {
 
     if (!Array.isArray(deletedRows) || deletedRows.length === 0) {
       return res.status(409).json({
-        error: "La base a refuse la suppression sans message d'erreur. Il manque probablement la regle 'delete' sur la table orders (sql/phase20_orders_delete_policy.sql)."
+        error: t(req, "La base a refuse la suppression sans message d'erreur. Il manque probablement la regle 'delete' sur la table orders (sql/phase20_orders_delete_policy.sql).", "The database refused the deletion without an error message. The 'delete' policy on the orders table is probably missing (sql/phase20_orders_delete_policy.sql).")
       });
     }
 
@@ -2004,7 +2019,7 @@ router.post('/', authenticate, async (req, res) => {
     const emailDuCompte = String(req.user?.email || '').trim();
     if (!emailDuCompte) {
       return res.status(403).json({
-        error: 'Indiquez votre adresse e-mail pour commander : elle vous permettra de retrouver votre livre et de suivre sa fabrication.',
+        error: t(req, 'Indiquez votre adresse e-mail pour commander : elle vous permettra de retrouver votre livre et de suivre sa fabrication.', 'Provide your email address to order: it will let you find your book again and track its production.'),
         requiresAccount: true
       });
     }
@@ -2035,15 +2050,15 @@ router.post('/', authenticate, async (req, res) => {
     const cgvAccepted = req.body?.cgvAccepted === true;
 
     if (!ORDER_TYPES.has(type)) {
-      return res.status(400).json({ error: 'Type de commande invalide' });
+      return res.status(400).json({ error: t(req, 'Type de commande invalide', 'Invalid order type') });
     }
 
     if (!cgvAccepted) {
-      return res.status(400).json({ error: "L'acceptation des conditions générales de vente est requise." });
+      return res.status(400).json({ error: t(req, "L'acceptation des conditions générales de vente est requise.", 'Acceptance of the terms and conditions is required.') });
     }
 
     if ((type === 'print' || type === 'pack') && !isAddressValid(shippingAddress)) {
-      return res.status(400).json({ error: 'Adresse de livraison incomplete' });
+      return res.status(400).json({ error: t(req, 'Adresse de livraison incomplete', 'Incomplete shipping address') });
     }
 
     const { data: book, error: bookError } = await db
@@ -2054,13 +2069,13 @@ router.post('/', authenticate, async (req, res) => {
       .single();
 
     if (bookError || !book) {
-      return res.status(404).json({ error: 'Livre introuvable' });
+      return res.status(404).json({ error: t(req, 'Livre introuvable', 'Book not found') });
     }
 
     const lifecycleStatus = getBookLifecycleStatusFromBook(book);
     if (getLifecycleRank(lifecycleStatus) < getLifecycleRank('finalized')) {
       return res.status(400).json({
-        error: 'Le livre doit etre finalise avant de lancer une commande'
+        error: t(req, 'Le livre doit etre finalise avant de lancer une commande', 'The book must be finalized before placing an order')
       });
     }
 
@@ -2092,9 +2107,15 @@ router.post('/', authenticate, async (req, res) => {
       ));
       if (auDela.length > 0) {
         return res.status(422).json({
-          error: `Votre livre contient ${auDela.length} page(s) de contenu au-dela des ${declared} pages annoncees. `
-            + 'Relancez une composition ou ajustez le nombre de pages : le prix et le fichier envoye a '
-            + "l'imprimeur doivent porter sur le meme livre.",
+          error: t(
+            req,
+            `Votre livre contient ${auDela.length} page(s) de contenu au-dela des ${declared} pages annoncees. `
+              + 'Relancez une composition ou ajustez le nombre de pages : le prix et le fichier envoye a '
+              + "l'imprimeur doivent porter sur le meme livre.",
+            `Your book contains ${auDela.length} page(s) of content beyond the ${declared} announced pages. `
+              + 'Re-run a composition or adjust the page count: the price and the file sent to '
+              + 'the printer must cover the same book.'
+          ),
           pageCountMismatch: true,
           declaredPageCount: declared,
           realPageCount: declared + auDela.length
@@ -2168,7 +2189,7 @@ router.post('/', authenticate, async (req, res) => {
 
 router.post('/:orderId/pay', authenticate, async (req, res) => {
   return res.status(410).json({
-    error: 'Paiement direct desactive. Utilisez Stripe Checkout.'
+    error: t(req, 'Paiement direct desactive. Utilisez Stripe Checkout.', 'Direct payment disabled. Use Stripe Checkout.')
   });
 });
 
@@ -2184,11 +2205,11 @@ router.post('/:orderId/checkout-session', authenticate, async (req, res) => {
       .single();
 
     if (orderError || !order) {
-      return res.status(404).json({ error: 'Commande introuvable' });
+      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
     if (!['draft', 'awaiting_payment'].includes(order.status)) {
-      return res.status(409).json({ error: 'Commande deja en paiement ou traitee' });
+      return res.status(409).json({ error: t(req, 'Commande deja en paiement ou traitee', 'Order already in payment or processed') });
     }
 
     const context = {
@@ -2228,8 +2249,8 @@ router.post('/:orderId/checkout-session', authenticate, async (req, res) => {
             currency: String(order.currency || 'EUR').toLowerCase(),
             unit_amount: Number(order.unit_cents || order.total_cents || 0),
             product_data: {
-              name: `Livre souvenir - ${order.book_title || 'Sans titre'}`,
-              description: `Commande ${order.order_number || ''} (${order.type || 'pdf'})`
+              name: `${t(req, 'Livre souvenir', 'Memory book')} - ${order.book_title || t(req, 'Sans titre', 'Untitled')}`,
+              description: `${t(req, 'Commande', 'Order')} ${order.order_number || ''} (${order.type || 'pdf'})`
             }
           }
         },
@@ -2239,7 +2260,7 @@ router.post('/:orderId/checkout-session', authenticate, async (req, res) => {
             currency: String(order.currency || 'EUR').toLowerCase(),
             unit_amount: Number(order.snapshot.shippingPriceCents),
             product_data: {
-              name: 'Livraison'
+              name: t(req, 'Livraison', 'Shipping')
             }
           }
         }] : [])
@@ -2278,7 +2299,7 @@ router.post('/:orderId/stripe/confirm', authenticate, async (req, res) => {
     const sessionId = cleanString(req.body?.sessionId || '', 240);
 
     if (!sessionId) {
-      return res.status(400).json({ error: 'sessionId requis' });
+      return res.status(400).json({ error: t(req, 'sessionId requis', 'sessionId required') });
     }
 
     const { data: order, error: orderError } = await db
@@ -2289,21 +2310,21 @@ router.post('/:orderId/stripe/confirm', authenticate, async (req, res) => {
       .single();
 
     if (orderError || !order) {
-      return res.status(404).json({ error: 'Commande introuvable' });
+      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (!session) {
-      return res.status(404).json({ error: 'Session Stripe introuvable' });
+      return res.status(404).json({ error: t(req, 'Session Stripe introuvable', 'Stripe session not found') });
     }
 
     const sessionOrderId = String(session.metadata?.orderId || '');
     if (sessionOrderId && sessionOrderId !== String(order.id)) {
-      return res.status(400).json({ error: 'Session Stripe non associee a cette commande' });
+      return res.status(400).json({ error: t(req, 'Session Stripe non associee a cette commande', 'Stripe session not associated with this order') });
     }
 
     if (String(session.payment_status || '').toLowerCase() !== 'paid') {
-      return res.status(409).json({ error: 'Paiement Stripe non confirme' });
+      return res.status(409).json({ error: t(req, 'Paiement Stripe non confirme', 'Stripe payment not confirmed') });
     }
 
     const updatedOrder = await persistStripePaymentForOrder({
@@ -2339,7 +2360,7 @@ router.post('/:orderId/status', authenticate, async (req, res) => {
     const nextMetadata = req.body?.metadata;
 
     if (!ORDER_STATUSES.has(nextStatus)) {
-      return res.status(400).json({ error: 'Statut de commande invalide' });
+      return res.status(400).json({ error: t(req, 'Statut de commande invalide', 'Invalid order status') });
     }
 
     const { data: order, error: orderError } = await db
@@ -2350,25 +2371,29 @@ router.post('/:orderId/status', authenticate, async (req, res) => {
       .single();
 
     if (orderError || !order) {
-      return res.status(404).json({ error: 'Commande introuvable' });
+      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
     if (!canUseStatusForOrderType(nextStatus, order.type)) {
-      return res.status(400).json({ error: 'Statut incompatible avec ce type de commande' });
+      return res.status(400).json({ error: t(req, 'Statut incompatible avec ce type de commande', 'Status incompatible with this order type') });
     }
     if (!canTransitionOrderStatus(order.status, nextStatus)) {
       return res.status(409).json({
-        error: `Transition de statut invalide (${order.status} -> ${nextStatus})`
+        error: t(
+          req,
+          `Transition de statut invalide (${order.status} -> ${nextStatus})`,
+          `Invalid status transition (${order.status} -> ${nextStatus})`
+        )
       });
     }
     if (nextStatus === 'paid') {
       return res.status(403).json({
-        error: 'Statut paid reserve a la confirmation Stripe'
+        error: t(req, 'Statut paid reserve a la confirmation Stripe', "'paid' status is reserved for Stripe confirmation")
       });
     }
     if (ORDER_STATUS_REQUIRES_PAID.has(nextStatus) && !ORDER_STATUS_PAID_OR_AFTER.has(order.status)) {
       return res.status(409).json({
-        error: 'Paiement requis avant de lancer la production'
+        error: t(req, 'Paiement requis avant de lancer la production', 'Payment required before starting production')
       });
     }
     if (nextStatus === order.status) {

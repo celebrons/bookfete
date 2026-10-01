@@ -23,6 +23,8 @@
 // aucun livre deja teste avec un paiement ne pourrait plus jamais etre
 // modifie, y compris par le fondateur lui-meme en train de tester le
 // parcours complet.
+const { t } = require('../services/i18n/t');
+
 function isBookEditBypassActive() {
   return process.env.ALLOW_BOOK_EDITS_AFTER_PAYMENT === '1';
 }
@@ -42,7 +44,11 @@ function requireBookNotLocked(req, res, next) {
   }
 
   return res.status(423).json({
-    error: 'Ce livre ne peut plus être modifié : une commande a déjà été payée.',
+    error: t(
+      req,
+      'Ce livre ne peut plus être modifié : une commande a déjà été payée.',
+      'This book can no longer be edited: an order has already been paid.'
+    ),
     bookLocked: true
   });
 }

@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const { t } = require('../services/i18n/t');
 
 const AUTH_CACHE_TTL_MS = Number(process.env.AUTH_CACHE_TTL_MS || 60_000);
 const AUTH_CACHE_MAX_ENTRIES = Number(process.env.AUTH_CACHE_MAX_ENTRIES || 2000);
@@ -48,13 +49,13 @@ const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       debugAuthLog('Auth: token missing');
-      return res.status(401).json({ error: 'Token manquant' });
+      return res.status(401).json({ error: t(req, 'Token manquant', 'Missing token') });
     }
 
     const parts = authHeader.split(' ');
     if (parts.length !== 2 || parts[0] !== 'Bearer') {
       debugAuthLog('Auth: invalid auth header format');
-      return res.status(401).json({ error: 'Format de token invalide' });
+      return res.status(401).json({ error: t(req, 'Format de token invalide', 'Invalid token format') });
     }
 
     const token = parts[1];
@@ -68,7 +69,7 @@ const authenticate = async (req, res, next) => {
     if (error || !user) {
       authUserCache.delete(token);
       debugAuthLog('Auth: invalid token', error?.message || error);
-      return res.status(401).json({ error: 'Token invalide' });
+      return res.status(401).json({ error: t(req, 'Token invalide', 'Invalid token') });
     }
 
     setCachedUser(token, user);
@@ -76,7 +77,7 @@ const authenticate = async (req, res, next) => {
     return next();
   } catch (error) {
     debugAuthLog('Auth: middleware error', error?.message || error);
-    return res.status(500).json({ error: 'Erreur serveur' });
+    return res.status(500).json({ error: t(req, 'Erreur serveur', 'Server error') });
   }
 };
 

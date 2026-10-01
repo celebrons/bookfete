@@ -285,6 +285,57 @@ describe('emailTemplates — redaction', () => {
     expect(m.html).toContain('https://transporteur.test/AB123');
     expect(m.text).toContain('AB123');
   });
+
+  // Chantier bilingue, phase 6 : chaque gabarit client bascule en anglais
+  // sur lang:'en', et reste en francais par defaut (lang omis) pour ne
+  // jamais casser un appelant existant.
+  it('sans lang (ou lang omis) : francais, comme avant le chantier bilingue', () => {
+    const m = gabarits.commandeConfirmee({ numero: 'CMD-1', totalCents: 4300, lien: 'https://x.test/orders' });
+    expect(m.subject).toContain('enregistrée');
+    expect(m.html).toContain('lang="fr"');
+  });
+
+  it('lang:"en" bascule sujet, corps et <html lang> sur les gabarits client', () => {
+    const cas = [
+      gabarits.retrouverSonLivre({ lien: 'https://x.test/b/1', titreLivre: 'Montreal', lang: 'en' }),
+      gabarits.commandeConfirmee({ numero: 'CMD-1', totalCents: 4300, lien: 'https://x.test/orders', lang: 'en' }),
+      gabarits.paiementRecu({ numero: 'CMD-1', totalCents: 4300, lang: 'en' }),
+      gabarits.factureEmise({ numeroFacture: 'F-1', numeroCommande: 'CMD-1', totalCents: 4300, lang: 'en' }),
+      gabarits.pdfPret({ titreLivre: 'Montreal', lien: 'https://x.test/b/1', pages: 32, lang: 'en' }),
+      gabarits.etapeDeFabrication({ statut: 'shipped', numero: 'CMD-1', lang: 'en' }),
+      gabarits.essai({ destinataire: 'jean@example.com', lang: 'en' })
+    ];
+    cas.forEach((m) => {
+      expect(m.html).toContain('lang="en"');
+      expect(m.html).not.toContain('lang="fr"');
+    });
+    expect(gabarits.commandeConfirmee({ numero: 'CMD-1', lien: 'x', lang: 'en' }).subject).toContain('recorded');
+    expect(gabarits.paiementRecu({ numero: 'CMD-1', lang: 'en' }).subject).toContain('Payment received');
+    expect(gabarits.pdfPret({ titreLivre: 'Montreal', lang: 'en' }).subject).toContain('ready');
+  });
+
+  it('mode collectif : lang:"en" traduit invitation/relance/nouvelle-contribution', () => {
+    const invitation = gabarits.invitationParticipant({
+      lien: 'https://x.test/collectif/tok', titreLivre: 'Anniv', pourQui: 'Jean', lang: 'en'
+    });
+    expect(invitation.subject).toContain('Take part');
+    expect(invitation.html).toContain('lang="en"');
+
+    const relance = gabarits.relanceParticipant({
+      lien: 'https://x.test/collectif/tok', pourQui: 'Jean', dejaCommence: false, lang: 'en'
+    });
+    expect(relance.subject).toContain('Reminder');
+
+    const contribution = gabarits.nouvelleContribution({
+      lien: 'https://x.test/b/1', titreLivre: 'Anniv', contributeur: 'Marie', photos: 2, lang: 'en'
+    });
+    expect(contribution.subject).toContain('Marie contributed');
+  });
+
+  it('alerteAdmin reste francais-seul, meme avec lang:"en" (hors perimetre bilingue)', () => {
+    const m = gabarits.alerteAdmin({ sujet: 'Test', lignes: ['x'], lang: 'en' });
+    expect(m.html).toContain('lang="fr"');
+  });
 });
 
 describe('emailService (ancien flux chapitres) — delegue a Brevo', () => {

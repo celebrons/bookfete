@@ -17,6 +17,14 @@
 //
 // Le TON suit celui du produit : simple, chaleureux, jamais commercial. On
 // dit ce qui s'est passe et ce qui va suivre, rien de plus.
+//
+// BILINGUE (chantier phase 6, 2026-10-01) : chaque gabarit CLIENT prend un
+// `lang` optionnel ('fr'|'en', defaut 'fr' — jamais une erreur si omis, les
+// appels existants restent valables). Qui resout CETTE langue pour quel
+// envoi est la responsabilite de transactionalEmails.js, pas de ce fichier
+// (fonctions pures). Seul alerteAdmin reste volontairement francais-seul :
+// le destinataire est toujours le fondateur (ADMIN_EMAILS), jamais un
+// client — hors perimetre du chantier bilingue, comme /admin cote frontend.
 
 const OR = '#c9a35f';
 const ENCRE = '#241f18';
@@ -41,12 +49,20 @@ const prix = (cents) => {
 // legitime d'un courrier non sollicite. « Vous avez cree un livre » serait
 // faux pour un proche invite a contribuer : il n'a rien cree du tout.
 const PIEDS = {
-  createur: 'Vous recevez cet email parce que vous avez créé un livre sur Célébrons.',
-  invite: 'Vous recevez cet email parce que quelqu’un vous a invité à contribuer à son livre souvenir.',
-  interne: 'Alerte technique interne — envoyée aux adresses listées dans ADMIN_EMAILS.'
+  fr: {
+    createur: 'Vous recevez cet email parce que vous avez créé un livre sur Célébrons.',
+    invite: 'Vous recevez cet email parce que quelqu’un vous a invité à contribuer à son livre souvenir.',
+    interne: 'Alerte technique interne — envoyée aux adresses listées dans ADMIN_EMAILS.'
+  },
+  en: {
+    createur: 'You are receiving this email because you created a book on Célébrons.',
+    invite: 'You are receiving this email because someone invited you to contribute to their memory book.',
+    interne: 'Internal technical alert — sent to the addresses listed in ADMIN_EMAILS.'
+  }
 };
 
-function habillage({ titre, corps, bouton, details, pied = 'createur' }) {
+function habillage({ titre, corps, bouton, details, pied = 'createur', lang = 'fr' }) {
+  const pieds = PIEDS[lang] || PIEDS.fr;
   const lignesDetails = (details || [])
     .filter(Boolean)
     .map(([cle, valeur]) => `
@@ -57,7 +73,7 @@ function habillage({ titre, corps, bouton, details, pied = 'createur' }) {
     .join('');
 
   return `<!doctype html>
-<html lang="fr">
+<html lang="${lang === 'en' ? 'en' : 'fr'}">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
 <body style="margin:0;padding:0;background:#f4f0e6;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f0e6;padding:32px 16px;">
@@ -81,7 +97,7 @@ function habillage({ titre, corps, bouton, details, pied = 'createur' }) {
         </td></tr>` : ''}
         <tr><td style="padding:28px 32px 28px;">
           <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:${GRIS};">
-            ${PIEDS[pied] || PIEDS.createur}
+            ${pieds[pied] || pieds.createur}
           </p>
         </td></tr>
       </table>
@@ -106,37 +122,45 @@ const texteDe = ({ titre, lignes, bouton, details }) => [
 // Chacun renvoie { subject, html, text }. Aucun n'envoie quoi que ce soit :
 // ce fichier ne fait que rediger (fonctions pures, testables).
 
-function retrouverSonLivre({ lien, titreLivre }) {
-  const nom = titreLivre ? `« ${titreLivre} »` : 'votre livre';
-  const titre = 'Retrouvez votre livre';
-  const lignes = [
+function retrouverSonLivre({ lien, titreLivre, lang = 'fr' }) {
+  const en = lang === 'en';
+  const nom = titreLivre ? (en ? `"${titreLivre}"` : `« ${titreLivre} »`) : (en ? 'your book' : 'votre livre');
+  const titre = en ? 'Find your book' : 'Retrouvez votre livre';
+  const lignes = en ? [
+    `Here's the link to get back to ${nom} and continue where you left off.`,
+    'This link recognizes you: no password to remember.'
+  ] : [
     `Voici le lien pour revenir à ${nom} et continuer là où vous vous êtes arrêté.`,
     'Ce lien vous reconnaît : vous n’avez pas de mot de passe à retenir.'
   ];
-  const bouton = { libelle: 'Ouvrir mon livre', url: lien };
+  const bouton = { libelle: en ? 'Open my book' : 'Ouvrir mon livre', url: lien };
   return {
-    subject: 'Retrouvez votre livre sur Célébrons',
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton }),
+    subject: en ? 'Find your book on Célébrons' : 'Retrouvez votre livre sur Célébrons',
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, lang }),
     text: texteDe({ titre, lignes, bouton })
   };
 }
 
-function commandeConfirmee({ numero, titreLivre, format, pages, totalCents, lien }) {
-  const titre = 'Votre commande est enregistrée';
-  const lignes = [
+function commandeConfirmee({ numero, titreLivre, format, pages, totalCents, lien, lang = 'fr' }) {
+  const en = lang === 'en';
+  const titre = en ? 'Your order has been recorded' : 'Votre commande est enregistrée';
+  const lignes = en ? [
+    `Thank you! We have received your order${titreLivre ? ` for "${titreLivre}"` : ''}.`,
+    'You will receive a new email as soon as your book goes into production.'
+  ] : [
     `Merci ! Nous avons bien reçu votre commande${titreLivre ? ` pour « ${titreLivre} »` : ''}.`,
     'Vous recevrez un nouvel email dès que votre livre partira en fabrication.'
   ];
   const details = [
-    ['Commande', numero],
-    format ? ['Format', format] : null,
-    pages ? ['Pages', String(pages)] : null,
-    totalCents != null ? ['Total', prix(totalCents)] : null
+    [en ? 'Order' : 'Commande', numero],
+    format ? [en ? 'Format' : 'Format', format] : null,
+    pages ? [en ? 'Pages' : 'Pages', String(pages)] : null,
+    totalCents != null ? [en ? 'Total' : 'Total', prix(totalCents)] : null
   ];
-  const bouton = lien ? { libelle: 'Suivre ma commande', url: lien } : null;
+  const bouton = lien ? { libelle: en ? 'Track my order' : 'Suivre ma commande', url: lien } : null;
   return {
-    subject: `Votre commande ${numero} est enregistrée`,
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details }),
+    subject: en ? `Your order ${numero} has been recorded` : `Votre commande ${numero} est enregistrée`,
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, lang }),
     text: texteDe({ titre, lignes, bouton, details })
   };
 }
@@ -145,52 +169,69 @@ function commandeConfirmee({ numero, titreLivre, format, pages, totalCents, lien
 // page est capturee en haute resolution). On invite donc l'utilisateur a
 // fermer la page pendant ce temps — promesse qui n'a de sens que si un
 // email vient reellement le rappeler ensuite. C'est cet email.
-function pdfPret({ titreLivre, lien, pages }) {
-  const titre = 'Votre PDF est prêt';
-  const lignes = [
+function pdfPret({ titreLivre, lien, pages, lang = 'fr' }) {
+  const en = lang === 'en';
+  const titre = en ? 'Your PDF is ready' : 'Votre PDF est prêt';
+  const lignes = en ? [
+    `The PDF file${titreLivre ? ` for "${titreLivre}"` : ''} has finished being generated.`,
+    'You can download it now from your order.'
+  ] : [
     `Le fichier PDF${titreLivre ? ` de « ${titreLivre} »` : ''} a fini d’être fabriqué.`,
     'Vous pouvez le télécharger dès maintenant depuis votre commande.'
   ];
-  const details = [pages ? ['Pages', String(pages)] : null];
-  const bouton = lien ? { libelle: 'Télécharger mon PDF', url: lien } : null;
+  const details = [pages ? [en ? 'Pages' : 'Pages', String(pages)] : null];
+  const bouton = lien ? { libelle: en ? 'Download my PDF' : 'Télécharger mon PDF', url: lien } : null;
   return {
-    subject: titreLivre ? `Votre PDF « ${titreLivre} » est prêt` : 'Votre PDF est prêt',
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details }),
+    subject: en
+      ? (titreLivre ? `Your PDF "${titreLivre}" is ready` : 'Your PDF is ready')
+      : (titreLivre ? `Votre PDF « ${titreLivre} » est prêt` : 'Votre PDF est prêt'),
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, lang }),
     text: texteDe({ titre, lignes, bouton, details })
   };
 }
 
-function paiementRecu({ numero, totalCents, lien }) {
-  const titre = 'Paiement reçu';
-  const lignes = [
+function paiementRecu({ numero, totalCents, lien, lang = 'fr' }) {
+  const en = lang === 'en';
+  const titre = en ? 'Payment received' : 'Paiement reçu';
+  const lignes = en ? [
+    'Your payment has been received. Your book is now entering preparation.',
+    'We will keep you posted at every step.'
+  ] : [
     'Votre paiement a bien été reçu. Votre livre entre maintenant en préparation.',
     'Nous vous préviendrons à chaque étape.'
   ];
-  const details = [['Commande', numero], totalCents != null ? ['Montant', prix(totalCents)] : null];
-  const bouton = lien ? { libelle: 'Suivre ma commande', url: lien } : null;
+  const details = [
+    [en ? 'Order' : 'Commande', numero],
+    totalCents != null ? [en ? 'Amount' : 'Montant', prix(totalCents)] : null
+  ];
+  const bouton = lien ? { libelle: en ? 'Track my order' : 'Suivre ma commande', url: lien } : null;
   return {
-    subject: `Paiement reçu — commande ${numero}`,
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details }),
+    subject: en ? `Payment received — order ${numero}` : `Paiement reçu — commande ${numero}`,
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, lang }),
     text: texteDe({ titre, lignes, bouton, details })
   };
 }
 
 /** Facture emise (PDF en piece jointe, voir invoiceService.js/brevoClient.js). */
-function factureEmise({ numeroFacture, numeroCommande, totalCents, lien }) {
-  const titre = 'Votre facture';
-  const lignes = [
+function factureEmise({ numeroFacture, numeroCommande, totalCents, lien, lang = 'fr' }) {
+  const en = lang === 'en';
+  const titre = en ? 'Your invoice' : 'Votre facture';
+  const lignes = en ? [
+    'Here is the invoice for your order, attached (PDF).',
+    'Keep it safe: it may come in handy later.'
+  ] : [
     'Voici la facture de votre commande, en pièce jointe (PDF).',
     'Conservez-la précieusement : elle vous sera utile en cas de besoin.'
   ];
   const details = [
-    ['Facture', numeroFacture],
-    ['Commande', numeroCommande],
-    totalCents != null ? ['Montant', prix(totalCents)] : null
+    [en ? 'Invoice' : 'Facture', numeroFacture],
+    [en ? 'Order' : 'Commande', numeroCommande],
+    totalCents != null ? [en ? 'Amount' : 'Montant', prix(totalCents)] : null
   ];
-  const bouton = lien ? { libelle: 'Voir ma commande', url: lien } : null;
+  const bouton = lien ? { libelle: en ? 'View my order' : 'Voir ma commande', url: lien } : null;
   return {
-    subject: `Votre facture ${numeroFacture} — commande ${numeroCommande}`,
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details }),
+    subject: en ? `Your invoice ${numeroFacture} — order ${numeroCommande}` : `Votre facture ${numeroFacture} — commande ${numeroCommande}`,
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, lang }),
     text: texteDe({ titre, lignes, bouton, details })
   };
 }
@@ -199,48 +240,81 @@ function factureEmise({ numeroFacture, numeroCommande, totalCents, lien }) {
 // chose a des moments differents, et trois gabarits presque identiques
 // auraient diverge au premier changement de ton.
 const ETAPES = {
-  print_queued: {
-    sujet: 'Votre livre est en préparation',
-    titre: 'Votre livre est en préparation',
-    lignes: ['Nous préparons le fichier d’impression de votre livre.', 'La fabrication commence juste après.']
+  fr: {
+    print_queued: {
+      sujet: 'Votre livre est en préparation',
+      titre: 'Votre livre est en préparation',
+      lignes: ['Nous préparons le fichier d’impression de votre livre.', 'La fabrication commence juste après.']
+    },
+    sent_to_printer: {
+      sujet: 'Votre livre est parti en fabrication',
+      titre: 'Votre livre est en fabrication',
+      lignes: ['Votre livre est entre les mains de notre imprimeur.', 'Comptez quelques jours avant l’expédition.']
+    },
+    printed: {
+      sujet: 'Votre livre est imprimé',
+      titre: 'Votre livre est imprimé',
+      lignes: ['Votre livre est imprimé et prêt à être expédié.']
+    },
+    shipped: {
+      sujet: 'Votre livre est expédié',
+      titre: 'Votre livre est en route',
+      lignes: ['Votre livre a quitté l’atelier d’impression.']
+    },
+    delivered: {
+      sujet: 'Votre livre est livré',
+      titre: 'Votre livre est arrivé',
+      lignes: ['Votre livre a été livré. Nous espérons qu’il vous plaira.']
+    }
   },
-  sent_to_printer: {
-    sujet: 'Votre livre est parti en fabrication',
-    titre: 'Votre livre est en fabrication',
-    lignes: ['Votre livre est entre les mains de notre imprimeur.', 'Comptez quelques jours avant l’expédition.']
-  },
-  printed: {
-    sujet: 'Votre livre est imprimé',
-    titre: 'Votre livre est imprimé',
-    lignes: ['Votre livre est imprimé et prêt à être expédié.']
-  },
-  shipped: {
-    sujet: 'Votre livre est expédié',
-    titre: 'Votre livre est en route',
-    lignes: ['Votre livre a quitté l’atelier d’impression.']
-  },
-  delivered: {
-    sujet: 'Votre livre est livré',
-    titre: 'Votre livre est arrivé',
-    lignes: ['Votre livre a été livré. Nous espérons qu’il vous plaira.']
+  en: {
+    print_queued: {
+      sujet: 'Your book is being prepared',
+      titre: 'Your book is being prepared',
+      lignes: ['We are preparing the print file for your book.', 'Production starts right after.']
+    },
+    sent_to_printer: {
+      sujet: 'Your book has gone into production',
+      titre: 'Your book is being manufactured',
+      lignes: ['Your book is in the hands of our printer.', 'Allow a few days before shipping.']
+    },
+    printed: {
+      sujet: 'Your book is printed',
+      titre: 'Your book is printed',
+      lignes: ['Your book is printed and ready to be shipped.']
+    },
+    shipped: {
+      sujet: 'Your book has shipped',
+      titre: 'Your book is on its way',
+      lignes: ['Your book has left the print workshop.']
+    },
+    delivered: {
+      sujet: 'Your book has been delivered',
+      titre: 'Your book has arrived',
+      lignes: ['Your book has been delivered. We hope you love it.']
+    }
   }
 };
 
-function etapeDeFabrication({ statut, numero, lien, suivi }) {
-  const etape = ETAPES[statut];
+function etapeDeFabrication({ statut, numero, lien, suivi, lang = 'fr' }) {
+  const en = lang === 'en';
+  const etape = (ETAPES[lang] || ETAPES.fr)[statut];
   if (!etape) return null; // statut sans email dedie : on n'invente pas de message
 
   const lignes = [...etape.lignes];
-  const details = [['Commande', numero], suivi?.code ? ['Numéro de suivi', suivi.code] : null];
+  const details = [
+    [en ? 'Order' : 'Commande', numero],
+    suivi?.code ? [en ? 'Tracking number' : 'Numéro de suivi', suivi.code] : null
+  ];
   // Le lien de suivi du transporteur prime sur celui du site : c'est
   // l'information la plus utile a ce moment precis.
   const bouton = suivi?.url
-    ? { libelle: 'Suivre mon colis', url: suivi.url }
-    : (lien ? { libelle: 'Suivre ma commande', url: lien } : null);
+    ? { libelle: en ? 'Track my package' : 'Suivre mon colis', url: suivi.url }
+    : (lien ? { libelle: en ? 'Track my order' : 'Suivre ma commande', url: lien } : null);
 
   return {
-    subject: `${etape.sujet} — commande ${numero}`,
-    html: habillage({ titre: etape.titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details }),
+    subject: en ? `${etape.sujet} — order ${numero}` : `${etape.sujet} — commande ${numero}`,
+    html: habillage({ titre: etape.titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, lang }),
     text: texteDe({ titre: etape.titre, lignes, bouton, details })
   };
 }
@@ -252,13 +326,19 @@ function etapeDeFabrication({ statut, numero, lien, suivi }) {
 // phrases de quoi il s'agit, parce que le destinataire n'a peut-etre jamais
 // entendu parler de Celebrons et ne s'attend pas a cet email.
 
-function invitationParticipant({ lien, titreLivre, pourQui, deLaPart, message, dateLimite }) {
-  const sujet = pourQui
-    ? `Participez au livre souvenir pour ${pourQui}`
-    : 'Participez a un livre souvenir';
-  const titre = pourQui ? `Un livre pour ${pourQui}` : 'Un livre souvenir vous attend';
+function invitationParticipant({ lien, titreLivre, pourQui, deLaPart, message, dateLimite, lang = 'fr' }) {
+  const en = lang === 'en';
+  const sujet = en
+    ? (pourQui ? `Take part in the memory book for ${pourQui}` : 'Take part in a memory book')
+    : (pourQui ? `Participez au livre souvenir pour ${pourQui}` : 'Participez a un livre souvenir');
+  const titre = en
+    ? (pourQui ? `A book for ${pourQui}` : 'A memory book is waiting for you')
+    : (pourQui ? `Un livre pour ${pourQui}` : 'Un livre souvenir vous attend');
 
-  const lignes = [
+  const lignes = en ? [
+    `${deLaPart ? `${deLaPart} is preparing` : 'Someone is preparing'} a memory book${pourQui ? ` for ${pourQui}` : ''}${titreLivre ? `: "${titreLivre}"` : ''}.`,
+    "Add your photos and memories — a few minutes is enough, and there's no account to create."
+  ] : [
     `${deLaPart ? deLaPart + ' prepare' : 'Quelqu’un prepare'} un livre souvenir${pourQui ? ` pour ${pourQui}` : ''}${titreLivre ? ` : « ${titreLivre} »` : ''}.`,
     'Ajoutez vos photos et vos souvenirs — quelques minutes suffisent, et il n’y a pas de compte a creer.'
   ];
@@ -266,48 +346,61 @@ function invitationParticipant({ lien, titreLivre, pourQui, deLaPart, message, d
   // entre un email personnel et un envoi automatique.
   if (message) lignes.push(`« ${message} »`);
 
-  const details = dateLimite ? [['A envoyer avant le', dateLimite]] : [];
-  const bouton = { libelle: 'Ajouter mes souvenirs', url: lien };
+  const details = dateLimite ? [[en ? 'Send before' : 'A envoyer avant le', dateLimite]] : [];
+  const bouton = { libelle: en ? 'Add my memories' : 'Ajouter mes souvenirs', url: lien };
 
   return {
     subject: sujet,
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, pied: 'invite' }),
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, pied: 'invite', lang }),
     text: texteDe({ titre, lignes, bouton, details })
   };
 }
 
-function relanceParticipant({ lien, titreLivre, pourQui, dateLimite, dejaCommence }) {
-  const titre = dejaCommence ? 'Votre contribution est presque prete' : 'Il reste un peu de temps';
-  const lignes = dejaCommence
-    ? ['Vous avez commence a ajouter vos souvenirs — il ne manque que la suite.']
-    : [`Le livre souvenir${pourQui ? ` pour ${pourQui}` : ''}${titreLivre ? ` (« ${titreLivre} »)` : ''} attend encore votre contribution.`];
-  lignes.push('Quelques photos suffisent.');
+function relanceParticipant({ lien, titreLivre, pourQui, dateLimite, dejaCommence, lang = 'fr' }) {
+  const en = lang === 'en';
+  const titre = en
+    ? (dejaCommence ? 'Your contribution is almost ready' : "There's still a little time left")
+    : (dejaCommence ? 'Votre contribution est presque prete' : 'Il reste un peu de temps');
+  const lignes = en
+    ? (dejaCommence
+      ? ['You started adding your memories — only the rest is missing.']
+      : [`The memory book${pourQui ? ` for ${pourQui}` : ''}${titreLivre ? ` ("${titreLivre}")` : ''} is still waiting for your contribution.`])
+    : (dejaCommence
+      ? ['Vous avez commence a ajouter vos souvenirs — il ne manque que la suite.']
+      : [`Le livre souvenir${pourQui ? ` pour ${pourQui}` : ''}${titreLivre ? ` (« ${titreLivre} »)` : ''} attend encore votre contribution.`]);
+  lignes.push(en ? 'A few photos are enough.' : 'Quelques photos suffisent.');
 
-  const details = dateLimite ? [['A envoyer avant le', dateLimite]] : [];
-  const bouton = { libelle: 'Ajouter mes souvenirs', url: lien };
+  const details = dateLimite ? [[en ? 'Send before' : 'A envoyer avant le', dateLimite]] : [];
+  const bouton = { libelle: en ? 'Add my memories' : 'Ajouter mes souvenirs', url: lien };
 
   return {
-    subject: pourQui ? `Rappel : le livre pour ${pourQui}` : 'Rappel : votre livre souvenir',
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, pied: 'invite' }),
+    subject: en
+      ? (pourQui ? `Reminder: the book for ${pourQui}` : 'Reminder: your memory book')
+      : (pourQui ? `Rappel : le livre pour ${pourQui}` : 'Rappel : votre livre souvenir'),
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, pied: 'invite', lang }),
     text: texteDe({ titre, lignes, bouton, details })
   };
 }
 
 // Vers le CREATEUR, pas vers les proches : « quelqu'un vient de contribuer ».
-function nouvelleContribution({ lien, titreLivre, contributeur, photos, souvenirs }) {
-  const titre = 'Un nouveau souvenir dans votre livre';
-  const lignes = [
-    `${contributeur || 'Quelqu’un'} vient d’ajouter${titreLivre ? ` a « ${titreLivre} »` : ' a votre livre'}.`
+function nouvelleContribution({ lien, titreLivre, contributeur, photos, souvenirs, lang = 'fr' }) {
+  const en = lang === 'en';
+  const titre = en ? 'A new memory in your book' : 'Un nouveau souvenir dans votre livre';
+  const qui = contributeur || (en ? 'Someone' : 'Quelqu’un');
+  const lignes = en ? [
+    `${qui} just added something${titreLivre ? ` to "${titreLivre}"` : ' to your book'}.`
+  ] : [
+    `${qui} vient d’ajouter${titreLivre ? ` a « ${titreLivre} »` : ' a votre livre'}.`
   ];
   const details = [
-    photos ? ['Photos ajoutees', String(photos)] : null,
-    souvenirs ? ['Souvenirs ajoutes', String(souvenirs)] : null
+    photos ? [en ? 'Photos added' : 'Photos ajoutees', String(photos)] : null,
+    souvenirs ? [en ? 'Memories added' : 'Souvenirs ajoutes', String(souvenirs)] : null
   ];
-  const bouton = lien ? { libelle: 'Voir mon livre', url: lien } : null;
+  const bouton = lien ? { libelle: en ? 'View my book' : 'Voir mon livre', url: lien } : null;
 
   return {
-    subject: `${contributeur || 'Quelqu’un'} a contribue a votre livre`,
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details }),
+    subject: en ? `${qui} contributed to your book` : `${qui} a contribue a votre livre`,
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, details, lang }),
     text: texteDe({ titre, lignes, bouton, details })
   };
 }
@@ -333,15 +426,19 @@ function alerteAdmin({ sujet, lignes = [], details = [] }) {
   };
 }
 
-function essai({ destinataire }) {
-  const titre = 'Vos emails fonctionnent';
-  const lignes = [
+function essai({ destinataire, lang = 'fr' }) {
+  const en = lang === 'en';
+  const titre = en ? 'Your emails are working' : 'Vos emails fonctionnent';
+  const lignes = en ? [
+    'If you are reading this message, Célébrons can send emails on your behalf.',
+    `Sent to ${destinataire}.`
+  ] : [
     'Si vous lisez ce message, Célébrons peut envoyer des emails en votre nom.',
     `Envoyé à ${destinataire}.`
   ];
   return {
-    subject: 'Célébrons — test d’envoi',
-    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join('') }),
+    subject: en ? 'Célébrons — test send' : 'Célébrons — test d’envoi',
+    html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), lang }),
     text: texteDe({ titre, lignes })
   };
 }
