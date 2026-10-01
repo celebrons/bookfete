@@ -266,9 +266,10 @@ export default function CreateBookSansIA() {
                     {format.recommande && <span className="format-choice-badge">{t('formatStep.recommended')}</span>}
                     <FormatMockup widthMm={format.widthMm} heightMm={format.heightMm} reliure={format.reliure} />
                     {/* format.nom/accroche viennent du catalogue serveur
-                        (GET /orders/formats), pas de ce fichier : ils
-                        restent en francais tant que le catalogue lui-meme
-                        n'est pas traduit (hors perimetre de cette phase). */}
+                        (GET /orders/formats) : nom jamais traduit (nom de
+                        produit), accroche bilingue depuis le chantier phase 6
+                        (resolue cote serveur via le meme en-tete X-App-Language
+                        que tous les autres appels, voir httpClient.js). */}
                     <span className="format-choice-name">{format.nom}</span>
                     <span className="format-choice-size">
                       {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm · {t('formatStep.coverLabel')} {format.reliure === 'rigide' ? t('formatStep.hardcover') : t('formatStep.softcover')}

@@ -1,0 +1,219 @@
+{
+  "common": {
+    "eyebrow": "CÉLÉBRONS",
+    "lastUpdated": "Last updated: {{date}}"
+  },
+  "cgv": {
+    "title": "Terms and Conditions of Sale",
+    "updated": "September 28, 2026",
+    "intro": "These terms and conditions of sale apply to any order placed on Célébrons. By checking the acceptance box at the time of payment, you declare that you have read and accepted them.",
+    "sections": {
+      "s1": {
+        "heading": "1. Purpose",
+        "paragraphs": [
+          "Célébrons offers the creation of personalized memory books from photos and text submitted by the customer (and, in collective mode, by the people they invite), composed automatically or manually, then delivered as a PDF, a printed book, or both."
+        ]
+      },
+      "s2": {
+        "heading": "2. Price",
+        "paragraphs": [
+          "Prices are shown in euros, all taxes included, and displayed in real time in the editor before any order. Pricing details by format are available on the Pricing page.",
+          "As Célébrons operates under the French micro-entreprise status, VAT does not apply, in accordance with Article 293 B of the French General Tax Code (\"TVA non applicable, art. 293 B du CGI\")."
+        ]
+      },
+      "s3": {
+        "heading": "3. Order and payment",
+        "paragraphs": [
+          "The order is confirmed after full online payment by card, through the secure Stripe solution. No banking data is stored or accessible by Célébrons.",
+          "The price charged at the time of payment corresponds exactly to the state of the book at that moment (page count, format): it is locked in for that order and does not change afterward, even if general pricing changes later."
+        ]
+      },
+      "s4": {
+        "heading": "4. Delivery",
+        "paragraphs": [
+          "Printed books are manufactured and shipped by our printing partner. The timelines indicated (production then shipping) are given for guidance only and are not contractual: they depend on production load at the time.",
+          "Production and shipping tracking is available at any time from your order area."
+        ]
+      },
+      "s5": {
+        "heading": "5. Right of withdrawal — exclusion",
+        "paragraphs": [
+          "In accordance with Article L221-28 3° of the French Consumer Code, the 14-day right of withdrawal does not apply to contracts for the supply of goods made to the consumer's specifications or clearly personalized.",
+          "Since your book is composed from your own photos and text (and, where applicable, those of the people you invite), it constitutes a clearly personalized good within the meaning of this article: its production cannot be cancelled once the order has been confirmed and paid.",
+          "By checking the acceptance box for these Terms before paying, you acknowledge having been informed of this exclusion and expressly consent to it, even before payment is requested."
+        ]
+      },
+      "s6": {
+        "heading": "6. Photo quality",
+        "paragraphs": [
+          "The editor automatically flags photos whose resolution is insufficient for sharp printing at the chosen format. A summary screen lists these photos before any order: you can replace them, or choose to order despite the warning. Célébrons cannot be held responsible for the rendering of a photo whose low quality was flagged and knowingly kept."
+        ]
+      },
+      "s7": {
+        "heading": "7. Responsibility for submitted content",
+        "paragraphs": [
+          "You are solely responsible for the photos and text you submit, as well as those submitted by people you invite in collective mode: you warrant that you hold the necessary rights to this content and agree not to submit any unlawful content."
+        ]
+      },
+      "s8": {
+        "heading": "8. Complaints and customer service",
+        "paragraphs": [
+          "For any question or complaint about an order, write to bonjour@celebrons.com stating your order number."
+        ]
+      },
+      "s9": {
+        "heading": "9. Consumer mediation",
+        "paragraphs": [
+          "In accordance with Article L616-1 of the French Consumer Code, in the event of a dispute not resolved directly with our customer service, you may refer free of charge to the following consumer mediator: [TO BE COMPLETED: name and contact details of the consumer mediator]."
+        ]
+      },
+      "s10": {
+        "heading": "10. Governing law",
+        "paragraphs": [
+          "These terms and conditions of sale are governed by French law. In the event of a dispute, and failing an amicable resolution, the competent French courts shall have sole jurisdiction."
+        ]
+      },
+      "s11": {
+        "heading": "11. Publisher",
+        "paragraphs": [
+          "The full identity of the site's publisher appears in the legal notice."
+        ]
+      }
+    }
+  },
+  "mentions": {
+    "title": "Legal Notice",
+    "updated": "September 28, 2026",
+    "sections": {
+      "s1": {
+        "heading": "Site publisher",
+        "paragraphs": [
+          "The Célébrons website (celebrons.com) is published by [TO BE COMPLETED: owner's full name], operating under the French micro-entreprise status."
+        ],
+        "list": [
+          "SIRET: [TO BE COMPLETED]",
+          "Registered address: [TO BE COMPLETED]",
+          "Contact: bonjour@celebrons.com"
+        ]
+      },
+      "s2": {
+        "heading": "Publication director",
+        "paragraphs": [
+          "[TO BE COMPLETED: owner's full name]."
+        ]
+      },
+      "s3": {
+        "heading": "Hosting",
+        "paragraphs": [
+          "The site and data are hosted by:"
+        ],
+        "list": [
+          "Scaleway SAS",
+          "8 rue de la Ville l'Évêque, 75008 Paris, France",
+          "https://www.scaleway.com"
+        ]
+      },
+      "s4": {
+        "heading": "Intellectual property",
+        "paragraphs": [
+          "All elements of the Célébrons site (text, layouts, composition engine, visual identity) are protected by intellectual property law. The photos and text you submit to your book remain your property: you grant us only the right to process them technically to compose and print your book."
+        ]
+      },
+      "s5": {
+        "heading": "Personal data",
+        "paragraphs": [
+          "The processing of your personal data is described in our privacy policy, accessible from the site's footer."
+        ]
+      }
+    }
+  },
+  "confidentialite": {
+    "title": "Privacy Policy",
+    "updated": "September 28, 2026",
+    "intro": "This page explains what data Célébrons collects, why, and with whom it is shared to manufacture and deliver your book.",
+    "sections": {
+      "s1": {
+        "heading": "Data controller",
+        "paragraphs": [
+          "The data controller is the site's publisher, identified in the legal notice. For any question, contact bonjour@celebrons.com."
+        ]
+      },
+      "s2": {
+        "heading": "Data collected",
+        "list": [
+          "Email address (identification, communication about your order)",
+          "Photos and text you submit, as well as those submitted by people you invite in collective mode",
+          "Shipping address and, if different, billing address",
+          "History of your books and orders"
+        ]
+      },
+      "s3": {
+        "heading": "Why this data is collected",
+        "paragraphs": [
+          "This data is used exclusively to create your account, compose your book, process and deliver your order, and keep you informed of its progress. No data is sold or used for advertising purposes."
+        ]
+      },
+      "s4": {
+        "heading": "Who receives your data (processors)",
+        "paragraphs": [
+          "Some of your data is shared with the following providers, each only for the task that concerns them:"
+        ],
+        "list": [
+          "Supabase — database hosting, authentication, photo storage",
+          "Stripe — secure card payment processing",
+          "Gelato — production and shipping of printed books (receives the shipping address and the book file)",
+          "Resend — sending transactional emails (order confirmation, PDF ready, production tracking)",
+          "Scaleway — application server hosting (France)"
+        ]
+      },
+      "s5": {
+        "heading": "Retention period",
+        "paragraphs": [
+          "Your data is retained [TO BE COMPLETED: retention period by data type — book, order, photo]."
+        ]
+      },
+      "s6": {
+        "heading": "Your rights",
+        "paragraphs": [
+          "In accordance with the General Data Protection Regulation (GDPR), you have the right to access, rectify, erase and port your data, as well as a right to object. To exercise it, write to bonjour@celebrons.com.",
+          "If you believe your rights are not being respected, you may file a complaint with the CNIL (www.cnil.fr)."
+        ]
+      },
+      "s7": {
+        "heading": "Cookies",
+        "paragraphs": [
+          "Célébrons does not use any advertising cookies or trackers for commercial audience measurement. Only technical elements strictly necessary for the site to function (keeping you signed in) are used."
+        ]
+      },
+      "s8": {
+        "heading": "Security",
+        "paragraphs": [
+          "Access to your data is protected by database-level security rules (each book is only visible to its owner) and by an encrypted connection (HTTPS) across the entire site."
+        ]
+      }
+    }
+  },
+  "tarifs": {
+    "title": "Our pricing",
+    "intro": "The price shown here is exactly what you'll see in the editor — never an estimate. It depends on the chosen format and the number of pages in your book (30 pages minimum).",
+    "loading": "Loading pricing…",
+    "recommended": "★ Recommended",
+    "rigid": "hardcover",
+    "flexible": "softcover",
+    "coverLabel": "{{type}} cover",
+    "startingFrom": "from {{count}} pages",
+    "thenPer2Pages": "then {{price}} every 2 additional pages",
+    "shipping": "Shipping (France): {{price}}",
+    "pdfOnly": "PDF only",
+    "pdfOnlyDescription": "High-definition PDF file, downloadable right after payment. No shipping.",
+    "pack": "PDF + printed pack",
+    "packDescription": "The price of the PDF and the printed book, added together then reduced by 10% — plus shipping.",
+    "vatNote": "All our prices are shown with all taxes included. As Célébrons operates under the French micro-entreprise status, VAT does not apply (Article 293 B of the French General Tax Code).",
+    "cta": "Create my book"
+  },
+  "exemples": {
+    "title": "Book examples",
+    "text": "We're preparing a selection of real Célébrons books to show you very soon — birthdays, weddings, farewells, group projects. In the meantime, the best way to see what your book will look like is to start your own: the preview updates live, at true scale, throughout composition.",
+    "cta": "Create my book"
+  }
+}

@@ -1,57 +1,28 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import LegalPageLuxe from './LegalPageLuxe';
 
 // Contenu rempli avec ce qui est connu aujourd'hui (hebergeur, contact,
 // statut juridique — micro-entreprise, retour utilisateur 2026-09-28) ;
 // les champs propres a l'entreprise (SIRET, adresse, nom du dirigeant) ne
-// sont pas devinables et restent marques "[À COMPLÉTER]" — jamais inventes.
+// sont pas devinables et restent marques "[À COMPLÉTER]"/"[TO BE COMPLETED]"
+// — jamais inventes. Traduction : voir la note de CGVLuxe.js (chantier
+// bilingue phase 5, relecture humaine requise avant publication).
 export default function MentionsLegalesLuxe() {
+  const { t } = useTranslation('legal');
+  const sectionKeys = ['s1', 's2', 's3', 's4', 's5'];
   return (
     <LegalPageLuxe
-      title="Mentions légales"
-      updated="28 septembre 2026"
-      sections={[
-        {
-          heading: 'Éditeur du site',
-          paragraphs: [
-            'Le site Célébrons (celebrons.com) est édité par [À COMPLÉTER : nom et prénom du dirigeant], exerçant sous le statut de micro-entreprise.',
-          ],
-          list: [
-            'SIRET : [À COMPLÉTER]',
-            'Adresse du siège : [À COMPLÉTER]',
-            'Contact : bonjour@celebrons.com'
-          ]
-        },
-        {
-          heading: 'Directeur de la publication',
-          paragraphs: [
-            '[À COMPLÉTER : nom et prénom du dirigeant].'
-          ]
-        },
-        {
-          heading: 'Hébergement',
-          paragraphs: [
-            "Le site et les données sont hébergés par :"
-          ],
-          list: [
-            'Scaleway SAS',
-            "8 rue de la Ville l'Évêque, 75008 Paris, France",
-            'https://www.scaleway.com'
-          ]
-        },
-        {
-          heading: 'Propriété intellectuelle',
-          paragraphs: [
-            "L'ensemble des éléments du site Célébrons (textes, mises en page, moteur de composition, identité visuelle) est protégé par le droit de la propriété intellectuelle. Les photos et textes que vous déposez dans votre livre restent votre propriété : vous nous accordez uniquement le droit de les traiter techniquement pour composer et imprimer votre livre."
-          ]
-        },
-        {
-          heading: 'Données personnelles',
-          paragraphs: [
-            'Le traitement de vos données personnelles est décrit dans notre politique de confidentialité, accessible depuis le pied de page du site.'
-          ]
-        }
-      ]}
+      title={t('mentions.title')}
+      updated={t('mentions.updated')}
+      sections={sectionKeys.map((key) => {
+        const hasList = key === 's1' || key === 's3';
+        return {
+          heading: t(`mentions.sections.${key}.heading`),
+          paragraphs: t(`mentions.sections.${key}.paragraphs`, { returnObjects: true }),
+          ...(hasList ? { list: t(`mentions.sections.${key}.list`, { returnObjects: true }) } : {})
+        };
+      })}
     />
   );
 }

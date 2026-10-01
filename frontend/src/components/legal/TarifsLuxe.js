@@ -7,6 +7,7 @@
 // stables, sont ecrits en clair ici (voir le commentaire a leur endroit).
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { listPrintFormats } from '../../services/ordersApi';
 import { formatPriceCents as formatEuros } from '../../utils/orderWorkflow';
 import '../../styles/luxe-theme.css';
@@ -20,6 +21,8 @@ const INCREMENT_PAR_FORMAT = { livret: 190, standard: 220, luxe: 290 };
 const PDF_PRICE_CENTS = 799;
 
 export default function TarifsLuxe() {
+  const { t, i18n } = useTranslation('legal');
+  const priceLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
   const [formats, setFormats] = useState([]);
   const [chargement, setChargement] = useState(true);
 
@@ -35,33 +38,32 @@ export default function TarifsLuxe() {
   return (
     <div className="tarifs-page">
       <div className="container-luxe tarifs-inner">
-        <span className="label-gold">CÉLÉBRONS</span>
-        <h1>Nos tarifs</h1>
+        <span className="label-gold">{t('common.eyebrow')}</span>
+        <h1>{t('tarifs.title')}</h1>
         <p className="tarifs-intro">
-          Le prix affiché ici est exactement celui que vous verrez dans l'atelier — jamais une estimation.
-          Il dépend du format choisi et du nombre de pages de votre livre (30 pages minimum).
+          {t('tarifs.intro')}
         </p>
 
-        {chargement && <p className="tarifs-chargement">Chargement des tarifs…</p>}
+        {chargement && <p className="tarifs-chargement">{t('tarifs.loading')}</p>}
 
         <div className="tarifs-grid">
           {formats.map((format) => (
             <div key={format.formatId} className={`tarifs-card ${format.recommande ? 'is-recommended' : ''}`}>
-              {format.recommande && <span className="tarifs-badge">★ Recommandé</span>}
+              {format.recommande && <span className="tarifs-badge">{t('tarifs.recommended')}</span>}
               <h2>{format.nom}</h2>
               <p className="tarifs-accroche">{format.accroche}</p>
               <p className="tarifs-dims">
-                {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm · Couverture {format.reliure === 'rigide' ? 'rigide' : 'souple'}
+                {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm · {t('tarifs.coverLabel', { type: format.reliure === 'rigide' ? t('tarifs.rigid') : t('tarifs.flexible') })}
               </p>
               <p className="tarifs-prix">
-                {formatEuros(format.startingPriceCents)}
-                <span className="tarifs-prix-note">à partir de {format.minPages} pages</span>
+                {formatEuros(format.startingPriceCents, 'EUR', priceLocale)}
+                <span className="tarifs-prix-note">{t('tarifs.startingFrom', { count: format.minPages })}</span>
               </p>
               <p className="tarifs-increment">
-                puis {formatEuros(INCREMENT_PAR_FORMAT[format.formatId])} toutes les 2 pages supplémentaires
+                {t('tarifs.thenPer2Pages', { price: formatEuros(INCREMENT_PAR_FORMAT[format.formatId], 'EUR', priceLocale) })}
               </p>
               <p className="tarifs-livraison">
-                Livraison (France) : {formatEuros(format.shippingPriceCents)}
+                {t('tarifs.shipping', { price: formatEuros(format.shippingPriceCents, 'EUR', priceLocale) })}
               </p>
             </div>
           ))}
@@ -69,23 +71,22 @@ export default function TarifsLuxe() {
 
         <div className="tarifs-autres">
           <div className="tarifs-autre-item">
-            <h3>PDF seul</h3>
-            <p className="tarifs-autre-prix">{formatEuros(PDF_PRICE_CENTS)}</p>
-            <p>Fichier PDF haute définition, téléchargeable dès le paiement. Aucune livraison.</p>
+            <h3>{t('tarifs.pdfOnly')}</h3>
+            <p className="tarifs-autre-prix">{formatEuros(PDF_PRICE_CENTS, 'EUR', priceLocale)}</p>
+            <p>{t('tarifs.pdfOnlyDescription')}</p>
           </div>
           <div className="tarifs-autre-item">
-            <h3>Pack PDF + imprimé</h3>
+            <h3>{t('tarifs.pack')}</h3>
             <p className="tarifs-autre-prix">−10 %</p>
-            <p>Le prix du PDF et celui du livre imprimé, additionnés puis réduits de 10 % — plus la livraison.</p>
+            <p>{t('tarifs.packDescription')}</p>
           </div>
         </div>
 
         <p className="tarifs-note">
-          Tous nos prix sont exprimés toutes taxes comprises. Célébrons exerçant sous le statut de
-          micro-entreprise, la TVA n'est pas applicable (article 293 B du Code général des impôts).
+          {t('tarifs.vatNote')}
         </p>
 
-        <Link to="/create-book" className="btn btn-primary tarifs-cta">Créer mon livre</Link>
+        <Link to="/create-book" className="btn btn-primary tarifs-cta">{t('tarifs.cta')}</Link>
       </div>
     </div>
   );

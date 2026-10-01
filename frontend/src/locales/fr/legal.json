@@ -1,0 +1,219 @@
+{
+  "common": {
+    "eyebrow": "CÉLÉBRONS",
+    "lastUpdated": "Dernière mise à jour : {{date}}"
+  },
+  "cgv": {
+    "title": "Conditions générales de vente",
+    "updated": "28 septembre 2026",
+    "intro": "Les présentes conditions générales de vente s'appliquent à toute commande passée sur Célébrons. En cochant la case d'acceptation au moment du paiement, vous déclarez les avoir lues et acceptées.",
+    "sections": {
+      "s1": {
+        "heading": "1. Objet",
+        "paragraphs": [
+          "Célébrons propose la création de livres souvenirs personnalisés à partir des photos et textes déposés par le client (et, en mode collectif, par les personnes qu'il invite), composés automatiquement ou manuellement, puis livrés au format PDF, imprimé, ou les deux."
+        ]
+      },
+      "s2": {
+        "heading": "2. Prix",
+        "paragraphs": [
+          "Les prix sont indiqués en euros, toutes taxes comprises, et affichés en temps réel dans l'atelier avant toute commande. Le détail des tarifs par format est consultable sur la page Tarifs.",
+          "Célébrons exerçant sous le statut de micro-entreprise, la TVA n'est pas applicable, conformément à l'article 293 B du Code général des impôts (mention \"TVA non applicable, art. 293 B du CGI\")."
+        ]
+      },
+      "s3": {
+        "heading": "3. Commande et paiement",
+        "paragraphs": [
+          "La commande est validée après paiement intégral en ligne, par carte bancaire, via la solution sécurisée Stripe. Aucune donnée bancaire n'est stockée ou accessible par Célébrons.",
+          "Le prix facturé au moment du paiement correspond exactement à l'état du livre à cet instant (nombre de pages, format) : il est figé pour cette commande et ne change plus ensuite, y compris si les tarifs généraux évoluent par la suite."
+        ]
+      },
+      "s4": {
+        "heading": "4. Livraison",
+        "paragraphs": [
+          "Les livres imprimés sont fabriqués et expédiés par notre partenaire d'impression. Les délais indiqués (fabrication puis expédition) sont donnés à titre indicatif et ne sont pas contractuels : ils dépendent de la charge de production du moment.",
+          "Le suivi de fabrication et d'expédition est visible à tout moment depuis votre espace de commande."
+        ]
+      },
+      "s5": {
+        "heading": "5. Droit de rétractation — exclusion",
+        "paragraphs": [
+          "Conformément à l'article L221-28 3° du Code de la consommation, le droit de rétractation de 14 jours ne s'applique pas aux contrats de fourniture de biens confectionnés selon les spécifications du consommateur ou nettement personnalisés.",
+          "Votre livre étant composé à partir de vos propres photos et textes (et, le cas échéant, de ceux des personnes que vous invitez), il constitue un bien nettement personnalisé au sens de cet article : sa fabrication ne peut pas être annulée une fois la commande validée et payée.",
+          "En cochant la case d'acceptation des présentes CGV avant de payer, vous reconnaissez avoir été informé de cette exclusion et y consentir expressément, avant même que le paiement ne soit demandé."
+        ]
+      },
+      "s6": {
+        "heading": "6. Qualité des photos",
+        "paragraphs": [
+          "L'atelier signale automatiquement les photos dont la résolution est insuffisante pour une impression nette au format choisi. Un écran récapitulatif liste ces photos avant toute commande : vous pouvez les remplacer, ou choisir de commander malgré l'avertissement. Célébrons ne peut être tenu responsable du rendu d'une photo dont la faible qualité a été signalée puis maintenue sciemment."
+        ]
+      },
+      "s7": {
+        "heading": "7. Responsabilité sur le contenu déposé",
+        "paragraphs": [
+          "Vous êtes seul responsable des photos et textes que vous déposez, ainsi que de ceux déposés par les personnes que vous invitez en mode collectif : vous garantissez disposer des droits nécessaires sur ce contenu et vous engagez à ne déposer aucun contenu illicite."
+        ]
+      },
+      "s8": {
+        "heading": "8. Réclamations et service client",
+        "paragraphs": [
+          "Pour toute question ou réclamation concernant une commande, écrivez à bonjour@celebrons.com en indiquant votre numéro de commande."
+        ]
+      },
+      "s9": {
+        "heading": "9. Médiation de la consommation",
+        "paragraphs": [
+          "Conformément à l'article L616-1 du Code de la consommation, en cas de litige non résolu directement avec notre service client, vous pouvez recourir gratuitement au médiateur de la consommation suivant : [À COMPLÉTER : nom et coordonnées du médiateur de la consommation]."
+        ]
+      },
+      "s10": {
+        "heading": "10. Droit applicable",
+        "paragraphs": [
+          "Les présentes conditions générales de vente sont soumises au droit français. En cas de litige, et à défaut de résolution amiable, les tribunaux français compétents seront seuls saisis."
+        ]
+      },
+      "s11": {
+        "heading": "11. Éditeur",
+        "paragraphs": [
+          "L'identité complète de l'éditeur du site figure dans les mentions légales."
+        ]
+      }
+    }
+  },
+  "mentions": {
+    "title": "Mentions légales",
+    "updated": "28 septembre 2026",
+    "sections": {
+      "s1": {
+        "heading": "Éditeur du site",
+        "paragraphs": [
+          "Le site Célébrons (celebrons.com) est édité par [À COMPLÉTER : nom et prénom du dirigeant], exerçant sous le statut de micro-entreprise."
+        ],
+        "list": [
+          "SIRET : [À COMPLÉTER]",
+          "Adresse du siège : [À COMPLÉTER]",
+          "Contact : bonjour@celebrons.com"
+        ]
+      },
+      "s2": {
+        "heading": "Directeur de la publication",
+        "paragraphs": [
+          "[À COMPLÉTER : nom et prénom du dirigeant]."
+        ]
+      },
+      "s3": {
+        "heading": "Hébergement",
+        "paragraphs": [
+          "Le site et les données sont hébergés par :"
+        ],
+        "list": [
+          "Scaleway SAS",
+          "8 rue de la Ville l'Évêque, 75008 Paris, France",
+          "https://www.scaleway.com"
+        ]
+      },
+      "s4": {
+        "heading": "Propriété intellectuelle",
+        "paragraphs": [
+          "L'ensemble des éléments du site Célébrons (textes, mises en page, moteur de composition, identité visuelle) est protégé par le droit de la propriété intellectuelle. Les photos et textes que vous déposez dans votre livre restent votre propriété : vous nous accordez uniquement le droit de les traiter techniquement pour composer et imprimer votre livre."
+        ]
+      },
+      "s5": {
+        "heading": "Données personnelles",
+        "paragraphs": [
+          "Le traitement de vos données personnelles est décrit dans notre politique de confidentialité, accessible depuis le pied de page du site."
+        ]
+      }
+    }
+  },
+  "confidentialite": {
+    "title": "Politique de confidentialité",
+    "updated": "28 septembre 2026",
+    "intro": "Cette page explique quelles données Célébrons collecte, pourquoi, et avec qui elles sont partagées pour fabriquer et livrer votre livre.",
+    "sections": {
+      "s1": {
+        "heading": "Responsable du traitement",
+        "paragraphs": [
+          "Le responsable du traitement des données est l'éditeur du site, identifié dans les mentions légales. Pour toute question, contactez bonjour@celebrons.com."
+        ]
+      },
+      "s2": {
+        "heading": "Données collectées",
+        "list": [
+          "Adresse email (identification, communication sur votre commande)",
+          "Photos et textes que vous déposez, ainsi que ceux déposés par les personnes que vous invitez en mode collectif",
+          "Adresse de livraison et, si distincte, adresse de facturation",
+          "Historique de vos livres et de vos commandes"
+        ]
+      },
+      "s3": {
+        "heading": "Pourquoi ces données sont collectées",
+        "paragraphs": [
+          "Ces données sont utilisées exclusivement pour créer votre compte, composer votre livre, traiter et livrer votre commande, et vous informer de son avancement. Aucune donnée n'est vendue ni utilisée à des fins publicitaires."
+        ]
+      },
+      "s4": {
+        "heading": "Qui reçoit vos données (sous-traitants)",
+        "paragraphs": [
+          "Certaines de vos données sont partagées avec les prestataires suivants, chacun pour la seule mission qui le concerne :"
+        ],
+        "list": [
+          "Supabase — hébergement de la base de données, authentification, stockage des photos",
+          "Stripe — traitement sécurisé du paiement par carte bancaire",
+          "Gelato — fabrication et expédition des livres imprimés (reçoit l'adresse de livraison et le fichier du livre)",
+          "Resend — envoi des emails transactionnels (confirmation de commande, PDF prêt, suivi de fabrication)",
+          "Scaleway — hébergement du serveur applicatif (France)"
+        ]
+      },
+      "s5": {
+        "heading": "Durée de conservation",
+        "paragraphs": [
+          "Vos données sont conservées [À COMPLÉTER : durée de conservation par type de donnée — livre, commande, photo]."
+        ]
+      },
+      "s6": {
+        "heading": "Vos droits",
+        "paragraphs": [
+          "Conformément au règlement général sur la protection des données (RGPD), vous disposez d'un droit d'accès, de rectification, d'effacement et de portabilité de vos données, ainsi que d'un droit d'opposition. Pour l'exercer, écrivez à bonjour@celebrons.com.",
+          "Si vous estimez que vos droits ne sont pas respectés, vous pouvez introduire une réclamation auprès de la CNIL (www.cnil.fr)."
+        ]
+      },
+      "s7": {
+        "heading": "Cookies",
+        "paragraphs": [
+          "Célébrons n'utilise aucun cookie publicitaire ni de traceur à des fins de mesure d'audience commerciale. Seuls des éléments techniques strictement nécessaires au fonctionnement du site (maintien de votre connexion) sont utilisés."
+        ]
+      },
+      "s8": {
+        "heading": "Sécurité",
+        "paragraphs": [
+          "L'accès à vos données est protégé par des règles de sécurité au niveau de la base de données (chaque livre n'est visible que par son propriétaire) et par une connexion chiffrée (HTTPS) sur l'ensemble du site."
+        ]
+      }
+    }
+  },
+  "tarifs": {
+    "title": "Nos tarifs",
+    "intro": "Le prix affiché ici est exactement celui que vous verrez dans l'atelier — jamais une estimation. Il dépend du format choisi et du nombre de pages de votre livre (30 pages minimum).",
+    "loading": "Chargement des tarifs…",
+    "recommended": "★ Recommandé",
+    "rigid": "rigide",
+    "flexible": "souple",
+    "coverLabel": "Couverture {{type}}",
+    "startingFrom": "à partir de {{count}} pages",
+    "thenPer2Pages": "puis {{price}} toutes les 2 pages supplémentaires",
+    "shipping": "Livraison (France) : {{price}}",
+    "pdfOnly": "PDF seul",
+    "pdfOnlyDescription": "Fichier PDF haute définition, téléchargeable dès le paiement. Aucune livraison.",
+    "pack": "Pack PDF + imprimé",
+    "packDescription": "Le prix du PDF et celui du livre imprimé, additionnés puis réduits de 10 % — plus la livraison.",
+    "vatNote": "Tous nos prix sont exprimés toutes taxes comprises. Célébrons exerçant sous le statut de micro-entreprise, la TVA n'est pas applicable (article 293 B du Code général des impôts).",
+    "cta": "Créer mon livre"
+  },
+  "exemples": {
+    "title": "Exemples de livres",
+    "text": "Nous préparons une sélection de vrais livres Célébrons à vous montrer très prochainement — anniversaires, mariages, départs, projets collectifs. En attendant, la meilleure façon de voir ce que donne votre livre est de commencer le vôtre : l'aperçu se met à jour en direct, à l'échelle réelle, pendant toute la composition.",
+    "cta": "Créer mon livre"
+  }
+}
