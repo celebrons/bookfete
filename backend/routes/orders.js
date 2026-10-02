@@ -1915,6 +1915,14 @@ router.delete('/:orderId', authenticate, async (req, res) => {
     // Si Gelato est injoignable, on REFUSE : entre risquer d'effacer le
     // suivi d'un livre paye et faire patienter, le choix est vite fait
     // (meme regle que pour une commande payee sans cle Stripe lisible).
+    //
+    // EXCEPTION, trouvee en vrai le 2026-10-02 : un 404 ("Order wasn't
+    // found") n'est PAS une incertitude, c'est une reponse — ce brouillon
+    // n'existe tout simplement plus chez Gelato (deja supprime par un essai
+    // precedent, ou expire tout seul), donc certainement pas en production.
+    // Bloquer la suppression dans ce cas precis rendait une commande de
+    // test definitivement irrecuperable (le brouillon ne reviendra jamais,
+    // "reessayez plus tard" ne menait donc jamais nulle part).
     const gelatoOrderId = order.metadata?.gelatoOrderId || null;
     if (gelatoOrderId) {
       let typeChezGelato = null;
@@ -1922,9 +1930,14 @@ router.delete('/:orderId', authenticate, async (req, res) => {
         const distant = await gelatoClient.getOrder(gelatoOrderId);
         typeChezGelato = gelatoTracking.readGelatoOrderType(distant);
       } catch (error) {
-        return res.status(409).json({
-          error: t(req, "Impossible de verifier aupres de l'imprimeur si cette commande est partie en production. Par prudence, elle n'est pas supprimee. Reessayez plus tard.", 'Unable to check with the printer whether this order has gone into production. As a precaution, it has not been deleted. Try again later.')
-        });
+        if (error?.status !== 404) {
+          return res.status(409).json({
+            error: t(req, "Impossible de verifier aupres de l'imprimeur si cette commande est partie en production. Par prudence, elle n'est pas supprimee. Reessayez plus tard.", 'Unable to check with the printer whether this order has gone into production. As a precaution, it has not been deleted. Try again later.')
+          });
+        }
+        // 404 : rien a verifier davantage, le brouillon n'existe plus —
+        // typeChezGelato reste null, la suite traite ca comme "pas en
+        // production" (meme comportement qu'un gelatoOrderId absent).
       }
 
       if (typeChezGelato === 'order') {

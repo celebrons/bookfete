@@ -47,6 +47,10 @@ jest.mock('../config/supabase', () => {
         commande('order-brouillon', { gelatoOrderId: 'gel-brouillon', gelatoOrderType: 'draft' }),
         // Gelato injoignable pour celle-ci.
         commande('order-gelato-muet', { gelatoOrderId: 'gel-muet', gelatoOrderType: 'draft' }),
+        // Le brouillon n'existe plus du tout chez Gelato (deja supprime par
+        // un essai precedent, ou expire tout seul) — trouve en vrai le
+        // 2026-10-02, voir le commentaire dans routes/orders.js.
+        commande('order-brouillon-disparu', { gelatoOrderId: 'gel-disparu', gelatoOrderType: 'draft' }),
         // Jamais envoyee : rien a verifier aupres de l'imprimeur.
         commande('order-jamais-envoyee', {})
       ],
@@ -70,6 +74,11 @@ jest.mock('../services/printing/gelatoClient', () => ({
     }
     if (id === 'gel-muet') {
       throw new Error('Gelato injoignable');
+    }
+    if (id === 'gel-disparu') {
+      const erreur404 = new Error("Order with id 'gel-disparu' wasn't found");
+      erreur404.status = 404;
+      throw erreur404;
     }
     return { orderType: 'draft', items: [] };
   }),
@@ -125,6 +134,13 @@ describe('DELETE /api/orders/:orderId — commande confirmee chez Gelato', () =>
 
     expect(reponse.status).toBe(200);
     expect(idsEnBase()).not.toContain('order-brouillon');
+  });
+
+  it('laisse supprimer un brouillon que Gelato ne connait plus (404 — certainement pas en production)', async () => {
+    const reponse = await supprimer('order-brouillon-disparu');
+
+    expect(reponse.status).toBe(200);
+    expect(idsEnBase()).not.toContain('order-brouillon-disparu');
   });
 
   it("laisse supprimer une commande jamais envoyee, sans appeler l'imprimeur", async () => {
