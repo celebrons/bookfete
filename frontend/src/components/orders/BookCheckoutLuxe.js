@@ -179,12 +179,27 @@ const BookCheckoutLuxe = () => {
   useEffect(() => {
     if (!book?.id) return undefined;
     let cancelled = false;
-    estimatePrice(book.id, { printFormat: book.print_format, pageCount: book.page_count, type: orderType, quantity })
-      .then((result) => {
-        if (!cancelled) setEstimate({ total: result.totalCents, unit: result.unitCents, shipping: result.shippingCents });
-      })
-      .catch(() => { if (!cancelled) setEstimate({ total: 0 }); });
-    return () => { cancelled = true; };
+    const charger = () => {
+      estimatePrice(book.id, { printFormat: book.print_format, pageCount: book.page_count, type: orderType, quantity })
+        .then((result) => {
+          if (!cancelled) {
+            setEstimate({
+              total: result.totalCents, unit: result.unitCents, shipping: result.shippingCents, currency: result.currency
+            });
+          }
+        })
+        .catch(() => { if (!cancelled) setEstimate({ total: 0 }); });
+    };
+    charger();
+    // Pays choisi dans l'en-tete (chantier international, 2026-10-02) :
+    // avant qu'une commande existe, un changement de pays doit redemander
+    // l'estimation dans la nouvelle devise.
+    const onCountryChange = () => charger();
+    window.addEventListener('celebrons:country-changed', onCountryChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('celebrons:country-changed', onCountryChange);
+    };
   }, [book?.id, book?.print_format, book?.page_count, orderType, quantity]);
 
   // LES TROIS PRIX, POUR LES AFFICHER DEVANT LES TROIS PRODUITS.
@@ -196,20 +211,28 @@ const BookCheckoutLuxe = () => {
   useEffect(() => {
     if (!book?.id) return undefined;
     let cancelled = false;
-    Promise.all(['pdf', 'print', 'pack'].map((type) => (
-      estimatePrice(book.id, {
-        printFormat: book.print_format,
-        pageCount: book.page_count,
-        type,
-        quantity: 1
-      })
-        .then((result) => [type, Number(result.unitCents)])
-        .catch(() => [type, null])
-    ))).then((entries) => {
-      if (cancelled) return;
-      setPricesByType(Object.fromEntries(entries.filter(([, cents]) => Number.isFinite(cents))));
-    });
-    return () => { cancelled = true; };
+    const charger = () => {
+      Promise.all(['pdf', 'print', 'pack'].map((type) => (
+        estimatePrice(book.id, {
+          printFormat: book.print_format,
+          pageCount: book.page_count,
+          type,
+          quantity: 1
+        })
+          .then((result) => [type, Number(result.unitCents)])
+          .catch(() => [type, null])
+      ))).then((entries) => {
+        if (cancelled) return;
+        setPricesByType(Object.fromEntries(entries.filter(([, cents]) => Number.isFinite(cents))));
+      });
+    };
+    charger();
+    const onCountryChange = () => charger();
+    window.addEventListener('celebrons:country-changed', onCountryChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('celebrons:country-changed', onCountryChange);
+    };
   }, [book?.id, book?.print_format, book?.page_count]);
 
   // COMMANDER EXIGE UN COMPTE — ET LE DIRE DOIT MENER QUELQUE PART.
@@ -282,6 +305,13 @@ const BookCheckoutLuxe = () => {
   const effectiveShipping = checkoutFormLocked
     ? Number(latestOrder?.snapshot?.shippingPriceCents ?? estimate.shipping ?? 0)
     : (estimate.shipping || 0);
+  // Devise REELLEMENT facturee (chantier international, 2026-10-02) : une
+  // fois la commande creee, c'est celle FIGEE sur son snapshot (jamais
+  // recalculee, meme principe que shippingPriceCents juste au-dessus) ;
+  // avant, celle de la derniere estimation en cours.
+  const effectiveCurrency = checkoutFormLocked
+    ? (latestOrder?.currency || estimate.currency || 'EUR')
+    : (estimate.currency || 'EUR');
 
   // Etapes affichees : l'adresse disparait completement pour une commande
   // PDF (rien a livrer) — jamais une etape grisee qu'on n'atteindra pas.
@@ -1449,6 +1479,7 @@ const BookCheckoutLuxe = () => {
               unitCents={effectiveUnit}
               shippingCents={effectiveShipping}
               totalCents={effectiveTotal}
+              currency={effectiveCurrency}
               pricesByType={pricesByType}
             />
           )}
@@ -1474,6 +1505,7 @@ const BookCheckoutLuxe = () => {
               unitCents={effectiveUnit}
               shippingCents={effectiveShipping}
               totalCents={effectiveTotal}
+              currency={effectiveCurrency}
               address={address}
               bookTitle={book?.title}
               onPay={hasPendingPaymentOrder ? payPendingOrder : submitOrder}

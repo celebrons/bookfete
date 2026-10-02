@@ -1,0 +1,30 @@
+/* Selecteur de pays de livraison (chantier international, 2026-10-02) —
+   meme langage visuel (pilule, bordure fine, or au survol) que
+   LanguageSwitcher.css, adapte a un <select> natif. */
+.country-switcher {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(184, 146, 74, 0.35);
+  border-radius: 999px;
+  padding: 2px 4px;
+  flex: none;
+}
+
+.country-switcher select {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-light, var(--ink));
+  cursor: pointer;
+  transition: var(--transition-fast);
+  max-width: 140px;
+}
+
+.country-switcher select:hover,
+.country-switcher select:focus {
+  color: var(--gold);
+}

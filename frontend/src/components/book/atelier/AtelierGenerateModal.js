@@ -110,8 +110,8 @@ function AtelierGenerateModal({
             {t('generateModal.overflow.prefix')}<strong>{t('generateModal.overflow.pagesBold', { count: debordement.pagesPrevues })}</strong>
             {t('generateModal.overflow.middle', { current: debordement.pagesActuelles, next: debordement.pagesPrevues })}
             {debordement.prixActuelCents != null && debordement.prixPrevuCents != null && (
-              <>{t('generateModal.overflow.priceChangePrefix')}<strong>{formatEuro(debordement.prixActuelCents)}</strong>{t('generateModal.overflow.priceChangeSeparator')}
-              <strong>{formatEuro(debordement.prixPrevuCents)}</strong></>
+              <>{t('generateModal.overflow.priceChangePrefix')}<strong>{formatEuro(debordement.prixActuelCents, debordement.currency)}</strong>{t('generateModal.overflow.priceChangeSeparator')}
+              <strong>{formatEuro(debordement.prixPrevuCents, debordement.currency)}</strong></>
             )}
             {t('generateModal.overflow.suffix', { current: debordement.pagesActuelles })}
           </p>

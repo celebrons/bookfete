@@ -13,7 +13,9 @@ const {
   DEFAULT_COUNTRY,
   PRICING_VERSION,
   resolveFormatConfig,
-  resolveShippingCents
+  resolveShippingCents,
+  resolveCurrencyForCountry,
+  convertEurCentsTo
 } = require('./pricingConfig');
 const { MIN_BOOK_PAGES, MAX_BOOK_PAGES } = require('../composition/bookContentService');
 
@@ -21,6 +23,15 @@ const { MIN_BOOK_PAGES, MAX_BOOK_PAGES } = require('../composition/bookContentSe
 // La pagination est deja garantie PAIRE avant d'arriver ici (normalizePageCount,
 // bookContentService.js) : la division par 2 est donc toujours un entier — pas
 // d'arrondi a masquer une pagination invalide, juste une securite defensive.
+//
+// INTERNATIONAL (chantier 2026-10-02) : la formule ci-dessus reste TOUJOURS
+// calculee en euros (source unique de la marge, inchangee) ; seul le
+// RESULTAT est converti dans la devise du pays de livraison pour
+// l'affichage et l'encaissement — jamais une deuxieme formule par devise,
+// qui finirait par diverger. La livraison, elle, n'a jamais besoin de
+// conversion : resolveShippingCents renvoie deja un montant NATIF (voir
+// pricingConfig.js, obtenu directement depuis l'API Gelato dans la bonne
+// devise).
 function calculateBookPrice({ format, pageCount, country = DEFAULT_COUNTRY } = {}) {
   // Format REELLEMENT connu (pas juste le repli) : la reponse doit dire la
   // verite sur le format applique, meme quand l'entree etait invalide/absente
@@ -28,6 +39,7 @@ function calculateBookPrice({ format, pageCount, country = DEFAULT_COUNTRY } = {
   // jamais NaN, toujours un prix standard par defaut).
   const resolvedFormat = Object.prototype.hasOwnProperty.call(PRICING_CONFIG, format) ? format : DEFAULT_FORMAT;
   const config = resolveFormatConfig(resolvedFormat);
+  const currency = resolveCurrencyForCountry(country);
 
   const safePageCount = Number.isFinite(Number(pageCount)) && Number(pageCount) > 0
     ? Math.min(MAX_BOOK_PAGES, Math.max(MIN_BOOK_PAGES, Math.round(Number(pageCount))))
@@ -35,10 +47,14 @@ function calculateBookPrice({ format, pageCount, country = DEFAULT_COUNTRY } = {
 
   const additionalPages = Math.max(0, safePageCount - config.basePages);
   const additionalPageBlocks = additionalPages / 2;
-  const additionalPagesPriceCents = Math.round(additionalPageBlocks * config.pricePer2PagesCents);
+  const additionalPagesPriceEurCents = Math.round(additionalPageBlocks * config.pricePer2PagesCents);
 
-  const basePriceCents = config.basePriceCents;
-  const bookPriceCents = basePriceCents + additionalPagesPriceCents;
+  const basePriceEurCents = config.basePriceCents;
+  const bookPriceEurCents = basePriceEurCents + additionalPagesPriceEurCents;
+
+  const basePriceCents = convertEurCentsTo(basePriceEurCents, currency);
+  const additionalPagesPriceCents = convertEurCentsTo(additionalPagesPriceEurCents, currency);
+  const bookPriceCents = convertEurCentsTo(bookPriceEurCents, currency);
   const shippingPriceCents = resolveShippingCents(resolvedFormat, country);
   const totalPriceCents = bookPriceCents + shippingPriceCents;
 
@@ -46,7 +62,7 @@ function calculateBookPrice({ format, pageCount, country = DEFAULT_COUNTRY } = {
     format: resolvedFormat,
     pageCount: safePageCount,
     country,
-    currency: 'EUR',
+    currency,
     pricingVersion: PRICING_VERSION,
     basePriceCents,
     additionalPages,

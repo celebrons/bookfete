@@ -30,6 +30,27 @@
   "language": {
     "switchLabel": "Langue"
   },
+  "country": {
+    "switchLabel": "Pays de livraison",
+    "names": {
+      "FR": "France",
+      "BE": "Belgique",
+      "CH": "Suisse",
+      "LU": "Luxembourg",
+      "CA": "Canada",
+      "MC": "Monaco",
+      "DE": "Allemagne",
+      "ES": "Espagne",
+      "IT": "Italie",
+      "GB": "Royaume-Uni",
+      "US": "États-Unis",
+      "NL": "Pays-Bas",
+      "PT": "Portugal",
+      "MA": "Maroc",
+      "TN": "Tunisie",
+      "DZ": "Algérie"
+    }
+  },
   "errors": {
     "timeout": "Le serveur met trop de temps à répondre (il est peut-être en train de redémarrer). Réessayez dans une minute.",
     "networkInterrupted": "Connexion interrompue. Vérifiez votre réseau et réessayez."

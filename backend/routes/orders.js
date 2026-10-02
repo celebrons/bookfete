@@ -10,7 +10,12 @@ const gelatoClient = require('../services/printing/gelatoClient');
 const { removePrintFilesForOrder } = require('../services/printing/printFileStorage');
 const { logEvent } = require('../services/events/eventLog');
 const { calculateBookPrice } = require('../services/pricing/calculateBookPrice');
-const { PDF_PRICE_CENTS, PACK_DISCOUNT_PERCENT } = require('../services/pricing/pricingConfig');
+const {
+  PDF_PRICE_CENTS, PACK_DISCOUNT_PERCENT, DEFAULT_COUNTRY, PRICING_CONFIG,
+  resolveCurrencyForCountry, convertEurCentsTo
+} = require('../services/pricing/pricingConfig');
+const { resolveCountry } = require('../services/pricing/resolveCountry');
+const { resolveCountryIso2 } = require('../services/printing/countryCodes');
 
 // Envois a l'imprimeur EN COURS, par commande.
 //
@@ -298,7 +303,7 @@ const DEFAULT_PRINT_FORMAT = 'standard';
 // calcule avec la MEME formule que le prix reel d'une commande
 // (computeOrderPricing/calculateBookPrice), jamais un tarif d'affichage
 // saisi a part qui finirait par diverger.
-const startingPriceCents = (printFormat, pages) => calculateBookPrice({ format: printFormat, pageCount: pages }).bookPriceCents;
+const startingPriceCents = (printFormat, pages, country) => calculateBookPrice({ format: printFormat, pageCount: pages, country }).bookPriceCents;
 
 // book.page_count (pas book.pages, une colonne heritee de l'ancien flux IA
 // jamais mise a jour par le moteur de composition actuel) : la vraie valeur,
@@ -312,16 +317,21 @@ const startingPriceCents = (printFormat, pages) => calculateBookPrice({ format: 
 // les exemples du cahier des charges) ; `unitCents` garde son sens d'avant
 // (prix du livre par exemplaire), seul `totalCents` change de definition
 // pour inclure vraiment le total paye.
-const computeOrderPricing = ({ book, type, quantity }) => {
+const computeOrderPricing = ({ book, type, quantity, country = DEFAULT_COUNTRY }) => {
   const pages = Number(book?.page_count || 0);
   const safePages = Number.isFinite(pages) && pages > 0 ? pages : 64;
   const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
   const requestedFormat = book?.print_format || DEFAULT_PRINT_FORMAT;
 
-  const pricing = calculateBookPrice({ format: requestedFormat, pageCount: safePages });
+  const pricing = calculateBookPrice({ format: requestedFormat, pageCount: safePages, country });
   const printFormat = pricing.format;
   const printUnitCents = pricing.bookPriceCents;
-  const pdfUnitCents = PDF_PRICE_CENTS; // Hors grille (aucun exemplaire physique, aucune livraison) — 7,99€ (retour utilisateur 2026-09-27).
+  const currency = pricing.currency;
+  // PDF_PRICE_CENTS : hors grille (aucun exemplaire physique, aucune
+  // livraison) — 7,99€ (retour utilisateur 2026-09-27), TOUJOURS calcule en
+  // euros puis converti (meme principe que le prix du livre imprime, voir
+  // calculateBookPrice.js — jamais une deuxieme formule par devise).
+  const pdfUnitCents = convertEurCentsTo(PDF_PRICE_CENTS, currency);
 
   let unitCents = pdfUnitCents;
   let shippingCents = 0;
@@ -342,6 +352,8 @@ const computeOrderPricing = ({ book, type, quantity }) => {
     unitCents,
     shippingCents,
     totalCents: (unitCents * safeQuantity) + shippingCents,
+    currency,
+    country: pricing.country,
     breakdown: {
       pages: safePages,
       printFormat,
@@ -349,7 +361,9 @@ const computeOrderPricing = ({ book, type, quantity }) => {
       pdfUnitCents,
       bookPriceCents: pricing.bookPriceCents,
       shippingPriceCents: shippingCents,
-      pricingVersion: pricing.pricingVersion
+      pricingVersion: pricing.pricingVersion,
+      currency,
+      country: pricing.country
     }
   };
 };
@@ -1601,7 +1615,14 @@ router.post('/email/test', authenticate, async (req, res) => {
 router.get('/formats', (req, res) => {
   const { MIN_BOOK_PAGES, MAX_BOOK_PAGES } = require('../services/composition/bookContentService');
   const { COVER_FORMATS } = require('../services/composition/coverFormat');
-  const { resolveShippingCents, DEFAULT_COUNTRY } = require('../services/pricing/pricingConfig');
+  const { resolveShippingCents } = require('../services/pricing/pricingConfig');
+
+  // Pays/devise du visiteur (chantier international, 2026-10-02) : lu sur
+  // X-App-Country (voir resolveCountry.js — meme mecanisme que la langue),
+  // puisqu'aucune adresse n'existe encore a ce stade (page Tarifs, choix
+  // du format a la creation du livre, avant tout paiement).
+  const country = resolveCountry(req);
+  const currency = resolveCurrencyForCountry(country);
 
   // reliure : matiere reelle de la couverture (voir coverFormat.js — Standard
   // et Luxe partagent le MEME format papier, seule la matiere les distingue).
@@ -1636,18 +1657,32 @@ router.get('/formats', (req, res) => {
       heightMm: dims.trimHeightMm,
       // "a partir de" : le prix au plancher produit, pas un prix moyen.
       minPages: MIN_BOOK_PAGES,
-      startingPriceCents: startingPriceCents(formatId, MIN_BOOK_PAGES),
-      // Livraison France uniquement pour l'instant (§20) — meme repli que le
-      // reste de ce chantier tant qu'un seul pays est configure.
-      shippingPriceCents: resolveShippingCents(formatId, DEFAULT_COUNTRY),
+      startingPriceCents: startingPriceCents(formatId, MIN_BOOK_PAGES, country),
+      // Increment par tranche de 2 pages, converti dans la devise resolue —
+      // expose ici (chantier international, 2026-10-02) pour que le
+      // frontend n'ait plus besoin de sa propre copie (TarifsLuxe.js en
+      // gardait une recopiee a la main, risque de desynchronisation deja
+      // signale dans son propre commentaire).
+      pricePer2PagesCents: convertEurCentsTo(PRICING_CONFIG[formatId].pricePer2PagesCents, currency),
+      // Tarif REEL du pays resolu ci-dessus (chantier international,
+      // 2026-10-02 — relevé auprès de l'API Gelato, voir pricingConfig.js).
+      // Deja dans la bonne devise, jamais une conversion a la volee.
+      shippingPriceCents: resolveShippingCents(formatId, country),
       ...(currentPageCount ? {
         currentPageCount,
-        currentPriceCents: startingPriceCents(formatId, currentPageCount)
+        currentPriceCents: startingPriceCents(formatId, currentPageCount, country)
       } : {})
     };
   });
 
-  res.json({ formats, defaultFormatId: DEFAULT_PRINT_FORMAT });
+  res.json({
+    formats,
+    defaultFormatId: DEFAULT_PRINT_FORMAT,
+    country,
+    currency,
+    pdfPriceCents: convertEurCentsTo(PDF_PRICE_CENTS, currency),
+    packDiscountPercent: PACK_DISCOUNT_PERCENT
+  });
 });
 
 router.get('/', authenticate, async (req, res) => {
@@ -1724,7 +1759,11 @@ router.get('/book/:bookId/price-estimate', authenticate, async (req, res) => {
     const type = allowedTypes.includes(req.query.type) ? req.query.type : 'print';
     const quantity = Math.max(1, Number.parseInt(req.query.quantity, 10) || 1);
 
-    const pricing = computeOrderPricing({ book: mergedBook, type, quantity });
+    // Pays/devise (chantier international, 2026-10-02) : l'adresse de
+    // livraison reelle n'existe pas encore a ce stade (simple previsualisation,
+    // avant la commande) — lu sur X-App-Country, meme mecanisme que /formats.
+    const country = resolveCountry(req);
+    const pricing = computeOrderPricing({ book: mergedBook, type, quantity, country });
     return res.json({
       printFormat: pricing.breakdown.printFormat,
       pageCount: pricing.breakdown.pages,
@@ -1736,7 +1775,9 @@ router.get('/book/:bookId/price-estimate', authenticate, async (req, res) => {
       // detail a la main.
       bookPriceCents: pricing.breakdown.bookPriceCents,
       shippingCents: pricing.shippingCents,
-      totalCents: pricing.totalCents
+      totalCents: pricing.totalCents,
+      currency: pricing.currency,
+      country: pricing.country
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -2029,6 +2070,15 @@ router.post('/', authenticate, async (req, res) => {
     const quantity = Number(req.body?.quantity || 1);
     const shippingAddress = sanitizeAddress(req.body?.shippingAddress);
     const notes = cleanString(req.body?.notes || '', 600);
+    // Pays/devise REELLEMENT factures (chantier international, 2026-10-02) :
+    // pour 'print'/'pack', l'adresse de livraison vient d'etre saisie et
+    // c'est elle qui decide ce que Gelato facture — jamais le header, qui ne
+    // reflete qu'un choix fait plus tot dans le parcours (page Tarifs), avant
+    // de connaitre la vraie destination. Pour 'pdf' (aucune adresse,
+    // aucune livraison), seul le header existe : voir resolveCountry.js.
+    const orderCountry = type === 'pdf'
+      ? resolveCountry(req)
+      : resolveCountryIso2(shippingAddress.country);
     // Facturation (retour utilisateur, 2026-09-27) : "meme que la livraison"
     // par defaut cote frontend — body.billingAddress n'est envoye QUE quand
     // la case a ete decochee, donc son absence signifie "identique". Jamais
@@ -2123,12 +2173,14 @@ router.post('/', authenticate, async (req, res) => {
       }
     }
 
-    const pricing = computeOrderPricing({ book, type, quantity });
-    // bookPriceCents/shippingPriceCents/pricingVersion FIGES ici (retour
-    // utilisateur, 2026-09-27, §18/§19) : une commande deja creee ne relit
-    // plus jamais services/pricing/pricingConfig.js — changer les tarifs
-    // demain ne doit jamais modifier le prix d'une commande deja passee.
-    // Pas de nouvelle colonne SQL : snapshot est deja un jsonb ecrit ici.
+    const pricing = computeOrderPricing({ book, type, quantity, country: orderCountry });
+    // bookPriceCents/shippingPriceCents/pricingVersion/currency FIGES ici
+    // (retour utilisateur, 2026-09-27, §18/§19 — etendu a la devise par le
+    // chantier international, 2026-10-02) : une commande deja creee ne relit
+    // plus jamais services/pricing/pricingConfig.js — changer les tarifs OU
+    // les taux de change demain ne doit jamais modifier le prix (ni la
+    // devise) d'une commande deja passee. Pas de nouvelle colonne SQL :
+    // snapshot est deja un jsonb ecrit ici.
     const snapshot = {
       bookId: book.id,
       title: book.title || 'Livre sans titre',
@@ -2140,7 +2192,8 @@ router.post('/', authenticate, async (req, res) => {
       bookPriceCents: pricing.breakdown.bookPriceCents,
       shippingPriceCents: pricing.breakdown.shippingPriceCents,
       totalPriceCents: pricing.totalCents,
-      currency: 'EUR',
+      currency: pricing.currency,
+      country: pricing.country,
       pricingVersion: pricing.breakdown.pricingVersion,
       createdAt: getNowIso()
     };
@@ -2154,7 +2207,7 @@ router.post('/', authenticate, async (req, res) => {
       type,
       status: 'awaiting_payment',
       quantity: pricing.quantity,
-      currency: 'EUR',
+      currency: pricing.currency,
       unit_cents: pricing.unitCents,
       total_cents: pricing.totalCents,
       shipping_address: type === 'pdf' ? null : shippingAddress,

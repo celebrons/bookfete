@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabaseClient';
 import { checkIsAdmin } from '../../services/adminApi';
 import LanguageSwitcher from '../common/LanguageSwitcher';
+import CountrySwitcher from '../common/CountrySwitcher';
 import '../../styles/luxe-theme.css';
 import './HeaderLuxe.css';
 
@@ -172,6 +173,7 @@ const HeaderLuxe = () => {
                 {user.email || t('header.noAccount')}
               </span>
               <LanguageSwitcher />
+              <CountrySwitcher />
               <button onClick={handleLogout} className="btn btn-outline">
                 {t('header.logout')}
               </button>
@@ -179,6 +181,7 @@ const HeaderLuxe = () => {
           ) : (
             <>
               <LanguageSwitcher />
+              <CountrySwitcher />
               <Link to="/login" className="btn btn-outline">
                 {t('header.login')}
               </Link>

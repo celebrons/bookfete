@@ -117,6 +117,50 @@ function buildApp() {
   return app;
 }
 
+// Pas d'authentification requise (page Tarifs/choix de format publics,
+// avant tout compte) — chantier international, 2026-10-02.
+describe('GET /api/orders/formats', () => {
+  let app;
+
+  beforeAll(() => {
+    app = buildApp();
+  });
+
+  it('sans en-tete : France/EUR, comportement inchange', async () => {
+    const response = await request(app).get('/api/orders/formats');
+    expect(response.status).toBe(200);
+    expect(response.body.country).toBe('FR');
+    expect(response.body.currency).toBe('EUR');
+    const standard = response.body.formats.find((f) => f.formatId === 'standard');
+    expect(standard.startingPriceCents).toBe(3990);
+    expect(standard.shippingPriceCents).toBe(600);
+    expect(standard.pricePer2PagesCents).toBe(220);
+    expect(response.body.pdfPriceCents).toBe(799);
+  });
+
+  it('X-App-Country: CA bascule tout en CAD, y compris le PDF et l\'increment par page', async () => {
+    const response = await request(app).get('/api/orders/formats').set('X-App-Country', 'CA');
+    expect(response.status).toBe(200);
+    expect(response.body.country).toBe('CA');
+    expect(response.body.currency).toBe('CAD');
+    const standard = response.body.formats.find((f) => f.formatId === 'standard');
+    // 3990 * 1.5984 = 6377.6 -> 6378 (meme taux fige que calculateBookPrice.test.js).
+    expect(standard.startingPriceCents).toBe(6378);
+    // Tarif Gelato REEL pour le Canada, jamais une conversion du tarif France.
+    expect(standard.shippingPriceCents).toBe(1000);
+    // 220 * 1.5984 = 351.648 -> 352.
+    expect(standard.pricePer2PagesCents).toBe(352);
+    // 799 * 1.5984 = 1277.1 -> 1277.
+    expect(response.body.pdfPriceCents).toBe(1277);
+  });
+
+  it('nom du produit jamais traduit/converti, seule l\'accroche et le prix changent', async () => {
+    const response = await request(app).get('/api/orders/formats').set('X-App-Country', 'GB');
+    const standard = response.body.formats.find((f) => f.formatId === 'standard');
+    expect(standard.nom).toBe('Standard');
+  });
+});
+
 describe('GET /api/orders/book/:bookId/price-estimate', () => {
   let app;
 
@@ -155,7 +199,7 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      printFormat: 'luxe', pageCount: 24, unitCents: 4990, bookPriceCents: 4990, shippingCents: 539, totalCents: 5529
+      printFormat: 'luxe', pageCount: 24, unitCents: 4990, bookPriceCents: 4990, shippingCents: 650, totalCents: 5640, currency: 'EUR', country: 'FR'
     });
   });
 
@@ -166,7 +210,7 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      printFormat: 'livret', pageCount: 24, unitCents: 2990, bookPriceCents: 2990, shippingCents: 500, totalCents: 3490
+      printFormat: 'livret', pageCount: 24, unitCents: 2990, bookPriceCents: 2990, shippingCents: 600, totalCents: 3590, currency: 'EUR', country: 'FR'
     });
   });
 
@@ -177,7 +221,7 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      printFormat: 'luxe', pageCount: 64, unitCents: 9920, bookPriceCents: 9920, shippingCents: 539, totalCents: 10459
+      printFormat: 'luxe', pageCount: 64, unitCents: 9920, bookPriceCents: 9920, shippingCents: 650, totalCents: 10570, currency: 'EUR', country: 'FR'
     });
   });
 
@@ -188,7 +232,7 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      printFormat: 'standard', pageCount: 64, unitCents: 7730, bookPriceCents: 7730, shippingCents: 500, totalCents: 8230
+      printFormat: 'standard', pageCount: 64, unitCents: 7730, bookPriceCents: 7730, shippingCents: 600, totalCents: 8330, currency: 'EUR', country: 'FR'
     });
   });
 
@@ -202,7 +246,7 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
       .set('Authorization', 'Bearer valid-token');
 
     expect(again.body).toEqual({
-      printFormat: 'luxe', pageCount: 24, unitCents: 4990, bookPriceCents: 4990, shippingCents: 539, totalCents: 5529
+      printFormat: 'luxe', pageCount: 24, unitCents: 4990, bookPriceCents: 4990, shippingCents: 650, totalCents: 5640, currency: 'EUR', country: 'FR'
     });
   });
 
@@ -217,14 +261,14 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
       .get(`/api/orders/book/${BOOK_ID}/price-estimate?type=pack`)
       .set('Authorization', 'Bearer valid-token');
     expect(pack.body.unitCents).toBe(Math.round((799 + 4990) * 0.9)); // (PDF + imprime) - 10%
-    expect(pack.body.shippingCents).toBe(539);
+    expect(pack.body.shippingCents).toBe(650);
 
     const doublePrint = await request(app)
       .get(`/api/orders/book/${BOOK_ID}/price-estimate?type=print&quantity=2`)
       .set('Authorization', 'Bearer valid-token');
     expect(doublePrint.body.unitCents).toBe(4990);
     // La livraison est un forfait par COMMANDE, jamais multiplie par la quantite (§3).
-    expect(doublePrint.body.totalCents).toBe((4990 * 2) + 539);
+    expect(doublePrint.body.totalCents).toBe((4990 * 2) + 650);
   });
 });
 
@@ -757,6 +801,68 @@ describe('POST /api/orders — adresse de facturation', () => {
     expect(response.status).toBe(201);
     expect(response.body.metadata.billingAddress).toBeUndefined();
     expect(response.body.metadata.billingSameAsShipping).toBeUndefined();
+  });
+});
+
+// Chantier international (2026-10-02) : la devise/le tarif de livraison
+// REELLEMENT factures dependent du pays, jamais fige sur l'EUR/la France.
+describe('POST /api/orders — international', () => {
+  let app;
+  const FINALIZED_BOOK_ID = 'order-book-finalise'; // standard, 30 pages -> 3990 cts EUR, voir fixture plus haut.
+
+  beforeAll(() => {
+    app = buildApp();
+  });
+
+  it('livraison au Canada : devise CAD, prix du livre converti, tarif de livraison NATIF (jamais reconverti)', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        bookId: FINALIZED_BOOK_ID,
+        type: 'print',
+        quantity: 1,
+        shippingAddress: {
+          email: 'client@test.local', fullName: 'Jean Client', line1: '1 rue Sainte-Catherine',
+          postalCode: 'H3B 1A1', city: 'Montreal', country: 'Canada'
+        },
+        cgvAccepted: true
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.currency).toBe('CAD');
+    // 3990 EUR cts * 1.5984 (taux fige, voir pricingConfig.js) = 6378.
+    expect(response.body.unit_cents).toBe(6378);
+    // Tarif Gelato REEL pour le Canada (1000 cts CAD), jamais une conversion
+    // du tarif France.
+    expect(response.body.total_cents).toBe(6378 + 1000);
+    expect(response.body.snapshot.currency).toBe('CAD');
+    expect(response.body.snapshot.country).toBe('CA');
+  });
+
+  it('commande PDF seule, aucune adresse : la devise vient de X-App-Country (choisie plus tot dans le parcours)', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .set('X-App-Country', 'GB')
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true });
+
+    expect(response.status).toBe(201);
+    expect(response.body.currency).toBe('GBP');
+    // 799 EUR cts (prix PDF plat) * 0.85033 = 679.41 -> 679.
+    expect(response.body.unit_cents).toBe(679);
+    expect(response.body.total_cents).toBe(679);
+  });
+
+  it('sans adresse ni en-tete : repli explicite sur la France/EUR, comportement inchange', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true });
+
+    expect(response.status).toBe(201);
+    expect(response.body.currency).toBe('EUR');
+    expect(response.body.unit_cents).toBe(799);
   });
 });
 

@@ -30,7 +30,8 @@ const DRAFT_KEY = 'createBookDraftSansIA';
 //    coup revenait a recomposer un livre deja fait. Prix affiche des cet
 //    ecran : on doit savoir ce qu'on fabrique.
 export default function CreateBookSansIA() {
-  const { t } = useTranslation('createBook');
+  const { t, i18n } = useTranslation('createBook');
+  const priceLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -38,6 +39,7 @@ export default function CreateBookSansIA() {
   const [mode, setMode] = useState(null); // 'solo' | 'open'
   const [printFormat, setPrintFormat] = useState(null);
   const [formats, setFormats] = useState([]);
+  const [currency, setCurrency] = useState('EUR');
   const [recipientName, setRecipientName] = useState('');
   const [eventDate, setEventDate] = useState('');
   // Occasion : jamais redemandee explicitement (cahier des charges §9) —
@@ -67,14 +69,26 @@ export default function CreateBookSansIA() {
   // finirait par annoncer un prix different de celui paye.
   useEffect(() => {
     let annule = false;
-    listPrintFormats()
-      .then((data) => {
-        if (annule) return;
-        setFormats(data?.formats || []);
-        setPrintFormat((actuel) => actuel || data?.defaultFormatId || null);
-      })
-      .catch(() => { /* non bloquant : l'ecran de format affiche alors un repli */ });
-    return () => { annule = true; };
+    const charger = () => {
+      listPrintFormats()
+        .then((data) => {
+          if (annule) return;
+          setFormats(data?.formats || []);
+          setCurrency(data?.currency || 'EUR');
+          setPrintFormat((actuel) => actuel || data?.defaultFormatId || null);
+        })
+        .catch(() => { /* non bloquant : l'ecran de format affiche alors un repli */ });
+    };
+    charger();
+    // Pays choisi dans l'en-tete (CountrySwitcher.js, chantier
+    // international 2026-10-02) : redemande les tarifs dans la nouvelle
+    // devise si le visiteur change de pays APRES ce premier chargement.
+    const onCountryChange = () => charger();
+    window.addEventListener('celebrons:country-changed', onCountryChange);
+    return () => {
+      annule = true;
+      window.removeEventListener('celebrons:country-changed', onCountryChange);
+    };
   }, []);
 
   const buildPayload = async (values) => ({
@@ -276,7 +290,7 @@ export default function CreateBookSansIA() {
                     </span>
                     <span className="format-choice-pitch">{format.accroche}</span>
                     <span className="format-choice-price">
-                      {t('formatStep.startingFrom')} {formatPriceCents(format.startingPriceCents)}
+                      {t('formatStep.startingFrom')} {formatPriceCents(format.startingPriceCents, currency, priceLocale)}
                       <small>{t('formatStep.forPages', { count: format.minPages })}</small>
                     </span>
                   </button>

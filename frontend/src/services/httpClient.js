@@ -43,6 +43,28 @@ export function getLanguageHeader() {
   return { 'X-App-Language': i18n.language || 'fr' };
 }
 
+// Pays REELLEMENT choisi dans l'app (chantier international, 2026-10-02) —
+// meme principe que getLanguageHeader() : sans lui, le backend ne peut
+// calculer un prix/une devise localisee qu'une fois une adresse de
+// livraison connue (page Tarifs, choix du format a la creation du livre,
+// tous AVANT l'adresse). Stocke sous la meme cle que le selecteur de pays
+// (voir components/layout/CountrySwitcher.js), jamais la langue du
+// navigateur — un visiteur anglophone peut tres bien habiter en France.
+export function getCountryHeader() {
+  let country = 'FR';
+  try {
+    country = localStorage.getItem('celebrons_country') || 'FR';
+  } catch (_error) {
+    // Navigation privee/stockage refuse : repli silencieux sur la France,
+    // jamais bloquant.
+  }
+  return { 'X-App-Country': country };
+}
+
+export function getContextHeaders() {
+  return { ...getLanguageHeader(), ...getCountryHeader() };
+}
+
 // FONCTION, pas une constante figee au chargement du module (chantier
 // bilingue, 2026-09-30) : la langue peut changer en cours de session, ce
 // message doit donc etre lu dans la langue CURRENTE au moment de l'erreur,
@@ -96,7 +118,7 @@ async function fetchWithTimeout(url, options, timeoutMs) {
   try {
     return await fetch(url, {
       ...options,
-      headers: { ...getLanguageHeader(), ...(options.headers || {}) },
+      headers: { ...getContextHeaders(), ...(options.headers || {}) },
       signal: controller.signal
     });
   } finally {

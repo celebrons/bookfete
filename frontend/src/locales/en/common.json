@@ -30,6 +30,27 @@
   "language": {
     "switchLabel": "Language"
   },
+  "country": {
+    "switchLabel": "Shipping country",
+    "names": {
+      "FR": "France",
+      "BE": "Belgium",
+      "CH": "Switzerland",
+      "LU": "Luxembourg",
+      "CA": "Canada",
+      "MC": "Monaco",
+      "DE": "Germany",
+      "ES": "Spain",
+      "IT": "Italy",
+      "GB": "United Kingdom",
+      "US": "United States",
+      "NL": "Netherlands",
+      "PT": "Portugal",
+      "MA": "Morocco",
+      "TN": "Tunisia",
+      "DZ": "Algeria"
+    }
+  },
   "errors": {
     "timeout": "The server is taking too long to respond (it may be restarting). Try again in a minute.",
     "networkInterrupted": "Connection interrupted. Check your network and try again."

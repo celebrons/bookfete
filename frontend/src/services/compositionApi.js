@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { fetchWithWakeRetry, getLanguageHeader } from './httpClient';
+import { fetchWithWakeRetry, getContextHeaders } from './httpClient';
 
 // Adresse de l API.
 //
@@ -99,7 +99,7 @@ const rawRequest = async (path, options = {}) => {
   const { token } = await buildHeaders();
   const response = await fetch(`${buildApiBaseUrl()}${path}`, {
     ...options,
-    headers: { Authorization: `Bearer ${token}`, ...getLanguageHeader(), ...(options.headers || {}) }
+    headers: { Authorization: `Bearer ${token}`, ...getContextHeaders(), ...(options.headers || {}) }
   });
   if (!response.ok) {
     const payload = await parseJsonSafe(response);
@@ -129,7 +129,7 @@ const publicRequest = async (path, options = {}) => {
 const publicRawRequest = async (path, options = {}) => {
   const response = await fetch(`${buildApiBaseUrl()}${path}`, {
     ...options,
-    headers: { ...getLanguageHeader(), ...(options.headers || {}) }
+    headers: { ...getContextHeaders(), ...(options.headers || {}) }
   });
   if (!response.ok) {
     const payload = await parseJsonSafe(response);

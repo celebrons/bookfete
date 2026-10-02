@@ -24,28 +24,66 @@ describe('calculateBookPrice — 18 valeurs exactes du cahier des charges', () =
 });
 
 describe('calculateBookPrice — livraison France (§20)', () => {
-  it('livret : 5,00 €', () => {
-    expect(calculateBookPrice({ format: 'livret', pageCount: 30 }).shippingPriceCents).toBe(500);
+  // 600/650 (plutot que les anciens 500/539) : tarifs reels releves auprès
+  // de l'API Gelato le 2026-10-02 (voir pricingConfig.js) — l'ancien tarif
+  // France etait sous son propre cout reel (5,99 € TTC), corrige au passage
+  // du chantier international.
+  it('livret : 6,00 €', () => {
+    expect(calculateBookPrice({ format: 'livret', pageCount: 30 }).shippingPriceCents).toBe(600);
   });
-  it('standard : 5,00 €', () => {
-    expect(calculateBookPrice({ format: 'standard', pageCount: 30 }).shippingPriceCents).toBe(500);
+  it('standard : 6,00 €', () => {
+    expect(calculateBookPrice({ format: 'standard', pageCount: 30 }).shippingPriceCents).toBe(600);
   });
-  it('luxe : 5,39 €', () => {
-    expect(calculateBookPrice({ format: 'luxe', pageCount: 30 }).shippingPriceCents).toBe(539);
+  it('luxe : 6,50 €', () => {
+    expect(calculateBookPrice({ format: 'luxe', pageCount: 30 }).shippingPriceCents).toBe(650);
   });
-  it('pays inconnu retombe sur la France (seul pays configure pour l\'instant)', () => {
+  it('pays inconnu retombe sur la France (repli explicite, jamais un pays au hasard)', () => {
     const fr = calculateBookPrice({ format: 'standard', pageCount: 30, country: 'FR' });
     const inconnu = calculateBookPrice({ format: 'standard', pageCount: 30, country: 'ZZ' });
     expect(inconnu.shippingPriceCents).toBe(fr.shippingPriceCents);
+    expect(inconnu.currency).toBe(fr.currency);
   });
 });
 
 describe('calculateBookPrice — total livre + livraison', () => {
-  it('exemple du cahier des charges : Standard 34 pages = 44,30€ + 5,00€ = 49,30€', () => {
+  it('exemple du cahier des charges : Standard 34 pages = 44,30€ + 6,00€ = 50,30€', () => {
     const result = calculateBookPrice({ format: 'standard', pageCount: 34 });
     expect(result.bookPriceCents).toBe(4430);
-    expect(result.shippingPriceCents).toBe(500);
-    expect(result.totalPriceCents).toBe(4930);
+    expect(result.shippingPriceCents).toBe(600);
+    expect(result.totalPriceCents).toBe(5030);
+  });
+});
+
+describe('calculateBookPrice — international (chantier 2026-10-02)', () => {
+  it('France (EUR) reste la devise par defaut, comportement inchange', () => {
+    const result = calculateBookPrice({ format: 'standard', pageCount: 30 });
+    expect(result.currency).toBe('EUR');
+    expect(result.bookPriceCents).toBe(3990);
+  });
+
+  it('Canada : prix du livre converti en CAD, livraison NATIVE (jamais convertie)', () => {
+    const result = calculateBookPrice({ format: 'standard', pageCount: 30, country: 'CA' });
+    expect(result.currency).toBe('CAD');
+    // 3990 EUR cts * 1.5984 (taux fige, voir pricingConfig.js) = 6377.76 -> 6378
+    expect(result.bookPriceCents).toBe(6378);
+    // Tarif Gelato reel CAD, jamais une conversion du tarif EUR.
+    expect(result.shippingPriceCents).toBe(1000);
+    expect(result.totalPriceCents).toBe(7378);
+  });
+
+  it('Royaume-Uni : conversion EUR -> GBP appliquee au livre uniquement', () => {
+    const result = calculateBookPrice({ format: 'livret', pageCount: 30, country: 'GB' });
+    expect(result.currency).toBe('GBP');
+    // 2990 * 0.85033 = 2542.4867 -> 2542
+    expect(result.bookPriceCents).toBe(2542);
+    expect(result.shippingPriceCents).toBe(400);
+  });
+
+  it('Maroc/Tunisie/Algerie restent en EUR (Gelato n\'accepte pas MAD/TND/DZD)', () => {
+    const ma = calculateBookPrice({ format: 'standard', pageCount: 30, country: 'MA' });
+    expect(ma.currency).toBe('EUR');
+    expect(ma.bookPriceCents).toBe(3990);
+    expect(ma.shippingPriceCents).toBe(2550);
   });
 });
 

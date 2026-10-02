@@ -154,7 +154,7 @@ function ScaledPageFrame({ html, title, naturalWidthPx, naturalHeightPx, wrapCla
 export default function BookPreviewFinalLuxe() {
   const { t, i18n } = useTranslation('preview');
   const locale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
-  const formatEuro = (cents) => (cents == null ? '—' : formatPriceCents(cents, 'EUR', locale));
+  const formatEuro = (cents) => (cents == null ? '—' : formatPriceCents(cents, pricingCurrency, locale));
   const { bookId } = useParams();
   const navigate = useNavigate();
 
@@ -184,6 +184,7 @@ export default function BookPreviewFinalLuxe() {
   // d'une pagination differente par format (l'ancien formatOptions/
   // getFormatOptions, retire).
   const [formatPricing, setFormatPricing] = useState({});
+  const [pricingCurrency, setPricingCurrency] = useState('EUR');
   const [switchingFormat, setSwitchingFormat] = useState(false);
   // Indication breve de variation de prix au changement de format (§9/§11) —
   // meme mecanique que l'atelier (BookAtelierLuxe.js: priceDelta), disparait
@@ -270,16 +271,27 @@ export default function BookPreviewFinalLuxe() {
   useEffect(() => {
     if (!book?.id || !totalPages) return undefined;
     let cancelled = false;
-    listPrintFormats(totalPages)
-      .then(({ formats }) => {
-        if (cancelled) return;
-        setFormatPricing(Object.fromEntries((formats || []).map((entry) => [
-          entry.formatId,
-          { bookPriceCents: entry.currentPriceCents ?? entry.startingPriceCents, shippingCents: entry.shippingPriceCents }
-        ])));
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    const charger = () => {
+      listPrintFormats(totalPages)
+        .then(({ formats, currency }) => {
+          if (cancelled) return;
+          setFormatPricing(Object.fromEntries((formats || []).map((entry) => [
+            entry.formatId,
+            { bookPriceCents: entry.currentPriceCents ?? entry.startingPriceCents, shippingCents: entry.shippingPriceCents }
+          ])));
+          setPricingCurrency(currency || 'EUR');
+        })
+        .catch(() => {});
+    };
+    charger();
+    // Pays choisi dans l'en-tete (chantier international, 2026-10-02) :
+    // redemande les tarifs si le visiteur change de pays en cours de route.
+    const onCountryChange = () => charger();
+    window.addEventListener('celebrons:country-changed', onCountryChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('celebrons:country-changed', onCountryChange);
+    };
   }, [book?.id, totalPages, currentFormat]);
 
   useEffect(() => () => {
@@ -670,7 +682,7 @@ export default function BookPreviewFinalLuxe() {
           <div className="preview-final-sidebar-section preview-final-total">
             {priceDelta && (
               <p className="preview-final-price-delta">
-                {priceDelta.label} · {formatEurosDelta(priceDelta.priceCents, 'EUR', locale)}
+                {priceDelta.label} · {formatEurosDelta(priceDelta.priceCents, pricingCurrency, locale)}
               </p>
             )}
             <div className="preview-final-price-line">

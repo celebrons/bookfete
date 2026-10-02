@@ -16,6 +16,7 @@ function StepPayment({
   unitCents,
   shippingCents,
   totalCents,
+  currency = 'EUR',
   address,
   bookTitle,
   onPay,
@@ -34,7 +35,9 @@ function StepPayment({
   cgvAccepted = false,
   onToggleCgv
 }) {
-  const { t } = useTranslation('checkout');
+  const { t, i18n } = useTranslation('checkout');
+  const priceLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
+  const formatPrix = (cents) => formatPriceCents(cents, currency, priceLocale);
   const withPrint = includesPrint(orderType);
   const typeLabel = TYPE_KEYS.includes(orderType) ? t(`stepPayment.typeLabels.${orderType}`) : orderType;
 
@@ -56,13 +59,13 @@ function StepPayment({
           </span>
           <span className="orders-recap-compact-sub">
             {t('stepProduct.qty.unit', { count: quantity })}
-            {quantity > 1 && Number.isFinite(unitCents) ? ` · ${t('stepProduct.qty.perUnitPrice', { price: formatPriceCents(unitCents) })}` : ''}
+            {quantity > 1 && Number.isFinite(unitCents) ? ` · ${t('stepProduct.qty.perUnitPrice', { price: formatPrix(unitCents) })}` : ''}
             {withPrint
-              ? (Number.isFinite(shippingCents) ? ` · ${t('stepProduct.qty.shipping', { price: formatPriceCents(shippingCents) })}` : ` · ${t('stepPayment.shippingHome')}`)
+              ? (Number.isFinite(shippingCents) ? ` · ${t('stepProduct.qty.shipping', { price: formatPrix(shippingCents) })}` : ` · ${t('stepPayment.shippingHome')}`)
               : ` · ${t('stepPayment.downloadOnly')}`}
           </span>
         </div>
-        <span className="orders-recap-compact-total">{formatPriceCents(totalCents)}</span>
+        <span className="orders-recap-compact-total">{formatPrix(totalCents)}</span>
       </div>
 
       {withPrint && (

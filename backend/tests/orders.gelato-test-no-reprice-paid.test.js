@@ -134,7 +134,7 @@ describe('POST /:orderId/gelato-test — ne reecrit jamais le prix d\'une comman
     // pas le "1" arbitraire pose dans la fixture pour rendre ce test
     // probant s'il n'etait pas recalcule).
     expect(commande.unit_cents).toBe(4430);
-    expect(commande.total_cents).toBe(4430 + 500);
+    expect(commande.total_cents).toBe(4430 + 600);
     expect(commande.metadata.pricing).toBeTruthy();
   });
 });

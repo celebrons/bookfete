@@ -1773,7 +1773,8 @@ export default function BookAtelierLuxe() {
           pagesPrevues,
           pagesActuelles,
           prixActuelCents: actuel?.unitCents ?? null,
-          prixPrevuCents: prevu?.unitCents ?? null
+          prixPrevuCents: prevu?.unitCents ?? null,
+          currency: actuel?.currency || prevu?.currency
         });
       } else {
         setDebordement(null);
@@ -1950,7 +1951,7 @@ export default function BookAtelierLuxe() {
       setPriceInfo(result);
       if (before != null && Number.isFinite(result?.bookPriceCents)) {
         const diffCents = result.bookPriceCents - before;
-        if (diffCents !== 0) showPriceDelta({ pages: pageDelta, priceCents: diffCents });
+        if (diffCents !== 0) showPriceDelta({ pages: pageDelta, priceCents: diffCents, currency: result.currency });
       }
     } catch (_err) {
       // Non bloquant : un echec laisse simplement l'ancien prix affiche.
@@ -2246,13 +2247,13 @@ export default function BookAtelierLuxe() {
               : t('main.header.customAtelier')}
             {/* Prix discret (§6 : "STANDARD · 34 pages · 44,30 €" ou
                 equivalent — jamais un panneau, juste ce texte). */}
-            {Number.isFinite(priceInfo?.bookPriceCents) && ` · ${formatEuros(priceInfo.bookPriceCents)}`}
+            {Number.isFinite(priceInfo?.bookPriceCents) && ` · ${formatEuros(priceInfo.bookPriceCents, priceInfo.currency)}`}
             {/* Indication breve au moment d'un changement (§7/§8/§11) — puis
                 disparait toute seule (showPriceDelta/priceDeltaTimeoutRef). */}
             {priceDelta && (
               <span className="atelier-header-price-delta">
                 {priceDelta.pages ? `${priceDelta.pages > 0 ? '+' : ''}${t('main.header.pagesCount', { count: priceDelta.pages })} · ` : ''}
-                {formatEurosDelta(priceDelta.priceCents)}
+                {formatEurosDelta(priceDelta.priceCents, priceDelta.currency)}
               </span>
             )}
             {/* Le verrouillage apres paiement (mode test) vit desormais dans

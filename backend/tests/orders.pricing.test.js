@@ -53,8 +53,8 @@ describe('routes/orders.computeOrderPricing', () => {
     const pricing = computeOrderPricing({ book: { page_count: 34 }, type: 'pack', quantity: 1 });
     const attendu = Math.round((799 + 4430) * 0.9); // 4706
     expect(pricing.unitCents).toBe(attendu);
-    expect(pricing.shippingCents).toBe(500);
-    expect(pricing.totalCents).toBe(attendu + 500);
+    expect(pricing.shippingCents).toBe(600);
+    expect(pricing.totalCents).toBe(attendu + 600);
   });
 
   it('type "pack" : la remise de 10% suit le prix reel du format (pas un supplement fixe)', () => {
@@ -67,8 +67,8 @@ describe('routes/orders.computeOrderPricing', () => {
 
   it('multiplie unitCents par la quantite, mais PAS la livraison (un forfait par commande)', () => {
     const pricing = computeOrderPricing({ book: { page_count: 34 }, type: 'print', quantity: 3 });
-    expect(pricing.shippingCents).toBe(500);
-    expect(pricing.totalCents).toBe((4430 * 3) + 500);
+    expect(pricing.shippingCents).toBe(600);
+    expect(pricing.totalCents).toBe((4430 * 3) + 600);
   });
 });
 
@@ -103,17 +103,17 @@ describe('routes/orders.computeOrderPricing — grille par format (18 valeurs du
 });
 
 describe('routes/orders.computeOrderPricing — livraison France par format (§20)', () => {
-  it('livret : 5,00 €', () => {
+  it('livret : 6,00 €', () => {
     const pricing = computeOrderPricing({ book: { page_count: 30, print_format: 'livret' }, type: 'print', quantity: 1 });
-    expect(pricing.shippingCents).toBe(500);
+    expect(pricing.shippingCents).toBe(600);
   });
-  it('standard : 5,00 €', () => {
+  it('standard : 6,00 €', () => {
     const pricing = computeOrderPricing({ book: { page_count: 30, print_format: 'standard' }, type: 'print', quantity: 1 });
-    expect(pricing.shippingCents).toBe(500);
+    expect(pricing.shippingCents).toBe(600);
   });
-  it('luxe : 5,39 €', () => {
+  it('luxe : 6,50 €', () => {
     const pricing = computeOrderPricing({ book: { page_count: 30, print_format: 'luxe' }, type: 'print', quantity: 1 });
-    expect(pricing.shippingCents).toBe(539);
+    expect(pricing.shippingCents).toBe(650);
   });
 });
 
@@ -166,10 +166,10 @@ describe('routes/orders.computeOrderPricing — changement de format (§9)', () 
 });
 
 describe('routes/orders.computeOrderPricing — total livre + livraison (§3)', () => {
-  it('exemple du cahier des charges : Standard 34 pages = 44,30€ + 5,00€ = 49,30€', () => {
+  it('exemple du cahier des charges : Standard 34 pages = 44,30€ + 6,00€ = 50,30€', () => {
     const pricing = computeOrderPricing({ book: { page_count: 34, print_format: 'standard' }, type: 'print', quantity: 1 });
     expect(pricing.unitCents).toBe(4430);
-    expect(pricing.shippingCents).toBe(500);
-    expect(pricing.totalCents).toBe(4930);
+    expect(pricing.shippingCents).toBe(600);
+    expect(pricing.totalCents).toBe(5030);
   });
 });

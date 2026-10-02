@@ -25,9 +25,12 @@ function StepProduct({
   unitCents,
   shippingCents,
   totalCents,
+  currency = 'EUR',
   pricesByType = {}
 }) {
-  const { t } = useTranslation('checkout');
+  const { t, i18n } = useTranslation('checkout');
+  const priceLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
+  const formatPrix = (cents) => formatPriceCents(cents, currency, priceLocale);
   // Economie du pack : calculee a partir des VRAIS prix renvoyes par le
   // serveur, jamais d'un chiffre ecrit en dur qui finirait par mentir le
   // jour ou la grille tarifaire bouge. Le pourcentage aussi est DEDUIT de
@@ -73,9 +76,9 @@ function StepProduct({
               )}
               <span className="product-choice-price">
                 {montrerRemise && (
-                  <span className="product-choice-price-was">{formatPriceCents(prixSepares)}</span>
+                  <span className="product-choice-price-was">{formatPrix(prixSepares)}</span>
                 )}
-                {Number.isFinite(prix) ? formatPriceCents(prix) : '—'}
+                {Number.isFinite(prix) ? formatPrix(prix) : '—'}
                 <span className="product-choice-price-unit">{t('stepProduct.perUnit')}</span>
               </span>
               <span className="product-choice-text">
@@ -88,7 +91,7 @@ function StepProduct({
                 </span>
                 {montrerRemise && (
                   <span className="product-choice-savings">
-                    {t('stepProduct.savings', { amount: formatPriceCents(economiePack) })}
+                    {t('stepProduct.savings', { amount: formatPrix(economiePack) })}
                   </span>
                 )}
               </span>
@@ -129,10 +132,10 @@ function StepProduct({
         </div>
         <span className="orders-recap-detail">
           {t('stepProduct.qty.unit', { count: quantity })}
-          {quantity > 1 && Number.isFinite(unitCents) ? ` · ${t('stepProduct.qty.perUnitPrice', { price: formatPriceCents(unitCents) })}` : ''}
-          {includesPrint(orderType) && Number.isFinite(shippingCents) ? ` · ${t('stepProduct.qty.shipping', { price: formatPriceCents(shippingCents) })}` : ''}
+          {quantity > 1 && Number.isFinite(unitCents) ? ` · ${t('stepProduct.qty.perUnitPrice', { price: formatPrix(unitCents) })}` : ''}
+          {includesPrint(orderType) && Number.isFinite(shippingCents) ? ` · ${t('stepProduct.qty.shipping', { price: formatPrix(shippingCents) })}` : ''}
         </span>
-        <span className="orders-recap-total">{formatPriceCents(totalCents)}</span>
+        <span className="orders-recap-total">{formatPrix(totalCents)}</span>
       </div>
 
       <p className="orders-disclaimer">

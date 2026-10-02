@@ -1,39 +1,54 @@
-// Page Tarifs publique. Les prix de base (livret/standard/luxe) et la
-// livraison viennent EN DIRECT de GET /orders/formats (deja la source
-// utilisee par le choix de format a la creation d'un livre, voir
-// CreateBookSansIA.js) — jamais un chiffre recopie qui finirait par
-// mentir le jour ou la grille tarifaire bouge. Seuls l'increment par
-// page (le "+X € / 2 pages") et le prix PDF/la regle du pack, plus
-// stables, sont ecrits en clair ici (voir le commentaire a leur endroit).
+// Page Tarifs publique. TOUT vient EN DIRECT de GET /orders/formats (deja
+// la source utilisee par le choix de format a la creation d'un livre, voir
+// CreateBookSansIA.js) — jamais un chiffre recopie qui finirait par mentir
+// le jour ou la grille tarifaire (ou le pays de livraison) change.
+// L'increment par page et le prix du PDF etaient autrefois recopies ici en
+// dur (EUR uniquement) ; exposes par l'API depuis le chantier international
+// (2026-10-02) pour ne plus avoir cette duplication a resynchroniser a la
+// main — et pour qu'ils apparaissent dans la bonne devise.
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { listPrintFormats } from '../../services/ordersApi';
-import { formatPriceCents as formatEuros } from '../../utils/orderWorkflow';
+import { formatPriceCents } from '../../utils/orderWorkflow';
 import '../../styles/luxe-theme.css';
 import './TarifsLuxe.css';
-
-// Increment par tranche de 2 pages : backend/services/pricing/pricingConfig.js
-// (PRICING_CONFIG.<format>.pricePer2PagesCents) — pas expose par
-// GET /orders/formats aujourd'hui, donc repris ici. A resynchroniser si ce
-// fichier bouge (mis a jour pour la derniere fois le 2026-09-28).
-const INCREMENT_PAR_FORMAT = { livret: 190, standard: 220, luxe: 290 };
-const PDF_PRICE_CENTS = 799;
 
 export default function TarifsLuxe() {
   const { t, i18n } = useTranslation('legal');
   const priceLocale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
   const [formats, setFormats] = useState([]);
+  const [pdfPriceCents, setPdfPriceCents] = useState(0);
+  const [currency, setCurrency] = useState('EUR');
   const [chargement, setChargement] = useState(true);
 
   useEffect(() => {
     let annule = false;
-    listPrintFormats()
-      .then((data) => { if (!annule) setFormats(data?.formats || []); })
-      .catch(() => {})
-      .finally(() => { if (!annule) setChargement(false); });
-    return () => { annule = true; };
+    const charger = () => {
+      setChargement(true);
+      listPrintFormats()
+        .then((data) => {
+          if (annule) return;
+          setFormats(data?.formats || []);
+          setPdfPriceCents(data?.pdfPriceCents || 0);
+          setCurrency(data?.currency || 'EUR');
+        })
+        .catch(() => {})
+        .finally(() => { if (!annule) setChargement(false); });
+    };
+    charger();
+    // Le pays peut changer APRES le premier chargement (selecteur dans
+    // l'en-tete, voir CountrySwitcher.js) — on redemande alors les tarifs
+    // dans la nouvelle devise plutot que de laisser l'ancienne affichee.
+    const onCountryChange = () => charger();
+    window.addEventListener('celebrons:country-changed', onCountryChange);
+    return () => {
+      annule = true;
+      window.removeEventListener('celebrons:country-changed', onCountryChange);
+    };
   }, []);
+
+  const formatPrix = (cents) => formatPriceCents(cents, currency, priceLocale);
 
   return (
     <div className="tarifs-page">
@@ -56,14 +71,14 @@ export default function TarifsLuxe() {
                 {Math.round(format.widthMm / 10)} × {Math.round(format.heightMm / 10)} cm · {t('tarifs.coverLabel', { type: format.reliure === 'rigide' ? t('tarifs.rigid') : t('tarifs.flexible') })}
               </p>
               <p className="tarifs-prix">
-                {formatEuros(format.startingPriceCents, 'EUR', priceLocale)}
+                {formatPrix(format.startingPriceCents)}
                 <span className="tarifs-prix-note">{t('tarifs.startingFrom', { count: format.minPages })}</span>
               </p>
               <p className="tarifs-increment">
-                {t('tarifs.thenPer2Pages', { price: formatEuros(INCREMENT_PAR_FORMAT[format.formatId], 'EUR', priceLocale) })}
+                {t('tarifs.thenPer2Pages', { price: formatPrix(format.pricePer2PagesCents) })}
               </p>
               <p className="tarifs-livraison">
-                {t('tarifs.shipping', { price: formatEuros(format.shippingPriceCents, 'EUR', priceLocale) })}
+                {t('tarifs.shipping', { price: formatPrix(format.shippingPriceCents) })}
               </p>
             </div>
           ))}
@@ -72,7 +87,7 @@ export default function TarifsLuxe() {
         <div className="tarifs-autres">
           <div className="tarifs-autre-item">
             <h3>{t('tarifs.pdfOnly')}</h3>
-            <p className="tarifs-autre-prix">{formatEuros(PDF_PRICE_CENTS, 'EUR', priceLocale)}</p>
+            <p className="tarifs-autre-prix">{formatPrix(pdfPriceCents)}</p>
             <p>{t('tarifs.pdfOnlyDescription')}</p>
           </div>
           <div className="tarifs-autre-item">
