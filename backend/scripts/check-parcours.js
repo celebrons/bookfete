@@ -1,7 +1,7 @@
 // Le site repond-il, page par page, dans un vrai navigateur ?
 //
 //   node scripts/check-parcours.js
-//   node scripts/check-parcours.js --url https://bookfete-front.onrender.com
+//   node scripts/check-parcours.js --url http://localhost:3000
 //
 // Ecrit le 2026-09-19 apres « j'ai l'impression que rien ne marche » : des
 // boutons muets, des pages blanches, des « failed to fetch ». Impossible de

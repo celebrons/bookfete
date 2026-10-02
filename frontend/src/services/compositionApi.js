@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { fetchWithWakeRetry, getContextHeaders } from './httpClient';
+import { fetchWithRetry, getContextHeaders } from './httpClient';
 
 // Adresse de l API.
 //
@@ -71,7 +71,7 @@ const parseJsonSafe = async (response) => {
 // seconde tentative sur reveil d'instance : voir httpClient.js.
 const request = async (path, options = {}) => {
   const { headers } = await buildHeaders();
-  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}${path}`, {
+  const response = await fetchWithRetry(`${buildApiBaseUrl()}${path}`, {
     ...options,
     headers: { ...headers, ...(options.headers || {}) }
   });
@@ -111,7 +111,7 @@ const rawRequest = async (path, options = {}) => {
 // Requete publique (aucune session requise) : pour les pages accessibles
 // avant connexion, comme l'entree de creation depuis la page d'accueil.
 const publicRequest = async (path, options = {}) => {
-  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}${path}`, {
+  const response = await fetchWithRetry(`${buildApiBaseUrl()}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
   });

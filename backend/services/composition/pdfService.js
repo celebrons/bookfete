@@ -838,7 +838,9 @@ async function capturePagesAsImagesDirect({ book, pages, items, layouts, format,
         // Au plus deux encodages en vol : on attend celui d'il y a deux
         // pages avant d'en lancer un nouveau, pour que les buffers bruts
         // (3 a 7 Mo chacun) ne s'accumulent pas en memoire sur un livre de
-        // 30 pages — la marge est etroite sur l'instance Render (512 Mo).
+        // 30 pages — meme avec la limite 1,5 Go du service Scaleway
+        // (deploy/celebrons.service, MemoryMax), la marge reste serree une
+        // fois Chromium et le reste du processus Node comptes.
         if (encodeTasks.length >= 2) {
           await encodeTasks[encodeTasks.length - 2];
         }

@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { fetchWithWakeRetry } from './httpClient';
+import { fetchWithRetry } from './httpClient';
 
 const buildApiBaseUrl = () => {
   const configured = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -31,7 +31,7 @@ const parseJsonSafe = async (response) => {
 // Timeout + seconde tentative sur reveil d'instance : voir httpClient.js.
 const request = async (path, options = {}) => {
   const headers = await buildHeaders();
-  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}${path}`, {
+  const response = await fetchWithRetry(`${buildApiBaseUrl()}${path}`, {
     ...options,
     headers: {
       ...headers,
@@ -169,7 +169,7 @@ export const getApiBaseUrl = buildApiBaseUrl;
 // avant ce chantier).
 export const listPrintFormats = async (pageCount) => {
   const query = Number.isFinite(pageCount) && pageCount > 0 ? `?page_count=${pageCount}` : '';
-  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}/orders/formats${query}`);
+  const response = await fetchWithRetry(`${buildApiBaseUrl()}/orders/formats${query}`);
   if (!response.ok) throw new Error('Formats indisponibles');
   return response.json();
 };
@@ -178,7 +178,7 @@ export const listPrintFormats = async (pageCount) => {
 // `enabled` dit si une cle Resend est reellement posee cote serveur : il faut
 // pouvoir l'afficher SANS envoyer d'email pour le savoir.
 export const getEmailStatus = async () => {
-  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}/orders/email/status`, {
+  const response = await fetchWithRetry(`${buildApiBaseUrl()}/orders/email/status`, {
     headers: await buildHeaders()
   });
   if (!response.ok) throw new Error('Etat des emails indisponible');
@@ -189,7 +189,7 @@ export const getEmailStatus = async () => {
 // seule (le serveur n'accepte aucune adresse libre : ce serait un relais
 // ouvert). Declenche explicitement par l'utilisateur.
 export const sendTestEmail = async () => {
-  const response = await fetchWithWakeRetry(`${buildApiBaseUrl()}/orders/email/test`, {
+  const response = await fetchWithRetry(`${buildApiBaseUrl()}/orders/email/test`, {
     method: 'POST',
     headers: await buildHeaders()
   });

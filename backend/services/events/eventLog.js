@@ -18,13 +18,15 @@ const supabase = require('../../config/supabase');
 // D'ou vient l'evenement. Indispensable depuis qu'on fait tourner plusieurs
 // environnements sur la MEME base : le 2026-09-18, un serveur reste sur une
 // version perimee reecrivait le statut d'une commande, et rien a l'ecran ne
-// permettait de savoir lequel des trois avait ecrit.
+// permettait de savoir lequel des trois avait ecrit. Render decommissionne
+// le 2026-10-02 (voir deploy/README.md) : la branche 'render' est retiree,
+// sans effet sur les evenements deja ecrits avec cette etiquette (jamais
+// recalcule, juste plus jamais produit a l'avenir).
 function environnement() {
   const explicite = String(process.env.APP_ENV || '').trim();
   if (explicite) return explicite;
 
   const url = String(process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || '');
-  if (url.includes('onrender.com')) return 'render';
   if (url.includes('sslip.io')) return 'scaleway';
   if (url.includes('localhost')) return 'local';
   return 'inconnu';

@@ -1,6 +1,5 @@
 # Logs
 deploy.ps1
-git-render-deploy.ps1
 *.token.ps1
 
 .env
@@ -154,6 +153,5 @@ backend/tmp/
 # Site construit : produit par « npx craco build », jamais edite a la main.
 # Versionne jusqu au 2026-09-19, ou il a casse le deploiement Scaleway : le
 # serveur y recoit SON build (API relative), le depot en portait un autre, et
-# « git pull » refusait d ecraser les fichiers. Render, lui, reconstruit
-# depuis les sources — le dossier versionne ne servait donc a personne.
+# « git pull » refusait d ecraser les fichiers.
 frontend/build/

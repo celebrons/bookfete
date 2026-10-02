@@ -1,6 +1,5 @@
 {
   "name": "livre-souvenir-frontend",
-  "homepage": "https://votre-frontend.onrender.com",
   "version": "1.0.0",
   "private": true,
   "dependencies": {

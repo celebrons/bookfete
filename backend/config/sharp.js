@@ -3,14 +3,17 @@
 // Reglages memoire de sharp, partages par TOUS les usages (upload de photos,
 // rendu PDF, couverture Gelato). A importer a la place de `require('sharp')`.
 //
-// Pourquoi : l'instance d'hebergement (Render, offre gratuite) dispose de
-// 512 Mo. Or traiter une photo moderne est couteux en memoire — une image de
-// 24 Mpx decodee occupe ~70 Mo en bitmap, quel que soit le poids du fichier
-// JPEG d'origine. Depasser la limite ne produit pas une erreur applicative :
-// le processus est TUE, la requete en cours meurt sans reponse, et le
-// navigateur affiche "Failed to fetch" (constate le 2026-09-12 sur un envoi
-// de 40 photos, qui echouait a la 9e puis a la 33e — un rang variable, la
-// signature typique d'une saturation de ressources et non d'une limite fixe).
+// Pourquoi : traiter une photo moderne est couteux en memoire — une image
+// de 24 Mpx decodee occupe ~70 Mo en bitmap, quel que soit le poids du
+// fichier JPEG d'origine. Depasser la limite disponible ne produit pas une
+// erreur applicative : le processus est TUE, la requete en cours meurt sans
+// reponse, et le navigateur affiche "Failed to fetch" (constate le
+// 2026-09-12, a l'epoque sur l'instance Render — 512 Mo seulement — sur un
+// envoi de 40 photos, qui echouait a la 9e puis a la 33e — un rang variable,
+// la signature typique d'une saturation de ressources et non d'une limite
+// fixe). Le serveur de production (Scaleway, 1,5 Go — voir
+// deploy/celebrons.service) a bien plus de marge, mais ces reglages
+// memoire-conscients restent une securite peu couteuse.
 //
 // Deux reglages, tous deux orientes PIC MEMOIRE plutot que vitesse brute :
 //
