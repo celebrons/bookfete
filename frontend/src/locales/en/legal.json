@@ -162,7 +162,7 @@
           "Supabase — database hosting, authentication, photo storage",
           "Stripe — secure card payment processing",
           "Gelato — production and shipping of printed books (receives the shipping address and the book file)",
-          "Resend — sending transactional emails (order confirmation, PDF ready, production tracking)",
+          "Brevo — sending transactional emails (order confirmation, PDF ready, production tracking)",
           "Scaleway — application server hosting (France)"
         ]
       },

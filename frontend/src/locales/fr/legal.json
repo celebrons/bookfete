@@ -162,7 +162,7 @@
           "Supabase — hébergement de la base de données, authentification, stockage des photos",
           "Stripe — traitement sécurisé du paiement par carte bancaire",
           "Gelato — fabrication et expédition des livres imprimés (reçoit l'adresse de livraison et le fichier du livre)",
-          "Resend — envoi des emails transactionnels (confirmation de commande, PDF prêt, suivi de fabrication)",
+          "Brevo — envoi des emails transactionnels (confirmation de commande, PDF prêt, suivi de fabrication)",
           "Scaleway — hébergement du serveur applicatif (France)"
         ]
       },

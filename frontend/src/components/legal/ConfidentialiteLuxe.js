@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import LegalPageLuxe from './LegalPageLuxe';
 
 // Sous-traitants nommes explicitement (retour utilisateur, plan de mise en
-// production) : Supabase, Stripe, Gelato, le service d'e-mail (Resend), et
-// Scaleway. Duree de conservation encore ouverte ailleurs dans le plan
-// (point "conservation") : marquee A COMPLETER plutot que devinee.
+// production) : Supabase, Stripe, Gelato, le service d'e-mail (Brevo, corrige
+// le 2026-10-02 — le nom d'origine ici etait Resend, jamais reellement
+// branche, voir services/email/transactionalEmails.js), et Scaleway. Duree
+// de conservation encore ouverte ailleurs dans le plan (point
+// "conservation") : marquee A COMPLETER plutot que devinee.
 // Traduction : voir la note de CGVLuxe.js (chantier bilingue phase 5,
 // relecture humaine requise avant publication).
 export default function ConfidentialiteLuxe() {
