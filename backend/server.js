@@ -65,13 +65,16 @@ app.set(
 // La liste etait ecrite en dur sur les deux adresses Render : tout autre
 // hebergement etait refuse par le navigateur sans moyen de le configurer
 // (rencontre le 2026-09-18 en montant un second environnement). Elle se
-// regle desormais par ALLOWED_ORIGINS, une liste separee par des virgules.
+// regle desormais par ALLOWED_ORIGINS, une liste separee par des virgules —
+// deja posee sur le serveur Scaleway (seul environnement de production
+// depuis le 2026-10-02, Render decommissionne : PDF/print ne pouvaient de
+// toute facon jamais y fonctionner, 512 Mo contre ~600-800 Mo necessaires).
 //
-// Les deux adresses Render restent le defaut : sans variable, le
-// comportement en production ne change pas d'un iota.
+// Ce defaut ne sert donc plus qu'en l'absence totale de la variable
+// (jamais le cas sur le serveur reel) — mis a jour pour ne pas laisser une
+// adresse Render perimee comme repli silencieux.
 const ORIGINES_PAR_DEFAUT = [
-  'https://bookfete-front.onrender.com',
-  'https://bookfete.onrender.com'
+  'https://78.232.5.181.sslip.io'
 ];
 const originesAutorisees = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
@@ -96,12 +99,14 @@ if (typeof orderRoutes.handleStripeWebhook === 'function') {
 //
 // `contentSecurityPolicy: false` : la politique par defaut de helmet
 // bloquerait les polices Google que le rendu charge, et les images servies
-// depuis Supabase. Une politique adaptee est a ecrire le jour ou le site
-// sera servi par ce meme processus en production ; d'ici la, mieux vaut la
-// desactiver franchement que la laisser casser le rendu en silence.
+// depuis Supabase. Une politique adaptee reste a ecrire ; d'ici la, mieux
+// vaut la desactiver franchement que la laisser casser le rendu en silence
+// (toujours vrai meme maintenant que SERVE_FRONTEND=1 sert le site et l'API
+// par le meme processus, sur Scaleway).
 //
-// `crossOriginResourcePolicy: false` : le site et l'API sont sur deux
-// origines differentes sur Render.
+// `crossOriginResourcePolicy: false` : les photos (Supabase) et les polices
+// (Google Fonts) restent sur des origines externes meme quand le site et
+// l'API sont eux-memes servis ensemble.
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: false

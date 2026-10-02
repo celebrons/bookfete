@@ -1,11 +1,15 @@
 # Déployer Célébrons sur un serveur Scaleway
 
-Phase de test, décidée le 2026-09-18 : on installe une **copie** du backend sur
-Scaleway pour vérifier que la génération PDF y fonctionne — ce que Render ne
-permet pas (512 Mo disponibles pour ~600 Mo nécessaires).
+Installé en test le 2026-09-18 pour vérifier que la génération PDF y
+fonctionne — ce que Render ne permet pas (512 Mo disponibles pour
+~600-800 Mo nécessaires). **Depuis le 2026-10-02, ce serveur EST la
+production : Render a été décommissionné** (les deux services
+`*.onrender.com` restent à supprimer manuellement dans le tableau de bord
+Render — aucun accès API/CLI pour le faire depuis ce dépôt).
 
-**Rien n'est migré pendant cette phase.** Supabase reste la base et le stockage.
-Render reste l'environnement de secours. Le domaine ne bouge pas.
+Supabase reste la base et le stockage, inchangé. Pas de nom de domaine
+encore acheté : le site vit sur `https://78.232.5.181.sslip.io` (voir
+`Caddyfile`) jusqu'à l'achat de celebrons.fr/.com.
 
 ---
 
