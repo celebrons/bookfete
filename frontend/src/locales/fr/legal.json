@@ -215,6 +215,8 @@
     "title": "Exemples de livres",
     "text": "Nous préparons une sélection de vrais livres Bookipix à vous montrer très prochainement — anniversaires, mariages, départs, projets collectifs. En attendant, la meilleure façon de voir ce que donne votre livre est de commencer le vôtre : l'aperçu se met à jour en direct, à l'échelle réelle, pendant toute la composition.",
     "galleryIntro": "De vrais livres Bookipix, reçus par de vrais clients.",
+    "mockupIntro": "En attendant de vrais livres à vous montrer, voici ce que donnent nos trois styles — des maquettes illustratives, pas de vraies commandes.",
+    "mockupDisclaimer": "Maquette illustrative — pas une vraie commande",
     "cta": "Créer mon livre"
   }
 }

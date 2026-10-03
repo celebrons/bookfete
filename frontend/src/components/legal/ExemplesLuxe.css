@@ -5,6 +5,10 @@
 }
 
 .exemples-inner {
+  max-width: 960px;
+}
+
+.exemples-inner > .exemples-texte {
   max-width: 640px;
 }
 
@@ -52,4 +56,62 @@
   margin-top: var(--space-sm);
   font-size: 13.5px;
   color: var(--text-light);
+}
+
+/* Maquettes illustratives (voir MAQUETTES_ILLUSTRATIVES dans
+   ExemplesLuxe.js) : les memes 3 couleurs de style que
+   backend/services/composition/coverTheme.js (COVER_THEMES), pour que
+   cette demonstration corresponde a ce que l'atelier affiche reellement —
+   jamais une 4e palette inventee pour l'occasion. */
+.exemples-maquette {
+  margin: 0;
+}
+
+.exemples-maquette-spread {
+  display: flex;
+  gap: 6px;
+  height: 150px;
+  padding: 14px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(31, 28, 23, 0.12);
+}
+
+.exemples-maquette-bloc {
+  border-radius: 6px;
+  flex-basis: 0;
+}
+
+.theme-elegance .exemples-maquette-spread { background: #f4f0e6; }
+.theme-elegance .exemples-maquette-bloc { background: rgba(201, 163, 95, 0.4); }
+
+.theme-editorial .exemples-maquette-spread { background: #eceae4; }
+.theme-editorial .exemples-maquette-bloc { background: rgba(138, 122, 99, 0.4); }
+
+.theme-minimal .exemples-maquette-spread { background: #f2f2f2; }
+.theme-minimal .exemples-maquette-bloc { background: rgba(26, 26, 26, 0.18); }
+
+.exemples-maquette figcaption {
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.exemples-maquette-event {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.exemples-maquette-meta {
+  font-size: 12.5px;
+  color: var(--text-light);
+}
+
+.exemples-maquette-disclaimer {
+  margin-top: 2px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-light);
+  opacity: 0.75;
 }
