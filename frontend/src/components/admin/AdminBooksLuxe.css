@@ -22,6 +22,24 @@
 
 .admin-search { max-width: 420px; margin-bottom: var(--space-md); }
 
+/* Separe les grandes zones de la page (Livres / Exploitation) sans aller
+   jusqu'a des onglets — cette page reste une seule vue qui defile. */
+.admin-section-title {
+  margin: var(--space-lg, 32px) 0 var(--space-sm, 12px);
+  padding-top: var(--space-md, 20px);
+  border-top: 1px solid rgba(223, 216, 201, 0.9);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light, #7a7266);
+}
+
+.admin-shell > .admin-section-title:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
 .admin-state { color: var(--text-light); font-size: 14px; }
 .admin-error {
   padding: 10px 14px;

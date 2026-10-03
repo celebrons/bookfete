@@ -32,7 +32,9 @@ jest.mock('../config/supabase', () => {
     orders: [{ id: 'o1', book_id: 'b1', status: 'paid', type: 'print', total_cents: 7450 }],
     profiles: [{ id: 'user-1', email: 'client@test.local', full_name: 'Marie Test' }],
     layout_definitions: [],
-    book_templates: []
+    book_templates: [],
+    app_settings: [{ id: 'global', mode: 'test', updated_at: '2026-10-01T00:00:00Z', updated_by: null }],
+    app_events: []
   });
 
   mock.auth = {
@@ -233,5 +235,91 @@ describe('Espace admin — consultation d\'un livre', () => {
 
   it('404 sur un livre inexistant', async () => {
     expect((await preview('nexiste-pas')).status).toBe(404);
+  });
+});
+
+// Mode global test/production (2026-10-04) : voir services/settings/appMode.js.
+// Le point qui compte le plus ici n'est pas "ca bascule", c'est "ca REFUSE
+// de basculer en production sans les cles live" — une bascule a moitie
+// prete serait pire qu'aucune bascule.
+describe('Espace admin — mode test/production', () => {
+  let app;
+  const OLD_ENV = { ...process.env };
+
+  beforeAll(() => { app = buildApp(); });
+  beforeEach(() => {
+    process.env.ADMIN_EMAILS = ADMIN_EMAIL;
+    global.__adminSupabaseMock.__table('app_settings')[0].mode = 'test';
+    delete process.env.STRIPE_SECRET_KEY_LIVE;
+    delete process.env.STRIPE_WEBHOOK_SECRET_LIVE;
+    delete process.env.GELATO_API_KEY;
+  });
+  afterEach(() => { process.env = { ...OLD_ENV }; });
+
+  it('GET /mode refuse un non-administrateur', async () => {
+    const response = await request(app).get('/api/admin/mode').set('Authorization', 'Bearer user-token');
+    expect(response.status).toBe(404);
+  });
+
+  it('GET /mode annonce le mode courant et ce qui manque pour la production', async () => {
+    const response = await request(app).get('/api/admin/mode').set('Authorization', 'Bearer admin-token');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('test');
+    expect(response.body.missingForProduction).toEqual(expect.arrayContaining([
+      expect.stringContaining('Stripe'), expect.stringContaining('Gelato')
+    ]));
+  });
+
+  it('POST /mode refuse un non-administrateur, sans toucher au mode', async () => {
+    const response = await request(app)
+      .post('/api/admin/mode')
+      .set('Authorization', 'Bearer user-token')
+      .send({ mode: 'production' });
+    expect(response.status).toBe(404);
+    expect(global.__adminSupabaseMock.__table('app_settings')[0].mode).toBe('test');
+  });
+
+  it('POST /mode REFUSE de basculer en production sans les cles live configurees', async () => {
+    const response = await request(app)
+      .post('/api/admin/mode')
+      .set('Authorization', 'Bearer admin-token')
+      .send({ mode: 'production' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.missing).toEqual(expect.arrayContaining([expect.stringContaining('Stripe')]));
+    expect(global.__adminSupabaseMock.__table('app_settings')[0].mode).toBe('test');
+  });
+
+  it('POST /mode bascule en production quand tout est configure, et le repasse en test sans condition', async () => {
+    process.env.STRIPE_SECRET_KEY_LIVE = 'sk_live_abc';
+    process.env.STRIPE_WEBHOOK_SECRET_LIVE = 'whsec_abc';
+    process.env.GELATO_API_KEY = 'une-cle';
+
+    const activation = await request(app)
+      .post('/api/admin/mode')
+      .set('Authorization', 'Bearer admin-token')
+      .send({ mode: 'production' });
+
+    expect(activation.status).toBe(200);
+    expect(activation.body.mode).toBe('production');
+    expect(global.__adminSupabaseMock.__table('app_settings')[0].mode).toBe('production');
+    expect(global.__adminSupabaseMock.__table('app_settings')[0].updated_by).toBe(ADMIN_EMAIL);
+
+    const retour = await request(app)
+      .post('/api/admin/mode')
+      .set('Authorization', 'Bearer admin-token')
+      .send({ mode: 'test' });
+
+    expect(retour.status).toBe(200);
+    expect(retour.body.mode).toBe('test');
+    expect(global.__adminSupabaseMock.__table('app_settings')[0].mode).toBe('test');
+  });
+
+  it('POST /mode refuse une valeur de mode invalide', async () => {
+    const response = await request(app)
+      .post('/api/admin/mode')
+      .set('Authorization', 'Bearer admin-token')
+      .send({ mode: 'yolo' });
+    expect(response.status).toBe(400);
   });
 });

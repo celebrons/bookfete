@@ -1,8 +1,8 @@
 // Tests de gelatoOrderService.js — le point d'entree d'une VRAIE commande
-// payee vers Gelato (argent + production reelle en jeu si GELATO_LIVE_ORDERS
-// est active). Tout ce qui parle reseau (Gelato, Supabase Storage) est
-// mocke ; seule la logique d'orchestration/idempotence/mode brouillon-vs-reel
-// est testee ici.
+// payee vers Gelato (argent + production reelle en jeu si le mode global
+// est 'production', voir services/settings/appMode.js). Tout ce qui parle
+// reseau (Gelato, Supabase Storage) est mocke ; seule la logique
+// d'orchestration/idempotence/mode brouillon-vs-reel est testee ici.
 
 jest.mock('../../services/composition/bookContentService', () => ({
   listPagesForRender: jest.fn(async () => ([{ page_index: 0, layout_id: null, content: { kind: 'photo', blocks: [] } }])),
@@ -29,10 +29,14 @@ jest.mock('../../services/printing/gelatoClient', () => ({
   buildOrderPayload: jest.requireActual('../../services/printing/gelatoClient').buildOrderPayload,
   createOrder: jest.fn(async () => ({ id: 'gelato-order-fake-1' }))
 }));
+jest.mock('../../services/settings/appMode', () => ({
+  getAppModeSync: jest.fn(() => 'test')
+}));
 
 const bookContentService = require('../../services/composition/bookContentService');
 const gelatoClient = require('../../services/printing/gelatoClient');
 const { uploadPrintFile } = require('../../services/printing/printFileStorage');
+const { getAppModeSync } = require('../../services/settings/appMode');
 const { submitPrintOrderToGelato, mapShippingAddress } = require('../../services/printing/gelatoOrderService');
 
 function makeDb(updateSpy) {
@@ -73,12 +77,9 @@ const baseOrder = {
 };
 
 describe('gelatoOrderService', () => {
-  const originalEnv = process.env.GELATO_LIVE_ORDERS;
-
   afterEach(() => {
     jest.clearAllMocks();
-    if (originalEnv === undefined) delete process.env.GELATO_LIVE_ORDERS;
-    else process.env.GELATO_LIVE_ORDERS = originalEnv;
+    getAppModeSync.mockReturnValue('test');
   });
 
   it('ignore une commande deja soumise (idempotence) — ne genere rien, ne rappelle pas Gelato', async () => {
@@ -93,8 +94,7 @@ describe('gelatoOrderService', () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  it('soumet en orderType "draft" par defaut (GELATO_LIVE_ORDERS absent)', async () => {
-    delete process.env.GELATO_LIVE_ORDERS;
+  it('soumet en orderType "draft" par defaut (mode test)', async () => {
     const updateSpy = jest.fn();
 
     const result = await submitPrintOrderToGelato({ db: makeDb(updateSpy), book, order: baseOrder });
@@ -115,7 +115,6 @@ describe('gelatoOrderService', () => {
   // Avant, seules les metadonnees changeaient : la commande restait
   // affichee « Payee » alors que le livre etait deja chez l'imprimeur.
   it('passe la commande a « Envoye imprimeur » quand l\'envoi reussit', async () => {
-    delete process.env.GELATO_LIVE_ORDERS;
     const updateSpy = jest.fn();
 
     await submitPrintOrderToGelato({
@@ -128,7 +127,6 @@ describe('gelatoOrderService', () => {
   });
 
   it('ne fait jamais RECULER une commande deja plus avancee', async () => {
-    delete process.env.GELATO_LIVE_ORDERS;
     const updateSpy = jest.fn();
 
     await submitPrintOrderToGelato({
@@ -142,8 +140,8 @@ describe('gelatoOrderService', () => {
     expect(updateSpy.mock.calls[0][0].metadata.gelatoOrderId).toBe('gelato-order-fake-1');
   });
 
-  it('soumet en orderType "order" reel uniquement si GELATO_LIVE_ORDERS=1', async () => {
-    process.env.GELATO_LIVE_ORDERS = '1';
+  it('soumet en orderType "order" reel uniquement si le mode global est "production"', async () => {
+    getAppModeSync.mockReturnValue('production');
     const updateSpy = jest.fn();
 
     const result = await submitPrintOrderToGelato({ db: makeDb(updateSpy), book, order: baseOrder });
@@ -153,8 +151,8 @@ describe('gelatoOrderService', () => {
     expect(payloadSent.orderType).toBe('order');
   });
 
-  it('une valeur autre que "1" (ex. "true", "yes") reste en brouillon — jamais d activation implicite', async () => {
-    process.env.GELATO_LIVE_ORDERS = 'true';
+  it('une valeur de mode inattendue (ni "test" ni "production") reste en brouillon — jamais d activation implicite', async () => {
+    getAppModeSync.mockReturnValue('autre-chose');
     const updateSpy = jest.fn();
 
     const result = await submitPrintOrderToGelato({ db: makeDb(updateSpy), book, order: baseOrder });
@@ -191,9 +189,8 @@ describe('gelatoOrderService', () => {
   // ce correctif, le bloc catch n'enregistrait que gelatoError — perdant la
   // trace du gelatoOrderId — si bien qu'une nouvelle tentative repartait de
   // zero et en creait une SECONDE chez Gelato (un vrai doublon facture des
-  // que GELATO_LIVE_ORDERS=1).
+  // que le mode global est 'production').
   it('createOrder reussit mais l ecriture Supabase echoue juste apres : le gelatoOrderId est quand meme retenu, un retry ne cree pas de doublon', async () => {
-    delete process.env.GELATO_LIVE_ORDERS;
     const updateSpy = jest.fn();
     let appelNumero = 0;
     const db = {

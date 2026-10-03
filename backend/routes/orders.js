@@ -6,6 +6,7 @@ const authenticate = require('../middleware/auth');
 const { t } = require('../services/i18n/t');
 const { resolveLanguage } = require('../services/i18n/resolveLanguage');
 const { submitPrintOrderToGelato, isGelatoLiveOrdersEnabled } = require('../services/printing/gelatoOrderService');
+const { getAppModeSync } = require('../services/settings/appMode');
 const gelatoClient = require('../services/printing/gelatoClient');
 const { removePrintFilesForOrder } = require('../services/printing/printFileStorage');
 const { logEvent } = require('../services/events/eventLog');
@@ -126,29 +127,32 @@ const BOOK_LIFECYCLE_ORDER = [
 
 const getNowIso = () => new Date().toISOString();
 const FRONTEND_BASE_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
 const STRIPE_ENABLED = process.env.STRIPE_ENABLED === '1';
 const STRIPE_CHECKOUT_SUCCESS_URL = process.env.STRIPE_CHECKOUT_SUCCESS_URL || '';
 const STRIPE_CHECKOUT_CANCEL_URL = process.env.STRIPE_CHECKOUT_CANCEL_URL || '';
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
 const STRIPE_WEBHOOK_ALLOW_UNSIGNED = process.env.STRIPE_WEBHOOK_ALLOW_UNSIGNED === '1';
 const MAX_STRIPE_EVENT_IDS = 25;
-const stripeClient = (STRIPE_ENABLED && Stripe && STRIPE_SECRET_KEY)
-  ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
-  : null;
 
-// Stripe indique lui-meme son mode dans le prefixe de la cle secrete
-// (`sk_test_...` bac a sable, `sk_live_...` vrais paiements) — c'est la
-// source la plus fiable disponible ici, et elle ne demande aucune variable
-// d'environnement supplementaire a tenir a jour. Utilise par DELETE
-// /:orderId pour laisser effacer librement une commande de test tout en
-// protegeant une commande reellement payee.
-//
-// Par prudence, une cle absente ou de forme inconnue est traitee comme du
-// LIVE : en cas de doute, on protege la commande plutot que de la laisser
-// supprimer. Relu a CHAQUE appel (et non fige au chargement du module) pour
-// que basculer la cle prenne effet sans redemarrage, et pour rester testable.
-const isStripeLiveMode = () => !/^sk_test_/.test(process.env.STRIPE_SECRET_KEY || '');
+// Mode test/production : piloté par le bouton de l'espace admin (voir
+// services/settings/appMode.js), plus par le prefixe de cle historique —
+// c'est LUI qui decide maintenant QUELLE cle Stripe utiliser, remplacant le
+// reniflage du prefixe sk_test_/sk_live_ qui faisait foi avant le
+// 2026-10-04. STRIPE_SECRET_KEY (sans suffixe) reste un repli : le serveur
+// continue de fonctionner tel quel tant que STRIPE_SECRET_KEY_TEST/_LIVE ne
+// sont pas poses.
+const stripeSecretKeyFor = (mode) => (mode === 'production'
+  ? (process.env.STRIPE_SECRET_KEY_LIVE || process.env.STRIPE_SECRET_KEY || '')
+  : (process.env.STRIPE_SECRET_KEY_TEST || process.env.STRIPE_SECRET_KEY || ''));
+
+const stripeWebhookSecretFor = (mode) => (mode === 'production'
+  ? (process.env.STRIPE_WEBHOOK_SECRET_LIVE || '')
+  : (process.env.STRIPE_WEBHOOK_SECRET_TEST || process.env.STRIPE_WEBHOOK_SECRET || ''));
+
+// Utilise par DELETE /:orderId pour laisser effacer librement une commande
+// de test tout en protegeant une commande reellement payee. Lu depuis le
+// cache en memoire du mode (synchrone, a jour a quelques secondes pres —
+// voir appMode.js), jamais fige au chargement du module.
+const isStripeLiveMode = () => getAppModeSync() === 'production';
 
 const extractBearerToken = (req) => {
   const authHeader = req.headers?.authorization || '';
@@ -180,6 +184,10 @@ const createUserScopedClient = (req) => {
   );
 };
 
+// Construit un client A LA DEMANDE plutot qu'une seule fois au demarrage
+// (ancien comportement) : la cle utilisee doit pouvoir changer quand le
+// mode test/production bascule, sans attendre un redemarrage du serveur.
+// Stripe() est bon marche a construire — pas besoin de mettre en cache.
 const ensureStripeClient = () => {
   if (!STRIPE_ENABLED) {
     const error = new Error('Stripe est desactive');
@@ -191,12 +199,13 @@ const ensureStripeClient = () => {
     error.status = 500;
     throw error;
   }
-  if (!stripeClient) {
+  const cle = stripeSecretKeyFor(getAppModeSync());
+  if (!cle) {
     const error = new Error('Configuration Stripe incomplete');
     error.status = 500;
     throw error;
   }
-  return stripeClient;
+  return new Stripe(cle, { apiVersion: '2024-06-20' });
 };
 
 const fillCheckoutUrlTemplate = (template, context) => {
@@ -1347,8 +1356,9 @@ const parseUnsignedWebhookEvent = (rawBody) => {
 const buildStripeWebhookEvent = (req) => {
   const stripe = ensureStripeClient();
   const signature = req.headers?.['stripe-signature'];
+  const secretWebhook = stripeWebhookSecretFor(getAppModeSync());
 
-  if (STRIPE_WEBHOOK_SECRET) {
+  if (secretWebhook) {
     if (!signature) {
       const error = new Error('Signature Stripe manquante');
       error.status = 400;
@@ -1360,7 +1370,7 @@ const buildStripeWebhookEvent = (req) => {
       throw error;
     }
     try {
-      return stripe.webhooks.constructEvent(req.body, signature, STRIPE_WEBHOOK_SECRET);
+      return stripe.webhooks.constructEvent(req.body, signature, secretWebhook);
     } catch (erreurDeSignature) {
       // 400 et non 500. Stripe REESSAIE un evenement pendant trois jours
       // tant qu il recoit une erreur serveur, et affiche « votre serveur a
@@ -1374,7 +1384,7 @@ const buildStripeWebhookEvent = (req) => {
   }
 
   if (!STRIPE_WEBHOOK_ALLOW_UNSIGNED) {
-    const error = new Error('Configuration webhook Stripe incomplete (STRIPE_WEBHOOK_SECRET)');
+    const error = new Error('Configuration webhook Stripe incomplete (STRIPE_WEBHOOK_SECRET_TEST/_LIVE)');
     error.status = 400;
     throw error;
   }

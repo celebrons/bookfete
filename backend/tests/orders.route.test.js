@@ -107,6 +107,15 @@ jest.mock('@supabase/supabase-js', () => ({
   createClient: () => global.__ordersSupabaseMock
 }));
 
+// Mode global test/production (2026-10-04) : remplace le reniflage de
+// STRIPE_SECRET_KEY/la variable GELATO_LIVE_ORDERS comme source de verite
+// (voir services/settings/appMode.js) — par defaut 'test' ici, les tests qui
+// ont besoin de simuler la production appellent getAppModeSync.mockReturnValue.
+jest.mock('../services/settings/appMode', () => ({
+  getAppModeSync: jest.fn(() => 'test')
+}));
+const { getAppModeSync } = require('../services/settings/appMode');
+
 const express = require('express');
 const request = require('supertest');
 
@@ -564,7 +573,16 @@ describe('POST /:orderId/gelato-test — renvoi apres changement de format', () 
 // Suppression d'une commande pour recommencer un test. Les cas interessants
 // ne sont pas les suppressions qui marchent, mais les DEUX refus : une
 // commande partie en production chez l'imprimeur, et une commande payee avec
-// Stripe en mode live. Ces deux-la representent un engagement reel.
+// le mode global sur 'production'. Ces deux-la representent un engagement reel.
+//
+// 2026-10-04 : isStripeLiveMode() ne devine plus a partir du prefixe de
+// STRIPE_SECRET_KEY, elle lit le mode global (voir
+// services/settings/appMode.js). Un ancien test verifiait qu'une cle Stripe
+// absente/invalide protegeait la commande "en cas de doute" — ce doute n'a
+// plus de raison d'etre : le mode par defaut est TOUJOURS 'test' (plus de
+// cle a mal configurer), et passer en 'production' exige desormais une
+// action explicite et verifiee (voir setAppMode/missingLiveRequirements),
+// pas un reglage qu'on peut laisser dans un etat ambigu.
 describe('DELETE /api/orders/:orderId', () => {
   let app;
   const OLD_ENV = { ...process.env };
@@ -621,6 +639,7 @@ describe('DELETE /api/orders/:orderId', () => {
     gelatoClient.deleteOrder.mockReset();
     gelatoClient.deleteOrder.mockResolvedValue({});
     process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+    getAppModeSync.mockReturnValue('test');
 
     const rows = global.__ordersSupabaseMock.__table('orders');
     const fixtures = FIXTURES();
@@ -707,19 +726,8 @@ describe('DELETE /api/orders/:orderId', () => {
     expect(idsInStore()).not.toContain('order-payee-test');
   });
 
-  it('REFUSE une commande payee quand Stripe est en mode LIVE (vrai argent)', async () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_live_reelle';
-
-    const response = await request(app)
-      .delete('/api/orders/order-payee-test')
-      .set('Authorization', 'Bearer valid-token');
-
-    expect(response.status).toBe(409);
-    expect(idsInStore()).toContain('order-payee-test');
-  });
-
-  it('sans cle Stripe configuree, une commande payee est protegee (en cas de doute, on protege)', async () => {
-    delete process.env.STRIPE_SECRET_KEY;
+  it('REFUSE une commande payee quand le mode global est PRODUCTION (vrai argent)', async () => {
+    getAppModeSync.mockReturnValue('production');
 
     const response = await request(app)
       .delete('/api/orders/order-payee-test')

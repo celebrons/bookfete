@@ -1,0 +1,107 @@
+/* Mode global test/production : le controle le plus consequent de l'espace
+   admin, place en tete et traite comme tel — une bordure franche, pas une
+   simple carte parmi d'autres. */
+
+.admin-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm, 12px) var(--space-lg, 24px);
+  padding: 16px 20px;
+  margin-bottom: var(--space-lg, 32px);
+  border-radius: 12px;
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  background: #fffdf8;
+}
+
+.admin-mode.is-production {
+  border-color: rgba(179, 38, 30, 0.5);
+  background: rgba(179, 38, 30, 0.04);
+}
+
+.admin-mode-etat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 320px;
+}
+
+.admin-mode-badge {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: #3a5a78;
+}
+
+.admin-mode.is-production .admin-mode-badge {
+  background: #b3261e;
+}
+
+.admin-mode-description {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft, #7a7266);
+  max-width: 62ch;
+}
+
+.admin-mode-manquant {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12.5px;
+  color: #8a5a1f;
+}
+
+.admin-mode-bouton {
+  flex: none;
+}
+
+/* Boite de confirmation : volontairement un vrai texte a taper pour activer
+   la production (pas une simple case), rien pour repasser en test. */
+.admin-mode-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(36, 31, 24, 0.45);
+}
+
+.admin-mode-modal {
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(36, 31, 24, 0.25);
+}
+
+.admin-mode-modal h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.admin-mode-modal p {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  color: var(--ink-soft, #7a7266);
+  line-height: 1.5;
+}
+
+.admin-mode-modal-consigne strong {
+  color: var(--ink, #241f18);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.admin-mode-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}

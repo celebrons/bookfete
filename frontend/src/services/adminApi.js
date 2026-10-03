@@ -81,15 +81,17 @@ export const checkIsAdmin = async () => {
 // POST, et la confirmation cote ecran.
 export const listJobs = () => request('/jobs');
 
-const action = async (chemin) => {
+const action = async (chemin, corps) => {
   const response = await fetch(`${getApiBaseUrl()}/admin${chemin}`, {
     method: 'POST',
-    headers: await authHeaders()
+    headers: await authHeaders(),
+    ...(corps ? { body: JSON.stringify(corps) } : {})
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(payload?.error || payload?.raison || 'Action refusée.');
     error.status = response.status;
+    error.missing = payload?.missing;
     throw error;
   }
   return payload;
@@ -136,3 +138,11 @@ export const listEvents = ({ orderId, bookId, level, limit } = {}) => {
 // derniere sauvegarde. Ce qui se lit depuis Node, donc disponible sur les
 // trois environnements.
 export const fetchServerHealth = () => request('/health');
+
+// Mode global test/production (2026-10-04, voir backend/services/settings/
+// appMode.js) : un seul etat pour Stripe (vrais paiements) ET Gelato
+// (vraies commandes facturees/imprimees). `missingForProduction` liste ce
+// qu'il reste a configurer avant de pouvoir basculer — jamais devine cote
+// ecran.
+export const fetchAppMode = () => request('/mode');
+export const setAppModeRemote = (mode) => action('/mode', { mode });

@@ -5,6 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { logEvent } = require('./services/events/eventLog');
+const { initAppMode } = require('./services/settings/appMode');
 require('dotenv').config();
 
 const quietStartup = process.env.QUIET_STARTUP !== '0';
@@ -333,8 +334,15 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: err.message });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`API started on http://localhost:${PORT}`);
+// Le mode (test/production, voir services/settings/appMode.js) doit etre lu
+// AVANT d'accepter des requetes : sans ca, les toutes premieres commandes
+// apres un redemarrage verraient le repli 'test' par defaut pendant
+// quelques secondes, meme si la base dit deja 'production'.
+let server;
+initAppMode().finally(() => {
+  server = app.listen(PORT, () => {
+    console.log(`API started on http://localhost:${PORT}`);
+  });
 });
 
 // ARRET PROPRE : NE PAS TUER UN TRAVAIL EN COURS.
@@ -378,7 +386,9 @@ const arreterProprement = async (signal) => {
   console.log(`${signal} recu. Travaux en cours : ${restants}.`);
 
   // Plus de nouvelles connexions, mais celles en cours vont au bout.
-  server.close(() => {});
+  // `?.` : un SIGTERM dans l'instant (improbable) avant la toute fin de
+  // initAppMode() trouverait `server` pas encore assigne.
+  server?.close(() => {});
 
   const echeance = Date.now() + DELAI_ARRET_MS;
   while (Date.now() < echeance && travauxEnCours() > 0) {

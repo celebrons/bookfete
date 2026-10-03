@@ -2,18 +2,21 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { checkIsAdmin, fetchBookPreviewHtml, listAllBooks, poserCodeAdmin } from '../../services/adminApi';
 import '../../styles/luxe-theme.css';
+import AdminModeToggle from './AdminModeToggle';
 import AdminHealth from './AdminHealth';
 import AdminEvents from './AdminEvents';
 import AdminJobs from './AdminJobs';
 import './AdminBooksLuxe.css';
 
-// Espace d'administration : tous les livres, leur statut, qui les a faits, et
-// de quoi les consulter.
+// Espace d'administration : le mode global (test/production), tous les
+// livres avec leur statut et qui les a faits, l'etat du serveur, les
+// travaux en cours et le journal d'evenements.
 //
-// LECTURE SEULE, volontairement (voir backend/routes/admin.js) : on peut tout
-// voir, rien modifier. Agir sur le livre de quelqu'un d'autre demande une
-// reflexion a part (traçabilite, confirmation, recours) qu'on ne bacle pas en
-// meme temps que l'affichage.
+// Essentiellement en lecture seule (voir backend/routes/admin.js) : la seule
+// vraie action est la bascule de mode ci-dessous (et les quelques controles
+// de AdminJobs : arreter/relancer un travail). Agir sur le LIVRE de
+// quelqu'un d'autre demande une reflexion a part (traçabilite, confirmation,
+// recours) qu'on ne bacle pas en meme temps que l'affichage.
 //
 // Le filtrage de recherche se fait cote serveur (l'ecran doit rester
 // utilisable a des milliers de livres), avec un anti-rebond pour ne pas
@@ -187,6 +190,9 @@ export default function AdminBooksLuxe() {
         <Link className="btn btn-outline" to="/dashboard">Retour au tableau de bord</Link>
       </header>
 
+      <AdminModeToggle />
+
+      <h2 className="admin-section-title">Livres</h2>
       <input
         type="search"
         className="input-luxe admin-search"
@@ -283,6 +289,7 @@ export default function AdminBooksLuxe() {
         </div>
       )}
 
+      <h2 className="admin-section-title">Exploitation</h2>
       {/* Ce que fait la machine en ce moment. */}
       <AdminHealth />
       <AdminJobs />

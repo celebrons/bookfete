@@ -5,17 +5,19 @@
 // a 0 erreur le 2026-09-10 sur les 3 formats via l'outil officiel Gelato),
 // l'heberge (print-files), et cree la commande Gelato correspondante.
 //
-// SECURITE — GELATO_LIVE_ORDERS (meme convention que STRIPE_ENABLED,
-// routes/orders.js) : tant que cette variable d'environnement n'est pas
-// exactement '1', chaque soumission reste un brouillon Gelato
-// (orderType:'draft', jamais facture/imprime/expedie reellement) — choix
-// explicite de l'utilisateur (2026-09-10, AskUserQuestion) pour valider le
-// pipeline sur de vraies commandes payees SANS risque de production
-// accidentelle. Passer a '1' declenche une vraie production/facturation
-// automatique pour CHAQUE commande Impression/Pack payee a partir de ce
-// moment — decision business, jamais a activer sans confirmation explicite
-// et recente de l'utilisateur pour ce changement precis (meme principe que
-// gelatoClient.js pour un appel isole).
+// SECURITE — pilote par le mode global test/production (voir
+// services/settings/appMode.js, bouton de l'espace admin depuis le
+// 2026-10-04) : tant que ce mode n'est pas 'production', chaque soumission
+// reste un brouillon Gelato (orderType:'draft', jamais facture/imprime/
+// expedie reellement) — choix explicite de l'utilisateur (2026-09-10,
+// AskUserQuestion) pour valider le pipeline sur de vraies commandes payees
+// SANS risque de production accidentelle. Passer en 'production' declenche
+// une vraie production/facturation automatique pour CHAQUE commande
+// Impression/Pack payee a partir de ce moment — decision business, jamais a
+// activer sans confirmation explicite et recente de l'utilisateur pour ce
+// changement precis (meme principe que gelatoClient.js pour un appel
+// isole). Avant le 2026-10-04 cette meme decision vivait dans la variable
+// d'environnement GELATO_LIVE_ORDERS, reglable seulement par SSH+redemarrage.
 //
 // Idempotence : si order.metadata.gelatoOrderId existe deja, ne resoumet
 // rien (retourne l'etat existant) — appele depuis 2 points d'entree
@@ -30,6 +32,7 @@ const { resolveFormatDensity } = require('../composition/formatDensity');
 const { resolveGelatoProduct, resolveGelatoPageCount } = require('./gelatoCatalog');
 const { buildGelatoPrintReadyPdf } = require('./gelatoPrintFile');
 const { uploadPrintFile } = require('./printFileStorage');
+const { getAppModeSync } = require('../settings/appMode');
 const { resolveCountryIso2 } = require('./countryCodes');
 const gelatoClient = require('./gelatoClient');
 
@@ -79,7 +82,7 @@ function mapShippingAddress(address, ownerEmail) {
 }
 
 function isGelatoLiveOrdersEnabled() {
-  return process.env.GELATO_LIVE_ORDERS === '1';
+  return getAppModeSync() === 'production';
 }
 
 /**

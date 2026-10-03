@@ -1,13 +1,16 @@
 // backend/routes/admin.js
 //
 // Espace d'administration (2026-09-12) : voir tous les livres, leur statut,
-// qui les a faits, et les consulter.
+// qui les a faits, et les consulter ; suivre les travaux en cours (PDF,
+// Gelato) et l'etat du serveur ; et depuis le 2026-10-04, basculer le mode
+// global test/production (voir services/settings/appMode.js).
 //
-// LECTURE SEULE, volontairement, pour cette premiere version. Un
-// administrateur peut tout VOIR, rien modifier ni supprimer : les gestes
-// destructifs sur le livre de quelqu'un d'autre demandent une reflexion
-// separee (traçabilité, confirmation, recours) qu'on ne bâcle pas en même
-// temps que l'affichage.
+// Lire un LIVRE reste strictement en lecture seule : agir sur le livre de
+// quelqu'un d'autre demanderait une reflexion separee (traçabilité,
+// confirmation, recours) qu'on ne bâcle pas en même temps que l'affichage.
+// Les mutations qui existent (arreter/relancer un travail, nettoyer la
+// liste, basculer le mode) portent toutes sur l'EXPLOITATION du service,
+// jamais sur les donnees d'un utilisateur — et sont toutes journalisees.
 //
 // Toutes les routes passent par `authenticate` PUIS `requireAdmin` — voir
 // middleware/requireAdmin.js pour la designation des administrateurs.
@@ -25,6 +28,7 @@ const pageRenderer = require('../services/composition/pageRenderer');
 const coverComposer = require('../services/composition/coverComposer');
 const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../services/composition/coverFormat');
 const { resolveFormatDensity } = require('../services/composition/formatDensity');
+const { getAppMode, setAppMode, missingLiveRequirements } = require('../services/settings/appMode');
 
 // Statut de fabrication du livre. Repris a l'identique de routes/orders.js
 // (getBookLifecycleStatusFromBook) : le meme livre doit afficher le meme
@@ -407,6 +411,36 @@ router.get('/books/:bookId/preview.html', authenticate, requireAdmin, async (req
     res.send(html);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/admin/mode
+// Mode global actuel (test/production, voir services/settings/appMode.js) et
+// ce qui manque, le cas echeant, pour pouvoir basculer en production reelle
+// — jamais devine par l'interface, toujours annonce explicitement.
+router.get('/mode', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const mode = await getAppMode();
+    res.json({ mode, missingForProduction: missingLiveRequirements() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/admin/mode
+// Bascule EN UN SEUL GESTE Stripe (vrais paiements) ET Gelato (vraies
+// commandes facturees/imprimees) — demande du 2026-10-04, remplace les deux
+// reglages disperses (prefixe de cle Stripe, GELATO_LIVE_ORDERS) qui
+// demandaient chacun un acces SSH + redemarrage. Refuse net si les cles live
+// ne sont pas configurees (voir missingLiveRequirements) : jamais de
+// production "a moitie prete". Toujours journalise (voir setAppMode).
+router.post('/mode', authenticate, requireAdmin, async (req, res) => {
+  const mode = String(req.body?.mode || '').trim();
+  try {
+    const applique = await setAppMode(mode, req.user?.email);
+    res.json({ mode: applique });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message, missing: error.missing });
   }
 });
 
