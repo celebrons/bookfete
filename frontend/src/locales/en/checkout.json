@@ -27,6 +27,7 @@
     "steps": {
       "product": "Product",
       "delivery": "Delivery",
+      "billing": "Billing",
       "payment": "Payment",
       "tracking": "Tracking"
     },
@@ -164,7 +165,9 @@
     "incompleteWarning": "Name, address, postal code, city and country are required for shipping.",
     "billingSameLabel": "Billing address same as shipping address",
     "billingTitle": "Billing address",
-    "billingIncompleteWarning": "Name, address, postal code, city and country are required for billing."
+    "billingIncompleteWarning": "Name, address, postal code, city and country are required for billing.",
+    "billingOnlyTitle": "Billing",
+    "billingOnlyNote": "A PDF-only book has nothing to ship, but this information will appear on your invoice."
   },
   "stepPayment": {
     "title": "Summary and payment",

@@ -2124,6 +2124,16 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: t(req, 'Adresse de livraison incomplete', 'Incomplete shipping address') });
     }
 
+    // PDF seul : rien a livrer, mais une facture doit quand meme identifier
+    // son destinataire (retour utilisateur, 2026-10-04) — sans ca, le nom du
+    // client sur la facture retombait sur l'email du compte, voire sur
+    // "Client" (voir invoiceService.resolveBuyer). Meme exigence qu'une
+    // adresse de livraison, portee ici par `billingAddress` puisqu'il n'y a
+    // pas d'adresse de livraison a comparer.
+    if (type === 'pdf' && !isAddressValid(billingAddress)) {
+      return res.status(400).json({ error: t(req, 'Informations de facturation incompletes', 'Incomplete billing information') });
+    }
+
     const { data: book, error: bookError } = await db
       .from('books')
       .select('*')
@@ -2227,7 +2237,11 @@ router.post('/', authenticate, async (req, res) => {
       metadata: {
         notes,
         pricing: pricing.breakdown,
-        ...(type === 'pdf' ? {} : { billingAddress, billingSameAsShipping }),
+        // Pour 'pdf', billingSameAsShipping est toujours false (pas
+        // d'adresse de livraison a etre "la meme que") : resolveBuyer lit
+        // alors billingAddress directement, voir invoiceService.js.
+        billingAddress,
+        billingSameAsShipping,
         // Preuve d'acceptation des CGV : deja verifiee obligatoire plus
         // haut (400 sinon), donc toujours vraie ici — horodatee au moment
         // de la creation de la commande, qui est aussi le moment le plus

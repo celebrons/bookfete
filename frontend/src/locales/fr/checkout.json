@@ -27,6 +27,7 @@
     "steps": {
       "product": "Produit",
       "delivery": "Livraison",
+      "billing": "Facturation",
       "payment": "Paiement",
       "tracking": "Suivi"
     },
@@ -164,7 +165,9 @@
     "incompleteWarning": "Nom, adresse, code postal, ville et pays sont nécessaires pour l'expédition.",
     "billingSameLabel": "Adresse de facturation identique à l'adresse de livraison",
     "billingTitle": "Adresse de facturation",
-    "billingIncompleteWarning": "Nom, adresse, code postal, ville et pays sont nécessaires pour la facturation."
+    "billingIncompleteWarning": "Nom, adresse, code postal, ville et pays sont nécessaires pour la facturation.",
+    "billingOnlyTitle": "Facturation",
+    "billingOnlyNote": "Un livre au format PDF n'a rien à expédier, mais ces informations apparaîtront sur votre facture."
   },
   "stepPayment": {
     "title": "Récapitulatif et paiement",

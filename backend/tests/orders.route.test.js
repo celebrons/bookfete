@@ -792,15 +792,34 @@ describe('POST /api/orders — adresse de facturation', () => {
     expect(response.body.shipping_address).toEqual(expect.objectContaining({ fullName: 'Jean Client', city: 'Paris' }));
   });
 
-  it('commande PDF seule : aucune adresse de facturation enregistree (rien a facturer physiquement)', async () => {
+  it('commande PDF seule : refusee sans identite de facturation (rien a livrer, mais une facture a emettre)', async () => {
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', 'Bearer valid-token')
       .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true });
 
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/facturation/i);
+  });
+
+  it('commande PDF seule : l\'identite de facturation envoyee est enregistree (pas d\'adresse de livraison)', async () => {
+    const identiteFacturation = {
+      fullName: 'Jean Client', line1: '5 avenue de la Facturation',
+      postalCode: '69001', city: 'Lyon', country: 'France'
+    };
+
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1,
+        billingAddress: identiteFacturation, cgvAccepted: true
+      });
+
     expect(response.status).toBe(201);
-    expect(response.body.metadata.billingAddress).toBeUndefined();
-    expect(response.body.metadata.billingSameAsShipping).toBeUndefined();
+    expect(response.body.metadata.billingSameAsShipping).toBe(false);
+    expect(response.body.metadata.billingAddress).toEqual(expect.objectContaining(identiteFacturation));
+    expect(response.body.shipping_address).toBeNull();
   });
 });
 
@@ -840,12 +859,15 @@ describe('POST /api/orders — international', () => {
     expect(response.body.snapshot.country).toBe('CA');
   });
 
-  it('commande PDF seule, aucune adresse : la devise vient de X-App-Country (choisie plus tot dans le parcours)', async () => {
+  it('commande PDF seule, aucune adresse de livraison : la devise vient de X-App-Country (choisie plus tot dans le parcours)', async () => {
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', 'Bearer valid-token')
       .set('X-App-Country', 'GB')
-      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true });
+      .send({
+        bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true,
+        billingAddress: { fullName: 'Jean Client', line1: '1 rue Test', postalCode: '75001', city: 'Paris', country: 'France' }
+      });
 
     expect(response.status).toBe(201);
     expect(response.body.currency).toBe('GBP');
@@ -854,11 +876,14 @@ describe('POST /api/orders — international', () => {
     expect(response.body.total_cents).toBe(679);
   });
 
-  it('sans adresse ni en-tete : repli explicite sur la France/EUR, comportement inchange', async () => {
+  it('sans en-tete pays : repli explicite sur la France/EUR, comportement inchange', async () => {
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', 'Bearer valid-token')
-      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true });
+      .send({
+        bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true,
+        billingAddress: { fullName: 'Jean Client', line1: '1 rue Test', postalCode: '75001', city: 'Paris', country: 'France' }
+      });
 
     expect(response.status).toBe(201);
     expect(response.body.currency).toBe('EUR');
@@ -901,7 +926,10 @@ describe('POST /api/orders — acceptation des CGV', () => {
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', 'Bearer valid-token')
-      .send({ bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true });
+      .send({
+        bookId: FINALIZED_BOOK_ID, type: 'pdf', quantity: 1, cgvAccepted: true,
+        billingAddress: { fullName: 'Jean Client', line1: '1 rue Test', postalCode: '75001', city: 'Paris', country: 'France' }
+      });
 
     expect(response.status).toBe(201);
     expect(response.body.metadata.cgvAccepted).toBe(true);

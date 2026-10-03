@@ -2,9 +2,10 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import AddressAutocomplete from '../../common/AddressAutocomplete';
 
-// Ecran 2 : adresse de livraison. Affiche uniquement pour une commande
-// contenant un livre imprime — une commande PDF saute purement et
-// simplement cette etape (voir BookCheckoutLuxe.js: buildSteps).
+// Ecran 2 : adresse de livraison pour un livre imprime, ou facturation
+// seule pour une commande PDF (prop `billingOnly`, voir BookCheckoutLuxe.js:
+// steps) — rien a expedier, mais une facture doit identifier son
+// destinataire (retour utilisateur, 2026-10-04).
 // Champs repris tels quels de l'ancienne page (meme `name`, meme handler) :
 // c'est `sanitizeAddress`/`isAddressValid` cote backend qui reste l'autorite
 // sur ce qui est acceptable.
@@ -43,6 +44,35 @@ const BILLING_FIELDS = [
   { name: 'country' }
 ];
 
+// Partage entre l'adresse de livraison, le bloc facturation conditionnel et
+// le mode "facturation seule" (PDF) plus bas : les trois rendent la meme
+// forme de champ (autocomplete ou simple input), seule la liste de champs et
+// les valeurs changent.
+function renderFields(fields, values, onChange, locked, t) {
+  return fields.map((field) => (field.autocomplete ? (
+    <AddressAutocomplete
+      key={field.name}
+      field={field.name}
+      value={values[field.name] || ''}
+      address={values}
+      onChangeField={onChange}
+      placeholder={t(`stepAddress.fields.${field.name}`)}
+      disabled={locked}
+    />
+  ) : (
+    <input
+      key={field.name}
+      className="input-luxe"
+      name={field.name}
+      type={field.type || 'text'}
+      value={values[field.name] || ''}
+      onChange={onChange}
+      placeholder={t(`stepAddress.fields.${field.name}`)}
+      disabled={locked}
+    />
+  )));
+}
+
 function StepAddress({
   address,
   onChangeField,
@@ -52,35 +82,40 @@ function StepAddress({
   onToggleBillingSame,
   billingAddress,
   onChangeBillingField,
-  billingIncomplete
+  billingIncomplete,
+  billingOnly
 }) {
   const { t } = useTranslation('checkout');
+
+  // Commande PDF seule : rien a expedier, donc pas d'adresse de livraison —
+  // mais une facture doit quand meme identifier son destinataire (retour
+  // utilisateur, 2026-10-04 : le nom du client y retombait sur son email,
+  // voire sur "Client"). On reutilise le meme formulaire que la facturation
+  // "adresse differente" ci-dessous, ici comme UNIQUE saisie de cette etape
+  // plutot que cachee derriere une case "meme que la livraison" qui n'aurait
+  // aucun sens sans livraison a comparer.
+  if (billingOnly) {
+    return (
+      <article className="orders-panel">
+        <h2>{t('stepAddress.billingOnlyTitle')}</h2>
+        <p className="orders-disclaimer">{t('stepAddress.billingOnlyNote')}</p>
+        <div className="orders-form-grid">
+          {renderFields(BILLING_FIELDS, billingAddress, onChangeBillingField, locked, t)}
+        </div>
+        {billingIncomplete && (
+          <p className="orders-disclaimer">
+            {t('stepAddress.billingIncompleteWarning')}
+          </p>
+        )}
+      </article>
+    );
+  }
+
   return (
     <article className="orders-panel">
       <h2>{t('stepAddress.title')}</h2>
       <div className="orders-form-grid">
-        {FIELDS.map((field) => (field.autocomplete ? (
-          <AddressAutocomplete
-            key={field.name}
-            field={field.name}
-            value={address[field.name] || ''}
-            address={address}
-            onChangeField={onChangeField}
-            placeholder={t(`stepAddress.fields.${field.name}`)}
-            disabled={locked}
-          />
-        ) : (
-          <input
-            key={field.name}
-            className="input-luxe"
-            name={field.name}
-            type={field.type || 'text'}
-            value={address[field.name] || ''}
-            onChange={onChangeField}
-            placeholder={t(`stepAddress.fields.${field.name}`)}
-            disabled={locked}
-          />
-        )))}
+        {renderFields(FIELDS, address, onChangeField, locked, t)}
       </div>
       <p className="orders-disclaimer">
         {t('stepAddress.emailNote')}
@@ -110,28 +145,7 @@ function StepAddress({
         <div className="orders-billing-fields">
           <h3>{t('stepAddress.billingTitle')}</h3>
           <div className="orders-form-grid">
-            {BILLING_FIELDS.map((field) => (field.autocomplete ? (
-              <AddressAutocomplete
-                key={field.name}
-                field={field.name}
-                value={billingAddress[field.name] || ''}
-                address={billingAddress}
-                onChangeField={onChangeBillingField}
-                placeholder={t(`stepAddress.fields.${field.name}`)}
-                disabled={locked}
-              />
-            ) : (
-              <input
-                key={field.name}
-                className="input-luxe"
-                name={field.name}
-                type={field.type || 'text'}
-                value={billingAddress[field.name] || ''}
-                onChange={onChangeBillingField}
-                placeholder={t(`stepAddress.fields.${field.name}`)}
-                disabled={locked}
-              />
-            )))}
+            {renderFields(BILLING_FIELDS, billingAddress, onChangeBillingField, locked, t)}
           </div>
           {billingIncomplete && (
             <p className="orders-disclaimer">

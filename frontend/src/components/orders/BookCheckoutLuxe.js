@@ -313,11 +313,17 @@ const BookCheckoutLuxe = () => {
     ? (latestOrder?.currency || estimate.currency || 'EUR')
     : (estimate.currency || 'EUR');
 
-  // Etapes affichees : l'adresse disparait completement pour une commande
-  // PDF (rien a livrer) — jamais une etape grisee qu'on n'atteindra pas.
+  // Etapes affichees : une commande PDF n'a rien a livrer, mais garde quand
+  // meme cette etape sous une forme allegee (facturation seule, voir
+  // StepAddress.js: billingOnly) — sans ca, aucune identite n'etait jamais
+  // collectee et la facture retombait sur un nom devine (retour utilisateur,
+  // 2026-10-04).
   const steps = useMemo(() => {
     const list = [{ key: 'product', label: t('flow.steps.product') }];
-    if (includesPrint(effectiveOrderType)) list.push({ key: 'address', label: t('flow.steps.delivery') });
+    list.push({
+      key: 'address',
+      label: includesPrint(effectiveOrderType) ? t('flow.steps.delivery') : t('flow.steps.billing')
+    });
     list.push({ key: 'payment', label: t('flow.steps.payment') });
     list.push({ key: 'tracking', label: t('flow.steps.tracking') });
     return list;
@@ -328,14 +334,20 @@ const BookCheckoutLuxe = () => {
       .every((field) => String(address?.[field] || '').trim().length > 0)
   ), [address]);
 
-  // Meme exigence que l'adresse de livraison, mais seulement quand la case
-  // "meme adresse" est decochee — sinon la facturation suit `address` et n'a
-  // rien a valider separement.
-  const billingComplete = useMemo(() => (
-    billingSameAsShipping
-    || ['fullName', 'line1', 'postalCode', 'city', 'country']
-      .every((field) => String(billingAddress?.[field] || '').trim().length > 0)
-  ), [billingSameAsShipping, billingAddress]);
+  // Meme exigence que l'adresse de livraison. Pour l'impression, seulement
+  // quand la case "meme adresse" est decochee — sinon la facturation suit
+  // `address` et n'a rien a valider separement. Pour un PDF, ce formulaire
+  // EST la seule saisie de l'etape (pas de case a cocher, rien a comparer) :
+  // toujours requis.
+  const billingComplete = useMemo(() => {
+    if (!includesPrint(effectiveOrderType)) {
+      return ['fullName', 'line1', 'postalCode', 'city', 'country']
+        .every((field) => String(billingAddress?.[field] || '').trim().length > 0);
+    }
+    return billingSameAsShipping
+      || ['fullName', 'line1', 'postalCode', 'city', 'country']
+        .every((field) => String(billingAddress?.[field] || '').trim().length > 0);
+  }, [effectiveOrderType, billingSameAsShipping, billingAddress]);
 
   // Etape REELLE : une commande payee renvoie au suivi (sans retour possible),
   // une commande en attente de paiement renvoie a l'ecran paiement. Tant
@@ -957,8 +969,13 @@ const BookCheckoutLuxe = () => {
         // "Meme que la livraison" (cochee par defaut, retour utilisateur
         // 2026-09-27) : n'envoie une adresse de facturation DISTINCTE que si
         // la case a ete decochee — sinon le serveur la deduit lui-meme de
-        // l'adresse de livraison (voir routes/orders.js).
-        billingAddress: includesPrint(orderType) && !billingSameAsShipping ? billingAddress : null,
+        // l'adresse de livraison (voir routes/orders.js). Pour un PDF,
+        // `billingAddress` EST la seule saisie de l'etape precedente
+        // (StepAddress.js: billingOnly) : toujours envoyee, jamais null
+        // (retour utilisateur, 2026-10-04).
+        billingAddress: includesPrint(orderType)
+          ? (!billingSameAsShipping ? billingAddress : null)
+          : billingAddress,
         // Preuve d'acceptation des CGV, ECRITE et ANTERIEURE au paiement
         // (retour utilisateur, 2026-09-28) — c'est elle qui rend opposable
         // l'exclusion du droit de retractation (voir CGVLuxe.js §5).
@@ -1495,6 +1512,7 @@ const BookCheckoutLuxe = () => {
               billingAddress={billingAddress}
               onChangeBillingField={setBillingAddressField}
               billingIncomplete={!billingComplete}
+              billingOnly={!includesPrint(effectiveOrderType)}
             />
           )}
 
@@ -1555,7 +1573,7 @@ const BookCheckoutLuxe = () => {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={currentStepKey === 'address' && (!addressComplete || !billingComplete)}
+                  disabled={currentStepKey === 'address' && (includesPrint(effectiveOrderType) ? (!addressComplete || !billingComplete) : !billingComplete)}
                   onClick={() => setManualStep(derivedStep + 1)}
                 >
                   {t('flow.nav.continue')}
