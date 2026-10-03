@@ -88,7 +88,7 @@
       "s1": {
         "heading": "Éditeur du site",
         "paragraphs": [
-          "Le site Bookipix (bookipix.com) est édité par [À COMPLÉTER : nom et prénom du dirigeant], exerçant sous le statut de micro-entreprise."
+          "Bookipix est un nom commercial exploité par [À COMPLÉTER : prénom et nom du dirigeant], entrepreneur individuel (micro-entrepreneur)."
         ],
         "list": [
           "SIRET : [À COMPLÉTER]",
@@ -169,7 +169,18 @@
       "s5": {
         "heading": "Durée de conservation",
         "paragraphs": [
-          "Vos données sont conservées [À COMPLÉTER : durée de conservation par type de donnée — livre, commande, photo]."
+          "Les durées ci-dessous distinguent la conservation en base active et un éventuel archivage légal (obligations comptables notamment) :"
+        ],
+        "list": [
+          "Compte utilisateur : conservé pendant toute la durée d'existence de votre compte. En cas de suppression de votre compte, vos données (profil, livres, photos) sont supprimées immédiatement — sauf si une commande est activement en cours de fabrication chez l'imprimeur, où la suppression est proposée une fois la fabrication terminée.",
+          "Projet ou livre non finalisé et inactif : supprimé au plus tard 12 mois après sa dernière modification, avec les photos et textes qu'il contient.",
+          "Photos et contenus liés à une commande terminée : conservés au maximum 12 mois après la commande, sauf nécessité particulière (service après-vente, litige, obligation légale).",
+          "Données de commande nécessaires au suivi ou au service après-vente : conservées pendant la durée nécessaire à cette finalité.",
+          "Factures et données comptables : conservées 10 ans, conformément à l'obligation légale de conservation des documents comptables.",
+          "Communications commerciales : si vous y avez consenti, vos données sont conservées 3 ans à compter du dernier contact.",
+          "Journaux techniques (traçabilité des actions sur les commandes et les livres) : conservés 90 jours, puis supprimés automatiquement.",
+          "Moyens de paiement : Bookipix ne conserve aucune donnée de carte bancaire — le paiement est traité directement par Stripe, qui seul détient ces informations.",
+          "Sauvegardes de secours : une copie de la base de données est conservée 14 jours à des fins de récupération en cas d'incident, puis supprimée automatiquement — une donnée effacée en base active peut donc subsister jusqu'à 14 jours dans ces sauvegardes."
         ]
       },
       "s6": {

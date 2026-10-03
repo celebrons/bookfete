@@ -88,7 +88,7 @@
       "s1": {
         "heading": "Site publisher",
         "paragraphs": [
-          "The Bookipix website (bookipix.com) is published by [TO BE COMPLETED: owner's full name], operating under the French micro-entreprise status."
+          "Bookipix is a trade name operated by [TO BE COMPLETED: owner's full name], a French sole trader (entrepreneur individuel / micro-entrepreneur)."
         ],
         "list": [
           "SIRET: [TO BE COMPLETED]",
@@ -169,7 +169,18 @@
       "s5": {
         "heading": "Retention period",
         "paragraphs": [
-          "Your data is retained [TO BE COMPLETED: retention period by data type — book, order, photo]."
+          "The periods below distinguish retention in our active database from any legal archiving (accounting obligations in particular):"
+        ],
+        "list": [
+          "User account: retained for as long as your account exists. If you delete your account, your data (profile, books, photos) is deleted immediately — unless an order is actively being manufactured by the printer, in which case deletion is offered once manufacturing is complete.",
+          "Unfinished, inactive project or book: deleted no later than 12 months after its last change, along with the photos and text it contains.",
+          "Photos and content linked to a completed order: retained for a maximum of 12 months after the order, unless a specific need arises (after-sales support, dispute, legal obligation).",
+          "Order data needed for tracking or after-sales support: retained for as long as needed for that purpose.",
+          "Invoices and accounting records: retained for 10 years, in accordance with the legal obligation to keep accounting documents.",
+          "Marketing communications: if you consented to them, your data is retained for 3 years from the last contact.",
+          "Technical logs (traceability of actions on orders and books): retained for 90 days, then automatically deleted.",
+          "Payment details: Bookipix never retains any card data — payment is processed directly by Stripe, who alone holds this information.",
+          "Backups: a copy of the database is kept for 14 days for disaster recovery, then automatically deleted — data erased from the active database may therefore persist for up to 14 days in these backups."
         ]
       },
       "s6": {
