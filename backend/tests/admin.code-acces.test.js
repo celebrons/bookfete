@@ -62,11 +62,11 @@ describe("Code d'acces a l'espace d'administration", () => {
   });
 
   it('sans code configure, rien ne change : la liste d adresses decide seule', () => {
-    process.env.ADMIN_EMAILS = 'patron@celebrons.fr';
+    process.env.ADMIN_EMAILS = 'patron@bookipix.com';
     delete process.env.ADMIN_ACCESS_CODE;
 
     expect(codeDemande()).toBe(false);
-    expect(isAdminUser({ email: 'patron@celebrons.fr' }, requete(null))).toBe(true);
+    expect(isAdminUser({ email: 'patron@bookipix.com' }, requete(null))).toBe(true);
     expect(isAdminUser(utilisateur, requete('peu importe'))).toBe(false);
   });
 
@@ -75,6 +75,6 @@ describe("Code d'acces a l'espace d'administration", () => {
     delete process.env.ADMIN_ACCESS_CODE;
 
     // Une variable oubliee doit fermer la porte, jamais l'ouvrir.
-    expect(isAdminUser({ email: 'patron@celebrons.fr' }, requete(null))).toBe(false);
+    expect(isAdminUser({ email: 'patron@bookipix.com' }, requete(null))).toBe(false);
   });
 });

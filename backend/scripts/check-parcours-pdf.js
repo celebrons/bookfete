@@ -66,7 +66,7 @@ const extraireJpegs = (donnees) => {
   console.log(`Parcours complet d'une commande PDF sur ${BASE}\n`);
 
   const marque = `pdf-${Date.now()}`;
-  const email = `${marque}@celebrons-test.invalid`;
+  const email = `${marque}@bookipix-test.invalid`;
   const motDePasse = `jetable-${Math.random().toString(36).slice(2)}-A1!`;
   let userId = null;
   let bookId = null;

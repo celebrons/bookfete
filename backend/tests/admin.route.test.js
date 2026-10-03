@@ -5,12 +5,12 @@
 // d'autre que `requireAdmin` ne protege ces donnees. Les tests portent donc
 // d'abord et avant tout sur les REFUS.
 
-const ADMIN_EMAIL = 'patron@celebrons.fr';
+const ADMIN_EMAIL = 'patron@bookipix.com';
 const USER_EMAIL = 'client@test.local';
 
 const TOKENS = {
   'admin-token': { id: 'admin-1', email: ADMIN_EMAIL, is_anonymous: false },
-  'admin-token-casse': { id: 'admin-1', email: 'PATRON@Celebrons.FR', is_anonymous: false },
+  'admin-token-casse': { id: 'admin-1', email: 'PATRON@BOOKIPIX.COM', is_anonymous: false },
   'user-token': { id: 'user-1', email: USER_EMAIL, is_anonymous: false },
   'anon-token': { id: 'anon-1', is_anonymous: true },
   'sans-email-token': { id: 'ghost-1', email: '', is_anonymous: false }

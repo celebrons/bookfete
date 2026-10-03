@@ -36,7 +36,7 @@ const buildApiBaseUrl = () => {
   if (!ADRESSE_VALABLE.test(configured)) {
     // eslint-disable-next-line no-console
     console.error(
-      `[Celebrons] REACT_APP_API_URL vaut « ${configured} », ce qui n'est pas une adresse. `
+      `[Bookipix] REACT_APP_API_URL vaut « ${configured} », ce qui n'est pas une adresse. `
       + 'Le site a ete construit avec une variable abimee (souvent MSYS/Git Bash qui '
       + 'transforme /api en chemin Windows : utiliser MSYS_NO_PATHCONV=1). '
       + 'On se rabat sur /api ; la construction est a refaire.'

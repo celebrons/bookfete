@@ -148,7 +148,7 @@ async function ouvrirNavigateur(dossierTelechargements) {
   console.log(`Le bouton « telecharger » sur ${BASE}\n`);
 
   const marque = `bouton-${Date.now()}`;
-  const email = `${marque}@celebrons-test.invalid`;
+  const email = `${marque}@bookipix-test.invalid`;
   const motDePasse = `jetable-${Math.random().toString(36).slice(2)}-A1!`;
   const dossier = path.join(__dirname, '..', 'tmp', marque);
   fs.mkdirSync(dossier, { recursive: true });

@@ -116,7 +116,7 @@ async function main() {
     orderType: 'draft',
     shippingAddress: {
       firstName: 'Test',
-      lastName: 'Celebrons',
+      lastName: 'Bookipix',
       addressLine1: '1 rue de Test',
       city: 'Paris',
       postCode: '75001',

@@ -3,7 +3,7 @@
 À faire après chaque déploiement sur le serveur Scaleway (voir `deploy/README.md`), dans cet ordre. Prend 3-5 minutes.
 
 ## 1. Le déploiement lui-même
-- [ ] `ssh root@78.232.5.181 "systemctl status celebrons --no-pager"` → service `active (running)`
+- [ ] `ssh root@78.232.5.181 "systemctl status bookipix --no-pager"` → service `active (running)`
 - [ ] `curl https://78.232.5.181.sslip.io/api/health` → `{"status":"OK"}`
 - [ ] Si le frontend a changé : les trois lignes de contrôle du bundle (voir `deploy/README.md`) → `onrender.com` et `Program Files` à 0, `"/api"` présent
 
@@ -33,4 +33,4 @@
 - [ ] Un livre qui n'est pas le vôtre reste inaccessible (403/404) si vous testez avec un ID connu
 
 ---
-*Fichier créé le 2026-08-29 pendant la refonte Celebrons — mis à jour au fil des étapes. Réécrit le 2026-10-02 pour le serveur Scaleway, Render ayant été décommissionné.*
+*Fichier créé le 2026-08-29 pendant la refonte Bookipix — mis à jour au fil des étapes. Réécrit le 2026-10-02 pour le serveur Scaleway, Render ayant été décommissionné.*

@@ -1,5 +1,5 @@
 {
-  "brand": "Célébrons",
+  "brand": "Bookipix",
   "header": {
     "openMenu": "Ouvrir le menu",
     "closeMenu": "Fermer le menu",
@@ -25,7 +25,7 @@
     "legalNotice": "Mentions légales",
     "contact": "Contact",
     "location": "Paris, France",
-    "copyright": "© {{year}} Célébrons. Tous droits réservés."
+    "copyright": "© {{year}} Bookipix. Tous droits réservés."
   },
   "language": {
     "switchLabel": "Langue"

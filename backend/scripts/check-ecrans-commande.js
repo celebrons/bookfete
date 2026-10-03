@@ -159,7 +159,7 @@ async function main() {
   const css = await trouverLaFeuilleDeStyle();
   console.log(`  feuille de style servie : ${css.replace(BASE, '')}\n`);
 
-  const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'celebrons-ecrans-'));
+  const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'bookipix-ecrans-'));
   const navigateur = await puppeteer.launch({
     headless: 'new',
     // Chrome peut 'assombrir automatiquement' une page qu'il juge claire :

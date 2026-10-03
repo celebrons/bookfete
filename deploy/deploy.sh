@@ -39,14 +39,14 @@ sudo -u "${UTILISATEUR}" npm ci --omit=dev
 echo "==> Services systeme"
 # Les fichiers d'unite font partie du depot, mais systemd lit ceux de
 # /etc/systemd/system. Sans cette recopie, un plafond de memoire ajoute
-# dans deploy/celebrons.service ne s'applique JAMAIS : on croit la machine
+# dans deploy/bookipix.service ne s'applique JAMAIS : on croit la machine
 # protegee alors qu'elle ne l'est pas. C'est ce qui l'a rendue injoignable
 # le 2026-09-19.
 RECHARGER=0
 # Toutes les unites du depot, sans liste a tenir a jour : une unite ajoutee
 # et oubliee dans une liste en dur ne serait jamais deployee, et on la
 # croirait active. C'est deja arrive avec le plafond de memoire.
-for SOURCE in "${DOSSIER}"/deploy/celebrons*.service "${DOSSIER}"/deploy/celebrons*.timer; do
+for SOURCE in "${DOSSIER}"/deploy/bookipix*.service "${DOSSIER}"/deploy/bookipix*.timer; do
   [ -f "${SOURCE}" ] || continue
   UNITE=$(basename "${SOURCE}")
   if ! cmp -s "${SOURCE}" "/etc/systemd/system/${UNITE}"; then
@@ -58,7 +58,7 @@ done
 if [ "${RECHARGER}" = "1" ]; then
   systemctl daemon-reload
   # Activer les minuteries, y compris celles qui viennent d'apparaitre.
-  for T in "${DOSSIER}"/deploy/celebrons*.timer; do
+  for T in "${DOSSIER}"/deploy/bookipix*.timer; do
     [ -f "${T}" ] || continue
     systemctl enable --now "$(basename "${T}")" >/dev/null 2>&1 || true
   done
@@ -73,19 +73,19 @@ echo "==> Redemarrage"
 # comprises. Le piege s'est referme deux fois sur nous en local le
 # 2026-09-17 (double page corrigee mais toujours inversee, puis fichier
 # Gelato toujours a 35 pages) — il ne doit jamais se reproduire ici.
-systemctl restart celebrons
+systemctl restart bookipix
 
 sleep 3
-systemctl is-active --quiet celebrons && echo "==> Service actif" || {
+systemctl is-active --quiet bookipix && echo "==> Service actif" || {
   echo "==> ECHEC : le service n'a pas demarre"
-  journalctl -u celebrons -n 30 --no-pager
+  journalctl -u bookipix -n 30 --no-pager
   exit 1
 }
 
 echo "==> Verification de l'API"
 curl -fsS --max-time 15 http://127.0.0.1:5000/api/health && echo "" || {
   echo "==> ECHEC : l'API ne repond pas"
-  journalctl -u celebrons -n 30 --no-pager
+  journalctl -u bookipix -n 30 --no-pager
   exit 1
 }
 

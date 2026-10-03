@@ -123,7 +123,7 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
           )}
         </div>
       )}
-      {/* Revenir a "Automatique" (laisser Celebrons choisir) — l'ancien
+      {/* Revenir a "Automatique" (laisser Bookipix choisir) — l'ancien
           panneau "Mise en page" offrait ce choix via une pastille dediee,
           disparue avec la galerie de photos qu'il portait (retour
           utilisateur, 2026-09-26). Sans cette croix, une photo choisie a la

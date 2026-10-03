@@ -12,7 +12,7 @@
 // envoi de 40 photos, qui echouait a la 9e puis a la 33e — un rang variable,
 // la signature typique d'une saturation de ressources et non d'une limite
 // fixe). Le serveur de production (Scaleway, 1,5 Go — voir
-// deploy/celebrons.service) a bien plus de marge, mais ces reglages
+// deploy/bookipix.service) a bien plus de marge, mais ces reglages
 // memoire-conscients restent une securite peu couteuse.
 //
 // Deux reglages, tous deux orientes PIC MEMOIRE plutot que vitesse brute :

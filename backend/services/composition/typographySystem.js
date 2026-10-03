@@ -1,6 +1,6 @@
 // backend/services/composition/typographySystem.js
 //
-// SOURCE UNIQUE de la typographie Celebrons (cahier des charges "Systeme
+// SOURCE UNIQUE de la typographie Bookipix (cahier des charges "Systeme
 // typographique", 2026-09-11). Fonctions pures : aucun acces reseau/disque,
 // aucune dependance au DOM — c'est ce qui permet au PDF (Chrome headless
 // cote serveur) et a l'atelier (navigateur) d'appliquer EXACTEMENT les
@@ -12,7 +12,7 @@
 // photoQuality.js. Toute modification ici doit y etre reportee.
 //
 // PRINCIPE DIRECTEUR (§ regle finale) : "L'utilisateur personnalise le
-// contenu. Celebrons reste responsable du design." Ce module ne decrit donc
+// contenu. Bookipix reste responsable du design." Ce module ne decrit donc
 // jamais un reglage libre, mais un CADRE : un role choisi par l'utilisateur
 // determine police, taille, graisse, interligne et couleur. Il n'y a
 // volontairement aucune fonction ici permettant de choisir une police

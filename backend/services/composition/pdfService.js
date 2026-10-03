@@ -656,7 +656,7 @@ const PRIORITE_RENDU = 10;
 //
 // Un dossier neuf par rendu, supprime ensuite : rien ne s accumule.
 function dossierJetable() {
-  return path.join(os.tmpdir(), `celebrons-chrome-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  return path.join(os.tmpdir(), `bookipix-chrome-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 }
 
 function lancerLeNavigateur(browserPath, args) {
@@ -839,7 +839,7 @@ async function capturePagesAsImagesDirect({ book, pages, items, layouts, format,
         // pages avant d'en lancer un nouveau, pour que les buffers bruts
         // (3 a 7 Mo chacun) ne s'accumulent pas en memoire sur un livre de
         // 30 pages — meme avec la limite 1,5 Go du service Scaleway
-        // (deploy/celebrons.service, MemoryMax), la marge reste serree une
+        // (deploy/bookipix.service, MemoryMax), la marge reste serree une
         // fois Chromium et le reste du processus Node comptes.
         if (encodeTasks.length >= 2) {
           await encodeTasks[encodeTasks.length - 2];

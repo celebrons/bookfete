@@ -5,13 +5,13 @@
 # assez long pour ne rien couter. Le script lui-meme ne fait qu'un curl.
 
 [Unit]
-Description=Veille Celebrons, chaque minute
+Description=Veille Bookipix, chaque minute
 
 [Timer]
 OnBootSec=2min
 OnUnitActiveSec=1min
 AccuracySec=10s
-Unit=celebrons-veille.service
+Unit=bookipix-veille.service
 
 [Install]
 WantedBy=timers.target

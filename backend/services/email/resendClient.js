@@ -36,7 +36,7 @@ const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
 // Expediteur par defaut : celui que Resend autorise sans domaine verifie.
 // Remplacer par une adresse de votre domaine une fois celui-ci verifie.
-const DEFAULT_FROM = 'Celebrons <onboarding@resend.dev>';
+const DEFAULT_FROM = 'Bookipix <onboarding@resend.dev>';
 
 const emailValide = (adresse) => typeof adresse === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adresse.trim());
 

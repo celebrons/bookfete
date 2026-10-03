@@ -57,7 +57,7 @@ i18n
       // par sous-domaine ou prefixe d'URL : les URLs du site restent les
       // memes dans les deux langues (voir le plan du chantier).
       order: ['localStorage', 'navigator'],
-      lookupLocalStorage: 'celebrons_language',
+      lookupLocalStorage: 'bookipix_language',
       caches: ['localStorage']
     },
     interpolation: {

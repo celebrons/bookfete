@@ -5,13 +5,14 @@
 # renouvelle tout seul.
 #
 # LE NOM DE DOMAINE : Let's Encrypt ne delivre pas de certificat pour une
-# simple adresse IP. Tant que le domaine Celebrons n'est pas achete, on passe
-# par sslip.io : <ip>.sslip.io resout vers <ip>, sans rien configurer, et
-# permet donc d'obtenir un vrai certificat des maintenant.
+# simple adresse IP. Avant l'achat de bookipix.com, on passait par sslip.io :
+# <ip>.sslip.io resout vers <ip>, sans rien configurer, et permet donc
+# d'obtenir un vrai certificat sans attendre de domaine.
 #
-# Le jour ou le domaine existe, remplacer la premiere ligne par :
-#   celebrons.fr, www.celebrons.fr
-# et recharger : systemctl reload caddy
+# 2026-10-03 : bookipix.com est achete. Le bloc sslip.io ci-dessous reste en
+# place EN TRANSITION, le temps que le DNS du nouveau domaine propage et que
+# Stripe/Supabase pointent dessus — a retirer une fois la bascule confirmee
+# (voir deploy/README.md).
 
 # PAS DE HTTP/3.
 #
@@ -39,7 +40,11 @@
 	}
 }
 
-78.232.5.181.sslip.io {
+www.bookipix.com {
+	redir https://bookipix.com{uri} permanent
+}
+
+bookipix.com {
 	# Le site ET l'API sont servis par le meme processus node (SERVE_FRONTEND=1),
 	# donc une seule redirection suffit : Caddy ne fait que le HTTPS et passe
 	# tout le reste tel quel.
@@ -47,6 +52,24 @@
 		# Un rendu PDF depasse deux minutes : sans cela, Caddy couperait la
 		# requete avant la fin et l'utilisateur verrait une erreur alors que
 		# le serveur travaille encore.
+		transport http {
+			read_timeout 600s
+			write_timeout 600s
+		}
+	}
+
+	encode gzip
+
+	log {
+		output file /var/log/caddy/bookipix.log
+		format console
+	}
+}
+
+# TRANSITOIRE (voir note en tete de fichier) — meme configuration que
+# bookipix.com, gardee joignable pendant la bascule du domaine.
+78.232.5.181.sslip.io {
+	reverse_proxy 127.0.0.1:5000 {
 		transport http {
 			read_timeout 600s
 			write_timeout 600s

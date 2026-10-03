@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Prepare un serveur Ubuntu neuf pour faire tourner Celebrons.
+# Prepare un serveur Ubuntu neuf pour faire tourner Bookipix.
 # A lancer UNE SEULE FOIS, en root, sur une instance fraiche.
 #
 #   ssh root@<ip-du-serveur>
@@ -70,9 +70,9 @@ sudo -u "${UTILISATEUR}" rm -rf "${DOSSIER}/backend/.cache/puppeteer"
 sudo -u "${UTILISATEUR}" npx puppeteer browsers install chrome
 
 echo "==> Service systeme"
-cp "${DOSSIER}/deploy/celebrons.service" /etc/systemd/system/celebrons.service
+cp "${DOSSIER}/deploy/bookipix.service" /etc/systemd/system/bookipix.service
 systemctl daemon-reload
-systemctl enable celebrons
+systemctl enable bookipix
 
 cat <<MESSAGE
 
@@ -87,8 +87,8 @@ donc PAS dans le depot. Depuis votre machine :
 
 Puis demarrer et verifier :
 
-  systemctl start celebrons
-  systemctl status celebrons
+  systemctl start bookipix
+  systemctl status bookipix
   sudo -u ${UTILISATEUR} bash -c "cd ${DOSSIER}/backend && node scripts/check-serveur.js"
 
 ======================================================================

@@ -114,7 +114,7 @@ const HeaderLuxe = () => {
     <header className="site-header">
       <div className="container-luxe site-header-inner">
         <Link to="/" className="site-header-logo">
-          Célébrons<span className="site-header-logo-dot">.</span>
+          Bookipix<span className="site-header-logo-dot">.</span>
         </Link>
 
         <button

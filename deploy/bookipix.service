@@ -1,13 +1,17 @@
-# Service systeme de l'API Celebrons.
+# Service systeme de l'API Bookipix.
 #
 # systemd plutot que pm2 : rien de plus a installer, redemarrage automatique
 # apres un plantage ET apres un reboot de la machine, journaux consultables
-# avec `journalctl -u celebrons -f`.
+# avec `journalctl -u bookipix -f`.
 #
 # Installe par deploy/install-serveur.sh dans /etc/systemd/system/.
+#
+# Tourne sous l'utilisateur Unix "celebrons" (nom historique, jamais
+# renomme : il n'est visible que par SSH, et renommer un compte Unix en
+# production pour un gain purement cosmetique n'en vaut pas le risque).
 
 [Unit]
-Description=API Celebrons (bookfete)
+Description=API Bookipix (bookfete)
 After=network-online.target
 Wants=network-online.target
 
@@ -113,7 +117,7 @@ IOWeight=50
 
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=celebrons
+SyslogIdentifier=bookipix
 
 [Install]
 WantedBy=multi-user.target

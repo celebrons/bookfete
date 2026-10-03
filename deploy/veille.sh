@@ -2,7 +2,7 @@
 #
 # Veille : l'application repond-elle encore ?
 #
-# Lance chaque minute par celebrons-veille.timer.
+# Lance chaque minute par bookipix-veille.timer.
 #
 # POURQUOI CE SCRIPT EXISTE
 #
@@ -13,7 +13,7 @@
 # l'utilisateur qui a fini par s'en apercevoir.
 #
 # Deux reponses, et il faut les deux :
-#   - empecher la panne : celebrons.service borne desormais la memoire et le
+#   - empecher la panne : bookipix.service borne desormais la memoire et le
 #     processeur de l'application (MemoryMax, CPUQuota) ;
 #   - la voir quand meme : ce script.
 #
@@ -108,7 +108,7 @@ ecoule=$(( $(date +%s) - ${dernier:-0} ))
 if [ "${ecoule}" -lt "${DELAI_ENTRE_REDEMARRAGES}" ]; then
   action="aucune (redemarrage deja tente il y a ${ecoule} s)"
 else
-  systemctl restart celebrons && action="service redemarre" || action="redemarrage IMPOSSIBLE"
+  systemctl restart bookipix && action="service redemarre" || action="redemarrage IMPOSSIBLE"
 fi
 
 cat > "${JOURNAL}" <<JSON

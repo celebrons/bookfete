@@ -129,7 +129,7 @@ async function poserLaMaquette(onglet, corps, fond) {
 
 async function main() {
   const css = await trouverLaFeuilleDeStyle();
-  const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'celebrons-capture-'));
+  const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'bookipix-capture-'));
   const navigateur = await puppeteer.launch({
     headless: 'new',
     // Chrome peut 'assombrir automatiquement' une page qu'il juge claire :

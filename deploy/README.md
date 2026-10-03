@@ -1,4 +1,4 @@
-# Déployer Célébrons sur un serveur Scaleway
+# Déployer Bookipix sur un serveur Scaleway
 
 Installé en test le 2026-09-18 pour vérifier que la génération PDF y
 fonctionne — ce que Render ne permet pas (512 Mo disponibles pour
@@ -7,9 +7,11 @@ production : Render a été décommissionné** (les deux services
 `*.onrender.com` restent à supprimer manuellement dans le tableau de bord
 Render — aucun accès API/CLI pour le faire depuis ce dépôt).
 
-Supabase reste la base et le stockage, inchangé. Pas de nom de domaine
-encore acheté : le site vit sur `https://78.232.5.181.sslip.io` (voir
-`Caddyfile`) jusqu'à l'achat de celebrons.fr/.com.
+Supabase reste la base et le stockage, inchangé. Le domaine **bookipix.com**
+est acheté (2026-10-03) ; le site reste joignable sur
+`https://78.232.5.181.sslip.io` (voir `Caddyfile`) en transition, le temps
+que le DNS du nouveau domaine propage et que Stripe/Supabase pointent
+dessus.
 
 ---
 
@@ -59,7 +61,7 @@ facturée et imprimée.
 ### 4. Démarrer et vérifier
 
 ```bash
-ssh root@<IP> "systemctl start celebrons && systemctl status celebrons --no-pager"
+ssh root@<IP> "systemctl start bookipix && systemctl status bookipix --no-pager"
 ssh root@<IP> "sudo -u celebrons bash -c 'cd /home/celebrons/bookfete/backend && node scripts/check-serveur.js'"
 ```
 
@@ -90,10 +92,10 @@ l'ancienne version. Le piège s'est refermé deux fois sur nous en local.
 ## Commandes utiles
 
 ```bash
-systemctl status celebrons          # état du service
-systemctl restart celebrons         # redémarrer
-journalctl -u celebrons -f          # journaux en direct
-journalctl -u celebrons -n 100      # les 100 dernières lignes
+systemctl status bookipix          # état du service
+systemctl restart bookipix         # redémarrer
+journalctl -u bookipix -f          # journaux en direct
+journalctl -u bookipix -n 100      # les 100 dernières lignes
 curl http://127.0.0.1:5000/api/health
 node scripts/check-serveur.js --rendus 3   # batterie complète, 3 rendus
 ```
@@ -182,7 +184,7 @@ Ajouter un point de terminaison :
 
 | champ | valeur |
 |---|---|
-| URL | `https://78.232.5.181.sslip.io/api/orders/webhook/stripe` |
+| URL | `https://78.232.5.181.sslip.io/api/orders/webhook/stripe` (à remplacer par `https://bookipix.com/api/orders/webhook/stripe` une fois le domaine confirmé — Stripe ne migre pas cette URL seul) |
 | événements | `checkout.session.completed` et `checkout.session.async_payment_succeeded` |
 
 Stripe affiche ensuite un **secret de signature** (`whsec_...`). Il se pose
@@ -191,7 +193,7 @@ sur le serveur :
 ```bash
 ssh root@<IP>
 printf 'STRIPE_WEBHOOK_SECRET=whsec_xxx\n' >> /home/celebrons/bookfete/backend/.env
-systemctl restart celebrons
+systemctl restart bookipix
 ```
 
 Le `printf` avec `\n` n’est pas un détail : un `.env` sans saut de ligne
@@ -258,7 +260,17 @@ qui s’est produit.
 ## Ce qui n'est PAS fait à ce stade
 
 - Aucune photo déplacée : le stockage reste Supabase.
-- Aucun changement DNS : le domaine ne pointe pas ici.
-- Render continue de tourner, intact.
+- DNS de bookipix.com pas encore pointé ici (A `@` et `www` vers l'IP du
+  serveur) — tant que ce n'est pas fait, le site ne reste joignable que sur
+  `78.232.5.181.sslip.io`.
+- `FRONTEND_URL`/`PUBLIC_APP_URL`/`ALLOWED_ORIGINS`/les URL de retour Stripe
+  pointent encore sur `78.232.5.181.sslip.io` — à basculer sur
+  `https://bookipix.com` SEULEMENT une fois le DNS confirmé (sinon les liens
+  dans les emails et le retour de paiement Stripe pointeraient vers un
+  domaine qui ne répond pas encore).
+- Liste des URL de redirection autorisées (Supabase Auth, tableau de bord) :
+  pas encore mise à jour avec le nouveau domaine.
+- Expéditeur des emails transactionnels (Brevo) : à vérifier/authentifier
+  pour `bonjour@bookipix.com` avant de basculer `EMAIL_FROM` dessus.
 - Aucune supervision externe (Sentry, alerte par courriel) : les erreurs sont
   au journal des événements, encore faut-il aller le regarder.

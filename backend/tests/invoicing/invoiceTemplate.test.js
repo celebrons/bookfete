@@ -5,7 +5,7 @@ const BASE = {
   issuedAt: '2026-09-28T10:00:00.000Z',
   seller: {
     name: 'Jean Dupont', siret: '12345678900011', address: '1 rue de Paris, 75001 Paris',
-    email: 'bonjour@celebrons.com', vatMention: 'TVA non applicable, art. 293 B du CGI', statusMention: 'Micro-entreprise'
+    email: 'bonjour@bookipix.com', vatMention: 'TVA non applicable, art. 293 B du CGI', statusMention: 'Micro-entreprise'
   },
   buyer: { name: 'Marie Curie', email: 'marie@example.com', address: { line1: '2 rue de Lyon', postalCode: '69001', city: 'Lyon', country: 'France' } },
   order: { orderNumber: 'CMD-260927-ABC-123', paidAt: '2026-09-27T21:24:59.000Z' },

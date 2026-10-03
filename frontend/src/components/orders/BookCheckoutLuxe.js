@@ -195,10 +195,10 @@ const BookCheckoutLuxe = () => {
     // avant qu'une commande existe, un changement de pays doit redemander
     // l'estimation dans la nouvelle devise.
     const onCountryChange = () => charger();
-    window.addEventListener('celebrons:country-changed', onCountryChange);
+    window.addEventListener('bookipix:country-changed', onCountryChange);
     return () => {
       cancelled = true;
-      window.removeEventListener('celebrons:country-changed', onCountryChange);
+      window.removeEventListener('bookipix:country-changed', onCountryChange);
     };
   }, [book?.id, book?.print_format, book?.page_count, orderType, quantity]);
 
@@ -228,10 +228,10 @@ const BookCheckoutLuxe = () => {
     };
     charger();
     const onCountryChange = () => charger();
-    window.addEventListener('celebrons:country-changed', onCountryChange);
+    window.addEventListener('bookipix:country-changed', onCountryChange);
     return () => {
       cancelled = true;
-      window.removeEventListener('celebrons:country-changed', onCountryChange);
+      window.removeEventListener('bookipix:country-changed', onCountryChange);
     };
   }, [book?.id, book?.print_format, book?.page_count]);
 

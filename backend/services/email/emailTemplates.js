@@ -1,4 +1,4 @@
-// Gabarits des emails transactionnels de Celebrons.
+// Gabarits des emails transactionnels de Bookipix.
 //
 // UN SEUL HABILLAGE, decline par message : meme en-tete, meme pied, meme
 // typographie. Un email de confirmation qui ne ressemble pas au site fait
@@ -50,12 +50,12 @@ const prix = (cents) => {
 // faux pour un proche invite a contribuer : il n'a rien cree du tout.
 const PIEDS = {
   fr: {
-    createur: 'Vous recevez cet email parce que vous avez créé un livre sur Célébrons.',
+    createur: 'Vous recevez cet email parce que vous avez créé un livre sur Bookipix.',
     invite: 'Vous recevez cet email parce que quelqu’un vous a invité à contribuer à son livre souvenir.',
     interne: 'Alerte technique interne — envoyée aux adresses listées dans ADMIN_EMAILS.'
   },
   en: {
-    createur: 'You are receiving this email because you created a book on Célébrons.',
+    createur: 'You are receiving this email because you created a book on Bookipix.',
     invite: 'You are receiving this email because someone invited you to contribute to their memory book.',
     interne: 'Internal technical alert — sent to the addresses listed in ADMIN_EMAILS.'
   }
@@ -80,7 +80,7 @@ function habillage({ titre, corps, bouton, details, pied = 'createur', lang = 'f
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${PAPIER};border-radius:14px;overflow:hidden;">
         <tr><td style="padding:28px 32px 0;">
-          <div style="font-family:Georgia,'Times New Roman',serif;font-size:20px;letter-spacing:0.06em;color:${ENCRE};">Célébrons</div>
+          <div style="font-family:Georgia,'Times New Roman',serif;font-size:20px;letter-spacing:0.06em;color:${ENCRE};">Bookipix</div>
           <div style="height:2px;width:36px;background:${OR};margin-top:8px;"></div>
         </td></tr>
         <tr><td style="padding:24px 32px 0;">
@@ -114,7 +114,7 @@ const texteDe = ({ titre, lignes, bouton, details }) => [
   ...(details && details.length ? ['', ...details.filter(Boolean).map(([c, v]) => `${c} : ${v}`)] : []),
   ...(bouton ? ['', `${bouton.libelle} : ${bouton.url}`] : []),
   '',
-  '— Célébrons'
+  '— Bookipix'
 ].join('\n');
 
 // --- Les messages ---------------------------------------------------------
@@ -135,7 +135,7 @@ function retrouverSonLivre({ lien, titreLivre, lang = 'fr' }) {
   ];
   const bouton = { libelle: en ? 'Open my book' : 'Ouvrir mon livre', url: lien };
   return {
-    subject: en ? 'Find your book on Célébrons' : 'Retrouvez votre livre sur Célébrons',
+    subject: en ? 'Find your book on Bookipix' : 'Retrouvez votre livre sur Bookipix',
     html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), bouton, lang }),
     text: texteDe({ titre, lignes, bouton })
   };
@@ -324,7 +324,7 @@ function etapeDeFabrication({ statut, numero, lien, suivi, lang = 'fr' }) {
 // Ces trois messages sortent du cadre « une commande » : ils s'adressent aux
 // PROCHES du createur, pas au client. Le ton change donc : on explique en deux
 // phrases de quoi il s'agit, parce que le destinataire n'a peut-etre jamais
-// entendu parler de Celebrons et ne s'attend pas a cet email.
+// entendu parler de Bookipix et ne s'attend pas a cet email.
 
 function invitationParticipant({ lien, titreLivre, pourQui, deLaPart, message, dateLimite, lang = 'fr' }) {
   const en = lang === 'en';
@@ -415,7 +415,7 @@ function nouvelleContribution({ lien, titreLivre, contributeur, photos, souvenir
 function alerteAdmin({ sujet, lignes = [], details = [] }) {
   const titre = sujet;
   return {
-    subject: `[Célébrons] ${sujet}`,
+    subject: `[Bookipix] ${sujet}`,
     html: habillage({
       titre,
       corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''),
@@ -430,14 +430,14 @@ function essai({ destinataire, lang = 'fr' }) {
   const en = lang === 'en';
   const titre = en ? 'Your emails are working' : 'Vos emails fonctionnent';
   const lignes = en ? [
-    'If you are reading this message, Célébrons can send emails on your behalf.',
+    'If you are reading this message, Bookipix can send emails on your behalf.',
     `Sent to ${destinataire}.`
   ] : [
-    'Si vous lisez ce message, Célébrons peut envoyer des emails en votre nom.',
+    'Si vous lisez ce message, Bookipix peut envoyer des emails en votre nom.',
     `Envoyé à ${destinataire}.`
   ];
   return {
-    subject: en ? 'Célébrons — test send' : 'Célébrons — test d’envoi',
+    subject: en ? 'Bookipix — test send' : 'Bookipix — test d’envoi',
     html: habillage({ titre, corps: lignes.map((l) => `<p style="margin:0 0 12px;">${echapper(l)}</p>`).join(''), lang }),
     text: texteDe({ titre, lignes })
   };

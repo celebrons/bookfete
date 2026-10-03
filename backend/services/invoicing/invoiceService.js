@@ -122,7 +122,12 @@ async function resolveBuyer(order) {
   }
 
   return {
-    name: name || 'Client Célébrons',
+    // Jamais le nom de la marque a la place du client : a defaut de nom
+    // reel, l'email identifie quand meme la bonne personne (toujours
+    // connu — compte authentifie ou adresse de livraison) ; seul le
+    // tout dernier repli ('Client') couvre l'improbable cas ou meme
+    // l'email est indisponible (compte Supabase introuvable).
+    name: name || email || 'Client',
     email,
     address: adresse
       ? { line1: adresse.line1, line2: adresse.line2 || null, postalCode: adresse.postalCode, city: adresse.city, country: adresse.country }

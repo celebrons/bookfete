@@ -4,7 +4,7 @@
   },
   "confirmSwitch": {
     "title": "Passer en mode automatique ?",
-    "body": "Célébrons va proposer une nouvelle organisation de votre livre à partir de vos contenus. Les pages que vous avez déjà construites à la main restent intactes — seules les pages encore automatiques seront réorganisées.",
+    "body": "Bookipix va proposer une nouvelle organisation de votre livre à partir de vos contenus. Les pages que vous avez déjà construites à la main restent intactes — seules les pages encore automatiques seront réorganisées.",
     "keep": "Conserver mon travail",
     "continue": "Continuer"
   },
@@ -36,7 +36,7 @@
       },
       "auto": {
         "title": "Mode automatique",
-        "text": "Ou laissez Célébrons composer tout le livre (\"Composer automatiquement\", en haut), puis ajustez les pages que vous voulez à la main."
+        "text": "Ou laissez Bookipix composer tout le livre (\"Composer automatiquement\", en haut), puis ajustez les pages que vous voulez à la main."
       }
     }
   },
@@ -95,7 +95,7 @@
   "generateModal": {
     "title": "Générer automatiquement",
     "close": "Fermer",
-    "intro": "Choisissez une ambiance : Célébrons compose tout le livre d'un coup à partir de vos souvenirs, chaque photo et chaque texte utilisé une seule fois. Vous pourrez ensuite ajuster n'importe quelle page à la main, ou régénérer avec une autre ambiance.",
+    "intro": "Choisissez une ambiance : Bookipix compose tout le livre d'un coup à partir de vos souvenirs, chaque photo et chaque texte utilisé une seule fois. Vous pourrez ensuite ajuster n'importe quelle page à la main, ou régénérer avec une autre ambiance.",
     "manualKept_one": "Votre {{count}} page composée à la main est conservée telle quelle : la génération ne remplit que les pages restantes, et n'y replace jamais une photo ou un souvenir que vous y avez déjà posé.",
     "manualKept_other": "Vos {{count}} pages composées à la main sont conservées telles quelles : la génération ne remplit que les pages restantes, et n'y replace jamais une photo ou un souvenir que vous y avez déjà posé.",
     "replaceWarning": "Les pages déjà composées automatiquement seront remplacées par la nouvelle proposition. Vos photos et souvenirs, eux, ne sont jamais supprimés.",
@@ -103,7 +103,7 @@
     "overflow": {
       "prefix": "Votre contenu demande ",
       "pagesBold": "{{count}} pages",
-      "middle": " alors que votre livre en compte {{current}}. Célébrons ne laisse jamais une photo de côté : le livre passera donc à {{next}} pages",
+      "middle": " alors que votre livre en compte {{current}}. Bookipix ne laisse jamais une photo de côté : le livre passera donc à {{next}} pages",
       "priceChangePrefix": ", et son prix de ",
       "priceChangeSeparator": " à ",
       "suffix": ". Pour garder {{current}} pages, fermez cette fenêtre et retirez des photos dans « Mes souvenirs »."
@@ -111,7 +111,7 @@
     "remaining": {
       "main_one": "Votre contenu remplit environ {{estimated}} page{{estimatedPlural}} sur les {{min}} de votre livre : la dernière page restera blanche.",
       "main_other": "Votre contenu remplit environ {{estimated}} page{{estimatedPlural}} sur les {{min}} de votre livre : les {{count}} dernières pages resteront blanches.",
-      "note": "Célébrons ne répète jamais une photo ni un souvenir pour combler l'espace — vous pourrez les composer à la main, ou ajouter du contenu dans « Mes souvenirs »."
+      "note": "Bookipix ne répète jamais une photo ni un souvenir pour combler l'espace — vous pourrez les composer à la main, ou ajouter du contenu dans « Mes souvenirs »."
     },
     "cancel": "Annuler",
     "willGrowTo": "Le livre passera à {{pages}} pages",
@@ -216,7 +216,7 @@
       "inviteTitleManage": "Voir le lien, inviter et suivre les contributions",
       "inviteTitleNew": "Inviter vos proches à déposer leurs photos et leurs mots",
       "invite": "Inviter",
-      "composeAutoTitle": "Célébrons propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page à la main ensuite",
+      "composeAutoTitle": "Bookipix propose une nouvelle organisation de votre livre — vous pourrez toujours ajuster chaque page à la main ensuite",
       "composeAuto": "Composer automatiquement",
       "reviewHelp": "Revoir les explications"
     },
@@ -304,7 +304,7 @@
     "coverColorLabel": "Couleur de la couverture",
     "coverColorGroupLabel": "Couleur de la couverture",
     "autoColorLabel": "Auto",
-    "autoColorTitle": "Laisser Célébrons choisir selon le style et le format",
+    "autoColorTitle": "Laisser Bookipix choisir selon le style et le format",
     "coverColorHint": "S'applique à la couverture, au dos et à la 4e — un livre n'a qu'une seule matière.",
     "albumStyleLabel": "Style de l'album",
     "albumStyleGroupLabel": "Style de l'album",

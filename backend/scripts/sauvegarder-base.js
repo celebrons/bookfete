@@ -1,7 +1,7 @@
 // Sauvegarde la base dans un fichier, chaque nuit.
 //
 //   node scripts/sauvegarder-base.js
-//   node scripts/sauvegarder-base.js --dossier /var/backups/celebrons
+//   node scripts/sauvegarder-base.js --dossier /var/backups/bookipix
 //
 // Pourquoi ce script existe : l'offre gratuite de Supabase n'inclut AUCUNE
 // sauvegarde automatique. Une fausse manipulation en base, et les livres de
@@ -85,7 +85,7 @@ const mo = (o) => (o / 1024 / 1024).toFixed(1);
   }
 
   const horodatage = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  const fichier = path.join(DOSSIER, `celebrons-${horodatage}.json.gz`);
+  const fichier = path.join(DOSSIER, `bookipix-${horodatage}.json.gz`);
 
   const brut = Buffer.from(JSON.stringify({
     genereLe: new Date().toISOString(),
@@ -117,7 +117,7 @@ const mo = (o) => (o / 1024 / 1024).toFixed(1);
   const limite = Date.now() - JOURS_CONSERVES * 24 * 60 * 60 * 1000;
   let effacees = 0;
   for (const nom of fs.readdirSync(DOSSIER)) {
-    if (!nom.startsWith('celebrons-') || !nom.endsWith('.json.gz')) continue;
+    if (!nom.startsWith('bookipix-') || !nom.endsWith('.json.gz')) continue;
     const chemin = path.join(DOSSIER, nom);
     if (fs.statSync(chemin).mtimeMs < limite) { fs.unlinkSync(chemin); effacees += 1; }
   }

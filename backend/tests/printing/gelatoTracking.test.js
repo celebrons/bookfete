@@ -1,4 +1,4 @@
-// Traduction de l'etat reel d'une commande Gelato en statut Celebrons
+// Traduction de l'etat reel d'une commande Gelato en statut Bookipix
 // (2026-09-11). L'exigence centrale testee ici : ne JAMAIS ecraser un statut
 // sur une valeur inconnue — un libelle manquant est acceptable, un statut
 // faux ne l'est pas (voir l'entete de gelatoTracking.js).

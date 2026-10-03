@@ -1,6 +1,6 @@
 // backend/services/pricing/pricingConfig.js
 //
-// SOURCE UNIQUE de la grille tarifaire Célébrons (chantier "tarification
+// SOURCE UNIQUE de la grille tarifaire Bookipix (chantier "tarification
 // dynamique", 2026-09-27). Remplace FORMAT_PRICING (ad hoc, routes/orders.js)
 // et la table book_products (confirmee morte : price_cents=0/active=false
 // partout, sa route n'est meme pas montee dans server.js).
@@ -85,7 +85,7 @@ const PACK_DISCOUNT_PERCENT = 10;
 // delai, jamais juste un pourcentage applique a la louche.
 //
 // Devise : TOUJOURS celle du pays (resolveCurrencyForCountry ci-dessous) —
-// jamais une conversion a la volee, Gelato facture deja Celebrons dans
+// jamais une conversion a la volee, Gelato facture deja Bookipix dans
 // cette devise pour ce pays precis.
 const SHIPPING_PRICE_CENTS = {
   FR: { livret: 600, standard: 600, luxe: 650 },

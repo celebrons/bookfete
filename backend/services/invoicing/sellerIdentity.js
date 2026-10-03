@@ -26,7 +26,7 @@ function sellerIdentity() {
     address: (process.env.INVOICE_SELLER_ADDRESS || '').trim() || PLACEHOLDER,
     // Adresse de contact reelle, deja publiee sur /mentions-legales — pas un
     // champ obligatoire sur une facture, mais utile au client.
-    email: (process.env.INVOICE_SELLER_EMAIL || '').trim() || 'bonjour@celebrons.com',
+    email: (process.env.INVOICE_SELLER_EMAIL || '').trim() || 'bonjour@bookipix.com',
     vatMention: VAT_MENTION,
     statusMention: STATUS_MENTION
   };

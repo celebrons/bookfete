@@ -3,7 +3,7 @@
 // Constate le 2026-09-18 sur une vraie commande payee : l'application avait
 // cree un BROUILLON chez Gelato, que l'utilisateur a ensuite confirme depuis
 // le tableau de bord Gelato. Cote Gelato : orderType `order`, financialStatus
-// `paid`, un livre en fabrication. Cote Celebrons : metadata.gelatoOrderType
+// `paid`, un livre en fabrication. Cote Bookipix : metadata.gelatoOrderType
 // valait toujours `draft`.
 //
 // Or c'est precisement ce champ que teste le garde-fou de la suppression. Il

@@ -1,4 +1,4 @@
-// Placeholder assume : aucune vraie photo de livre Celebrons n'est
+// Placeholder assume : aucune vraie photo de livre Bookipix n'est
 // disponible aujourd'hui (retour utilisateur, plan de mise en production —
 // "des livres reels valent mieux que n'importe quel argumentaire"). Cette
 // page NE FABRIQUE AUCUN faux temoignage ni fausse photo pour combler

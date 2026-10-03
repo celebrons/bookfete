@@ -6,7 +6,7 @@
 //
 // POURQUOI
 //
-// Jusqu'au 2026-09-25, Celebrons appariait les pages (1,2), (3,4)... Un
+// Jusqu'au 2026-09-25, Bookipix appariait les pages (1,2), (3,4)... Un
 // livre relie, lui, ouvre sur la page 1 SEULE a droite : les vis-a-vis
 // reels sont (2,3), (4,5)... Confirme par le premier vrai livre imprime —
 // premiere photo a droite, derniere photo a gauche.

@@ -41,7 +41,7 @@ const FooterLuxe = () => {
           {/* Colonne 1 - Marque */}
           <div>
             <span className="site-footer-brand">
-              Célébrons<span className="site-footer-brand-dot">.</span>
+              Bookipix<span className="site-footer-brand-dot">.</span>
             </span>
             <p className="body-text" style={{ color: 'var(--text-light)' }}>
               {t('footer.tagline')}
@@ -82,8 +82,8 @@ const FooterLuxe = () => {
             <span className="label-gold">{t('footer.contact')}</span>
             <ul className="site-footer-list">
               <li>
-                <a href="mailto:bonjour@celebrons.com" className="site-footer-link">
-                  bonjour@celebrons.com
+                <a href="mailto:bonjour@bookipix.com" className="site-footer-link">
+                  bonjour@bookipix.com
                 </a>
               </li>
               <li>

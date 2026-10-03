@@ -132,7 +132,7 @@ async function ouvrirNavigateur() {
   console.log('navigateur neuf, sans cache ni session\n');
 
   const marque = `parcours-${Date.now()}`;
-  const email = `${marque}@celebrons-test.invalid`;
+  const email = `${marque}@bookipix-test.invalid`;
   let userId = null;
   let navigateur = null;
 

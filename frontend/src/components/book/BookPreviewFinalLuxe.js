@@ -287,10 +287,10 @@ export default function BookPreviewFinalLuxe() {
     // Pays choisi dans l'en-tete (chantier international, 2026-10-02) :
     // redemande les tarifs si le visiteur change de pays en cours de route.
     const onCountryChange = () => charger();
-    window.addEventListener('celebrons:country-changed', onCountryChange);
+    window.addEventListener('bookipix:country-changed', onCountryChange);
     return () => {
       cancelled = true;
-      window.removeEventListener('celebrons:country-changed', onCountryChange);
+      window.removeEventListener('bookipix:country-changed', onCountryChange);
     };
   }, [book?.id, totalPages, currentFormat]);
 

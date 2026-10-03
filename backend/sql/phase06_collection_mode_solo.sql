@@ -1,5 +1,5 @@
 -- Corrige un oubli de phase03_data_model.sql : le §05 de l'artefact
--- "Celebrons sans IA" prevoit collection_mode in (solo | open | targeted),
+-- "Bookipix sans IA" prevoit collection_mode in (solo | open | targeted),
 -- la contrainte posee n'avait garde que (open | targeted). Un livre Solo
 -- (createur seul, aucune contribution collectee) doit pouvoir le dire
 -- explicitement plutot que d'utiliser 'open' par defaut sans que ca

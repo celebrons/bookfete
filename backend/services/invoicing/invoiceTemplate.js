@@ -108,7 +108,7 @@ function renderInvoiceHtml({ invoiceNumber, issuedAt, seller, buyer, order, line
 </head>
 <body>
   <div class="entete">
-    <div class="marque">Célébrons<span class="point">.</span></div>
+    <div class="marque">Bookipix<span class="point">.</span></div>
     <div class="titre-facture">
       <h1>FACTURE</h1>
       <div class="numero">N° ${echapper(invoiceNumber)} · ${echapper(dateLongue(issuedAt))}</div>
@@ -127,7 +127,7 @@ function renderInvoiceHtml({ invoiceNumber, issuedAt, seller, buyer, order, line
       <h2>Facturé à</h2>
       <p class="nom">${echapper(buyer.name)}</p>
       ${adresseAcheteur ? `<p>${adresseAcheteur}</p>` : ''}
-      ${buyer.email ? `<p>${echapper(buyer.email)}</p>` : ''}
+      ${buyer.email && buyer.email !== buyer.name ? `<p>${echapper(buyer.email)}</p>` : ''}
     </div>
   </div>
 

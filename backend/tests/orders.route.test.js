@@ -442,7 +442,7 @@ describe('GET /api/orders/:orderId/tracking', () => {
   // "a dessein" (ce ne sont pas des etapes d'avancement) — mais leur rang de
   // -1 les faisait donc TOUJOURS rejeter par shouldAdvance, quel que soit
   // l'etat courant. Une vraie annulation cote Gelato ne remontait donc
-  // jamais dans Celebrons.
+  // jamais dans Bookipix.
   it('Gelato dit "canceled" : le statut passe a cancelled meme si -1 est hors sequence', async () => {
     gelatoClient.getOrder.mockResolvedValue({ fulfillmentStatus: 'canceled' });
 

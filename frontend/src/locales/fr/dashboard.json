@@ -50,7 +50,7 @@
     "activate": "Activer"
   },
   "card": {
-    "shareTitle": "Célébrons",
+    "shareTitle": "Bookipix",
     "shareText": "Participez à ce livre souvenir avec moi.",
     "autoDeleteTooltip": "Suppression auto le {{date}}",
     "auto": "Auto",

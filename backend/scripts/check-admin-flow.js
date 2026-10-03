@@ -13,7 +13,7 @@ const supabase = require('../config/supabase');
 const { createClient } = require('@supabase/supabase-js');
 
 const API = 'http://localhost:5000/api';
-const EMAIL = process.argv[2] || 'admin-test@celebrons.local';
+const EMAIL = process.argv[2] || 'admin-test@bookipix.local';
 const PASSWORD = 'MotDePasseAdmin123!';
 
 const ok = (label, condition, detail = '') => {

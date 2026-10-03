@@ -31,7 +31,7 @@ const FORMAT_DIMENSIONS_MM = {
 // l'`application/json` utilise par la barre laterale pour glisser un souvenir
 // (AtelierSidebar) : sans ca, lacher une photo sur le filmstrip aurait ete
 // interprete comme un deplacement de page.
-const PAGE_DRAG_TYPE = 'application/x-celebrons-page';
+const PAGE_DRAG_TYPE = 'application/x-bookipix-page';
 
 function FilmstripCell({
   target, label, status, isActive, aspectRatio, onSelect,

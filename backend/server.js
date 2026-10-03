@@ -74,6 +74,8 @@ app.set(
 // (jamais le cas sur le serveur reel) — mis a jour pour ne pas laisser une
 // adresse Render perimee comme repli silencieux.
 const ORIGINES_PAR_DEFAUT = [
+  'https://bookipix.com',
+  'https://www.bookipix.com',
   'https://78.232.5.181.sslip.io'
 ];
 const originesAutorisees = (process.env.ALLOWED_ORIGINS || '')

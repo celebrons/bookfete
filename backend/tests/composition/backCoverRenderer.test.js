@@ -23,11 +23,11 @@ describe('backCoverRenderer.renderBackCoverPage — structure commune', () => {
     expect(html).toContain('data-cvr-role="back-cover"');
   });
 
-  it('la signature Celebrons est toujours presente, mais discrete (petite classe de marque, jamais la classe titre)', () => {
+  it('la signature Bookipix est toujours presente, mais discrete (petite classe de marque, jamais la classe titre)', () => {
     const html = renderBackCoverPage(pageFor('BACK_MINIMAL'), { format: FORMAT, isLast: true, itemsById: {} });
     expect(html).toContain('cvr-brand');
-    expect(html).toContain('Celebrons');
-    expect(html).not.toMatch(/class="cvr-title[^"]*">Celebrons/);
+    expect(html).toContain('Bookipix');
+    expect(html).not.toMatch(/class="cvr-title[^"]*">Bookipix/);
   });
 
   it('echappe le contenu (protection injection)', () => {

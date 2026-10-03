@@ -9,7 +9,7 @@
 # met a echouer un peu partout, sans raison apparente.
 
 [Unit]
-Description=Menage des fichiers de travail Celebrons
+Description=Menage des fichiers de travail Bookipix
 
 [Service]
 Type=oneshot
@@ -23,4 +23,4 @@ IOWeight=20
 
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=celebrons-menage
+SyslogIdentifier=bookipix-menage

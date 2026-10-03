@@ -48,7 +48,7 @@ export function getLanguageHeader() {
 export function getCountryHeader() {
   let country = 'FR';
   try {
-    country = localStorage.getItem('celebrons_country') || 'FR';
+    country = localStorage.getItem('bookipix_country') || 'FR';
   } catch (_error) {
     // Navigation privee/stockage refuse : repli silencieux sur la France,
     // jamais bloquant.

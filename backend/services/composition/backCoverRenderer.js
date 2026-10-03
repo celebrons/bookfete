@@ -30,7 +30,7 @@ function statsHtml(statsLine, sizePt) {
 }
 
 function brandHtml() {
-  return '<div class="cvr-brand cvr-back-brand">Celebrons</div>';
+  return '<div class="cvr-brand cvr-back-brand">Bookipix</div>';
 }
 
 function renderBackMinimal(content, theme, scale) {

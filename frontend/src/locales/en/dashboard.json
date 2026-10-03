@@ -50,7 +50,7 @@
     "activate": "Activate"
   },
   "card": {
-    "shareTitle": "Célébrons",
+    "shareTitle": "Bookipix",
     "shareText": "Join this memory book with me.",
     "autoDeleteTooltip": "Auto-deletes on {{date}}",
     "auto": "Auto",

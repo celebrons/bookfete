@@ -1,4 +1,4 @@
-// Ce serveur est-il capable de faire tourner Celebrons ?
+// Ce serveur est-il capable de faire tourner Bookipix ?
 //
 //   node scripts/check-serveur.js
 //   node scripts/check-serveur.js --rendus 3      (par defaut 2)
@@ -286,6 +286,6 @@ const POLICES = 'Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&fami
     console.log('\nCe qui ne fonctionne pas :');
     echecs.forEach((e) => console.log(`  - ${e.msg}`));
   }
-  console.log(echecs.length === 0 ? '\nVERDICT : ce serveur peut faire tourner Celebrons.' : `\nVERDICT : ${echecs.length} point(s) a regler avant de s'en servir.`);
+  console.log(echecs.length === 0 ? '\nVERDICT : ce serveur peut faire tourner Bookipix.' : `\nVERDICT : ${echecs.length} point(s) a regler avant de s'en servir.`);
   process.exit(echecs.length === 0 ? 0 : 1);
 })();

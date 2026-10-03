@@ -191,7 +191,7 @@ async function copierLeContenu(bookId) {
   console.log(`Retour de Stripe sur ${BASE}\n`);
 
   const marque = `jetable-${Date.now()}`;
-  const email = `${marque}@celebrons-test.invalid`;
+  const email = `${marque}@bookipix-test.invalid`;
   let userId = null;
   let bookId = null;
   let orderId = null;

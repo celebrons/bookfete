@@ -7,7 +7,7 @@
 // livraison saisie a ce moment-la (voir routes/orders.js, resolveCountry) —
 // ce choix precoce n'est qu'une estimation, jamais une donnee a faire
 // suivre d'un appareil a l'autre.
-const STORAGE_KEY = 'celebrons_country';
+const STORAGE_KEY = 'bookipix_country';
 const DEFAULT_COUNTRY = 'FR';
 
 export function getCountryPreference() {
@@ -25,7 +25,7 @@ export function setCountryPreference(country) {
     // Navigation privee/stockage refuse : jamais bloquant, le choix reste
     // juste local a cette page tant que le stockage est indisponible.
   }
-  window.dispatchEvent(new CustomEvent('celebrons:country-changed', { detail: { country } }));
+  window.dispatchEvent(new CustomEvent('bookipix:country-changed', { detail: { country } }));
 }
 
 export { DEFAULT_COUNTRY };

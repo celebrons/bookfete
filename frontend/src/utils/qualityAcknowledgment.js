@@ -14,7 +14,7 @@
 //
 // sessionStorage, pas une colonne en base : c'est une commodite d'ecran,
 // jamais une donnee metier a synchroniser/persister au-dela de l'onglet.
-const PREFIX = 'celebrons:qualityAck:';
+const PREFIX = 'bookipix:qualityAck:';
 
 function lireEnsembleAcquitte(bookId) {
   try {

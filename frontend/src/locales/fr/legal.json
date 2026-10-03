@@ -1,30 +1,30 @@
 {
   "common": {
-    "eyebrow": "CÉLÉBRONS",
+    "eyebrow": "BOOKIPIX",
     "lastUpdated": "Dernière mise à jour : {{date}}"
   },
   "cgv": {
     "title": "Conditions générales de vente",
     "updated": "28 septembre 2026",
-    "intro": "Les présentes conditions générales de vente s'appliquent à toute commande passée sur Célébrons. En cochant la case d'acceptation au moment du paiement, vous déclarez les avoir lues et acceptées.",
+    "intro": "Les présentes conditions générales de vente s'appliquent à toute commande passée sur Bookipix. En cochant la case d'acceptation au moment du paiement, vous déclarez les avoir lues et acceptées.",
     "sections": {
       "s1": {
         "heading": "1. Objet",
         "paragraphs": [
-          "Célébrons propose la création de livres souvenirs personnalisés à partir des photos et textes déposés par le client (et, en mode collectif, par les personnes qu'il invite), composés automatiquement ou manuellement, puis livrés au format PDF, imprimé, ou les deux."
+          "Bookipix propose la création de livres souvenirs personnalisés à partir des photos et textes déposés par le client (et, en mode collectif, par les personnes qu'il invite), composés automatiquement ou manuellement, puis livrés au format PDF, imprimé, ou les deux."
         ]
       },
       "s2": {
         "heading": "2. Prix",
         "paragraphs": [
           "Les prix sont indiqués en euros, toutes taxes comprises, et affichés en temps réel dans l'atelier avant toute commande. Le détail des tarifs par format est consultable sur la page Tarifs.",
-          "Célébrons exerçant sous le statut de micro-entreprise, la TVA n'est pas applicable, conformément à l'article 293 B du Code général des impôts (mention \"TVA non applicable, art. 293 B du CGI\")."
+          "Bookipix exerçant sous le statut de micro-entreprise, la TVA n'est pas applicable, conformément à l'article 293 B du Code général des impôts (mention \"TVA non applicable, art. 293 B du CGI\")."
         ]
       },
       "s3": {
         "heading": "3. Commande et paiement",
         "paragraphs": [
-          "La commande est validée après paiement intégral en ligne, par carte bancaire, via la solution sécurisée Stripe. Aucune donnée bancaire n'est stockée ou accessible par Célébrons.",
+          "La commande est validée après paiement intégral en ligne, par carte bancaire, via la solution sécurisée Stripe. Aucune donnée bancaire n'est stockée ou accessible par Bookipix.",
           "Le prix facturé au moment du paiement correspond exactement à l'état du livre à cet instant (nombre de pages, format) : il est figé pour cette commande et ne change plus ensuite, y compris si les tarifs généraux évoluent par la suite."
         ]
       },
@@ -46,7 +46,7 @@
       "s6": {
         "heading": "6. Qualité des photos",
         "paragraphs": [
-          "L'atelier signale automatiquement les photos dont la résolution est insuffisante pour une impression nette au format choisi. Un écran récapitulatif liste ces photos avant toute commande : vous pouvez les remplacer, ou choisir de commander malgré l'avertissement. Célébrons ne peut être tenu responsable du rendu d'une photo dont la faible qualité a été signalée puis maintenue sciemment."
+          "L'atelier signale automatiquement les photos dont la résolution est insuffisante pour une impression nette au format choisi. Un écran récapitulatif liste ces photos avant toute commande : vous pouvez les remplacer, ou choisir de commander malgré l'avertissement. Bookipix ne peut être tenu responsable du rendu d'une photo dont la faible qualité a été signalée puis maintenue sciemment."
         ]
       },
       "s7": {
@@ -58,7 +58,7 @@
       "s8": {
         "heading": "8. Réclamations et service client",
         "paragraphs": [
-          "Pour toute question ou réclamation concernant une commande, écrivez à bonjour@celebrons.com en indiquant votre numéro de commande."
+          "Pour toute question ou réclamation concernant une commande, écrivez à bonjour@bookipix.com en indiquant votre numéro de commande."
         ]
       },
       "s9": {
@@ -88,12 +88,12 @@
       "s1": {
         "heading": "Éditeur du site",
         "paragraphs": [
-          "Le site Célébrons (celebrons.com) est édité par [À COMPLÉTER : nom et prénom du dirigeant], exerçant sous le statut de micro-entreprise."
+          "Le site Bookipix (bookipix.com) est édité par [À COMPLÉTER : nom et prénom du dirigeant], exerçant sous le statut de micro-entreprise."
         ],
         "list": [
           "SIRET : [À COMPLÉTER]",
           "Adresse du siège : [À COMPLÉTER]",
-          "Contact : bonjour@celebrons.com"
+          "Contact : bonjour@bookipix.com"
         ]
       },
       "s2": {
@@ -116,7 +116,7 @@
       "s4": {
         "heading": "Propriété intellectuelle",
         "paragraphs": [
-          "L'ensemble des éléments du site Célébrons (textes, mises en page, moteur de composition, identité visuelle) est protégé par le droit de la propriété intellectuelle. Les photos et textes que vous déposez dans votre livre restent votre propriété : vous nous accordez uniquement le droit de les traiter techniquement pour composer et imprimer votre livre."
+          "L'ensemble des éléments du site Bookipix (textes, mises en page, moteur de composition, identité visuelle) est protégé par le droit de la propriété intellectuelle. Les photos et textes que vous déposez dans votre livre restent votre propriété : vous nous accordez uniquement le droit de les traiter techniquement pour composer et imprimer votre livre."
         ]
       },
       "s5": {
@@ -130,12 +130,12 @@
   "confidentialite": {
     "title": "Politique de confidentialité",
     "updated": "28 septembre 2026",
-    "intro": "Cette page explique quelles données Célébrons collecte, pourquoi, et avec qui elles sont partagées pour fabriquer et livrer votre livre.",
+    "intro": "Cette page explique quelles données Bookipix collecte, pourquoi, et avec qui elles sont partagées pour fabriquer et livrer votre livre.",
     "sections": {
       "s1": {
         "heading": "Responsable du traitement",
         "paragraphs": [
-          "Le responsable du traitement des données est l'éditeur du site, identifié dans les mentions légales. Pour toute question, contactez bonjour@celebrons.com."
+          "Le responsable du traitement des données est l'éditeur du site, identifié dans les mentions légales. Pour toute question, contactez bonjour@bookipix.com."
         ]
       },
       "s2": {
@@ -175,14 +175,14 @@
       "s6": {
         "heading": "Vos droits",
         "paragraphs": [
-          "Conformément au règlement général sur la protection des données (RGPD), vous disposez d'un droit d'accès, de rectification, d'effacement et de portabilité de vos données, ainsi que d'un droit d'opposition. Pour l'exercer, écrivez à bonjour@celebrons.com.",
+          "Conformément au règlement général sur la protection des données (RGPD), vous disposez d'un droit d'accès, de rectification, d'effacement et de portabilité de vos données, ainsi que d'un droit d'opposition. Pour l'exercer, écrivez à bonjour@bookipix.com.",
           "Si vous estimez que vos droits ne sont pas respectés, vous pouvez introduire une réclamation auprès de la CNIL (www.cnil.fr)."
         ]
       },
       "s7": {
         "heading": "Cookies",
         "paragraphs": [
-          "Célébrons n'utilise aucun cookie publicitaire ni de traceur à des fins de mesure d'audience commerciale. Seuls des éléments techniques strictement nécessaires au fonctionnement du site (maintien de votre connexion) sont utilisés."
+          "Bookipix n'utilise aucun cookie publicitaire ni de traceur à des fins de mesure d'audience commerciale. Seuls des éléments techniques strictement nécessaires au fonctionnement du site (maintien de votre connexion) sont utilisés."
         ]
       },
       "s8": {
@@ -208,12 +208,12 @@
     "pdfOnlyDescription": "Fichier PDF haute définition, téléchargeable dès le paiement. Aucune livraison.",
     "pack": "Pack PDF + imprimé",
     "packDescription": "Le prix du PDF et celui du livre imprimé, additionnés puis réduits de 10 % — plus la livraison.",
-    "vatNote": "Tous nos prix sont exprimés toutes taxes comprises. Célébrons exerçant sous le statut de micro-entreprise, la TVA n'est pas applicable (article 293 B du Code général des impôts).",
+    "vatNote": "Tous nos prix sont exprimés toutes taxes comprises. Bookipix exerçant sous le statut de micro-entreprise, la TVA n'est pas applicable (article 293 B du Code général des impôts).",
     "cta": "Créer mon livre"
   },
   "exemples": {
     "title": "Exemples de livres",
-    "text": "Nous préparons une sélection de vrais livres Célébrons à vous montrer très prochainement — anniversaires, mariages, départs, projets collectifs. En attendant, la meilleure façon de voir ce que donne votre livre est de commencer le vôtre : l'aperçu se met à jour en direct, à l'échelle réelle, pendant toute la composition.",
+    "text": "Nous préparons une sélection de vrais livres Bookipix à vous montrer très prochainement — anniversaires, mariages, départs, projets collectifs. En attendant, la meilleure façon de voir ce que donne votre livre est de commencer le vôtre : l'aperçu se met à jour en direct, à l'échelle réelle, pendant toute la composition.",
     "cta": "Créer mon livre"
   }
 }

@@ -109,7 +109,7 @@ describe('brevoClient — rien ne part sans cle', () => {
   beforeEach(() => {
     jest.resetModules();
     fetchOrigine = global.fetch;
-    process.env.EMAIL_FROM = 'Celebrons <bonjour@celebrons.test>';
+    process.env.EMAIL_FROM = 'Bookipix <bonjour@bookipix.test>';
   });
   afterEach(() => {
     global.fetch = fetchOrigine;
@@ -209,7 +209,7 @@ describe('brevoClient — rien ne part sans cle', () => {
     expect(url).toBe('https://api.brevo.com/v3/smtp/email');
     expect(options.headers['api-key']).toBe('xkeysib-vraie-cle');
     const corps = JSON.parse(options.body);
-    expect(corps.sender).toEqual({ name: 'Celebrons', email: 'bonjour@celebrons.test' });
+    expect(corps.sender).toEqual({ name: 'Bookipix', email: 'bonjour@bookipix.test' });
     expect(corps.to).toEqual([{ email: 'jean@example.com' }]);
     expect(corps.subject).toBe('Votre livre');
   });
@@ -346,7 +346,7 @@ describe('emailService (ancien flux chapitres) — delegue a Brevo', () => {
   beforeEach(() => {
     jest.resetModules();
     fetchOrigine = global.fetch;
-    process.env.EMAIL_FROM = 'Celebrons <bonjour@celebrons.test>';
+    process.env.EMAIL_FROM = 'Bookipix <bonjour@bookipix.test>';
   });
   afterEach(() => {
     global.fetch = fetchOrigine;

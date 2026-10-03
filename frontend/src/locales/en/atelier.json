@@ -4,7 +4,7 @@
   },
   "confirmSwitch": {
     "title": "Switch to automatic mode?",
-    "body": "Célébrons will propose a new layout for your book based on your content. Pages you've already built by hand stay untouched — only the pages still on automatic will be reorganized.",
+    "body": "Bookipix will propose a new layout for your book based on your content. Pages you've already built by hand stay untouched — only the pages still on automatic will be reorganized.",
     "keep": "Keep my work",
     "continue": "Continue"
   },
@@ -36,7 +36,7 @@
       },
       "auto": {
         "title": "Automatic mode",
-        "text": "Or let Célébrons compose the whole book (\"Compose automatically\", at the top), then adjust any pages you like by hand."
+        "text": "Or let Bookipix compose the whole book (\"Compose automatically\", at the top), then adjust any pages you like by hand."
       }
     }
   },
@@ -95,7 +95,7 @@
   "generateModal": {
     "title": "Generate automatically",
     "close": "Close",
-    "intro": "Choose a mood: Célébrons composes the whole book at once from your memories, each photo and each piece of text used only once. You can then adjust any page by hand, or regenerate with a different mood.",
+    "intro": "Choose a mood: Bookipix composes the whole book at once from your memories, each photo and each piece of text used only once. You can then adjust any page by hand, or regenerate with a different mood.",
     "manualKept_one": "Your {{count}} page composed by hand is kept as is: generation only fills the remaining pages, and never replaces a photo or memory you've already placed there.",
     "manualKept_other": "Your {{count}} pages composed by hand are kept as is: generation only fills the remaining pages, and never replaces a photo or memory you've already placed there.",
     "replaceWarning": "Pages already composed automatically will be replaced by the new proposal. Your photos and memories, on the other hand, are never deleted.",
@@ -103,7 +103,7 @@
     "overflow": {
       "prefix": "Your content needs ",
       "pagesBold": "{{count}} pages",
-      "middle": " while your book has {{current}}. Célébrons never leaves a photo out: the book will grow to {{next}} pages",
+      "middle": " while your book has {{current}}. Bookipix never leaves a photo out: the book will grow to {{next}} pages",
       "priceChangePrefix": ", and its price from ",
       "priceChangeSeparator": " to ",
       "suffix": ". To keep {{current}} pages, close this window and remove some photos in \"My memories\"."
@@ -111,7 +111,7 @@
     "remaining": {
       "main_one": "Your content fills about {{estimated}} page{{estimatedPlural}} out of the {{min}} in your book: the last page will stay blank.",
       "main_other": "Your content fills about {{estimated}} page{{estimatedPlural}} out of the {{min}} in your book: the last {{count}} pages will stay blank.",
-      "note": "Célébrons never repeats a photo or memory to fill the space — you can compose them by hand, or add content in \"My memories\"."
+      "note": "Bookipix never repeats a photo or memory to fill the space — you can compose them by hand, or add content in \"My memories\"."
     },
     "cancel": "Cancel",
     "willGrowTo": "The book will grow to {{pages}} pages",
@@ -216,7 +216,7 @@
       "inviteTitleManage": "See the link, invite, and track contributions",
       "inviteTitleNew": "Invite your loved ones to add their photos and words",
       "invite": "Invite",
-      "composeAutoTitle": "Célébrons proposes a new layout for your book — you'll always be able to adjust each page by hand afterward",
+      "composeAutoTitle": "Bookipix proposes a new layout for your book — you'll always be able to adjust each page by hand afterward",
       "composeAuto": "Compose automatically",
       "reviewHelp": "Review the instructions"
     },
@@ -304,7 +304,7 @@
     "coverColorLabel": "Cover color",
     "coverColorGroupLabel": "Cover color",
     "autoColorLabel": "Auto",
-    "autoColorTitle": "Let Célébrons choose based on style and format",
+    "autoColorTitle": "Let Bookipix choose based on style and format",
     "coverColorHint": "Applies to the front, spine, and back cover — a book has only one material.",
     "albumStyleLabel": "Album style",
     "albumStyleGroupLabel": "Album style",

@@ -19,7 +19,7 @@ import { getApiBaseUrl } from './compositionApi';
 //
 // Il voyage dans un en-tete, jamais dans une URL — une URL finit dans les
 // journaux du serveur et dans l'historique du navigateur.
-const CLE_CODE = 'celebrons.admin.code';
+const CLE_CODE = 'bookipix.admin.code';
 
 export const lireCodeAdmin = () => {
   try {

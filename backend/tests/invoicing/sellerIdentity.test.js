@@ -20,7 +20,7 @@ describe('sellerIdentity', () => {
     expect(identite.name).toBe('[À COMPLÉTER]');
     expect(identite.siret).toBe('[À COMPLÉTER]');
     expect(identite.address).toBe('[À COMPLÉTER]');
-    expect(identite.email).toBe('bonjour@celebrons.com');
+    expect(identite.email).toBe('bonjour@bookipix.com');
     expect(identite.vatMention).toMatch(/293 B/);
     expect(isSellerIdentityComplete(identite)).toBe(false);
   });

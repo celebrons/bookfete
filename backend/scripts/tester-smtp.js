@@ -135,7 +135,7 @@ async function main() {
     const envoi = await transport.sendMail({
       from: DE,
       to: VERS,
-      subject: 'Celebrons — essai de configuration',
+      subject: 'Bookipix — essai de configuration',
       text: [
         'Cet email confirme que la configuration SMTP fonctionne.',
         '',

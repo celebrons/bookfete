@@ -1,6 +1,6 @@
 // backend/services/printing/gelatoTracking.js
 //
-// Traduit l'etat REEL d'une commande chez Gelato en vocabulaire Celebrons
+// Traduit l'etat REEL d'une commande chez Gelato en vocabulaire Bookipix
 // (voir ORDER_STATUSES dans routes/orders.js et ORDER_STATUS_SEQUENCE cote
 // frontend, utils/orderWorkflow.js) — ces statuts existaient deja mais rien
 // ne les faisait avancer pour une commande imprimee : c'est ce module qui
@@ -16,7 +16,7 @@
 //
 // Fonctions pures, aucun acces reseau (l'appel API vit dans gelatoClient.js).
 
-// Gelato -> Celebrons. Les cles sont normalisees (minuscules, sans espace ni
+// Gelato -> Bookipix. Les cles sont normalisees (minuscules, sans espace ni
 // tiret/underscore) pour absorber les variantes d'ecriture d'une version
 // d'API a l'autre ("in_production", "inProduction", "in production"...).
 const STATUS_MAP = {
@@ -57,7 +57,7 @@ function normalizeKey(value) {
 
 /**
  * @param {string} raw - fulfillmentStatus renvoye par Gelato
- * @returns {string|null} statut Celebrons, ou null si non reconnu (l'appelant
+ * @returns {string|null} statut Bookipix, ou null si non reconnu (l'appelant
  *   garde alors le statut courant — jamais d'ecrasement a l'aveugle).
  */
 function mapGelatoStatus(raw) {
@@ -81,7 +81,7 @@ function firstNonEmpty(...values) {
 function extractTracking(gelatoOrder) {
   const shipment = gelatoOrder?.shipment || {};
   const items = Array.isArray(gelatoOrder?.items) ? gelatoOrder.items : [];
-  // Une commande Celebrons = un seul produit, mais Gelato expose le suivi au
+  // Une commande Bookipix = un seul produit, mais Gelato expose le suivi au
   // niveau de l'expedition ET/OU de chaque article selon les cas.
   const itemFulfillments = items.flatMap((item) => (Array.isArray(item?.fulfillments) ? item.fulfillments : []));
   const firstFulfillment = itemFulfillments[0] || {};

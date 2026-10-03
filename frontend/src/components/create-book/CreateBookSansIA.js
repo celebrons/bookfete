@@ -84,10 +84,10 @@ export default function CreateBookSansIA() {
     // international 2026-10-02) : redemande les tarifs dans la nouvelle
     // devise si le visiteur change de pays APRES ce premier chargement.
     const onCountryChange = () => charger();
-    window.addEventListener('celebrons:country-changed', onCountryChange);
+    window.addEventListener('bookipix:country-changed', onCountryChange);
     return () => {
       annule = true;
-      window.removeEventListener('celebrons:country-changed', onCountryChange);
+      window.removeEventListener('bookipix:country-changed', onCountryChange);
     };
   }, []);
 

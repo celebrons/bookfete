@@ -2200,7 +2200,7 @@ export default function BookAtelierLuxe() {
           l'on passe le plus de temps, donc celui ou il faut le dire. */}
       <AnonymousBanner compact />
       {/* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29, Gabarit 2
-          "bandeau test detachable" le meme jour — voir l'artefact "Célébrons
+          "bandeau test detachable" le meme jour — voir l'artefact "Bookipix
           — pistes d'interface", onglet "Barre d'atelier").
           Remplace ce que le site affichait par-dessus l'atelier jusqu'ici
           (logo, "Comment ca marche", tableau de bord, administration,

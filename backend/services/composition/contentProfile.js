@@ -8,7 +8,7 @@
 //
 // Fonction pure, aucun acces reseau/disque.
 
-// Meme constante que l'ancienne heuristique de pagination (§ artefact "Celebrons
+// Meme constante que l'ancienne heuristique de pagination (§ artefact "Bookipix
 // sans IA") : une approximation grossiere du nombre de "slots" qu'un texte
 // occupe, pas une mesure d'affichage precise (voir textLength.js pour les
 // categories de longueur utilisees par le scoring/rendu).

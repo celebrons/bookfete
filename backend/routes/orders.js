@@ -699,7 +699,7 @@ const triggerGelatoSubmissionIfNeeded = ({ db, order, ownerEmail }) => {
           console.error('Erreur alerte admin envoi Gelato echoue:', alertError.message);
         }
       } else if (!result.skipped) {
-        console.log(`Commande Gelato ${result.gelatoOrderType} creee (${result.gelatoOrderId}) pour la commande Celebrons ${order.id}`);
+        console.log(`Commande Gelato ${result.gelatoOrderType} creee (${result.gelatoOrderId}) pour la commande Bookipix ${order.id}`);
         logEvent({
           type: 'gelato.submitted',
           actor: ownerEmail,
@@ -1626,7 +1626,7 @@ router.get('/formats', (req, res) => {
 
   // reliure : matiere reelle de la couverture (voir coverFormat.js — Standard
   // et Luxe partagent le MEME format papier, seule la matiere les distingue).
-  // nom : nom de produit, jamais traduit (meme convention que "Célébrons"
+  // nom : nom de produit, jamais traduit (meme convention que "Bookipix"
   // lui-meme) — seule l'accroche change de langue (chantier bilingue,
   // phase 6 : ce catalogue etait reste en francais dans toutes les phases
   // precedentes, voir le commentaire laisse dans CreateBookSansIA.js).

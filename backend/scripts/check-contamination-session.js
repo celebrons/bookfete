@@ -49,7 +49,7 @@ async function main() {
   const { url, key } = cleAnonyme();
 
   const suffixe = Math.random().toString(36).slice(2, 8);
-  const email = `contamination-${suffixe}@celebrons-test.local`;
+  const email = `contamination-${suffixe}@bookipix-test.local`;
   const motDePasse = `Jetable-${suffixe}-A1!`;
   const aSupprimer = [];
   const livresASupprimer = [];

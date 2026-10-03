@@ -20,7 +20,7 @@ const OWNER_ID = 'owner-test-1';
 const JOB_ID = 'job1234567890abcdef';
 
 // Un dossier a nous, vide : on ne veut pas fouiller le vrai tmp du projet.
-const mockDossier = fs.mkdtempSync(path.join(os.tmpdir(), 'celebrons-pdf-'));
+const mockDossier = fs.mkdtempSync(path.join(os.tmpdir(), 'bookipix-pdf-'));
 
 jest.mock('../services/composition/pdfService', () => ({
   PDF_PREVIEW_DIR: mockDossier,

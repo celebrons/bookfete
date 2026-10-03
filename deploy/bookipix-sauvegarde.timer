@@ -1,13 +1,13 @@
 # Declenche la sauvegarde chaque nuit a 3 h.
 #
 # Installer :
-#   systemctl enable --now celebrons-sauvegarde.timer
+#   systemctl enable --now bookipix-sauvegarde.timer
 #
 # Verifier la prochaine execution :
-#   systemctl list-timers celebrons-sauvegarde
+#   systemctl list-timers bookipix-sauvegarde
 
 [Unit]
-Description=Sauvegarde nocturne de la base Celebrons
+Description=Sauvegarde nocturne de la base Bookipix
 
 [Timer]
 OnCalendar=*-*-* 03:00:00

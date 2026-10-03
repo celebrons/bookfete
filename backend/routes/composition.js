@@ -120,7 +120,7 @@ function sanitizeTextRoles(raw, validItemIds) {
 }
 
 // Nettoie { [itemId]: {align, color, sizePt} }. C'est ici que se joue
-// concretement le "Celebrons reste responsable du design" du cahier des
+// concretement le "Bookipix reste responsable du design" du cahier des
 // charges : une couleur hors palette, un alignement fantaisiste ou une
 // taille hors de la plage du role sont ECARTES — pas rejetes avec une
 // erreur (l'utilisateur n'y peut rien), simplement ignores au profit de la

@@ -14,7 +14,7 @@
 const ORDER_ID = 'order-webhook-1';
 const OWNER_ID = 'owner-test-1';
 const SESSION_ID = 'cs_test_webhook';
-const SECRET_WEBHOOK = 'whsec_test_celebrons';
+const SECRET_WEBHOOK = 'whsec_test_bookipix';
 
 jest.mock('../config/supabase', () => {
   const { createSupabaseMock } = require('./helpers/supabaseMock');

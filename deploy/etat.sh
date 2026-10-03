@@ -17,7 +17,7 @@ DOSSIER=/home/celebrons/bookfete
 titre() { echo ""; echo "=== $1"; }
 
 echo "======================================================================"
-echo " Celebrons — etat du serveur      $(date '+%Y-%m-%d %H:%M:%S %Z')"
+echo " Bookipix — etat du serveur      $(date '+%Y-%m-%d %H:%M:%S %Z')"
 echo "======================================================================"
 
 titre "Machine"
@@ -27,7 +27,7 @@ free -m | awk 'NR==2 {printf "  memoire         : %s Mo utilises sur %s (%s Mo l
 df -h / | awk 'NR==2 {printf "  disque          : %s utilises sur %s (%s libre)\n", $3, $2, $4}'
 
 titre "Services"
-for s in celebrons caddy; do
+for s in bookipix caddy; do
   etat=$(systemctl is-active "$s" 2>/dev/null)
   depuis=$(systemctl show "$s" -p ActiveEnterTimestamp --value 2>/dev/null)
   printf "  %-12s %-10s depuis %s\n" "$s" "$etat" "${depuis:-?}"
@@ -52,9 +52,9 @@ noeud=$(ps -eo rss,args | grep "node server.js" | grep -v grep | awk '{printf "%
 echo "  memoire de l'API : ${noeud:-0} Mo"
 
 titre "Erreurs des dernieres 24 h"
-erreurs=$(journalctl -u celebrons --since "24 hours ago" --no-pager 2>/dev/null | grep -icE "error|echoue|failed" || true)
+erreurs=$(journalctl -u bookipix --since "24 hours ago" --no-pager 2>/dev/null | grep -icE "error|echoue|failed" || true)
 echo "  ${erreurs:-0} ligne(s) mentionnant une erreur"
-journalctl -u celebrons --since "24 hours ago" --no-pager 2>/dev/null \
+journalctl -u bookipix --since "24 hours ago" --no-pager 2>/dev/null \
   | grep -iE "error|echoue|failed" | tail -5 | sed 's/^/    /' || true
 
 titre "Sauvegardes"
@@ -66,7 +66,7 @@ if [ -d /home/celebrons/sauvegardes ]; then
   else
     echo "  AUCUNE pour l'instant (la premiere se fera a 3 h)"
   fi
-  systemctl list-timers celebrons-sauvegarde --no-pager 2>/dev/null | sed -n 2p | awk '{print "  prochaine: " $1, $2, $3}'
+  systemctl list-timers bookipix-sauvegarde --no-pager 2>/dev/null | sed -n 2p | awk '{print "  prochaine: " $1, $2, $3}'
 else
   echo "  dossier de sauvegarde absent"
 fi
@@ -84,6 +84,6 @@ fi
 
 echo ""
 echo "----------------------------------------------------------------------"
-echo " Journaux en direct :  journalctl -u celebrons -f"
-echo " Sauvegarde          :  journalctl -u celebrons-sauvegarde -n 30"
+echo " Journaux en direct :  journalctl -u bookipix -f"
+echo " Sauvegarde          :  journalctl -u bookipix-sauvegarde -n 30"
 echo "----------------------------------------------------------------------"

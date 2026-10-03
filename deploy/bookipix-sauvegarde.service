@@ -1,12 +1,12 @@
 # Sauvegarde nocturne de la base.
 #
 # L'offre gratuite de Supabase n'inclut aucune sauvegarde : c'est le filet.
-# Declenche par celebrons-sauvegarde.timer, jamais directement.
+# Declenche par bookipix-sauvegarde.timer, jamais directement.
 #
-# Le resultat se lit avec :  journalctl -u celebrons-sauvegarde -n 30
+# Le resultat se lit avec :  journalctl -u bookipix-sauvegarde -n 30
 
 [Unit]
-Description=Sauvegarde de la base Celebrons
+Description=Sauvegarde de la base Bookipix
 After=network-online.target
 Wants=network-online.target
 
@@ -22,4 +22,4 @@ TimeoutStartSec=600
 
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=celebrons-sauvegarde
+SyslogIdentifier=bookipix-sauvegarde

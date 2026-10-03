@@ -63,7 +63,7 @@ function mapShippingAddress(address, ownerEmail) {
   const fullName = String(address?.fullName || '').trim();
   const spaceIndex = fullName.indexOf(' ');
   const firstName = spaceIndex > 0 ? fullName.slice(0, spaceIndex) : (fullName || 'Client');
-  const lastName = spaceIndex > 0 ? fullName.slice(spaceIndex + 1) : 'Celebrons';
+  const lastName = spaceIndex > 0 ? fullName.slice(spaceIndex + 1) : 'Bookipix';
 
   return {
     firstName,

@@ -109,7 +109,7 @@ async function main() {
       orderType: 'draft',
       currency: cible.currency,
       shippingAddress: {
-        firstName: 'Test', lastName: 'Celebrons',
+        firstName: 'Test', lastName: 'Bookipix',
         addressLine1: '1 Test Street', city: cible.city, postCode: cible.postCode, country: cible.country,
         email: 'test@example.com'
       },

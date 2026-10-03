@@ -20,7 +20,7 @@
 }
 
 /* EN-TETE (refonte visuelle 2026-09-25, elargie 2026-09-29, Gabarit 2
-   "bandeau test detachable" le meme jour — voir l'artefact "Célébrons —
+   "bandeau test detachable" le meme jour — voir l'artefact "Bookipix —
    pistes d'interface", onglet "Barre d'atelier"). Deux lignes dans
    .atelier-header : .atelier-header-top (retour, titre, format+pagination,
    "Terminer mon livre" pousse a droite) puis .atelier-tools-row (barre
@@ -2995,7 +2995,7 @@
   box-shadow: 0 0 0 2px var(--white, #fff), 0 0 0 4px var(--gold);
 }
 
-/* "Auto" : laisser Celebrons choisir selon le style et le format. */
+/* "Auto" : laisser Bookipix choisir selon le style et le format. */
 .coverlite-color.is-auto {
   width: auto;
   height: 26px;

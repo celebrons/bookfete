@@ -41,10 +41,10 @@ export default function TarifsLuxe() {
     // l'en-tete, voir CountrySwitcher.js) — on redemande alors les tarifs
     // dans la nouvelle devise plutot que de laisser l'ancienne affichee.
     const onCountryChange = () => charger();
-    window.addEventListener('celebrons:country-changed', onCountryChange);
+    window.addEventListener('bookipix:country-changed', onCountryChange);
     return () => {
       annule = true;
-      window.removeEventListener('celebrons:country-changed', onCountryChange);
+      window.removeEventListener('bookipix:country-changed', onCountryChange);
     };
   }, []);
 
