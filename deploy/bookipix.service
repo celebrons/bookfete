@@ -23,11 +23,16 @@ EnvironmentFile=/home/celebrons/bookfete/backend/.env
 # Fixe ICI et non dans .env (2026-10-04) : trouve le 2026-10-03 a NODE_ENV=
 # development sur le serveur de production — consequence reelle, le CORS
 # repondait * (n'importe quel site peut appeler l'API) au lieu de se
-# restreindre a bookipix.com (voir server.js). Place APRES EnvironmentFile :
-# systemd applique les affectations dans l'ordre du fichier, donc cette
-# ligne gagne toujours, quoi que porte .env — jamais plus de depart en
-# "developpement" par oubli sur CETTE machine, qui n'est QUE la production.
-Environment=NODE_ENV=production
+# restreindre a bookipix.com (voir server.js).
+#
+# Un second EnvironmentFile=, pas un Environment= : verifie empiriquement
+# sur ce serveur qu'une ligne Environment= placee APRES EnvironmentFile=
+# perd quand meme face a .env, quel que soit l'ordre dans ce fichier — donc
+# PAS la regle "le dernier assignement gagne" qu'on attendrait. Deux
+# EnvironmentFile= successifs, eux, se comportent bien en couches : celui-ci
+# gagne sur .env pour cette seule variable. Fichier non secret, versionne
+# (voir deploy/node-env-production.env).
+EnvironmentFile=/home/celebrons/bookfete/deploy/node-env-production.env
 ExecStart=/usr/bin/node server.js
 
 # Un rendu PDF dure plusieurs minutes et monte a ~600 Mo (node + Chromium).
