@@ -286,6 +286,11 @@ const BookCheckoutLuxe = () => {
   // avancer/reculer AVANT le paiement ; des qu'une commande existe, l'etat
   // reel reprend la main.
   const [manualStep, setManualStep] = useState(0);
+  // "Continuer" reste cliquable meme formulaire incomplet (retour
+  // utilisateur, 2026-10-04 : un bouton desactive ne disait jamais quel
+  // champ manquait) — ce drapeau revele les champs en erreur APRES une
+  // tentative, jamais avant. Remis a false en quittant l'etape adresse.
+  const [addressAttempted, setAddressAttempted] = useState(false);
   const [tracking, setTracking] = useState(null);
   const [loadingTracking, setLoadingTracking] = useState(false);
   const effectiveOrderType = checkoutFormLocked
@@ -1489,7 +1494,13 @@ const BookCheckoutLuxe = () => {
           {currentStepKey === 'product' && (
             <StepProduct
               orderType={effectiveOrderType}
-              onChangeType={setOrderType}
+              onChangeType={(nextType) => {
+                // Le jeu de champs de l'etape adresse change avec le type
+                // (livraison+facturation pour print/pack, facturation seule
+                // pour pdf) : une tentative passee n'a plus de sens.
+                setAddressAttempted(false);
+                setOrderType(nextType);
+              }}
               quantity={effectiveQuantity}
               onChangeQuantity={setQuantity}
               locked={checkoutFormLocked}
@@ -1513,6 +1524,7 @@ const BookCheckoutLuxe = () => {
               onChangeBillingField={setBillingAddressField}
               billingIncomplete={!billingComplete}
               billingOnly={!includesPrint(effectiveOrderType)}
+              showErrors={addressAttempted}
             />
           )}
 
@@ -1573,8 +1585,22 @@ const BookCheckoutLuxe = () => {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={currentStepKey === 'address' && (includesPrint(effectiveOrderType) ? (!addressComplete || !billingComplete) : !billingComplete)}
-                  onClick={() => setManualStep(derivedStep + 1)}
+                  onClick={() => {
+                    // Toujours cliquable : un bouton desactive ne disait
+                    // jamais quel champ manquait (retour utilisateur,
+                    // 2026-10-04). Sur l'etape adresse incomplete, le clic
+                    // revele les champs en erreur au lieu d'avancer.
+                    if (currentStepKey === 'address') {
+                      const complete = includesPrint(effectiveOrderType)
+                        ? (addressComplete && billingComplete)
+                        : billingComplete;
+                      if (!complete) {
+                        setAddressAttempted(true);
+                        return;
+                      }
+                    }
+                    setManualStep(derivedStep + 1);
+                  }}
                 >
                   {t('flow.nav.continue')}
                 </button>

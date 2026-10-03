@@ -44,33 +44,51 @@ const BILLING_FIELDS = [
   { name: 'country' }
 ];
 
+// Les SEULS champs realement obligatoires (meme liste que addressComplete/
+// billingComplete dans BookCheckoutLuxe.js, et que isAddressValid cote
+// serveur) — email/telephone/complement restent facultatifs partout, jamais
+// marques en erreur meme vides.
+const CHAMPS_OBLIGATOIRES = new Set(['fullName', 'line1', 'postalCode', 'city', 'country']);
+
 // Partage entre l'adresse de livraison, le bloc facturation conditionnel et
 // le mode "facturation seule" (PDF) plus bas : les trois rendent la meme
 // forme de champ (autocomplete ou simple input), seule la liste de champs et
 // les valeurs changent.
-function renderFields(fields, values, onChange, locked, t) {
-  return fields.map((field) => (field.autocomplete ? (
-    <AddressAutocomplete
-      key={field.name}
-      field={field.name}
-      value={values[field.name] || ''}
-      address={values}
-      onChangeField={onChange}
-      placeholder={t(`stepAddress.fields.${field.name}`)}
-      disabled={locked}
-    />
-  ) : (
-    <input
-      key={field.name}
-      className="input-luxe"
-      name={field.name}
-      type={field.type || 'text'}
-      value={values[field.name] || ''}
-      onChange={onChange}
-      placeholder={t(`stepAddress.fields.${field.name}`)}
-      disabled={locked}
-    />
-  )));
+//
+// `showErrors` : un bouton "Continuer" DESACTIVE sans indication ne disait
+// jamais quel champ manquait (retour utilisateur, 2026-10-04) — le bouton
+// est maintenant toujours cliquable, et un clic sur un formulaire incomplet
+// declenche `showErrors` pour entourer en rouge chaque champ obligatoire
+// encore vide. Jamais affiche avant une premiere tentative : un formulaire
+// vierge n'a pas besoin de s'annoncer en erreur.
+function renderFields(fields, values, onChange, locked, t, showErrors) {
+  return fields.map((field) => {
+    const manquant = showErrors && CHAMPS_OBLIGATOIRES.has(field.name) && !String(values[field.name] || '').trim();
+    const className = `input-luxe${manquant ? ' input-error' : ''}`;
+    return field.autocomplete ? (
+      <AddressAutocomplete
+        key={field.name}
+        field={field.name}
+        value={values[field.name] || ''}
+        address={values}
+        onChangeField={onChange}
+        placeholder={t(`stepAddress.fields.${field.name}`)}
+        disabled={locked}
+        className={className}
+      />
+    ) : (
+      <input
+        key={field.name}
+        className={className}
+        name={field.name}
+        type={field.type || 'text'}
+        value={values[field.name] || ''}
+        onChange={onChange}
+        placeholder={t(`stepAddress.fields.${field.name}`)}
+        disabled={locked}
+      />
+    );
+  });
 }
 
 function StepAddress({
@@ -83,7 +101,8 @@ function StepAddress({
   billingAddress,
   onChangeBillingField,
   billingIncomplete,
-  billingOnly
+  billingOnly,
+  showErrors
 }) {
   const { t } = useTranslation('checkout');
 
@@ -100,9 +119,9 @@ function StepAddress({
         <h2>{t('stepAddress.billingOnlyTitle')}</h2>
         <p className="orders-disclaimer">{t('stepAddress.billingOnlyNote')}</p>
         <div className="orders-form-grid">
-          {renderFields(BILLING_FIELDS, billingAddress, onChangeBillingField, locked, t)}
+          {renderFields(BILLING_FIELDS, billingAddress, onChangeBillingField, locked, t, showErrors)}
         </div>
-        {billingIncomplete && (
+        {showErrors && billingIncomplete && (
           <p className="orders-disclaimer">
             {t('stepAddress.billingIncompleteWarning')}
           </p>
@@ -115,12 +134,12 @@ function StepAddress({
     <article className="orders-panel">
       <h2>{t('stepAddress.title')}</h2>
       <div className="orders-form-grid">
-        {renderFields(FIELDS, address, onChangeField, locked, t)}
+        {renderFields(FIELDS, address, onChangeField, locked, t, showErrors)}
       </div>
       <p className="orders-disclaimer">
         {t('stepAddress.emailNote')}
       </p>
-      {incomplete && (
+      {showErrors && incomplete && (
         <p className="orders-disclaimer">
           {t('stepAddress.incompleteWarning')}
         </p>
@@ -145,9 +164,9 @@ function StepAddress({
         <div className="orders-billing-fields">
           <h3>{t('stepAddress.billingTitle')}</h3>
           <div className="orders-form-grid">
-            {renderFields(BILLING_FIELDS, billingAddress, onChangeBillingField, locked, t)}
+            {renderFields(BILLING_FIELDS, billingAddress, onChangeBillingField, locked, t, showErrors)}
           </div>
-          {billingIncomplete && (
+          {showErrors && billingIncomplete && (
             <p className="orders-disclaimer">
               {t('stepAddress.billingIncompleteWarning')}
             </p>
