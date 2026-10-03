@@ -58,11 +58,11 @@ const HeaderLuxe = () => {
   // masque tant qu'on ne l'ouvre pas ; au-dessus il doit rester visible en
   // permanence, sans dependre de l'etat d'ouverture.
   const [compact, setCompact] = React.useState(() => (
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1200px)').matches
   ));
 
   React.useEffect(() => {
-    const media = window.matchMedia('(max-width: 860px)');
+    const media = window.matchMedia('(max-width: 1200px)');
     const apply = (event) => {
       setCompact(event.matches);
       if (!event.matches) setMenuOpen(false); // repasse en large : plus de menu ouvert qui traine

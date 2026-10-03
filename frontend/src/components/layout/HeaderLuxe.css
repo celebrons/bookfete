@@ -34,10 +34,16 @@
 }
 .site-header-logo-dot { color: var(--gold); }
 
+/* Gap volontairement plus serre que --space-xl (60px, pensee pour separer
+   des sections de page, pas des liens de menu) : avec 7-8 elements dans la
+   nav connectee (accueil, tableau de bord, Administration, compte, email,
+   langue, pays, deconnexion), 60px entre chaque poussait Deconnexion hors
+   champ bien avant le seuil "ecran etroit" — voir le seuil @media plus bas,
+   recalcule pour cette largeur de nav. */
 .site-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-xl);
+  gap: var(--space-md);
 }
 
 .site-nav-link {
@@ -99,10 +105,13 @@
 .site-header-burger:hover { border-color: rgba(184, 146, 74, 0.45); color: var(--gold); }
 
 /* --- Ecrans etroits ---------------------------------------------------
-   860 px et non 720 : la navigation connectee (4 liens + 2 boutons) cesse
-   de tenir bien avant le seuil "mobile" habituel, et un menu qui deborde
-   silencieusement est pire qu'un menu replie un peu tot. */
-@media (max-width: 860px) {
+   1200 px et non 860 : releve le 2026-10-03, le seuil de 860px datait du
+   14/09 et n'a jamais ete recalcule depuis l'ajout d'Administration, du
+   selecteur de langue et du selecteur de pays — la nav connectee admin
+   (jusqu'a 8 elements) deborde largement avant 860px avec ces 3 ajouts.
+   Un menu qui deborde silencieusement est pire qu'un menu replie un peu
+   tot ; garder ce seuil synchronise avec le matchMedia de HeaderLuxe.js. */
+@media (max-width: 1200px) {
   .site-header-inner { padding: var(--space-sm) var(--space-md); }
   .site-header-burger { display: inline-flex; }
 
@@ -167,7 +176,7 @@
   font-style: italic;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1200px) {
   /* Dans le menu deroulant, la place ne manque plus : on affiche
      l'adresse en entier. */
   .site-nav-user {
