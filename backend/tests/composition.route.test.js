@@ -338,6 +338,53 @@ describe('routes/composition', () => {
         .attach('photo', Buffer.from('fake-image-bytes'), 'souvenir.jpg');
       expect(response.status).toBe(403);
     });
+
+    // Protection des uploads (plan de mise en production, 2026-10-04) :
+    // storageService.uploadFile rejette desormais un contenu qui n'est pas
+    // reellement une image (voir storageService.test.js) — ici on verifie
+    // que la route traduit ca en 400 (faute du client), jamais en 500
+    // (panne serveur), et sans creer de content-item.
+    it("refuse (400, pas 500) quand storageService signale un contenu qui n'est pas une image valide", async () => {
+      const storageService = require('../services/storageService');
+      storageService.uploadFile.mockResolvedValueOnce({
+        success: false,
+        invalidContent: true,
+        error: "Le fichier envoye n'est pas une image valide (contenu illisible)."
+      });
+
+      const response = await request(app)
+        .post(`/api/books/${BOOK_ID}/content-items/photo`)
+        .set('Authorization', 'Bearer valid-token')
+        .attach('photo', Buffer.from('pas-une-image'), 'souvenir.jpg');
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/pas une image valide/);
+    });
+
+    // Quota par livre (plan de mise en production, 2026-10-04) : voir
+    // bookContentService.MAX_PHOTOS_PAR_LIVRE.
+    it('refuse (413) une nouvelle photo quand le livre a deja atteint le quota, SANS appeler storageService', async () => {
+      const storageService = require('../services/storageService');
+      const table = supabaseMock.__table('book_content_items');
+      const avant = table.length;
+      for (let i = 0; i < 500; i += 1) {
+        table.push({ id: `quota-${i}`, book_id: BOOK_ID, kind: 'photo' });
+      }
+
+      const appelsAvant = storageService.uploadFile.mock.calls.length;
+      try {
+        const response = await request(app)
+          .post(`/api/books/${BOOK_ID}/content-items/photo`)
+          .set('Authorization', 'Bearer valid-token')
+          .attach('photo', Buffer.from('fake-image-bytes'), 'souvenir.jpg');
+
+        expect(response.status).toBe(413);
+        expect(response.body.error).toMatch(/limite de 500 photos/);
+        expect(storageService.uploadFile.mock.calls.length).toBe(appelsAvant);
+      } finally {
+        table.length = avant;
+      }
+    });
   });
 
   describe('lien de partage collaboratif (public, sans authentification)', () => {

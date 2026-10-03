@@ -16,6 +16,10 @@ const TOKENS = {
   'sans-email-token': { id: 'ghost-1', email: '', is_anonymous: false }
 };
 
+jest.mock('../services/storageService', () => ({
+  deleteBookFolder: jest.fn(async () => ({ success: true, removed: 0 }))
+}));
+
 jest.mock('../config/supabase', () => {
   const { createSupabaseMock } = require('./helpers/supabaseMock');
   const mock = createSupabaseMock({
@@ -42,7 +46,11 @@ jest.mock('../config/supabase', () => {
       const user = global.__adminTokens[token];
       if (!user) return { data: { user: null }, error: { message: 'invalid token' } };
       return { data: { user }, error: null };
-    })
+    }),
+    admin: {
+      listUsers: jest.fn(async () => ({ data: { users: [] }, error: null })),
+      deleteUser: jest.fn(async () => ({ error: null }))
+    }
   };
 
   global.__adminSupabaseMock = mock;
@@ -403,9 +411,60 @@ describe('Espace admin — nettoyage des livres non finalises', () => {
     expect(response.status).toBe(200);
     expect(response.body.removed).toBe(1);
     expect(response.body.bookIds).toEqual(['b2']);
+    // Les photos du dossier de b2 doivent etre nettoyees aussi — jamais
+    // seulement la ligne "books" (voir storageService.deleteBookFolder).
+    expect(require('../services/storageService').deleteBookFolder).toHaveBeenCalledWith('contribution-photos', 'b2');
 
     const remaining = global.__adminSupabaseMock.__table('books').map((b) => b.id);
     expect(remaining).toContain('b1');
     expect(remaining).not.toContain('b2');
+  });
+});
+
+// Comptes anonymes abandonnes (2026-10-04, voir
+// services/accounts/anonymousPurge.js). Les routes elles-memes ne font que
+// deleguer et verifier les droits — le detail (exclusion des comptes avec
+// commande, ordre des suppressions) est teste directement sur le service
+// dans tests/accounts/anonymousPurge.test.js ; ici on verifie juste le cote
+// HTTP (acces, parametre `jours`, forme de la reponse).
+describe('Espace admin — comptes anonymes abandonnes', () => {
+  let app;
+  const OLD_ENV = { ...process.env };
+
+  beforeAll(() => { app = buildApp(); });
+  beforeEach(() => {
+    process.env.ADMIN_EMAILS = ADMIN_EMAIL;
+    global.__adminSupabaseMock.auth.admin.listUsers.mockImplementation(async ({ page }) => (
+      page === 1
+        ? { data: { users: [{ id: 'u-abandon', is_anonymous: true, created_at: '2020-01-01T00:00:00Z' }] }, error: null }
+        : { data: { users: [] }, error: null }
+    ));
+  });
+  afterEach(() => { process.env = { ...OLD_ENV }; });
+
+  it('GET /accounts/anonymous/abandoned refuse un non-administrateur', async () => {
+    const response = await request(app).get('/api/admin/accounts/anonymous/abandoned').set('Authorization', 'Bearer user-token');
+    expect(response.status).toBe(404);
+  });
+
+  it('GET /accounts/anonymous/abandoned liste le compte abandonne, avec le seuil par defaut (7 jours)', async () => {
+    const response = await request(app).get('/api/admin/accounts/anonymous/abandoned').set('Authorization', 'Bearer admin-token');
+    expect(response.status).toBe(200);
+    expect(response.body.jours).toBe(7);
+    expect(response.body.total).toBe(1);
+    expect(response.body.comptes[0].userId).toBe('u-abandon');
+  });
+
+  it('POST /accounts/anonymous/abandoned/purge refuse un non-administrateur', async () => {
+    const response = await request(app).post('/api/admin/accounts/anonymous/abandoned/purge').set('Authorization', 'Bearer user-token');
+    expect(response.status).toBe(404);
+    expect(global.__adminSupabaseMock.auth.admin.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it('POST /accounts/anonymous/abandoned/purge supprime le compte abandonne', async () => {
+    const response = await request(app).post('/api/admin/accounts/anonymous/abandoned/purge').set('Authorization', 'Bearer admin-token');
+    expect(response.status).toBe(200);
+    expect(response.body.removed).toBe(1);
+    expect(global.__adminSupabaseMock.auth.admin.deleteUser).toHaveBeenCalledWith('u-abandon');
   });
 });

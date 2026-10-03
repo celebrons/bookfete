@@ -143,6 +143,20 @@ async function sendEmail({ to, subject, html, text, replyTo, attachment }) {
     return { sent: true, id: corps?.messageId || null };
   } catch (error) {
     console.error(`[email] erreur reseau -> ${to} : ${error.message}`);
+
+    try {
+      // eslint-disable-next-line global-require
+      require('../events/eventLog').logEvent({
+        type: 'email.failed',
+        level: 'error',
+        actor: 'system',
+        message: `Email non remis a ${to} (erreur reseau)`,
+        metadata: { destinataire: to, sujet: subject, motif: String(error.message || error).slice(0, 300) }
+      });
+    } catch (_error) {
+      // Journaliser un echec ne doit jamais en provoquer un autre.
+    }
+
     return { sent: false, error: error.message };
   }
 }

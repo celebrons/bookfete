@@ -8,6 +8,7 @@ import AdminModeToggle from './AdminModeToggle';
 import AdminHealth from './AdminHealth';
 import AdminEvents from './AdminEvents';
 import AdminJobs from './AdminJobs';
+import AdminAnonymousPurge from './AdminAnonymousPurge';
 import AdminSection from './AdminSection';
 import './AdminBooksLuxe.css';
 
@@ -330,6 +331,7 @@ export default function AdminBooksLuxe() {
         {/* Ce que fait la machine en ce moment. */}
         <AdminHealth />
         <AdminJobs />
+        <AdminAnonymousPurge />
 
         {/* Le journal des evenements : le deroule de ce qui est arrive aux
             livres et aux commandes, tous serveurs confondus. */}

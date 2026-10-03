@@ -11,6 +11,8 @@ const sharp = require('sharp');
 const sizeOf = require('image-size');
 
 const uploadCalls = [];
+const mockStorageList = jest.fn(async () => ({ data: [], error: null }));
+const mockStorageRemove = jest.fn(async () => ({ data: [], error: null }));
 
 jest.mock('../config/supabase', () => ({
   storage: {
@@ -19,12 +21,14 @@ jest.mock('../config/supabase', () => ({
         uploadCalls.push({ bucket, fileName, buffer, contentType: options?.contentType });
         return { data: { path: fileName }, error: null };
       }),
-      getPublicUrl: (fileName) => ({ data: { publicUrl: `https://cdn.test/${fileName}` } })
+      getPublicUrl: (fileName) => ({ data: { publicUrl: `https://cdn.test/${fileName}` } }),
+      list: (...args) => mockStorageList(bucket, ...args),
+      remove: (...args) => mockStorageRemove(bucket, ...args)
     })
   }
 }));
 
-const { uploadFile } = require('../services/storageService');
+const { uploadFile, deleteBookFolder } = require('../services/storageService');
 
 async function makeJpegBuffer(width, height) {
   return sharp({ create: { width, height, channels: 3, background: { r: 120, g: 80, b: 200 } } })
@@ -34,6 +38,8 @@ async function makeJpegBuffer(width, height) {
 
 beforeEach(() => {
   uploadCalls.length = 0;
+  mockStorageList.mockClear().mockResolvedValue({ data: [], error: null });
+  mockStorageRemove.mockClear().mockResolvedValue({ data: [], error: null });
 });
 
 describe('storageService.uploadFile — miniature/preview, original jamais modifie', () => {
@@ -82,15 +88,20 @@ describe('storageService.uploadFile — miniature/preview, original jamais modif
     expect(thumbDims.height).toBeLessThanOrEqual(100);
   });
 
-  it("l'upload de l'original reussit meme si le buffer n'est pas une image valide (jamais bloquant)", async () => {
+  // Comportement INVERSE depuis le plan de mise en production ("protection
+  // des uploads", 2026-10-04) : un fichier dont le CONTENU n'est pas une
+  // image reelle est maintenant refuse avant tout envoi au stockage. Avant
+  // ce correctif, seul l'en-tete Content-Type declare par le navigateur
+  // etait verifie (middleware/upload.js) — un fichier quelconque avec
+  // `Content-Type: image/jpeg` passait ce filtre et partait vers le
+  // stockage tel quel.
+  it("refuse (sans rien envoyer au stockage) un fichier dont le contenu n'est pas une image valide", async () => {
     const file = { originalname: 'corrompu.jpg', mimetype: 'image/jpeg', buffer: Buffer.from("ceci n'est pas une image") };
     const result = await uploadFile('contribution-photos', file, 'book-1');
 
-    expect(result.success).toBe(true);
-    expect(result.thumbnailUrl).toBeUndefined();
-    expect(result.previewUrl).toBeUndefined();
-    expect(result.width).toBeUndefined();
-    expect(uploadCalls).toHaveLength(1); // seul l'original (invalide) part vers Storage
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/pas une image valide/);
+    expect(uploadCalls).toHaveLength(0); // rien n'atteint Storage
   });
 });
 
@@ -195,5 +206,40 @@ describe("storageService.uploadFile — plafond de l'original (ORIGINAL_MAX_PX)"
     expect(Math.max(previewDims.width, previewDims.height)).toBeLessThanOrEqual(1600);
     expect(result.thumbnailUrl).toBeDefined();
     expect(result.previewUrl).toBeDefined();
+  });
+});
+
+// Suppression d'un livre entier (nettoyage des brouillons, purge des
+// comptes anonymes abandonnes) : les photos vivent sous <bucket>/<bookId>/
+// (voir uploadFile) — lister puis supprimer ce dossier retrouve TOUT,
+// y compris un fichier dont la ligne book_content_items a deja disparu.
+describe('storageService.deleteBookFolder', () => {
+  it('liste le dossier du livre et supprime chaque fichier trouve', async () => {
+    mockStorageList.mockResolvedValueOnce({
+      data: [{ name: 'a.jpg' }, { name: 'a_thumb.jpg' }, { name: 'a_preview.jpg' }],
+      error: null
+    });
+
+    const resultat = await deleteBookFolder('contribution-photos', 'book-abandonne-1');
+
+    expect(resultat).toEqual({ success: true, removed: 3 });
+    expect(mockStorageList).toHaveBeenCalledWith('contribution-photos', 'book-abandonne-1');
+    expect(mockStorageRemove).toHaveBeenCalledWith('contribution-photos', [
+      'book-abandonne-1/a.jpg', 'book-abandonne-1/a_thumb.jpg', 'book-abandonne-1/a_preview.jpg'
+    ]);
+  });
+
+  it('un dossier vide ou absent ne leve jamais — juste rien a supprimer', async () => {
+    mockStorageList.mockResolvedValueOnce({ data: [], error: null });
+    const resultat = await deleteBookFolder('contribution-photos', 'book-sans-photo');
+    expect(resultat).toEqual({ success: true, removed: 0 });
+    expect(mockStorageRemove).not.toHaveBeenCalled();
+  });
+
+  it('une erreur de stockage est rapportee, jamais levee', async () => {
+    mockStorageList.mockRejectedValueOnce(new Error('reseau indisponible'));
+    const resultat = await deleteBookFolder('contribution-photos', 'book-x');
+    expect(resultat.success).toBe(false);
+    expect(resultat.removed).toBe(0);
   });
 });

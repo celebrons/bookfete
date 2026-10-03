@@ -236,6 +236,94 @@ describe('brevoClient — rien ne part sans cle', () => {
   });
 });
 
+// Supervision des echecs d'envoi CLIENT (2026-10-04) : jusqu'ici, un email
+// commande/PDF/expedition qui echouait vraiment (pas juste "aucun
+// destinataire connu", benin et frequent) n'etait visible que dans le
+// journal des evenements. On verifie ici que l'envoi passe desormais par
+// une alerte admin — via la MEME alerte que paiement/PDF/Gelato, pas un
+// second systeme — et surtout qu'une panne Brevo totale (l'alerte elle-meme
+// echoue) ne boucle jamais indefiniment.
+describe('transactionalEmails — un echec d\'envoi CLIENT alerte l\'administration', () => {
+  const ADMIN = process.env.ADMIN_EMAILS;
+  beforeEach(() => {
+    jest.resetModules();
+    process.env.ADMIN_EMAILS = 'patron@bookipix.test';
+  });
+  afterEach(() => {
+    if (ADMIN === undefined) delete process.env.ADMIN_EMAILS; else process.env.ADMIN_EMAILS = ADMIN;
+    // jest.doMock reste actif au-dela de resetModules() tant qu'on ne le
+    // retire pas explicitement — sans ca, les describe suivants de ce
+    // fichier (ex. emailService, plus bas) heriteraient de ce brevoClient
+    // simule a la place du vrai.
+    jest.dontMock('../services/email/brevoClient');
+    jest.dontMock('../services/i18n/resolveLanguageForUserId');
+  });
+
+  const charger = (sendEmailMock) => {
+    jest.doMock('../services/email/brevoClient', () => ({
+      sendEmail: sendEmailMock,
+      isEmailEnabled: () => true
+    }));
+    jest.doMock('../services/i18n/resolveLanguageForUserId', () => ({
+      resolveLanguageForUserId: jest.fn(async () => 'fr')
+    }));
+    return require('../services/email/transactionalEmails');
+  };
+
+  it('un vrai echec d\'envoi (pas juste "destinataire inconnu") declenche une alerte admin', async () => {
+    const sendEmailMock = jest.fn()
+      .mockResolvedValueOnce({ sent: false, error: 'Sender not registered' }) // l'email client
+      .mockResolvedValueOnce({ sent: true, id: 'alerte-1' }); // l'alerte admin
+    const emails = charger(sendEmailMock);
+
+    await emails.envoyerCommandeConfirmee({
+      order: { id: 'o1', order_number: 'CMD-1', total_cents: 4300, owner_id: 'u1' },
+      book: { title: 'Montreal', print_format: 'standard', page_count: 30 },
+      ownerEmail: 'jean@example.com'
+    });
+
+    // Laisse partir l'alerte declenchee en arriere-plan (non attendue par envoyer()).
+    await new Promise((r) => setImmediate(r));
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+    const [, alerteArgs] = sendEmailMock.mock.calls;
+    expect(alerteArgs[0].to).toBe('patron@bookipix.test');
+    expect(alerteArgs[0].subject).toMatch(/non remis/i);
+  });
+
+  it('un echec "benin" (aucun destinataire connu) n\'alerte PAS — sinon chaque envoi sans adresse spammerait l\'admin', async () => {
+    const sendEmailMock = jest.fn();
+    const emails = charger(sendEmailMock);
+
+    await emails.envoyerCommandeConfirmee({
+      order: { id: 'o1', order_number: 'CMD-1', owner_id: 'u1' },
+      book: { title: 'Montreal' },
+      ownerEmail: null
+    });
+    await new Promise((r) => setImmediate(r));
+
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('si l\'alerte elle-meme echoue (panne Brevo totale), elle ne se re-declenche jamais sur elle-meme', async () => {
+    const sendEmailMock = jest.fn().mockResolvedValue({ sent: false, error: 'ECONNREFUSED' });
+    const emails = charger(sendEmailMock);
+
+    await emails.envoyerCommandeConfirmee({
+      order: { id: 'o1', order_number: 'CMD-1', owner_id: 'u1' },
+      book: { title: 'Montreal' },
+      ownerEmail: 'jean@example.com'
+    });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    // Exactement 2 : l'email client (echoue) + une seule tentative d'alerte
+    // (echouee aussi) — jamais une troisieme tentative pour signaler l'echec
+    // de la seconde.
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('emailTemplates — redaction', () => {
   const gabarits = require('../services/email/emailTemplates');
 

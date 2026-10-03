@@ -68,13 +68,36 @@ function destinataireDe({ order, ownerEmail }) {
     : (typeof ownerEmail === 'string' && ownerEmail.trim() ? ownerEmail.trim() : null);
 }
 
+// PREFIXE des alertes admin elles-memes : jamais re-alerter sur l'echec
+// d'une alerte (sans ce garde-fou, une panne Brevo totale ferait essayer de
+// signaler l'echec de l'email de signalement, indefiniment).
+const PREFIXE_ALERTE = 'alerte admin : ';
+
 async function envoyer(gabarit, destinataire, contexte) {
   if (!gabarit) return { sent: false, skipped: 'aucun_gabarit' };
   if (!destinataire) {
     console.log(`[email] aucun destinataire connu (${contexte}) — rien envoye`);
     return { sent: false, skipped: 'destinataire_inconnu' };
   }
-  return sendEmail({ to: destinataire, ...gabarit });
+
+  const resultat = await sendEmail({ to: destinataire, ...gabarit });
+
+  // Supervision (2026-10-04) : jusqu'ici, un email CLIENT (confirmation de
+  // commande, PDF pret, expedition...) qui echoue vraiment (pas juste
+  // "aucun destinataire connu", un cas benin et frequent) n'etait visible
+  // que dans le journal des evenements, a aller consulter. `resultat.error`
+  // n'existe que quand un envoi a reellement ete tente et a echoue (erreur
+  // Brevo ou reseau) — jamais pour les cas "skipped" benins (destinataire
+  // inconnu, cle absente...), qui resteraient sinon une alerte a chaque
+  // envoi plutot qu'un vrai incident.
+  if (!resultat.sent && resultat.error && !contexte.startsWith(PREFIXE_ALERTE)) {
+    envoyerAlerteAdmin({
+      sujet: `Email non remis (${contexte})`,
+      lignes: [`Destinataire : ${destinataire}`, `Motif : ${resultat.error}`]
+    }).catch(() => {});
+  }
+
+  return resultat;
 }
 
 /** Lien pour revenir sur son livre — le filet du parcours sans mot de passe. */
@@ -290,7 +313,7 @@ async function envoyerAlerteAdmin({ sujet, lignes, details }) {
   }
   const gabarit = gabarits.alerteAdmin({ sujet, lignes, details });
   const resultats = await Promise.all(
-    destinataires.map((to) => envoyer(gabarit, to, `alerte admin : ${sujet}`))
+    destinataires.map((to) => envoyer(gabarit, to, `${PREFIXE_ALERTE}${sujet}`))
   );
   return { sent: resultats.some((r) => r.sent), resultats };
 }

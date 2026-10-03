@@ -198,6 +198,26 @@ const uploadFile = async (bucket, file, folder = '') => {
     const orienteBuffer = await normalizeOrientation(file.buffer);
     const { buffer: originalBuffer, reencoded } = await capOriginalResolution(orienteBuffer, ORIGINAL_MAX_PX);
 
+    // VALIDATION REELLE DU CONTENU (plan de mise en production, "protection
+    // des uploads") : jusqu'ici, seul l'EN-TETE Content-Type declare par le
+    // navigateur etait verifie (middleware/upload.js) — un fichier quelconque
+    // envoye avec `Content-Type: image/jpeg` passait ce filtre sans
+    // probleme, puis partait vers le stockage tel quel (confirme par un test
+    // qui l'acceptait explicitement comme "jamais bloquant"). On decode
+    // vraiment les octets ICI, avant tout envoi au stockage — jamais apres,
+    // ce qui aurait laisse un fichier invalide deja stocke.
+    const dimensionsReelles = probeImageDimensions(originalBuffer);
+    if (!dimensionsReelles) {
+      // `invalidContent` distingue une FAUTE DU CLIENT (400) d'une panne de
+      // stockage reelle (500) — voir les appelants (routes/composition.js,
+      // routes/collective.js).
+      return {
+        success: false,
+        invalidContent: true,
+        error: "Le fichier envoye n'est pas une image valide (contenu illisible)."
+      };
+    }
+
     // Reencode en JPEG uniquement si la photo depassait le plafond (voir
     // capOriginalResolution) : l'extension/le type MIME doivent alors suivre
     // les VRAIS octets stockes, jamais ceux du fichier d'origine — un .png
@@ -218,8 +238,6 @@ const uploadFile = async (bucket, file, folder = '') => {
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
       .getPublicUrl(fileName);
-
-    const dimensions = probeImageDimensions(originalBuffer);
 
     // Echec de generation d'une variante (format non reconnu par sharp,
     // etc.) : jamais bloquant, thumbnailUrl/previewUrl restent simplement
@@ -242,7 +260,7 @@ const uploadFile = async (bucket, file, folder = '') => {
       success: true,
       url: publicUrl,
       fileName,
-      ...(dimensions || {}),
+      ...dimensionsReelles,
       ...(thumbnailUrl ? { thumbnailUrl } : {}),
       ...(previewUrl ? { previewUrl } : {})
     };
@@ -264,6 +282,35 @@ const deleteFile = async (bucket, fileName) => {
   }
 };
 
+// Supprime TOUT un dossier d'un coup (les photos d'un livre vivent sous
+// <bucket>/<bookId>/..., voir uploadFile ci-dessus) — plutot que de
+// supprimer fichier par fichier a partir des URL de book_content_items.
+//
+// Pourquoi ca compte (retour utilisateur, plan de mise en production —
+// "purge des comptes anonymes abandonnes") : une suppression de LIGNES
+// (books, book_content_items...) ne touche jamais au stockage — ce sont
+// deux systemes distincts chez Supabase. Jusqu'ici, supprimer un livre
+// (nettoyage des brouillons, compte abandonne) laissait ses photos
+// orphelines dans le bucket, pour toujours. Lister le DOSSIER directement
+// retrouve aussi les fichiers qu'une ligne DB supprimee ou jamais ecrite
+// ne permettrait plus de retrouver par leur URL.
+//
+// Best effort, jamais bloquant : voir deleteByPublicUrl ci-dessus pour la
+// meme regle.
+const deleteBookFolder = async (bucket, bookId) => {
+  try {
+    const { data: fichiers, error } = await supabase.storage.from(bucket).list(String(bookId));
+    if (error || !fichiers?.length) return { success: true, removed: 0 };
+
+    const chemins = fichiers.map((f) => `${bookId}/${f.name}`);
+    const { error: removeError } = await supabase.storage.from(bucket).remove(chemins);
+    if (removeError) return { success: false, removed: 0, error: removeError.message };
+    return { success: true, removed: chemins.length };
+  } catch (error) {
+    return { success: false, removed: 0, error: error.message };
+  }
+};
+
 const getSignedUrl = async (bucket, fileName, expiresIn = 3600) => {
   try {
     const { data, error } = await supabase.storage
@@ -281,6 +328,7 @@ module.exports = {
   uploadFile,
   deleteFile,
   deleteByPublicUrl,
+  deleteBookFolder,
   getSignedUrl,
   // Exportes pour scripts/plafonner-photos-existantes.js (retour utilisateur,
   // 2026-09-29) : reutilise EXACTEMENT la meme logique/les memes constantes

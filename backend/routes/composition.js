@@ -335,9 +335,22 @@ router.post(
         return res.status(400).json({ error: t(req, 'Fichier manquant (champ "photo").', 'Missing file (field "photo").') });
       }
 
+      // Quota (plan de mise en production, "protection des uploads") : voir
+      // bookContentService.MAX_PHOTOS_PAR_LIVRE pour le pourquoi du chiffre.
+      const nombrePhotos = await bookContentService.countPhotos(req.params.bookId);
+      if (nombrePhotos >= bookContentService.MAX_PHOTOS_PAR_LIVRE) {
+        return res.status(413).json({
+          error: t(
+            req,
+            `Ce livre a déjà atteint sa limite de ${bookContentService.MAX_PHOTOS_PAR_LIVRE} photos. Retirez-en avant d'en ajouter d'autres.`,
+            `This book has already reached its limit of ${bookContentService.MAX_PHOTOS_PAR_LIVRE} photos. Remove some before adding more.`
+          )
+        });
+      }
+
       const uploadResult = await storageService.uploadFile(PHOTO_BUCKET, req.file, req.params.bookId);
       if (!uploadResult.success) {
-        return res.status(500).json({ error: uploadResult.error || "Echec de l'upload." });
+        return res.status(uploadResult.invalidContent ? 400 : 500).json({ error: uploadResult.error || "Echec de l'upload." });
       }
 
       const displayOrder = Number.parseInt(req.body?.display_order, 10);
@@ -527,9 +540,23 @@ router.post(
         return res.status(400).json({ error: t(req, 'Fichier manquant (champ "photo").', 'Missing file (field "photo").') });
       }
 
+      // Quota (plan de mise en production, "protection des uploads") : plus
+      // important encore sur CETTE route, accessible sans authentification
+      // via un simple lien partage.
+      const nombrePhotos = await bookContentService.countPhotos(req.book.id);
+      if (nombrePhotos >= bookContentService.MAX_PHOTOS_PAR_LIVRE) {
+        return res.status(413).json({
+          error: t(
+            req,
+            `Ce livre a déjà atteint sa limite de ${bookContentService.MAX_PHOTOS_PAR_LIVRE} photos. Retirez-en avant d'en ajouter d'autres.`,
+            `This book has already reached its limit of ${bookContentService.MAX_PHOTOS_PAR_LIVRE} photos. Remove some before adding more.`
+          )
+        });
+      }
+
       const uploadResult = await storageService.uploadFile(PHOTO_BUCKET, req.file, req.book.id);
       if (!uploadResult.success) {
-        return res.status(500).json({ error: uploadResult.error || "Echec de l'upload." });
+        return res.status(uploadResult.invalidContent ? 400 : 500).json({ error: uploadResult.error || "Echec de l'upload." });
       }
 
       const contributorName = typeof req.body?.contributorName === 'string' ? req.body.contributorName.trim() : '';

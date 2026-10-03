@@ -6,6 +6,27 @@
 
 const supabase = require('../../config/supabase');
 
+// Quota de photos par livre (plan de mise en production, "protection des
+// uploads", 2026-10-04) : rien n'empechait jusqu'ici d'envoyer un nombre
+// illimite de photos vers un meme livre — chaque envoi est individuellement
+// valide et accepte, mais rien ne bornait leur NOMBRE cumule. 500 est
+// volontairement tres au-dessus d'un vrai livre (layoutEngine.MAX_PRINTABLE_PAGES
+// = 200 pages, rarement plus de 2-3 photos/page en pratique) : le but n'est
+// pas de contraindre un usage reel, seulement de borner le cas d'abus
+// (script qui enverrait des milliers de fichiers) et son cout de stockage.
+const MAX_PHOTOS_PAR_LIVRE = 500;
+
+async function countPhotos(bookId) {
+  const { data, error } = await supabase
+    .from('book_content_items')
+    .select('id')
+    .eq('book_id', bookId)
+    .eq('kind', 'photo');
+
+  if (error) throw error;
+  return (data || []).length;
+}
+
 async function listContentItems(bookId) {
   const { data, error } = await supabase
     .from('book_content_items')
@@ -625,6 +646,8 @@ async function upsertPage(bookId, pageIndex, payload = {}) {
 }
 
 module.exports = {
+  countPhotos,
+  MAX_PHOTOS_PAR_LIVRE,
   listContentItems,
   createContentItem,
   updateContentItem,

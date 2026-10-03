@@ -29,6 +29,13 @@ const coverComposer = require('../services/composition/coverComposer');
 const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../services/composition/coverFormat');
 const { resolveFormatDensity } = require('../services/composition/formatDensity');
 const { getAppMode, setAppMode, missingLiveRequirements } = require('../services/settings/appMode');
+const storageService = require('../services/storageService');
+const { listAbandonedAnonymousAccounts, purgeAbandonedAnonymousAccounts } = require('../services/accounts/anonymousPurge');
+
+// Meme bucket que routes/composition.js/collective.js (duplique la-bas
+// aussi, convention deja en place dans ce projet) : les photos d'un livre
+// vivent sous <bucket>/<bookId>/...
+const PHOTO_BUCKET = 'contribution-photos';
 
 // Statut de fabrication du livre. Repris a l'identique de routes/orders.js
 // (getBookLifecycleStatusFromBook) : le meme livre doit afficher le meme
@@ -356,6 +363,16 @@ router.post('/books/unfinalized/purge', authenticate, requireAdmin, async (req, 
     const candidates = await listUnfinalizedCandidates();
     const ids = candidates.map((book) => book.id);
 
+    // Les PHOTOS (stockage) d'abord : une ligne "books" supprimee ne
+    // touche jamais au stockage (deux systemes distincts chez Supabase) —
+    // sans cette etape, les photos restent orphelines dans le bucket pour
+    // toujours (trouve le 2026-10-04 en construisant la purge des comptes
+    // anonymes abandonnes, qui a le meme besoin).
+    for (const bookId of ids) {
+      // eslint-disable-next-line no-await-in-loop
+      await storageService.deleteBookFolder(PHOTO_BUCKET, bookId);
+    }
+
     if (ids.length) {
       const { error } = await supabase.from('books').delete().in('id', ids);
       if (error) throw error;
@@ -370,6 +387,39 @@ router.post('/books/unfinalized/purge', authenticate, requireAdmin, async (req, 
     });
 
     return res.json({ removed: ids.length, bookIds: ids });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/admin/accounts/anonymous/abandoned
+// Previsualise les comptes anonymes abandonnes (par defaut, plus de 7
+// jours sans jamais etre revenus) — jamais un simple compte theorique, la
+// meme liste que /purge recalculera.
+router.get('/accounts/anonymous/abandoned', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const jours = Number(req.query.jours) > 0 ? Number(req.query.jours) : 7;
+    const candidats = await listAbandonedAnonymousAccounts({ jours });
+    return res.json({
+      jours,
+      total: candidats.filter((c) => !c.excluPourCommande).length,
+      exclusPourCommande: candidats.filter((c) => c.excluPourCommande).length,
+      comptes: candidats
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/admin/accounts/anonymous/abandoned/purge
+// Supprime effectivement les comptes abandonnes : photos, livres, profil,
+// puis le compte d'authentification. Recalcule la liste au moment de
+// l'appel (voir anonymousPurge.js).
+router.post('/accounts/anonymous/abandoned/purge', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const jours = Number(req.body?.jours) > 0 ? Number(req.body.jours) : 7;
+    const resultat = await purgeAbandonedAnonymousAccounts({ jours, actorEmail: req.user?.email });
+    return res.json(resultat);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

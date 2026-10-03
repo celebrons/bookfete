@@ -155,3 +155,8 @@ export const purgeEventsRemote = () => action('/events/purge');
 // supprimer (voir backend/routes/admin.js, listUnfinalizedCandidates).
 export const listUnfinalizedBooks = () => request('/books/unfinalized');
 export const purgeUnfinalizedBooks = () => action('/books/unfinalized/purge');
+
+// Comptes anonymes abandonnes (2026-10-04) — voir
+// backend/services/accounts/anonymousPurge.js. `jours` par defaut : 7.
+export const listAbandonedAnonymousAccounts = (jours) => request(`/accounts/anonymous/abandoned${jours ? `?jours=${jours}` : ''}`);
+export const purgeAbandonedAnonymousAccounts = (jours) => action('/accounts/anonymous/abandoned/purge', jours ? { jours } : undefined);
