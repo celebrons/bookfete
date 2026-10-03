@@ -1,6 +1,5 @@
 {
   "hero": {
-    "eyebrow": "NO-AI LAYOUT",
     "titleLine1": "Turn your memories",
     "titleLine2": "into a one-of-a-kind book",
     "subtitle": "Add your photos and text, pick a style: your memory book takes shape right before your eyes.",
@@ -77,10 +76,7 @@
     "eyebrow": "READY TO CREATE?",
     "title": "Create unforgettable memories",
     "subtitle": "Join thousands of families who have already created their memory book.",
-    "cta": "Create my book",
-    "statBooks": "BOOKS CREATED",
-    "statPages": "PAGES COMPOSED",
-    "statSatisfaction": "SATISFACTION"
+    "cta": "Create my book"
   },
   "howItWorks": {
     "hero": {

@@ -100,8 +100,6 @@ const FooterLuxe = () => {
         <div className="site-footer-bottom">
           <span className="body-text" style={{ fontSize: '12px', color: 'var(--text-light)' }}>
             {t('footer.copyright', { year: new Date().getFullYear() })}
-            {' '}
-            <span style={{ color: 'var(--gold)' }}>· build test-deploy</span>
           </span>
           <div className="site-footer-social">
             {['Instagram', 'Pinterest'].map((social) => (

@@ -1,6 +1,5 @@
 {
   "hero": {
-    "eyebrow": "MISE EN PAGE SANS IA",
     "titleLine1": "Transformez vos souvenirs",
     "titleLine2": "en un livre unique",
     "subtitle": "Ajoutez vos photos et vos textes, choisissez un style : votre livre souvenir prend forme sous vos yeux.",
@@ -77,10 +76,7 @@
     "eyebrow": "PRÊT À CRÉER ?",
     "title": "Créez vos souvenirs inoubliables",
     "subtitle": "Rejoignez des milliers de familles qui ont déjà créé leur livre de souvenirs.",
-    "cta": "Créer mon livre",
-    "statBooks": "LIVRES CRÉÉS",
-    "statPages": "PAGES COMPOSÉES",
-    "statSatisfaction": "SATISFACTION"
+    "cta": "Créer mon livre"
   },
   "howItWorks": {
     "hero": {

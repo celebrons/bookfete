@@ -296,10 +296,6 @@ const homepageEvents = events.slice(0, 0).concat([
       >
         <div className="container-luxe">
           <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-            <span className="label-gold" style={{ marginBottom: 'var(--space-md)' }}>
-              {t('hero.eyebrow')}
-            </span>
-
             <h1 style={{
               fontSize: 'clamp(40px, 8vw, 64px)',
               fontWeight: '700',
@@ -593,30 +589,6 @@ const homepageEvents = events.slice(0, 0).concat([
               {t('finalCta.cta')}
             </button>
           </Link>
-
-          {/* Statistiques */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 'var(--space-xl)',
-            marginTop: 'var(--space-xl)',
-            paddingTop: 'var(--space-xl)',
-            borderTop: '1px solid rgba(255,255,255,0.1)',
-            flexWrap: 'wrap'
-          }}>
-            <div>
-              <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--gold)' }}>10k+</div>
-              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>{t('finalCta.statBooks')}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--gold)' }}>50k+</div>
-              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>{t('finalCta.statPages')}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--gold)' }}>4.9★</div>
-              <div style={{ fontSize: '12px', color: 'var(--mist)' }}>{t('finalCta.statSatisfaction')}</div>
-            </div>
-          </div>
         </div>
       </section>
     </div>
