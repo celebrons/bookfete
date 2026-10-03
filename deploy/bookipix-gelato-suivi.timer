@@ -1,0 +1,22 @@
+# Toutes les 30 minutes : assez frequent pour prevenir un client le jour
+# meme d'une expedition reelle, assez espace pour ne pas solliciter l'API
+# Gelato inutilement sur un volume de commandes encore faible.
+#
+# Installer :
+#   systemctl enable --now bookipix-gelato-suivi.timer
+#
+# Verifier la prochaine execution :
+#   systemctl list-timers bookipix-gelato-suivi
+
+[Unit]
+Description=Controle des statuts Gelato, toutes les 30 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+AccuracySec=1min
+Persistent=true
+Unit=bookipix-gelato-suivi.service
+
+[Install]
+WantedBy=timers.target

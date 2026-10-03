@@ -41,6 +41,7 @@ const { resolveCountryIso2 } = require('../services/printing/countryCodes');
 // envoi qui travaille d un verrou oublie (2026-09-19).
 const gelatoSubmissionsEnCours = new Map();
 const gelatoTracking = require('../services/printing/gelatoTracking');
+const { refreshGelatoTracking } = require('../services/printing/gelatoStatusSync');
 const emails = require('../services/email/transactionalEmails');
 const { emailValide } = require('../services/email/brevoClient');
 const { generateInvoiceForOrder, signedInvoiceUrl } = require('../services/invoicing/invoiceService');
@@ -67,27 +68,10 @@ const ORDER_STATUSES = new Set([
   'cancelled',
   'failed'
 ]);
-// Ordre de progression d'une commande — miroir de ORDER_STATUS_SEQUENCE
-// (frontend/src/utils/orderWorkflow.js), meme convention de duplication
-// assumee que les autres petites tables partagees de ce projet. Sert au
-// suivi de production a ne jamais faire RECULER un statut (voir
-// GET /:orderId/tracking). 'draft'/'cancelled'/'failed' sont hors sequence
-// a dessein : ce ne sont pas des etapes d'avancement.
-const ORDER_STATUS_SEQUENCE = [
-  'awaiting_payment',
-  'paid',
-  'pdf_generating',
-  'pdf_ready',
-  'print_queued',
-  'sent_to_printer',
-  'printed',
-  'shipped',
-  'delivered'
-];
-// Etats definitifs : une fois atteints, plus rien ne les remplace (voir
-// shouldAdvance, GET /:orderId/tracking) — ni un recul dans la sequence
-// normale, ni une annulation/echec qui arriverait apres coup.
-const ORDER_STATUS_TERMINAL = new Set(['delivered', 'cancelled', 'failed']);
+// ORDER_STATUS_SEQUENCE/ORDER_STATUS_TERMINAL ont demenage dans
+// services/printing/gelatoStatusSync.js le 2026-10-04 (logique du suivi
+// Gelato extraite pour etre reutilisable par un controle periodique en
+// arriere-plan) — importees plus haut via refreshGelatoTracking.
 const ORDER_STATUS_REQUIRES_PAID = new Set([
   'pdf_generating',
   'pdf_ready',
@@ -1075,10 +1059,13 @@ router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
 // suivi), la ou l'application se contentait jusqu'ici d'afficher un statut
 // local qui n'avancait jamais tout seul pour une commande imprimee.
 //
-// Deux garanties :
-//  - le statut n'est persiste QUE s'il AVANCE (comparaison via
-//    ORDER_STATUS_SEQUENCE) : un aller-retour d'API ne peut jamais faire
-//    reculer une commande deja expediee ;
+// La logique (appel Gelato, decision d'avancer, persistance, email d'etape)
+// vit dans services/printing/gelatoStatusSync.js depuis le 2026-10-04 —
+// partagee avec le controle periodique en arriere-plan
+// (scripts/verifier-statuts-gelato.js) qui ne depend d'aucune visite de cet
+// ecran. Deux garanties, assurees par ce module commun :
+//  - le statut n'est persiste QUE s'il AVANCE : un aller-retour d'API ne
+//    peut jamais faire reculer une commande deja expediee ;
 //  - jamais bloquant : si Gelato est injoignable ou renvoie un statut
 //    inconnu, on renvoie le dernier etat connu avec `stale: true` plutot
 //    qu'une erreur (l'ecran de suivi doit toujours afficher quelque chose).
@@ -1096,145 +1083,8 @@ router.get('/:orderId/tracking', authenticate, async (req, res) => {
       return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
     }
 
-    const gelatoOrderId = order.metadata?.gelatoOrderId || null;
-    // DIRE QUE C'EST PARTI CHEZ L'IMPRIMEUR (2026-09-20).
-    //
-    // L'ecran de suivi ne montrait qu'un statut : rien ne disait que le
-    // livre avait ete transmis, ni quand, ni sous quel numero — « aujourd'hui
-    // on ne sait pas que ca a ete envoye ». Ces trois informations existaient
-    // deja en base (posees par gelatoOrderService) mais ne sortaient jamais
-    // de la reponse.
-    const localState = {
-      status: order.status,
-      gelatoOrderId,
-      gelatoStatus: order.metadata?.gelatoFulfillmentStatus || null,
-      gelatoSubmittedAt: order.metadata?.gelatoSubmittedAt || null,
-      gelatoError: order.metadata?.gelatoError || null,
-      tracking: order.metadata?.tracking || { carrier: null, code: null, url: null },
-      delivery: order.metadata?.delivery || { minDate: null, maxDate: null },
-      updatedAt: order.updated_at || null
-    };
-
-    // Commande PDF, ou impression pas encore soumise a l'imprimeur : rien a
-    // demander a Gelato, l'etat local EST l'etat reel.
-    if (!gelatoOrderId) {
-      return res.json({ ...localState, source: 'local', stale: false });
-    }
-
-    let gelatoOrder = null;
-    // UN 404 N'EST PAS UNE PANNE : c'est Gelato qui dit que cette commande
-    // n'existe plus. Constate le 2026-09-30 sur une vraie commande (brouillon
-    // supprime depuis le tableau de bord Gelato pour tester le parcours
-    // d'annulation) : getOrder renvoyait 404, et jusqu'ici CETTE reponse
-    // prenait le meme chemin qu'un reseau indisponible — « stale: true » —
-    // et l'ecran de suivi restait fige indefiniment sur le dernier statut
-    // connu, sans jamais dire que le livre n'etait plus chez l'imprimeur.
-    let supprimeeChezGelato = false;
-    try {
-      gelatoOrder = await gelatoClient.getOrder(gelatoOrderId);
-    } catch (error) {
-      if (error.status === 404) {
-        supprimeeChezGelato = true;
-      } else {
-        console.error('Suivi Gelato indisponible pour la commande', order.id, ':', error.message);
-        return res.json({ ...localState, source: 'cache', stale: true });
-      }
-    }
-
-    const rawStatus = supprimeeChezGelato ? 'canceled' : gelatoTracking.readGelatoFulfillmentStatus(gelatoOrder);
-    const mappedStatus = gelatoTracking.mapGelatoStatus(rawStatus);
-    const tracking = supprimeeChezGelato ? localState.tracking : gelatoTracking.extractTracking(gelatoOrder);
-    const delivery = supprimeeChezGelato ? localState.delivery : gelatoTracking.extractDelivery(gelatoOrder);
-
-    // Avancee seulement : un statut inconnu (mappedStatus null) ou anterieur
-    // laisse la commande exactement ou elle est. EXCEPTION explicite pour
-    // annulation/echec : `cancelled`/`failed` sont hors sequence a dessein
-    // (ce ne sont pas des etapes d'avancement, voir ORDER_STATUS_SEQUENCE
-    // plus haut) et un rang de -1 les faisait donc TOUJOURS rejeter, quel
-    // que soit l'etat courant — la commande ci-dessus restait « Envoye a
-    // l'imprimeur » alors que Gelato l'avait supprimee. Jamais applique
-    // si la commande a deja atteint un etat definitif (ORDER_STATUS_TERMINAL) :
-    // un livre deja livre ne redevient pas « annule » sur un B403/404 tardif.
-    const currentRank = ORDER_STATUS_SEQUENCE.indexOf(order.status);
-    const nextRank = mappedStatus ? ORDER_STATUS_SEQUENCE.indexOf(mappedStatus) : -1;
-    const estAnnulationOuEchec = mappedStatus === 'cancelled' || mappedStatus === 'failed';
-    const shouldAdvance = Boolean(mappedStatus) && !ORDER_STATUS_TERMINAL.has(order.status) && (
-      estAnnulationOuEchec || (nextRank > -1 && nextRank > currentRank)
-    );
-
-    // Un brouillon confirme depuis le tableau de bord Gelato devient une
-    // vraie commande sans que notre base le sache. On enregistre donc le
-    // type REEL a chaque consultation du suivi — jamais a l'envers : une
-    // commande devenue `order` ne peut plus redevenir `draft` chez nous,
-    // sinon une reponse inattendue desarmerait la protection.
-    const typeReel = supprimeeChezGelato ? null : gelatoTracking.readGelatoOrderType(gelatoOrder);
-    const typeConnu = order.metadata?.gelatoOrderType || null;
-    const typeRetenu = typeConnu === 'order' ? 'order' : (typeReel || typeConnu);
-
-    const nowIso = getNowIso();
-    const nextMetadata = {
-      ...(order.metadata || {}),
-      gelatoFulfillmentStatus: rawStatus || null,
-      gelatoOrderType: typeRetenu,
-      gelatoCheckedAt: nowIso,
-      tracking,
-      delivery,
-      // Trace distincte du cas 404 : un vrai statut "canceled" renvoye par
-      // Gelato et une suppression constatee via 404 aboutissent au meme
-      // mappedStatus ('cancelled'), mais seule cette valeur dit COMMENT on
-      // l'a su — utile pour comprendre un statut annule sans reponse Gelato
-      // correspondante dans le journal.
-      ...(supprimeeChezGelato ? { gelatoDeletedAt: nowIso } : {})
-    };
-
-    if (shouldAdvance) {
-      logEvent({
-        type: 'status.changed',
-        actor: 'gelato',
-        orderId: order.id,
-        bookId: order.book_id,
-        ownerId: order.owner_id,
-        message: supprimeeChezGelato
-          ? `Commande supprimee chez Gelato (404) : statut ${order.status} -> cancelled`
-          : `Statut : ${order.status} -> ${mappedStatus}`,
-        metadata: {
-          avant: order.status,
-          apres: mappedStatus,
-          source: 'gelato',
-          gelatoStatus: rawStatus,
-          supprimeeChezGelato,
-          // Qui regardait le suivi au moment ou Gelato a repondu.
-          consulteePar: req.user.email || null
-        }
-      });
-    }
-
-    const { data: updated } = await supabase
-      .from('orders')
-      .update({
-        ...(shouldAdvance ? { status: mappedStatus } : {}),
-        metadata: nextMetadata,
-        updated_at: nowIso
-      })
-      .eq('id', order.id)
-      .select('*')
-      .single();
-
-    return res.json({
-      status: updated?.status || (shouldAdvance ? mappedStatus : order.status),
-      gelatoOrderId,
-      gelatoStatus: rawStatus || null,
-      // Signale explicitement un statut que nous ne savons pas traduire :
-      // l'ecran affiche alors la chaine brute plutot que d'inventer.
-      gelatoStatusUnknown: Boolean(rawStatus && !mappedStatus),
-      gelatoSubmittedAt: order.metadata?.gelatoSubmittedAt || null,
-      gelatoError: null,
-      tracking,
-      delivery,
-      updatedAt: nowIso,
-      source: 'gelato',
-      stale: false
-    });
+    const resultat = await refreshGelatoTracking(order, { consulteePar: req.user.email });
+    return res.json(resultat);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

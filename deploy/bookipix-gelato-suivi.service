@@ -1,0 +1,25 @@
+# Controle periodique du statut reel des commandes chez Gelato, sans
+# attendre qu'un client ou un admin ouvre l'ecran de suivi (voir
+# backend/scripts/verifier-statuts-gelato.js pour le pourquoi complet).
+#
+# Declenche par bookipix-gelato-suivi.timer.
+
+[Unit]
+Description=Controle des statuts Gelato (suivi automatique des commandes)
+After=bookipix.service
+
+[Service]
+Type=oneshot
+User=celebrons
+WorkingDirectory=/home/celebrons/bookfete/backend
+EnvironmentFile=/home/celebrons/bookfete/backend/.env
+ExecStart=/usr/bin/node scripts/verifier-statuts-gelato.js
+
+# Une poignee de commandes, un appel API chacune : ne devrait jamais
+# approcher cette limite, mais une commande qui traine ne doit pas bloquer
+# indefiniment le prochain passage.
+TimeoutStartSec=300
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bookipix-gelato-suivi
