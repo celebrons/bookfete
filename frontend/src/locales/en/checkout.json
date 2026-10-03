@@ -56,8 +56,6 @@
       "downloadFailed": "Download failed",
       "noPdfYet": "No PDF has been produced for this order yet. Start generation, then come back to download.",
       "pdfGone": "This PDF is no longer available on the server. Restart generation from this page: it takes about a minute.",
-      "gelatoTestFailed": "The test send to the printer failed.",
-      "gelatoStillRunning": "The send is still in progress after 15 minutes. Reload the page to see where it stands.",
       "deleteOrderFailed": "Unable to delete this order.",
       "bookNotFinalized": "The book must be finalized before ordering.",
       "stripeDisabled": "Stripe payment must be enabled to place the order.",
@@ -269,18 +267,7 @@
       "announcedBy": "Delivery announced by the printer: ",
       "between": "between {{min}} and {{max}}",
       "from": "from {{date}}",
-      "notYetAnnounced": "The printer hasn't announced a delivery date yet. It will appear here once set, along with the parcel number."
-    },
-    "gelatoTest": {
-      "title": "Test send to the printer",
-      "descPrefix": "Sends this book to Gelato as a ",
-      "descBold": "draft",
-      "descSuffix": ": the actual print file is generated and deposited with the printer, but nothing is billed or printed. Generation takes several minutes (each page is rendered in high resolution): leave this page open.",
-      "sending": "Generating...",
-      "send": "Send to Gelato (test)",
-      "alreadySent": "This order has already been sent to production ({{id}}): it cannot be sent again.",
-      "draftCreated": "Draft created with Gelato: {{id}}.",
-      "resendNote": "You can resend after changing the format or editing the book: the previous draft is replaced with the printer."
+      "notYetAnnounced": "Estimated delay: about 1 week. The parcel number will appear here as soon as it's ready."
     }
   },
   "ordersList": {

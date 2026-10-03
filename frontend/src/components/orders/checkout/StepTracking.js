@@ -155,13 +155,7 @@ function StepTracking({
   // GET /books/:id/export-final-pdf/:jobId/status). Meme forme que la
   // progression de l'envoi Gelato : meme composant d'affichage.
   pdfJob,
-  downloadingKind,
-  gelatoTestAvailable,
-  gelatoSending,
-  gelatoProgress,
-  gelatoResult,
-  gelatoError,
-  onSendGelatoTest
+  downloadingKind
 }) {
   const { t, i18n } = useTranslation('checkout');
   const locale = i18n.language === 'en' ? 'en-US' : 'fr-FR';
@@ -458,12 +452,14 @@ function StepTracking({
         )}
       </div>
 
-      {/* LES DELAIS, EN BAS (2026-09-20).
-          Uniquement ceux annonces par l'imprimeur lui-meme : aucun
-          « comptez 3 a 5 jours » ecrit en dur, qui deviendrait faux le jour
-          ou l'imprimeur change de pays de production (voir backend
-          gelatoTracking.extractDelivery). Tant qu'il n'a rien annonce, on le
-          DIT plutot que de laisser un vide qui ressemble a un oubli. */}
+      {/* LES DELAIS, EN BAS (2026-09-20, repli chiffre depuis le 2026-10-04).
+          Priorite a ce que l'imprimeur annonce lui-meme (le plus precis).
+          Tant qu'il n'a rien annonce (debut du suivi), on affiche un delai
+          estime plutot qu'un vide/flou — retour utilisateur explicite :
+          "il ne faut pas qu'il y ait de flou sur le delai de livraison".
+          Le repli (notYetAnnounced, i18n) reste un ordre de grandeur, pas
+          un engagement contractuel — a ajuster s'il se revele trop
+          optimiste/pessimiste a l'usage. */}
       {isPrint && (
         <p className="tracking-delais">
           {livraisonMin || livraisonMax ? (
@@ -480,36 +476,6 @@ function StepTracking({
         </p>
       )}
 
-      {/* Envoi de test a l'imprimeur : sa place logique est ici, c'est ce qui
-          cree la commande de production sans passer par un paiement. */}
-      {gelatoTestAvailable && isPrint && (
-        <div className="tracking-test-block">
-          <h3>{t('stepTracking.gelatoTest.title')}</h3>
-          <p className="orders-disclaimer">
-            {t('stepTracking.gelatoTest.descPrefix')}<strong>{t('stepTracking.gelatoTest.descBold')}</strong>{t('stepTracking.gelatoTest.descSuffix')}
-          </p>
-          <button type="button" className="btn btn-outline" disabled={gelatoSending} onClick={onSendGelatoTest}>
-            {gelatoSending ? t('stepTracking.gelatoTest.sending') : t('stepTracking.gelatoTest.send')}
-          </button>
-          {gelatoSending && <GenerationProgress progress={gelatoProgress} />}
-          {gelatoResult && (
-            <p className="orders-disclaimer">
-              {gelatoResult.skipped
-                // Ne peut plus arriver que pour une VRAIE commande (chemin
-                // paiement) : un brouillon de test est desormais rejouable,
-                // notamment apres un changement de format.
-                ? t('stepTracking.gelatoTest.alreadySent', { id: gelatoResult.gelatoOrderId })
-                : t('stepTracking.gelatoTest.draftCreated', { id: gelatoResult.gelatoOrderId })}
-            </p>
-          )}
-          {gelatoResult && !gelatoResult.skipped && (
-            <p className="orders-disclaimer">
-              {t('stepTracking.gelatoTest.resendNote')}
-            </p>
-          )}
-          {gelatoError && <p className="orders-error">{gelatoError}</p>}
-        </div>
-      )}
     </article>
   );
 }

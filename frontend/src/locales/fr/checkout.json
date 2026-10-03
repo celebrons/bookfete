@@ -56,8 +56,6 @@
       "downloadFailed": "Téléchargement impossible",
       "noPdfYet": "Aucun PDF n'a encore été fabriqué pour cette commande. Lancez la génération, puis revenez télécharger.",
       "pdfGone": "Ce PDF n'est plus disponible sur le serveur. Relancez la génération depuis cette page : elle prend une minute environ.",
-      "gelatoTestFailed": "L'envoi de test à l'imprimeur a échoué.",
-      "gelatoStillRunning": "L'envoi est toujours en cours après 15 minutes. Rechargez la page pour voir où il en est.",
       "deleteOrderFailed": "Impossible de supprimer cette commande.",
       "bookNotFinalized": "Le livre doit être finalisé avant la commande.",
       "stripeDisabled": "Le paiement Stripe doit être activé pour lancer la commande.",
@@ -269,18 +267,7 @@
       "announcedBy": "Livraison annoncée par l'imprimeur : ",
       "between": "entre le {{min}} et le {{max}}",
       "from": "à partir du {{date}}",
-      "notYetAnnounced": "L'imprimeur n'a pas encore communiqué de date de livraison. Elle apparaîtra ici dès qu'il l'aura fixée, avec le numéro de colis."
-    },
-    "gelatoTest": {
-      "title": "Envoi de test à l'imprimeur",
-      "descPrefix": "Envoie ce livre à Gelato en ",
-      "descBold": "brouillon",
-      "descSuffix": " : le vrai fichier d'impression est généré et déposé chez l'imprimeur, mais rien n'est facturé ni imprimé. La génération prend plusieurs minutes (chaque page est rendue en haute résolution) : laissez cette page ouverte.",
-      "sending": "Génération en cours...",
-      "send": "Envoyer à Gelato (test)",
-      "alreadySent": "Cette commande a déjà été envoyée en production ({{id}}) : elle ne peut pas être renvoyée.",
-      "draftCreated": "Brouillon créé chez Gelato : {{id}}.",
-      "resendNote": "Vous pouvez relancer un envoi après avoir changé de format ou modifié le livre : le brouillon précédent est remplacé chez l'imprimeur."
+      "notYetAnnounced": "Délai estimé : environ 1 semaine. Le numéro de colis apparaîtra ici dès qu'il sera prêt."
     }
   },
   "ordersList": {

@@ -209,7 +209,6 @@ app.use('/api', limiteGenerale);
 app.use('/api/admin', limiteAdmin);
 app.use('/api/admin', limiteCodeAdmin);
 app.use('/api/books/:id/export-final-pdf', limiteRendu);
-app.use('/api/orders/:orderId/gelato-test', limiteRendu);
 
 app.use('/api/auth', authRoutes);
 // Espace d administration (lecture seule) — voir middleware/requireAdmin.js

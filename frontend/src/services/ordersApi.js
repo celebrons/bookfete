@@ -129,18 +129,13 @@ export const updateOrderStatus = (orderId, status, metadata = null) => request(`
   })
 });
 
-// --- Gelato, mode test (2026-09-11) ---------------------------------------
-// Envoi manuel d'une commande a l'imprimeur SANS paiement, en brouillon
-// (jamais facture ni imprime tant que GELATO_LIVE_ORDERS !== '1' cote
-// serveur — voir backend/routes/orders.js et gelatoOrderService.js).
-
-// Le bouton d'envoi de test ne s'affiche que si cet appel dit que c'est
-// reellement possible (cle API presente, mode production desactive).
+// Le mode production est-il actif ? Utilise pour adapter l'affichage cote
+// client (ex. masquer "Supprimer cette commande et recommencer" en
+// production — voir BookCheckoutLuxe.js). Portait jusqu'au 2026-10-04 aussi
+// l'etat du bouton "Envoi de test a l'imprimeur", retire ce jour-la : en
+// mode test, un paiement (meme factice) soumet deja un brouillon
+// automatiquement, ce bouton etait devenu redondant.
 export const getGelatoStatus = () => request('/orders/gelato/status');
-
-export const sendOrderToGelatoTest = (orderId) => request(`/orders/${orderId}/gelato-test`, {
-  method: 'POST'
-});
 
 // Suivi REEL de production : interroge l'imprimeur (voir
 // backend/routes/orders.js GET /:orderId/tracking). Renvoie toujours

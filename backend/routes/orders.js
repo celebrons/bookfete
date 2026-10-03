@@ -769,290 +769,6 @@ const triggerInvoiceIfNeeded = ({ order, ownerEmail }) => {
   })();
 };
 
-// POST /api/orders/:orderId/gelato-test
-// Envoi MANUEL d'une commande a Gelato en mode test, SANS paiement
-// prealable (2026-09-11, demande utilisateur : pouvoir tester en ligne sur
-// Render avec de vraies photos). Reutilise exactement le meme service que
-// le chemin de production (gelatoOrderService.submitPrintOrderToGelato,
-// donc le meme fichier d'impression valide a 0 erreur par l'outil Gelato)
-// — jamais un second pipeline en parallele.
-//
-// SECURITE : refuse net si GELATO_LIVE_ORDERS === '1'. Dans ce cas, une
-// soumission creerait une VRAIE commande facturee/imprimee : cette route
-// de test ne doit jamais pouvoir declencher ca par inadvertance. Sinon,
-// gelatoOrderService produit un brouillon (orderType:'draft') : visible
-// dans le tableau de bord Gelato, jamais facture ni imprime.
-router.post('/:orderId/gelato-test', authenticate, async (req, res) => {
-  try {
-    if (isGelatoLiveOrdersEnabled()) {
-      return res.status(409).json({
-        error: t(req, "GELATO_LIVE_ORDERS=1 : le mode production est actif, l'envoi de test est desactive pour ne pas creer une vraie commande facturee.", 'GELATO_LIVE_ORDERS=1: production mode is active, the test send is disabled so as not to create a real billed order.')
-      });
-    }
-
-    if (gelatoSubmissionsEnCours.has(req.params.orderId)) {
-      return res.status(409).json({
-        error: t(req, "Un envoi a l'imprimeur est deja en cours pour cette commande. Attendez qu'il se termine.", 'A submission to the printer is already in progress for this order. Wait for it to finish.')
-      });
-    }
-
-    const db = createUserScopedClient(req);
-    const { data: order, error: orderError } = await db
-      .from('orders')
-      .select('*')
-      .eq('id', req.params.orderId)
-      .eq('owner_id', req.user.id)
-      .single();
-
-    if (orderError || !order) {
-      return res.status(404).json({ error: t(req, 'Commande introuvable', 'Order not found') });
-    }
-
-    const type = String(order.type || '').toLowerCase();
-    if (type !== 'print' && type !== 'pack') {
-      return res.status(400).json({ error: t(req, "Seules les commandes Impression ou Pack peuvent etre envoyees a l'imprimeur.", 'Only Print or Pack orders can be sent to the printer.') });
-    }
-    if (!isAddressValid(order.shipping_address)) {
-      return res.status(400).json({ error: t(req, 'Adresse de livraison incomplete : Gelato la refuserait.', 'Incomplete shipping address: Gelato would reject it.') });
-    }
-
-    const { data: book, error: bookError } = await db
-      .from('books')
-      .select('*')
-      .eq('id', order.book_id)
-      .single();
-    if (bookError || !book) {
-      return res.status(404).json({ error: t(req, 'Livre introuvable', 'Book not found') });
-    }
-
-    // Deja envoye ? L'idempotence de gelatoOrderService est indexee sur la
-    // COMMANDE, alors que le format d'impression vit sur le LIVRE : apres un
-    // changement de format (ou toute modification du livre), renvoyer un test
-    // est precisement ce qu'on veut — sinon l'utilisateur recoit "deja
-    // envoye" et ne peut plus rien tester (retour utilisateur 2026-09-11).
-    //
-    // Un BROUILLON est donc rejouable ; une vraie commande (issue du chemin
-    // paiement, orderType 'order') ne l'est JAMAIS : la reprendre
-    // reimprimerait et refacturerait.
-    const previousGelatoOrderId = order.metadata?.gelatoOrderId || null;
-    const previousOrderType = order.metadata?.gelatoOrderType || 'draft';
-
-    if (previousGelatoOrderId && previousOrderType !== 'draft') {
-      return res.json({
-        status: 'done',
-        skipped: true,
-        gelatoOrderId: previousGelatoOrderId,
-        gelatoOrderType: previousOrderType
-      });
-    }
-
-    // LE MENAGE NE BLOQUE PLUS LA REPONSE.
-    //
-    // Supprimer le brouillon precedent est un appel RESEAU a Gelato. Il
-    // etait attendu avant de repondre au client : quand Gelato tardait,
-    // le navigateur abandonnait au bout de quinze secondes avec « le
-    // serveur met trop de temps a repondre » et l envoi paraissait
-    // echoue, alors qu'il n'avait meme pas commence (2026-09-19).
-    //
-    // C'est du best effort : le pire cas est un brouillon orphelin dans
-    // le tableau de bord Gelato, sans consequence. Ca n'a rien a faire
-    // sur le chemin critique.
-    if (previousGelatoOrderId) {
-      gelatoClient.deleteOrder(previousGelatoOrderId).catch((error) => {
-        console.warn('Suppression du brouillon Gelato precedent impossible', previousGelatoOrderId, ':', error.message);
-      });
-    }
-
-    // ASYNCHRONE, volontairement (mesure 2026-09-11 : ~15 s par page pour
-    // la capture haute resolution, soit plusieurs MINUTES pour un livre
-    // complet). Attendre la fin dans la reponse HTTP ferait expirer la
-    // requete cote navigateur et cote proxy Render, alors meme que le
-    // serveur finit correctement son travail. On marque donc le depart,
-    // on repond tout de suite, et le client suit l'avancement en relisant
-    // la commande (meme principe que l'export PDF deja en place).
-    const startedAt = getNowIso();
-    const initialProgress = { phase: 'starting', done: 0, total: 0, updatedAt: startedAt };
-
-    // Prix RECALCULE sur l'etat actuel du livre (2026-09-11, demande
-    // utilisateur : "il faut recalculer et renvoyer avec le vrai prix meme
-    // pour le test"). Le produit envoye a Gelato est resolu depuis
-    // book.print_format au moment de l'envoi : sans ce recalcul, une
-    // commande testee apres un changement de format afficherait encore le
-    // prix et la pagination de l'ancien format — incoherent avec ce qui
-    // part reellement en production. Meme fonction que la creation de
-    // commande (computeOrderPricing), jamais un second calcul parallele.
-    const refreshedPricing = computeOrderPricing({
-      book,
-      type,
-      quantity: order.quantity || 1
-    });
-
-    // JAMAIS pour une commande DEJA PAYEE (retour utilisateur, 2026-09-28) :
-    // ce recalcul a ete pense pour un BROUILLON qu'on peut retester
-    // librement, pas pour reecrire ce que Stripe a reellement encaisse. Sans
-    // ce garde-fou, unit_cents/total_cents (et le snapshot fige a la
-    // commande) divergeaient silencieusement du montant paye des le premier
-    // envoi de test suivant un paiement — une facture qui en decoulerait
-    // aurait alors ete fausse. Le prix stocke reste donc intact pour une
-    // commande payee ; seules les metadonnees liees a l'envoi Gelato
-    // (gelatoOrderId, progression...) continuent d'etre mises a jour.
-    const estDejaPayee = ORDER_STATUS_PAID_OR_AFTER.has(String(order.status || '').toLowerCase());
-
-    // Metadonnees remises a zero pour ce nouvel essai : sans effacer
-    // gelatoOrderId, le garde-fou d'idempotence de gelatoOrderService
-    // court-circuiterait immediatement la soumission. L'ancien brouillon est
-    // ARCHIVE (jamais perdu silencieusement) : utile pour retrouver ce qui a
-    // ete envoye lors des essais precedents.
-    const previousDrafts = Array.isArray(order.metadata?.gelatoPreviousDrafts)
-      ? order.metadata.gelatoPreviousDrafts
-      : [];
-    const baseMetadata = {
-      ...(order.metadata || {}),
-      gelatoOrderId: null,
-      gelatoOrderType: null,
-      gelatoFileUrl: null,
-      gelatoError: null,
-      gelatoTestStartedAt: startedAt,
-      ...(previousGelatoOrderId
-        ? {
-          gelatoPreviousDrafts: [
-            ...previousDrafts,
-            { gelatoOrderId: previousGelatoOrderId, replacedAt: startedAt, printFormat: book.print_format }
-          ]
-        }
-        : {})
-    };
-
-    await supabase
-      .from('orders')
-      .update({
-        // Le prix et l'instantane suivent le livre reellement envoye — mais
-        // UNIQUEMENT tant que rien n'a ete paye (voir estDejaPayee ci-dessus).
-        ...(estDejaPayee ? {} : {
-          unit_cents: refreshedPricing.unitCents,
-          total_cents: refreshedPricing.totalCents,
-          quantity: refreshedPricing.quantity,
-          snapshot: {
-            ...(order.snapshot || {}),
-            printFormat: book.print_format || 'standard',
-            pages: Number(book.page_count || 0) || null,
-            repricedAt: startedAt
-          }
-        }),
-        metadata: {
-          ...baseMetadata,
-          ...(estDejaPayee ? {} : { pricing: refreshedPricing.breakdown }),
-          gelatoProgress: initialProgress
-        },
-        updated_at: startedAt
-      })
-      .eq('id', order.id);
-
-    // L'objet transmis au service doit refleter ce reset, sinon il verrait
-    // encore l'ancien gelatoOrderId (il recoit `order`, pas la ligne relue).
-    const orderForSubmission = { ...order, metadata: baseMetadata };
-
-    // Progression persistee en base : c'est le seul moyen pour le client de
-    // suivre un travail qui dure plusieurs minutes dans un processus
-    // detache. Ecriture "au fil de l'eau" mais peu frequente en pratique
-    // (une page rendue toutes les ~15 s), donc pas de limitation
-    // supplementaire necessaire. Jamais bloquant : une ecriture de
-    // progression qui echoue ne doit pas interrompre la generation.
-    const writeProgress = (progress) => {
-      supabase
-        .from('orders')
-        .update({
-          metadata: {
-            ...baseMetadata,
-            ...(estDejaPayee ? {} : { pricing: refreshedPricing.breakdown }),
-            gelatoProgress: { ...progress, updatedAt: getNowIso() }
-          }
-        })
-        .eq('id', order.id)
-        .then(() => {}, () => {});
-    };
-
-    // Le verrou est pris AVANT de repondre et relache dans le `finally` du
-    // travail detache : il couvre donc toute la duree du rendu (plusieurs
-    // minutes), pas seulement celle de la requete HTTP.
-    gelatoSubmissionsEnCours.set(order.id, {
-      debutLe: startedAt,
-      demandeur: req.user.email || null,
-      bookId: order.book_id || null
-    });
-    logEvent({
-      type: 'gelato.submit.started',
-      actor: req.user.email,
-      orderId: order.id,
-      bookId: order.book_id,
-      ownerId: order.owner_id,
-      message: 'Envoi a l\'imprimeur demande',
-      metadata: { format: book.print_format, pages: book.page_count }
-    });
-
-    (async () => {
-      try {
-        const result = await submitPrintOrderToGelato({
-          db: supabase, book, order: orderForSubmission, ownerEmail: req.user.email, onProgress: writeProgress
-        });
-        if (result.error) {
-          console.error('Envoi de test Gelato echoue pour la commande', order.id, ':', result.error);
-          logEvent({
-            type: 'gelato.submit.failed',
-            level: 'error',
-            actor: req.user.email,
-            orderId: order.id,
-            bookId: order.book_id,
-            ownerId: order.owner_id,
-            message: 'Envoi a l\'imprimeur echoue',
-            metadata: { erreur: String(result.error).slice(0, 300) }
-          });
-        } else {
-          console.log(`Envoi de test Gelato : brouillon ${result.gelatoOrderId} cree pour la commande ${order.id}`);
-          logEvent({
-            type: 'gelato.submitted',
-            actor: req.user.email,
-            orderId: order.id,
-            bookId: order.book_id,
-            ownerId: order.owner_id,
-            message: `Fichier depose chez Gelato (${result.gelatoOrderType})`,
-            metadata: { gelatoOrderId: result.gelatoOrderId, gelatoOrderType: result.gelatoOrderType }
-          });
-        }
-      } catch (error) {
-        console.error('Erreur inattendue lors de l\'envoi de test Gelato', order.id, ':', error.message);
-
-        // AU JOURNAL AUSSI. Seul un echec RENVOYE par submitPrintOrder
-        // etait consigne ; une exception ne laissait rien. Le 2026-09-19,
-        // trois envois ont demarre sans qu aucun resultat n apparaisse :
-        // impossible de savoir, depuis l application, ce qui les avait
-        // interrompus.
-        logEvent({
-          type: 'gelato.submit.failed',
-          level: 'error',
-          actor: req.user.email,
-          orderId: order.id,
-          bookId: order.book_id,
-          ownerId: order.owner_id,
-          message: 'Envoi a l\'imprimeur interrompu',
-          metadata: { erreur: String(error.message).slice(0, 300) }
-        });
-
-        await supabase
-          .from('orders')
-          .update({ metadata: { ...(order.metadata || {}), gelatoError: error.message }, updated_at: getNowIso() })
-          .eq('id', order.id);
-      } finally {
-        gelatoSubmissionsEnCours.delete(order.id);
-      }
-    })();
-
-    return res.status(202).json({ status: 'started', startedAt });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
 // GET /api/orders/:orderId/tracking
 // Suivi REEL de production (2026-09-11) : interroge Gelato pour savoir ou en
 // est vraiment la commande (en production / imprimee / expediee + numero de
@@ -1134,14 +850,16 @@ router.get('/:orderId/invoice', authenticate, async (req, res) => {
 });
 
 // GET /api/orders/gelato/status
-// Le frontend a besoin de savoir si l'envoi de test est possible (cle API
-// configuree, mode production desactive) pour n'afficher le bouton que
-// quand il peut reellement servir — jamais un bouton qui echouera a coup sur.
+// Le mode production est-il actif ? Utilise par le frontend pour adapter
+// l'affichage en consequence (ex. masquer "Supprimer cette commande et
+// recommencer" en production, voir BookCheckoutLuxe.js — retour utilisateur,
+// 2026-10-04). Portait aussi jusqu'ici `configured`/`testAvailable` pour le
+// bouton "Envoi de test a l'imprimeur", retire le meme jour : en mode test,
+// un paiement (meme factice) soumet deja un brouillon automatiquement, ce
+// bouton etait devenu redondant.
 router.get('/gelato/status', authenticate, (_req, res) => {
   res.json({
-    configured: Boolean(process.env.GELATO_API_KEY),
-    liveOrders: isGelatoLiveOrdersEnabled(),
-    testAvailable: Boolean(process.env.GELATO_API_KEY) && !isGelatoLiveOrdersEnabled()
+    liveOrders: isGelatoLiveOrdersEnabled()
   });
 });
 
@@ -1825,9 +1543,10 @@ router.delete('/:orderId', authenticate, async (req, res) => {
       });
     }
 
-    // Menage chez Gelato : le brouillon courant ET ceux archives par les
-    // renvois precedents (voir /gelato-test) encombreraient le tableau de
-    // bord alors que plus rien ne les reference. Best effort, comme partout
+    // Menage chez Gelato : le brouillon courant ET ceux archives par
+    // d'anciens renvois (gelatoPreviousDrafts, laisse par l'ancien bouton
+    // "Envoi de test a l'imprimeur", retire le 2026-10-04) encombreraient le
+    // tableau de bord alors que plus rien ne les reference. Best effort, comme partout
     // ailleurs pour cette suppression : un echec cote Gelato ne doit pas
     // empecher l'utilisateur de nettoyer sa propre commande (pire cas, un
     // brouillon orphelin, sans consequence ni cout).

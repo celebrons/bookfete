@@ -11,7 +11,6 @@ import {
   getGelatoStatus,
   getOrderTracking,
   listOrdersByBook,
-  sendOrderToGelatoTest,
   updateOrderStatus
 } from '../../services/ordersApi';
 import { estimatePrice } from '../../services/compositionApi';
@@ -151,14 +150,10 @@ const BookCheckoutLuxe = () => {
   // CGVLuxe.js/§5) — l'acceptation doit etre ECRITE et ANTERIEURE au
   // paiement, jamais deduite implicitement d'un simple clic sur "Payer".
   const [cgvAccepted, setCgvAccepted] = useState(false);
-  // Envoi de test a l'imprimeur (Gelato), sans paiement — n'apparait que si
-  // le serveur dit que c'est reellement possible (cle API configuree ET
-  // mode production desactive). Voir backend/routes/orders.js.
+  // Mode production actif ? Decide si "Supprimer cette commande et
+  // recommencer" s'affiche (uniquement en mode test, retour utilisateur
+  // 2026-10-04 — voir backend/routes/orders.js GET /gelato/status).
   const [gelatoStatus, setGelatoStatus] = useState(null);
-  const [gelatoSending, setGelatoSending] = useState(false);
-  const [gelatoProgress, setGelatoProgress] = useState(null);
-  const [gelatoResult, setGelatoResult] = useState(null);
-  const [gelatoError, setGelatoError] = useState('');
   const [deletingOrder, setDeletingOrder] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [pdfJob, setPdfJob] = useState(null);
@@ -802,9 +797,10 @@ const BookCheckoutLuxe = () => {
     }
   };
 
-  // Statut Gelato (cle API presente ? mode production actif ?) — charge une
-  // fois, jamais bloquant : en cas d'echec, le bloc d'envoi de test reste
-  // simplement masque.
+  // Mode production actif ? Charge une fois, jamais bloquant — en cas
+  // d'echec, "Supprimer cette commande et recommencer" reste affiche par
+  // defaut (repli cote sans danger : il reste de toute facon protege par
+  // les propres garde-fous du serveur, voir DELETE /:orderId).
   useEffect(() => {
     let cancelled = false;
     getGelatoStatus()
@@ -812,35 +808,6 @@ const BookCheckoutLuxe = () => {
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
-
-  // L'envoi est ASYNCHRONE cote serveur (la generation du fichier prend
-  // plusieurs minutes : ~15 s par page en haute resolution). On relit donc
-  // la commande jusqu'a voir le resultat arriver dans ses metadonnees —
-  // meme principe que le suivi d'export PDF deja en place plus bas.
-  const pollGelatoTestResult = async (orderId) => {
-    const deadline = Date.now() + 15 * 60 * 1000; // large : un livre epais peut etre long
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 6000));
-      try {
-        const fresh = await getOrderById(orderId);
-        const meta = fresh?.metadata || {};
-        // Progression REELLE ecrite par le serveur au fil du rendu (phase +
-        // pages rendues / total) — voir backend/routes/orders.js.
-        if (meta.gelatoProgress) setGelatoProgress(meta.gelatoProgress);
-        if (meta.gelatoOrderId) {
-          setGelatoResult({ gelatoOrderId: meta.gelatoOrderId, gelatoOrderType: meta.gelatoOrderType || 'draft' });
-          return;
-        }
-        if (meta.gelatoError) {
-          setGelatoError(meta.gelatoError);
-          return;
-        }
-      } catch (_err) {
-        // Lecture ratee (reveil d'instance, reseau) : on retente au tour suivant.
-      }
-    }
-    setGelatoError(t('flow.errors.gelatoStillRunning'));
-  };
 
   // Suivi reel : charge a l'affichage de l'ecran de suivi, rafraichi a la
   // demande, et automatiquement tant que la commande n'est pas dans un etat
@@ -890,30 +857,6 @@ const BookCheckoutLuxe = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTrackingStep, latestOrder?.id, latestOrder?.type, tracking?.gelatoOrderId]);
 
-  const sendToGelatoTest = async () => {
-    // gelatoSending garde le BOUTON, mais setGelatoSending est asynchrone :
-    // deux clics rapproches partent avant le re-rendu, et le serveur cree
-    // alors deux brouillons chez Gelato (constate le 2026-09-17). Cette garde
-    // ferme la fenetre cote client ; le serveur a la sienne, independante.
-    if (!latestOrder?.id || gelatoSending) return;
-    setGelatoSending(true);
-    setGelatoError('');
-    setGelatoResult(null);
-    setGelatoProgress({ phase: 'starting', done: 0, total: 0 });
-    try {
-      const started = await sendOrderToGelatoTest(latestOrder.id);
-      if (started?.status === 'done' || started?.gelatoOrderId) {
-        setGelatoResult(started);
-        return;
-      }
-      await pollGelatoTestResult(latestOrder.id);
-    } catch (err) {
-      setGelatoError(err?.message || t('flow.errors.gelatoTestFailed'));
-    } finally {
-      setGelatoSending(false);
-    }
-  };
-
   // Supprimer la commande pour RECOMMENCER le parcours (2026-09-11, demande
   // utilisateur : pouvoir reessayer un autre type, un autre format, un autre
   // paiement sans rester bloque). C'est la seule facon de revenir a l'ecran 1 :
@@ -933,13 +876,10 @@ const BookCheckoutLuxe = () => {
     setDeleteError('');
     try {
       await deleteOrder(latestOrder.id);
-      // Remise a zero complete : sans effacer aussi le suivi et les traces de
-      // l'envoi Gelato, l'ecran garderait l'etat de la commande supprimee.
+      // Remise a zero complete : sans effacer aussi le suivi, l'ecran
+      // garderait l'etat de la commande supprimee.
       setLatestOrder(null);
       setTracking(null);
-      setGelatoResult(null);
-      setGelatoError('');
-      setGelatoProgress(null);
       setManualStep(0);
     } catch (err) {
       setDeleteError(err?.message || t('flow.errors.deleteOrderFailed'));
@@ -1563,12 +1503,6 @@ const BookCheckoutLuxe = () => {
               pdfJob={pdfJob}
               onDownloadPdf={downloadPdfFile}
               downloadingKind={downloadingKind}
-              gelatoTestAvailable={Boolean(gelatoStatus?.testAvailable)}
-              gelatoSending={gelatoSending}
-              gelatoProgress={gelatoProgress}
-              gelatoResult={gelatoResult}
-              gelatoError={gelatoError}
-              onSendGelatoTest={sendToGelatoTest}
             />
           )}
 
@@ -1610,8 +1544,13 @@ const BookCheckoutLuxe = () => {
 
           {/* Recommencer : sans ca, une commande existante fige le parcours
               (etape imposee + creation verrouillee) et on ne peut plus
-              essayer un autre type, un autre format ni un autre paiement. */}
-          {latestOrder && (
+              essayer un autre type, un autre format ni un autre paiement.
+              UNIQUEMENT en mode test (retour utilisateur, 2026-10-04) : en
+              production, ce raccourci n'a plus de raison d'etre propose
+              pour un vrai client — le serveur refuse de toute facon de
+              supprimer une commande reellement payee, mais autant ne pas
+              montrer un bouton qui n'a plus vocation a servir. */}
+          {latestOrder && !gelatoStatus?.liveOrders && (
             <div className="orders-reset-block">
               <button
                 type="button"

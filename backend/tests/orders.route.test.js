@@ -281,74 +281,41 @@ describe('GET /api/orders/book/:bookId/price-estimate', () => {
   });
 });
 
-// --- Gelato, mode test (2026-09-11) ----------------------------------------
-// Envoi manuel a l'imprimeur SANS paiement (demande utilisateur : tester en
-// ligne sur Render avec de vraies photos). Ce qui compte ici : le garde-fou
-// production et les refus clairs — la soumission elle-meme est couverte par
-// tests/printing/gelatoOrderService.test.js.
-describe('Gelato — mode test', () => {
+// --- Gelato, mode global (2026-09-11, simplifie 2026-10-04) ---------------
+// Le bouton manuel "Envoi de test a l'imprimeur" a ete retire : en mode
+// test, un paiement (meme factice) soumet deja un brouillon automatiquement
+// (voir gelatoOrderService.test.js). Cette route ne sert plus qu'a dire au
+// frontend si le mode production est actif (masque alors certains controles
+// cote client, voir BookCheckoutLuxe.js).
+describe('GET /gelato/status', () => {
   let app;
   const OLD_ENV = { ...process.env };
 
   beforeAll(() => { app = buildApp(); });
   afterEach(() => { process.env = { ...OLD_ENV }; });
 
-  it('GET /gelato/status dit que le test est indisponible sans cle API', async () => {
-    delete process.env.GELATO_API_KEY;
-    const response = await request(app)
-      .get('/api/orders/gelato/status')
-      .set('Authorization', 'Bearer valid-token');
-
-    expect(response.status).toBe(200);
-    expect(response.body.configured).toBe(false);
-    expect(response.body.testAvailable).toBe(false);
+  it('exige une authentification', async () => {
+    const response = await request(app).get('/api/orders/gelato/status');
+    expect(response.status).toBe(401);
   });
 
-  it('GET /gelato/status : cle API presente et mode production desactive -> test disponible', async () => {
-    process.env.GELATO_API_KEY = 'cle-de-test';
+  it('mode test : liveOrders = false', async () => {
     process.env.GELATO_LIVE_ORDERS = '0';
     const response = await request(app)
       .get('/api/orders/gelato/status')
       .set('Authorization', 'Bearer valid-token');
 
-    expect(response.body.configured).toBe(true);
+    expect(response.status).toBe(200);
     expect(response.body.liveOrders).toBe(false);
-    expect(response.body.testAvailable).toBe(true);
   });
 
-  it('GET /gelato/status : GELATO_LIVE_ORDERS=1 -> test NON disponible (garde-fou production)', async () => {
-    process.env.GELATO_API_KEY = 'cle-de-test';
+  it('mode production : liveOrders = true', async () => {
     process.env.GELATO_LIVE_ORDERS = '1';
     const response = await request(app)
       .get('/api/orders/gelato/status')
       .set('Authorization', 'Bearer valid-token');
 
     expect(response.body.liveOrders).toBe(true);
-    expect(response.body.testAvailable).toBe(false);
-  });
-
-  it('POST /:orderId/gelato-test refuse net quand le mode production est actif (jamais de vraie commande facturee)', async () => {
-    process.env.GELATO_LIVE_ORDERS = '1';
-    const response = await request(app)
-      .post('/api/orders/commande-inexistante/gelato-test')
-      .set('Authorization', 'Bearer valid-token');
-
-    expect(response.status).toBe(409);
-    expect(response.body.error).toMatch(/GELATO_LIVE_ORDERS/);
-  });
-
-  it('POST /:orderId/gelato-test refuse une commande introuvable / d\'un autre proprietaire', async () => {
-    process.env.GELATO_LIVE_ORDERS = '0';
-    const response = await request(app)
-      .post('/api/orders/commande-inexistante/gelato-test')
-      .set('Authorization', 'Bearer valid-token');
-
-    expect(response.status).toBe(404);
-  });
-
-  it('POST /:orderId/gelato-test exige une authentification', async () => {
-    const response = await request(app).post('/api/orders/peu-importe/gelato-test');
-    expect(response.status).toBe(401);
   });
 });
 
@@ -496,78 +463,18 @@ describe('GET /api/orders/:orderId/tracking', () => {
   });
 });
 
-// --- Renvoi d'un test apres changement (2026-09-11) ------------------------
-// L'idempotence de gelatoOrderService est indexee sur la COMMANDE, alors que
-// le format d'impression vit sur le LIVRE : sans ce comportement, changer de
-// format puis relancer un test repondait "Deja envoye" et rien n'etait
-// regenere (retour utilisateur).
+// Mock defensif pour le reste du fichier : sans lui, le vrai
+// gelatoOrderService.js se chargerait (il n'est mocke nulle part ailleurs
+// ici) et tout chemin de ce fichier qui declenche une soumission Gelato
+// automatique (webhook, confirmation de paiement...) tenterait un vrai
+// appel reseau. Le test dedie au renvoi-apres-changement-de-format a ete
+// retire le 2026-10-04 avec la route /gelato-test qu'il testait — le
+// comportement d'idempotence lui-meme reste couvert par
+// gelatoOrderService.test.js.
 jest.mock('../services/printing/gelatoOrderService', () => ({
   submitPrintOrderToGelato: jest.fn(async () => ({ skipped: false, gelatoOrderId: 'gelato-nouveau', gelatoOrderType: 'draft' })),
   isGelatoLiveOrdersEnabled: () => process.env.GELATO_LIVE_ORDERS === '1'
 }));
-const { submitPrintOrderToGelato } = require('../services/printing/gelatoOrderService');
-
-describe('POST /:orderId/gelato-test — renvoi apres changement de format', () => {
-  let app;
-  const OLD_ENV = { ...process.env };
-
-  beforeAll(() => { app = buildApp(); });
-  beforeEach(async () => {
-    submitPrintOrderToGelato.mockClear();
-    gelatoClient.deleteOrder.mockReset();
-    gelatoClient.deleteOrder.mockResolvedValue({});
-    process.env.GELATO_LIVE_ORDERS = '0';
-    // Le magasin mock est partage par tout le fichier, et un renvoi efface
-    // justement gelatoOrderId : sans cette remise en etat, seul le premier
-    // test de ce bloc verrait un brouillon precedent a remplacer.
-    await global.__ordersSupabaseMock
-      .from('orders')
-      .update({ metadata: { gelatoOrderId: 'gelato-draft-1', gelatoOrderType: 'draft' } })
-      .eq('id', 'order-draft-envoye');
-  });
-  afterEach(() => { process.env = { ...OLD_ENV }; });
-
-  it('un BROUILLON deja envoye est rejouable : relance la generation', async () => {
-    const response = await request(app)
-      .post('/api/orders/order-draft-envoye/gelato-test')
-      .set('Authorization', 'Bearer valid-token');
-
-    expect(response.status).toBe(202);
-    expect(response.body.status).toBe('started');
-    expect(submitPrintOrderToGelato).toHaveBeenCalled();
-  });
-
-  it('le brouillon precedent est supprime chez Gelato (pas de tableau de bord encombre)', async () => {
-    await request(app)
-      .post('/api/orders/order-draft-envoye/gelato-test')
-      .set('Authorization', 'Bearer valid-token');
-
-    expect(gelatoClient.deleteOrder).toHaveBeenCalledWith('gelato-draft-1');
-  });
-
-  it("un echec de suppression du brouillon precedent n'empeche pas le nouvel envoi", async () => {
-    gelatoClient.deleteOrder.mockRejectedValue(new Error('Gelato indisponible'));
-
-    const response = await request(app)
-      .post('/api/orders/order-draft-envoye/gelato-test')
-      .set('Authorization', 'Bearer valid-token');
-
-    expect(response.status).toBe(202);
-    expect(submitPrintOrderToGelato).toHaveBeenCalled();
-  });
-
-  it('une VRAIE commande deja envoyee n\'est JAMAIS rejouee (pas de reimpression/refacturation)', async () => {
-    const response = await request(app)
-      .post('/api/orders/order-reelle-envoyee/gelato-test')
-      .set('Authorization', 'Bearer valid-token');
-
-    expect(response.status).toBe(200);
-    expect(response.body.skipped).toBe(true);
-    expect(response.body.gelatoOrderId).toBe('gelato-reel-1');
-    expect(submitPrintOrderToGelato).not.toHaveBeenCalled();
-    expect(gelatoClient.deleteOrder).not.toHaveBeenCalled();
-  });
-});
 
 // --- DELETE /api/orders/:orderId (2026-09-11) -----------------------------
 // Suppression d'une commande pour recommencer un test. Les cas interessants
