@@ -20,4 +20,4 @@ alter table public.books
   add column if not exists locked_at timestamptz;
 
 comment on column public.books.locked_at is
-  'Pose au tout premier paiement reussi d''une commande liee a ce livre (voir routes/orders.js persistStripePaymentForOrder). NULL = livre encore modifiable. Les routes d''edition (composition.js requireOwnedBook, books.js PUT /:id) refusent toute modification quand elle est posee, sauf si ALLOW_BOOK_EDITS_AFTER_PAYMENT=1 est defini cote serveur (mode test).';
+  'Pose au tout premier paiement reussi d''une commande liee a ce livre (voir routes/orders.js persistStripePaymentForOrder). NULL = livre encore modifiable. Les routes d''edition (composition.js requireOwnedBook, books.js PUT /:id) refusent toute modification quand elle est posee, sauf en mode test (voir services/settings/appMode.js et middleware/bookEditLock.js).';

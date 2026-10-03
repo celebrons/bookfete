@@ -17,16 +17,20 @@
 // controle-la specifiquement, meme si le reste ne l'est pas, evite qu'une
 // copie du verrou diverge silencieusement d'une autre.
 //
-// BYPASS DE TEST : ALLOW_BOOK_EDITS_AFTER_PAYMENT=1 autorise quand meme la
-// modification — meme convention que GELATO_LIVE_ORDERS/STRIPE_ENABLED
-// (comparaison stricte a la chaine '1', jamais une coercion). Sans elle,
-// aucun livre deja teste avec un paiement ne pourrait plus jamais etre
-// modifie, y compris par le fondateur lui-meme en train de tester le
-// parcours complet.
+// BYPASS DE TEST : actif tant que le mode global (voir
+// services/settings/appMode.js) n'est pas 'production' — meme bascule
+// unique que Stripe/Gelato, plutot qu'une variable d'environnement
+// separee a poser/retirer a la main sur le serveur. Sans elle, aucun
+// livre deja teste avec un paiement ne pourrait plus jamais etre modifie,
+// y compris par le fondateur lui-meme en train de tester le parcours
+// complet ; en production reelle, le verrou s'applique sans exception,
+// automatiquement, au moment ou le mode bascule — aucune etape manuelle
+// supplementaire.
 const { t } = require('../services/i18n/t');
+const { getAppModeSync } = require('../services/settings/appMode');
 
 function isBookEditBypassActive() {
-  return process.env.ALLOW_BOOK_EDITS_AFTER_PAYMENT === '1';
+  return getAppModeSync() !== 'production';
 }
 
 function requireBookNotLocked(req, res, next) {

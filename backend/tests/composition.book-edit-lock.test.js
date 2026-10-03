@@ -49,6 +49,14 @@ jest.mock('@supabase/supabase-js', () => ({
   createClient: () => global.__supabaseMock
 }));
 
+// Le bypass de test suit desormais le mode global (voir
+// services/settings/appMode.js), plus une variable d'environnement
+// separee — meme bascule unique que Stripe/Gelato.
+jest.mock('../services/settings/appMode', () => ({
+  getAppModeSync: jest.fn(() => 'test')
+}));
+const { getAppModeSync } = require('../services/settings/appMode');
+
 const express = require('express');
 const request = require('supertest');
 
@@ -61,11 +69,11 @@ function buildApp() {
 
 describe('Verrouillage d\'un livre apres paiement (middleware/bookEditLock.js)', () => {
   afterEach(() => {
-    delete process.env.ALLOW_BOOK_EDITS_AFTER_PAYMENT;
+    getAppModeSync.mockReturnValue('test');
   });
 
-  it('refuse une modification (423) sur un livre verrouille, sans bypass', async () => {
-    delete process.env.ALLOW_BOOK_EDITS_AFTER_PAYMENT;
+  it('refuse une modification (423) sur un livre verrouille, en mode production', async () => {
+    getAppModeSync.mockReturnValue('production');
     const app = buildApp();
 
     const response = await request(app)
@@ -78,7 +86,8 @@ describe('Verrouillage d\'un livre apres paiement (middleware/bookEditLock.js)',
     expect(response.body.error).toMatch(/déjà été payée/);
   });
 
-  it('autorise la meme modification sur un livre jamais paye', async () => {
+  it('autorise la meme modification sur un livre jamais paye, meme en production', async () => {
+    getAppModeSync.mockReturnValue('production');
     const app = buildApp();
 
     const response = await request(app)
@@ -89,8 +98,8 @@ describe('Verrouillage d\'un livre apres paiement (middleware/bookEditLock.js)',
     expect(response.status).not.toBe(423);
   });
 
-  it('ALLOW_BOOK_EDITS_AFTER_PAYMENT=1 (mode test) : la modification redevient possible sur un livre verrouille', async () => {
-    process.env.ALLOW_BOOK_EDITS_AFTER_PAYMENT = '1';
+  it('mode test : la modification redevient possible sur un livre verrouille', async () => {
+    getAppModeSync.mockReturnValue('test');
     const app = buildApp();
 
     const response = await request(app)
@@ -101,20 +110,8 @@ describe('Verrouillage d\'un livre apres paiement (middleware/bookEditLock.js)',
     expect(response.status).not.toBe(423);
   });
 
-  it('une valeur "truthy" mais pas litteralement "1" ne debloque PAS le mode test (jamais de coercion)', async () => {
-    process.env.ALLOW_BOOK_EDITS_AFTER_PAYMENT = 'true';
-    const app = buildApp();
-
-    const response = await request(app)
-      .post(`/api/books/${BOOK_ID_LOCKED}/pages/extend`)
-      .set('Authorization', 'Bearer valid-token')
-      .send({ count: 2 });
-
-    expect(response.status).toBe(423);
-  });
-
-  it('les routes de LECTURE restent accessibles sur un livre verrouille, sans bypass', async () => {
-    delete process.env.ALLOW_BOOK_EDITS_AFTER_PAYMENT;
+  it('les routes de LECTURE restent accessibles sur un livre verrouille, meme en production', async () => {
+    getAppModeSync.mockReturnValue('production');
     const app = buildApp();
 
     const response = await request(app)

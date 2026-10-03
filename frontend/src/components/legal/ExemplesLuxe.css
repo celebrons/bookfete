@@ -25,3 +25,31 @@
   margin-top: var(--space-lg);
   display: inline-block;
 }
+
+/* Galerie de vrais livres (voir LIVRES_EXEMPLES dans ExemplesLuxe.js) :
+   vide pour l'instant, prete a recevoir de vraies photos. */
+.exemples-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-lg);
+  margin-top: var(--space-xl);
+}
+
+.exemples-carte {
+  margin: 0;
+}
+
+.exemples-carte img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(31, 28, 23, 0.12);
+}
+
+.exemples-carte figcaption {
+  margin-top: var(--space-sm);
+  font-size: 13.5px;
+  color: var(--text-light);
+}
