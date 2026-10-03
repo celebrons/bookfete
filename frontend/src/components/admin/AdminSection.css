@@ -1,0 +1,51 @@
+/* Section depliante de l'espace d'administration (voir AdminSection.js). */
+
+.admin-section {
+  margin: var(--space-lg, 32px) 0 0;
+  border-top: 1px solid rgba(223, 216, 201, 0.9);
+}
+
+.admin-shell > .admin-section:first-of-type {
+  border-top: none;
+  margin-top: var(--space-md, 20px);
+}
+
+.admin-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: var(--space-md, 20px) 0 var(--space-sm, 12px);
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-section-chevron {
+  flex: none;
+  width: 16px;
+  color: var(--gold);
+  font-size: 13px;
+}
+
+.admin-section-title-text {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.admin-section-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-light);
+  background: rgba(184, 146, 74, 0.1);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.admin-section-body {
+  padding-bottom: var(--space-sm, 12px);
+}

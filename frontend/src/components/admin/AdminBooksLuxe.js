@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { checkIsAdmin, fetchBookPreviewHtml, listAllBooks, poserCodeAdmin } from '../../services/adminApi';
+import {
+  checkIsAdmin, fetchBookPreviewHtml, listAllBooks, listUnfinalizedBooks, poserCodeAdmin, purgeUnfinalizedBooks
+} from '../../services/adminApi';
 import '../../styles/luxe-theme.css';
 import AdminModeToggle from './AdminModeToggle';
 import AdminHealth from './AdminHealth';
 import AdminEvents from './AdminEvents';
 import AdminJobs from './AdminJobs';
+import AdminSection from './AdminSection';
 import './AdminBooksLuxe.css';
 
 // Espace d'administration : le mode global (test/production), tous les
@@ -72,6 +75,7 @@ export default function AdminBooksLuxe() {
   const [previewBook, setPreviewBook] = useState(null);
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [nettoyage, setNettoyage] = useState(false);
 
   const verifierLAcces = useCallback(async () => {
     const { isAdmin, codeAttendu: attendu } = await checkIsAdmin();
@@ -129,6 +133,33 @@ export default function AdminBooksLuxe() {
       setPreviewBook(null);
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const nettoyerLesBrouillons = async () => {
+    setNettoyage(true);
+    setError('');
+    try {
+      const apercu = await listUnfinalizedBooks();
+      if (apercu.total === 0) {
+        window.alert('Aucun livre non finalisé sans commande à supprimer.');
+        return;
+      }
+      const liste = apercu.books
+        .slice(0, 15)
+        .map((b) => `  - ${b.title || '(sans titre)'} (créé le ${new Date(b.createdAt).toLocaleDateString('fr-FR')})`)
+        .join('\n');
+      const suite = apercu.total > 15 ? `\n  … et ${apercu.total - 15} autre(s)` : '';
+      const confirme = window.confirm(
+        `Supprimer ${apercu.total} livre(s) non finalisé(s) et sans aucune commande ?\n\n${liste}${suite}\n\nIrréversible.`
+      );
+      if (!confirme) return;
+      await purgeUnfinalizedBooks();
+      await load(search);
+    } catch (err) {
+      setError(err.message || 'Nettoyage impossible.');
+    } finally {
+      setNettoyage(false);
     }
   };
 
@@ -192,14 +223,19 @@ export default function AdminBooksLuxe() {
 
       <AdminModeToggle />
 
-      <h2 className="admin-section-title">Livres</h2>
-      <input
-        type="search"
-        className="input-luxe admin-search"
-        placeholder="Rechercher un titre, un nom, un email…"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+      <AdminSection title="Livres" badge={total} defaultOpen>
+      <div className="admin-books-toolbar">
+        <input
+          type="search"
+          className="input-luxe admin-search"
+          placeholder="Rechercher un titre, un nom, un email…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <button type="button" className="btn btn-outline" onClick={nettoyerLesBrouillons} disabled={nettoyage}>
+          {nettoyage ? 'Vérification…' : 'Nettoyer les brouillons abandonnés'}
+        </button>
+      </div>
 
       {error && <p className="admin-error">{error}</p>}
 
@@ -265,6 +301,7 @@ export default function AdminBooksLuxe() {
           </table>
         </div>
       )}
+      </AdminSection>
 
       {previewBook && (
         <div className="admin-preview-backdrop" onClick={() => setPreviewBook(null)}>
@@ -289,14 +326,15 @@ export default function AdminBooksLuxe() {
         </div>
       )}
 
-      <h2 className="admin-section-title">Exploitation</h2>
-      {/* Ce que fait la machine en ce moment. */}
-      <AdminHealth />
-      <AdminJobs />
+      <AdminSection title="Exploitation">
+        {/* Ce que fait la machine en ce moment. */}
+        <AdminHealth />
+        <AdminJobs />
 
-      {/* Le journal des evenements : le deroule de ce qui est arrive aux
-          livres et aux commandes, tous serveurs confondus. */}
-      <AdminEvents />
+        {/* Le journal des evenements : le deroule de ce qui est arrive aux
+            livres et aux commandes, tous serveurs confondus. */}
+        <AdminEvents />
+      </AdminSection>
     </div>
   );
 }

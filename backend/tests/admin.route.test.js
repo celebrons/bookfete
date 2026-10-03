@@ -323,3 +323,89 @@ describe('Espace admin — mode test/production', () => {
     expect(response.status).toBe(400);
   });
 });
+
+// Vider le journal des evenements (2026-10-03).
+describe('Espace admin — purge du journal', () => {
+  let app;
+  const OLD_ENV = { ...process.env };
+
+  beforeAll(() => { app = buildApp(); });
+  beforeEach(() => {
+    process.env.ADMIN_EMAILS = ADMIN_EMAIL;
+    const table = global.__adminSupabaseMock.__table('app_events');
+    table.length = 0;
+    table.push(
+      { id: 'e1', type: 'order.created', level: 'info', created_at: '2026-09-01T00:00:00Z' },
+      { id: 'e2', type: 'pdf.failed', level: 'error', created_at: '2026-09-02T00:00:00Z' }
+    );
+  });
+  afterEach(() => { process.env = { ...OLD_ENV }; });
+
+  it('refuse un non-administrateur, sans toucher au journal', async () => {
+    const response = await request(app).post('/api/admin/events/purge').set('Authorization', 'Bearer user-token');
+    expect(response.status).toBe(404);
+    expect(global.__adminSupabaseMock.__table('app_events')).toHaveLength(2);
+  });
+
+  it('vide toutes les lignes existantes et le dit', async () => {
+    const response = await request(app).post('/api/admin/events/purge').set('Authorization', 'Bearer admin-token');
+    expect(response.status).toBe(200);
+    expect(response.body.removed).toBe(2);
+
+    // Une ligne de traçabilite reapparait APRES la purge, pour que le
+    // journal ne reparte pas totalement muet sur ce qui vient de se passer.
+    const table = global.__adminSupabaseMock.__table('app_events');
+    expect(table).toHaveLength(1);
+    expect(table[0].type).toBe('admin.events.purged');
+  });
+});
+
+// Livres non finalises et sans commande (2026-10-03, "repartir a zero").
+// b1 est en 'editing' mais a une commande (o1) : il ne doit JAMAIS etre
+// supprime, peu importe son statut — orders.book_id n'a aucune contrainte
+// de cle etrangere, donc c'est le seul garde-fou. b2 est en 'editing' et
+// n'a aucune commande : c'est le seul candidat legitime dans ce jeu de
+// donnees.
+describe('Espace admin — nettoyage des livres non finalises', () => {
+  let app;
+  const OLD_ENV = { ...process.env };
+
+  beforeAll(() => { app = buildApp(); });
+  beforeEach(() => { process.env.ADMIN_EMAILS = ADMIN_EMAIL; });
+  afterEach(() => {
+    process.env = { ...OLD_ENV };
+    // Remet b2 si un test precedent l'a supprime.
+    const books = global.__adminSupabaseMock.__table('books');
+    if (!books.find((b) => b.id === 'b2')) {
+      books.push({ id: 'b2', owner_id: 'anon-1', title: 'Livre sans compte', print_format: 'livret', page_count: 30, updated_at: '2026-09-11T10:00:00Z', created_at: '2026-09-11T09:00:00Z', cover_config: {} });
+    }
+  });
+
+  it('GET /books/unfinalized refuse un non-administrateur', async () => {
+    const response = await request(app).get('/api/admin/books/unfinalized').set('Authorization', 'Bearer user-token');
+    expect(response.status).toBe(404);
+  });
+
+  it('GET /books/unfinalized ne liste QUE b2 — jamais b1, qui a une commande', async () => {
+    const response = await request(app).get('/api/admin/books/unfinalized').set('Authorization', 'Bearer admin-token');
+    expect(response.status).toBe(200);
+    expect(response.body.books.map((b) => b.id)).toEqual(['b2']);
+  });
+
+  it('POST /books/unfinalized/purge refuse un non-administrateur, sans rien supprimer', async () => {
+    const response = await request(app).post('/api/admin/books/unfinalized/purge').set('Authorization', 'Bearer user-token');
+    expect(response.status).toBe(404);
+    expect(global.__adminSupabaseMock.__table('books').map((b) => b.id)).toEqual(expect.arrayContaining(['b1', 'b2']));
+  });
+
+  it('POST /books/unfinalized/purge supprime b2 et conserve b1 (il a une commande)', async () => {
+    const response = await request(app).post('/api/admin/books/unfinalized/purge').set('Authorization', 'Bearer admin-token');
+    expect(response.status).toBe(200);
+    expect(response.body.removed).toBe(1);
+    expect(response.body.bookIds).toEqual(['b2']);
+
+    const remaining = global.__adminSupabaseMock.__table('books').map((b) => b.id);
+    expect(remaining).toContain('b1');
+    expect(remaining).not.toContain('b2');
+  });
+});

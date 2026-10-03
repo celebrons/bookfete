@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { listEvents } from '../../services/adminApi';
+import { listEvents, purgeEventsRemote } from '../../services/adminApi';
 import './AdminEvents.css';
 
 // Journal des evenements metier, dans l'espace d'administration.
@@ -53,6 +53,7 @@ function AdminEvents() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
   const [niveau, setNiveau] = useState('');
+  const [vidage, setVidage] = useState(false);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -69,6 +70,20 @@ function AdminEvents() {
 
   useEffect(() => { charger(); }, [charger]);
 
+  const viderLeJournal = async () => {
+    if (!window.confirm('Vider tout le journal des événements ?\n\nIrréversible, mais purement informatif : rien sur les livres ou les commandes n’est touché.')) return;
+    setVidage(true);
+    setErreur(null);
+    try {
+      await purgeEventsRemote();
+      await charger();
+    } catch (err) {
+      setErreur(err?.message || 'Vidage impossible');
+    } finally {
+      setVidage(false);
+    }
+  };
+
   return (
     <section className="admin-events">
       <div className="admin-events-head">
@@ -79,6 +94,9 @@ function AdminEvents() {
           </select>
           <button type="button" className="btn btn-outline" onClick={charger} disabled={chargement}>
             {chargement ? 'Chargement…' : 'Actualiser'}
+          </button>
+          <button type="button" className="btn btn-outline" onClick={viderLeJournal} disabled={vidage || chargement}>
+            {vidage ? 'Vidage…' : 'Vider le journal'}
           </button>
         </div>
       </div>

@@ -146,3 +146,12 @@ export const fetchServerHealth = () => request('/health');
 // ecran.
 export const fetchAppMode = () => request('/mode');
 export const setAppModeRemote = (mode) => action('/mode', { mode });
+
+// Vider le journal des evenements (2026-10-03) : purement informatif, voir
+// backend/services/events/eventLog.js.
+export const purgeEventsRemote = () => action('/events/purge');
+
+// Livres non finalises et sans aucune commande — a previsualiser avant de
+// supprimer (voir backend/routes/admin.js, listUnfinalizedCandidates).
+export const listUnfinalizedBooks = () => request('/books/unfinalized');
+export const purgeUnfinalizedBooks = () => action('/books/unfinalized/purge');

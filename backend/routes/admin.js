@@ -20,7 +20,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
-const { listEvents, logEvent } = require('../services/events/eventLog');
+const { listEvents, logEvent, purgeEvents } = require('../services/events/eventLog');
 const { etatServeur } = require('../services/events/serverHealth');
 const bookContentService = require('../services/composition/bookContentService');
 const templateCatalog = require('../services/composition/templateCatalog');
@@ -277,6 +277,101 @@ router.get('/events', authenticate, requireAdmin, async (req, res) => {
       error: error.message,
       indice: "Avez-vous execute sql/phase21_app_events.sql dans Supabase ?"
     });
+  }
+});
+
+// POST /api/admin/events/purge
+// Vide le journal des evenements pour repartir a zero (demande du
+// 2026-10-03). Sans danger sur le fonctionnement du site : ce journal est
+// purement informatif (voir eventLog.js, "un journal perdu se
+// reconstitue"). On reecrit une ligne APRES la purge pour que le journal ne
+// reparte pas totalement muet sur ce qui vient de se passer.
+router.post('/events/purge', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const resultat = await purgeEvents({ jours: 0 });
+    logEvent({
+      type: 'admin.events.purged',
+      actor: req.user?.email,
+      message: `Journal des evenements vide depuis l'administration (${resultat.removed} ligne(s) supprimee(s))`
+    });
+    return res.json(resultat);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Statuts consideres comme "non finalise" : un brouillon jamais arrive au
+// bout, qu'il n'ait jamais eu d'apercu ou qu'il en ait un sans etre
+// finalise. Tout statut ulterieur (finalized et au-dela) n'est jamais un
+// candidat, par definition.
+const LIFECYCLE_NON_FINALISE = new Set(['editing', 'preview_available']);
+
+// Les livres non finalises ET SANS AUCUNE COMMANDE — jamais les deux
+// conditions separement. `orders.book_id` n'a AUCUNE contrainte de cle
+// etrangere (voir sql/orders.sql) : rien en base n'empecherait de supprimer
+// un livre dont une commande reelle depend. Cette fonction est le seul
+// rempart, donc appelee a l'identique par la liste ET par la suppression —
+// jamais une liste "optimiste" suivie d'une suppression qui recalcule
+// autrement.
+async function listUnfinalizedCandidates() {
+  const { data: books, error } = await supabase.from('books').select('*');
+  if (error) throw error;
+
+  const { data: orders, error: ordersError } = await supabase.from('orders').select('book_id');
+  if (ordersError) throw ordersError;
+  const booksWithOrders = new Set((orders || []).map((o) => o.book_id).filter(Boolean));
+
+  return (books || []).filter((book) => (
+    LIFECYCLE_NON_FINALISE.has(resolveLifecycle(book)) && !booksWithOrders.has(book.id)
+  ));
+}
+
+// GET /api/admin/books/unfinalized
+// Previsualise ce que /purge supprimerait, sans rien toucher — a consulter
+// avant de confirmer, jamais un simple compte theorique.
+router.get('/books/unfinalized', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const candidates = await listUnfinalizedCandidates();
+    return res.json({
+      total: candidates.length,
+      books: candidates.map((book) => ({
+        id: book.id,
+        title: book.title || null,
+        createdAt: book.created_at,
+        ownerId: book.owner_id || null
+      }))
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/admin/books/unfinalized/purge
+// Supprime tous les livres non finalises et sans commande (demande du
+// 2026-10-03, "repartir a zero"). Recalcule la liste au moment de l'appel
+// plutot que de faire confiance a une liste deja affichee a l'ecran : un
+// livre peut avoir change d'etat entre la consultation et le clic.
+router.post('/books/unfinalized/purge', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const candidates = await listUnfinalizedCandidates();
+    const ids = candidates.map((book) => book.id);
+
+    if (ids.length) {
+      const { error } = await supabase.from('books').delete().in('id', ids);
+      if (error) throw error;
+    }
+
+    logEvent({
+      type: 'admin.books.purged',
+      level: 'warn',
+      actor: req.user?.email,
+      message: `${ids.length} livre(s) non finalise(s) et sans commande supprime(s) depuis l'administration`,
+      metadata: { bookIds: ids }
+    });
+
+    return res.json({ removed: ids.length, bookIds: ids });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 });
 

@@ -43,6 +43,10 @@ function matchesFilters(row, filters) {
         return value >= filter.value;
       case 'lte':
         return value <= filter.value;
+      case 'gt':
+        return value > filter.value;
+      case 'lt':
+        return value < filter.value;
       case 'like':
       case 'ilike': {
         const pattern = String(filter.value).replace(/%/g, '.*');
@@ -215,6 +219,14 @@ function createSupabaseMock(tables = {}, options = {}) {
       },
       lte(column, value) {
         state.filters.push({ type: 'lte', column, value });
+        return query;
+      },
+      gt(column, value) {
+        state.filters.push({ type: 'gt', column, value });
+        return query;
+      },
+      lt(column, value) {
+        state.filters.push({ type: 'lt', column, value });
         return query;
       },
       like(column, value) {
