@@ -1,10 +1,9 @@
 // Page Exemples (plan de mise en production, "des livres reels valent
 // mieux que n'importe quel argumentaire") : tant que LIVRES_EXEMPLES est
-// vide, elle NE FABRIQUE AUCUN faux temoignage ni fausse photo pour combler
-// l'attente. Des qu'une vraie photo de livre existe, l'ajouter ICI (dans ce
-// tableau, voir la forme d'un exemple en commentaire juste en dessous)
-// suffit a faire apparaitre la galerie : aucune autre modification de code
-// n'est necessaire.
+// vide, elle NE FABRIQUE AUCUN faux temoignage ni fausse photo PRESENTEE
+// COMME VENANT D'UN VRAI CLIENT. Des qu'une vraie photo de livre existe,
+// l'ajouter ICI (dans ce tableau) suffit a faire apparaitre la galerie :
+// aucune autre modification de code n'est necessaire.
 //
 // Forme attendue de chaque entree :
 //   {
@@ -20,102 +19,152 @@ import './ExemplesLuxe.css';
 
 const LIVRES_EXEMPLES = [];
 
-// MAQUETTES ILLUSTRATIVES (2026-10-04, demande explicite "remplis la en
-// inventant des exemples qui collent avec le site") — en l'absence de
-// vraies photos, le choix a ete de montrer honnetement des SCENARIOS
-// inventes avec les 3 VRAIS styles du produit (memes slugs/couleurs que
-// services/composition/coverTheme.js), plutot que de fausses photos ou de
-// faux temoignages clients attribues a des gens qui n'existent pas — la
-// meme raison que le retrait des statistiques fictives ("10k+ livres
-// crees") le meme jour. Chaque carte affiche un disclaimer explicite
-// (exemples.mockupDisclaimer) : aucune confusion possible avec un vrai
-// livre ou un vrai client.
-const MAQUETTES_ILLUSTRATIVES = [
+// MAQUETTES DE FORMAT (2026-10-04, v2 — demande explicite : "montrer des
+// apercus des 3 formats EN VRAI, dimensions, couverture, dispositions
+// possibles a l'interieur, pour que l'acheteur visualise reellement le
+// livre"). Dimensions, type de couverture et couleurs d'accent REPRIS A
+// L'IDENTIQUE de backend/services/composition/coverFormat.js (COVER_FORMATS)
+// et coverTheme.js (applyFormatAccent) — jamais invente. Les photos sont
+// des photos libres de droit (Picsum/Unsplash, voir public/images/
+// exemples-stock/), choisies pour illustrer la MECANIQUE des dispositions
+// reelles du moteur de mise en page (voir DISPOSITIONS ci-dessous, memes
+// slugs que sql/phase08_layout_engine_v2.sql), jamais presentees comme un
+// vrai livre d'un vrai client — contrairement a la v1 (maquettes
+// abstraites), cette version montre une vraie apparence, avec de vraies
+// proportions, parce que c'est ce qui permet VRAIMENT de visualiser le
+// livre.
+const STOCK = (nom) => `/images/exemples-stock/${nom}.jpg`;
+
+// Dispositions reelles du moteur (layoutEngine/sql phase08) : FULL_PHOTO,
+// TWO_PHOTOS, PHOTO_TEXT, FOUR_PHOTOS sont les slugs exacts.
+const DISPOSITIONS = {
+  FULL_PHOTO: { type: 'full' },
+  TWO_PHOTOS: { type: 'duo' },
+  PHOTO_TEXT: { type: 'phototext' },
+  FOUR_PHOTOS: { type: 'grid4' }
+};
+
+const TEXTE_EXEMPLE_FR = 'Un bel après-midi, tous ensemble.';
+const TEXTE_EXEMPLE_EN = 'A lovely afternoon, all together.';
+
+// Les 3 VRAIS formats. trimWidthMm/trimHeightMm/accent/bg : copies de
+// COVER_FORMATS et applyFormatAccent (backend). couverture : vrai type
+// Gelato (soft-cover-photobooks / hard-cover-photobooks).
+const FORMATS = [
   {
-    id: 'anniversaire-60',
-    theme: 'elegance',
-    format: 'standard',
-    pages: 32,
-    eventFr: 'Anniversaire — 60 ans',
-    eventEn: '60th birthday',
-    blocs: [1.4, 0.8, 1, 0.6]
+    id: 'livret',
+    nomFr: 'Livret', nomEn: 'Booklet',
+    trimWidthMm: 200, trimHeightMm: 200,
+    couvertureFr: 'couverture souple', couvertureEn: 'soft cover',
+    bg: '#fffdf8', accent: '#8f8a7c', ornement: false,
+    pagesExemple: 32,
+    spreads: [
+      { disposition: 'FULL_PHOTO', photos: [STOCK('carre1')] },
+      { disposition: 'TWO_PHOTOS', photos: [STOCK('carre2'), STOCK('plage1')] },
+      { disposition: 'PHOTO_TEXT', photos: [STOCK('montagne1')] }
+    ]
   },
   {
-    id: 'mariage',
-    theme: 'elegance',
-    format: 'luxe',
-    pages: 48,
-    eventFr: 'Mariage',
-    eventEn: 'Wedding',
-    blocs: [1, 1, 1.6, 0.7]
+    id: 'standard',
+    nomFr: 'Standard', nomEn: 'Standard',
+    trimWidthMm: 210, trimHeightMm: 280,
+    couvertureFr: 'couverture souple', couvertureEn: 'soft cover',
+    bg: '#f4f0e6', accent: '#c9a35f', ornement: false,
+    pagesExemple: 44,
+    spreads: [
+      { disposition: 'TWO_PHOTOS', photos: [STOCK('foret1'), STOCK('lac1')] },
+      { disposition: 'FOUR_PHOTOS', photos: [STOCK('ville1'), STOCK('fete1'), STOCK('famille1'), STOCK('automne1')] },
+      { disposition: 'FULL_PHOTO', photos: [STOCK('chemin1')] }
+    ]
   },
   {
-    id: 'naissance',
-    theme: 'editorial',
-    format: 'livret',
-    pages: 24,
-    eventFr: 'Naissance',
-    eventEn: 'New baby',
-    blocs: [0.9, 1.3, 0.9]
-  },
-  {
-    id: 'voyage',
-    theme: 'minimal',
-    format: 'standard',
-    pages: 36,
-    eventFr: 'Voyage en famille',
-    eventEn: 'Family trip',
-    blocs: [1, 1, 1, 1]
-  },
-  {
-    id: 'retraite',
-    theme: 'editorial',
-    format: 'standard',
-    pages: 28,
-    eventFr: 'Départ à la retraite',
-    eventEn: 'Retirement',
-    blocs: [1.5, 0.7, 0.9]
-  },
-  {
-    id: 'collectif',
-    theme: 'elegance',
-    format: 'luxe',
-    pages: 40,
-    eventFr: 'Projet collectif entre amis',
-    eventEn: 'Group project with friends',
-    blocs: [0.8, 0.8, 0.8, 1.2]
+    id: 'luxe',
+    nomFr: 'Luxe', nomEn: 'Luxe',
+    trimWidthMm: 210, trimHeightMm: 280,
+    couvertureFr: 'couverture rigide', couvertureEn: 'hard cover',
+    bg: '#ede6d6', accent: '#c19a3d', ornement: true,
+    pagesExemple: 50,
+    spreads: [
+      { disposition: 'FULL_PHOTO', photos: [STOCK('nature1')] },
+      { disposition: 'PHOTO_TEXT', photos: [STOCK('voyage1')] },
+      { disposition: 'TWO_PHOTOS', photos: [STOCK('voyage2'), STOCK('jardin1')] }
+    ]
   }
 ];
 
-const FORMAT_LABELS = {
-  fr: { livret: 'Livret', standard: 'Standard', luxe: 'Luxe' },
-  en: { livret: 'Booklet', standard: 'Standard', luxe: 'Luxe' }
-};
+function Spread({ spread, langue, ratio }) {
+  const { type } = DISPOSITIONS[spread.disposition];
+  const texte = langue === 'en' ? TEXTE_EXEMPLE_EN : TEXTE_EXEMPLE_FR;
+  const style = { aspectRatio: ratio };
 
-const STYLE_LABELS = {
-  fr: { elegance: 'Élégance', editorial: 'Éditorial', minimal: 'Minimaliste' },
-  en: { elegance: 'Elegance', editorial: 'Editorial', minimal: 'Minimal' }
-};
+  if (type === 'full') {
+    return (
+      <div className="exemples-spread exemples-spread-full" style={style}>
+        <img src={spread.photos[0]} alt="" loading="lazy" />
+      </div>
+    );
+  }
+  if (type === 'duo') {
+    return (
+      <div className="exemples-spread exemples-spread-duo" style={style}>
+        <img src={spread.photos[0]} alt="" loading="lazy" />
+        <img src={spread.photos[1]} alt="" loading="lazy" />
+      </div>
+    );
+  }
+  if (type === 'grid4') {
+    return (
+      <div className="exemples-spread exemples-spread-grid4" style={style}>
+        {spread.photos.map((src) => <img key={src} src={src} alt="" loading="lazy" />)}
+      </div>
+    );
+  }
+  // phototext
+  return (
+    <div className="exemples-spread exemples-spread-phototext" style={style}>
+      <img src={spread.photos[0]} alt="" loading="lazy" />
+      <div className="exemples-spread-texte">
+        <span className="exemples-spread-ligne" />
+        <span className="exemples-spread-ligne" />
+        <span className="exemples-spread-citation">{texte}</span>
+      </div>
+    </div>
+  );
+}
 
-function MaquetteCarte({ maquette, langue, disclaimer }) {
-  const evenement = langue === 'en' ? maquette.eventEn : maquette.eventFr;
-  const formatLabel = FORMAT_LABELS[langue][maquette.format];
-  const styleLabel = STYLE_LABELS[langue][maquette.theme];
-  const pagesLabel = langue === 'en' ? `${maquette.pages} pages` : `${maquette.pages} pages`;
+function FormatCard({ format, langue, t }) {
+  const nom = langue === 'en' ? format.nomEn : format.nomFr;
+  const couverture = langue === 'en' ? format.couvertureEn : format.couvertureFr;
+  const ratio = `${format.trimWidthMm} / ${format.trimHeightMm}`;
+  const spreadRatio = `${format.trimWidthMm * 2} / ${format.trimHeightMm}`;
+  const dims = `${format.trimWidthMm / 10} × ${format.trimHeightMm / 10} cm`;
+  const coverPhoto = format.spreads[0].photos[0];
 
   return (
-    <figure className={`exemples-maquette theme-${maquette.theme}`}>
-      <div className="exemples-maquette-spread" aria-hidden="true">
-        {maquette.blocs.map((flex, index) => (
-          <span key={index} className="exemples-maquette-bloc" style={{ flexGrow: flex }} />
+    <article className={`exemples-format${format.ornement ? ' is-luxe' : ''}`}>
+      <div
+        className="exemples-cover"
+        style={{ aspectRatio: ratio, background: format.bg }}
+      >
+        <img className="exemples-cover-photo" src={coverPhoto} alt="" loading="lazy" />
+        <div className="exemples-cover-overlay" style={{ borderColor: format.accent }}>
+          <span className="exemples-cover-titre" style={{ color: format.accent }}>
+            {t('exemples.coverSampleTitle')}
+          </span>
+        </div>
+      </div>
+
+      <div className="exemples-format-meta">
+        <h2>{nom}</h2>
+        <p>{dims} · {couverture} · {t('exemples.pagesExample', { count: format.pagesExemple })}</p>
+      </div>
+
+      <div className="exemples-spreads">
+        {format.spreads.map((spread, index) => (
+          <Spread key={index} spread={spread} langue={langue} ratio={spreadRatio} />
         ))}
       </div>
-      <figcaption>
-        <span className="exemples-maquette-event">{evenement}</span>
-        <span className="exemples-maquette-meta">{styleLabel} · {formatLabel} · {pagesLabel}</span>
-        <span className="exemples-maquette-disclaimer">{disclaimer}</span>
-      </figcaption>
-    </figure>
+    </article>
   );
 }
 
@@ -130,7 +179,7 @@ export default function ExemplesLuxe() {
         <span className="label-gold">{t('common.eyebrow')}</span>
         <h1>{t('exemples.title')}</h1>
         <p className="exemples-texte">
-          {aDesExemples ? t('exemples.galleryIntro') : t('exemples.mockupIntro')}
+          {aDesExemples ? t('exemples.galleryIntro') : t('exemples.formatsIntro')}
         </p>
 
         {aDesExemples && (
@@ -145,16 +194,15 @@ export default function ExemplesLuxe() {
         )}
 
         {!aDesExemples && (
-          <div className="exemples-grille exemples-grille-maquettes">
-            {MAQUETTES_ILLUSTRATIVES.map((maquette) => (
-              <MaquetteCarte
-                key={maquette.id}
-                maquette={maquette}
-                langue={langue}
-                disclaimer={t('exemples.mockupDisclaimer')}
-              />
+          <div className="exemples-formats">
+            {FORMATS.map((format) => (
+              <FormatCard key={format.id} format={format} langue={langue} t={t} />
             ))}
           </div>
+        )}
+
+        {!aDesExemples && (
+          <p className="exemples-disclaimer">{t('exemples.photosDisclaimer')}</p>
         )}
 
         <Link to="/create-book" className="btn btn-primary exemples-cta">{t('exemples.cta')}</Link>

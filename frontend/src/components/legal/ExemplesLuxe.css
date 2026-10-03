@@ -5,7 +5,7 @@
 }
 
 .exemples-inner {
-  max-width: 960px;
+  max-width: 1200px;
 }
 
 .exemples-inner > .exemples-texte {
@@ -58,60 +58,178 @@
   color: var(--text-light);
 }
 
-/* Maquettes illustratives (voir MAQUETTES_ILLUSTRATIVES dans
-   ExemplesLuxe.js) : les memes 3 couleurs de style que
-   backend/services/composition/coverTheme.js (COVER_THEMES), pour que
-   cette demonstration corresponde a ce que l'atelier affiche reellement —
-   jamais une 4e palette inventee pour l'occasion. */
-.exemples-maquette {
+/* Les 3 VRAIS formats (voir FORMATS dans ExemplesLuxe.js) : dimensions,
+   type de couverture et couleurs reprises a l'identique de
+   backend/services/composition/coverFormat.js et coverTheme.js — jamais
+   inventees. */
+.exemples-formats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-xl);
+  margin-top: var(--space-xl);
+}
+
+.exemples-format {
   margin: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--white);
+  box-shadow: 0 10px 30px rgba(31, 28, 23, 0.1);
 }
 
-.exemples-maquette-spread {
-  display: flex;
-  gap: 6px;
-  height: 150px;
-  padding: 14px;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(31, 28, 23, 0.12);
+/* --- Couverture ------------------------------------------------------- */
+.exemples-cover {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
 }
 
-.exemples-maquette-bloc {
-  border-radius: 6px;
-  flex-basis: 0;
+.exemples-cover-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.theme-elegance .exemples-maquette-spread { background: #f4f0e6; }
-.theme-elegance .exemples-maquette-bloc { background: rgba(201, 163, 95, 0.4); }
+.exemples-cover-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 16px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.55));
+  border-top: 3px solid;
+}
 
-.theme-editorial .exemples-maquette-spread { background: #eceae4; }
-.theme-editorial .exemples-maquette-bloc { background: rgba(138, 122, 99, 0.4); }
+.exemples-cover-titre {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 22px;
+  color: #fffdf8;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
 
-.theme-minimal .exemples-maquette-spread { background: #f2f2f2; }
-.theme-minimal .exemples-maquette-bloc { background: rgba(26, 26, 26, 0.18); }
+/* Luxe : couverture rigide, papier lin/ivoire, cadre dore — pas une photo
+   plein bord (voir coverTheme.applyFormatAccent : paper/ornament "gold-frame"). */
+.exemples-format.is-luxe .exemples-cover {
+  padding: 22px;
+  box-sizing: border-box;
+}
 
-.exemples-maquette figcaption {
-  margin-top: var(--space-sm);
+.exemples-format.is-luxe .exemples-cover-photo {
+  inset: 22px;
+  width: calc(100% - 44px);
+  height: calc(100% - 44px);
+  border: 2px solid #c19a3d;
+  outline: 1px solid rgba(193, 154, 61, 0.4);
+  outline-offset: 4px;
+}
+
+.exemples-format.is-luxe .exemples-cover-overlay {
+  left: 22px;
+  right: 22px;
+  bottom: 22px;
+  background: linear-gradient(180deg, transparent, rgba(36, 31, 24, 0.65));
+}
+
+/* --- Meta : nom, dimensions, couverture, pages ------------------------ */
+.exemples-format-meta {
+  padding: var(--space-md) var(--space-md) 0;
+}
+
+.exemples-format-meta h2 {
+  margin: 0;
+  font-family: var(--font-editorial);
+  font-size: 20px;
+}
+
+.exemples-format-meta p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+/* --- Dispositions interieures ------------------------------------------ */
+.exemples-spreads {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
+  padding: var(--space-md);
 }
 
-.exemples-maquette-event {
-  font-size: 14.5px;
-  font-weight: 600;
+.exemples-spread {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f2efe8;
+  box-shadow: 0 4px 14px rgba(31, 28, 23, 0.1);
+}
+
+.exemples-spread img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Un <img> a une taille intrinseque qui, par defaut (min-width:auto),
+     empeche un enfant flex de retrecir en dessous — ca ecrasait le
+     panneau de texte voisin (phototext) jusqu'a une colonne de quelques
+     pixels, coupant le texte lettre par lettre. */
+  min-width: 0;
+}
+
+.exemples-spread-full { }
+.exemples-spread-full img { flex: 1; }
+
+.exemples-spread-duo img { flex: 1; width: 50%; }
+
+.exemples-spread-grid4 {
+  flex-wrap: wrap;
+}
+.exemples-spread-grid4 img {
+  flex: 1 1 calc(50% - 2px);
+  width: calc(50% - 2px);
+  height: 50%;
+}
+
+.exemples-spread-phototext img { flex: 1; }
+
+.exemples-spread-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  background: #fffdf8;
+}
+
+.exemples-spread-ligne {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(36, 31, 24, 0.12);
+}
+.exemples-spread-ligne:nth-child(2) { width: 70%; }
+
+.exemples-spread-citation {
+  margin-top: 4px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
   color: var(--ink);
+  line-height: 1.4;
 }
 
-.exemples-maquette-meta {
-  font-size: 12.5px;
-  color: var(--text-light);
-}
-
-.exemples-maquette-disclaimer {
-  margin-top: 2px;
-  font-size: 11px;
+.exemples-disclaimer {
+  margin-top: var(--space-lg);
+  font-size: 12px;
   font-style: italic;
   color: var(--text-light);
-  opacity: 0.75;
+  opacity: 0.8;
+  max-width: 640px;
 }

@@ -226,8 +226,10 @@
     "title": "Book examples",
     "text": "We're preparing a selection of real Bookipix books to show you very soon — birthdays, weddings, farewells, group projects. In the meantime, the best way to see what your book will look like is to start your own: the preview updates live, at true scale, throughout composition.",
     "galleryIntro": "Real Bookipix books, received by real customers.",
-    "mockupIntro": "While we wait for real books to show you, here's what our three styles look like — illustrative mockups, not real orders.",
-    "mockupDisclaimer": "Illustrative mockup — not a real order",
+    "formatsIntro": "While we wait for real books to show you, here are our three formats for real — actual dimensions, cover type, and examples of possible layouts for your photos inside.",
+    "coverSampleTitle": "Our favorite memories",
+    "pagesExample": "example shown: {{count}} pages",
+    "photosDisclaimer": "Real formats and dimensions. The photos are royalty-free stock images, used only to illustrate possible layouts — these are not real customer orders.",
     "cta": "Create my book"
   }
 }
