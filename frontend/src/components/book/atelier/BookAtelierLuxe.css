@@ -684,6 +684,9 @@
   padding: var(--space-md) var(--space-lg);
   margin-bottom: var(--space-md);
 }
+/* Repliee par defaut (2026-10-04) : juste le bandeau-titre, pas de padding
+   vertical supplementaire pour la grille d'etapes absente. */
+.atelier-onboarding.is-collapsed { padding: 10px var(--space-lg); }
 
 .atelier-onboarding-close {
   position: absolute;
@@ -707,6 +710,20 @@
   text-transform: uppercase;
   color: var(--gold);
 }
+.atelier-onboarding.is-collapsed .atelier-onboarding-title { margin: 0; }
+/* Le titre est maintenant un bouton (repli/depli) — reset des styles
+   natifs de <button>, le rendu reste identique a l'ancien <p>. */
+.atelier-onboarding-title-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.atelier-onboarding-chevron { font-size: 10px; color: var(--text-light); }
 
 .atelier-onboarding-steps {
   display: grid;
@@ -896,14 +913,44 @@
 /* Remplir le cadre / Photo entiere (fitMode). Deux boutons segmentes plutot
    qu'une case a cocher : ce sont deux etats egaux, pas une option accessoire
    — et le nom de chacun dit ce qu'il fait, jamais "cover"/"contain". */
+.atelier-adjust-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-sm);
+}
+
 .atelier-adjust-mode {
   display: flex;
   gap: 0;
-  margin-bottom: var(--space-sm);
   border: 1px solid rgba(36, 31, 24, 0.18);
   border-radius: 999px;
   overflow: hidden;
   width: fit-content;
+}
+
+/* Bulle d'aide "ⓘ" (retour utilisateur, 2026-10-04) : compare les deux modes
+   AVANT de choisir, contrairement a .atelier-adjust-hint qui ne decrit que
+   le mode actif. `title` suffit (pas de popover custom) — une info ponctuelle
+   consultee au survol/focus, pas un contenu qui merite un composant a part. */
+.atelier-adjust-mode-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(36, 31, 24, 0.3);
+  color: var(--text-light);
+  font-size: 12px;
+  cursor: help;
+  flex-shrink: 0;
+}
+.atelier-adjust-mode-info:hover,
+.atelier-adjust-mode-info:focus-visible {
+  border-color: var(--gold);
+  color: var(--gold);
+  outline: none;
 }
 
 .atelier-adjust-mode-btn {
@@ -1810,6 +1857,38 @@
 }
 .atelier-cover-photo-overlay:hover .atelier-cover-photo-overlay-hint { opacity: 1; }
 
+/* Menu a deux lignes sur un emplacement VIDE (2026-10-04) — contrairement au
+   hint ci-dessus, TOUJOURS visible (pas de survol requis) : c'est le tout
+   premier contact avec la couverture, il ne doit pas falloir deviner. Meme
+   logique que .atelier-overlay-slot-label sur les pages interieures. */
+.atelier-cover-empty-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.atelier-cover-empty-menu-btn {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: rgba(36, 31, 24, 0.55);
+  color: var(--white);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-cover-empty-menu-btn.is-primary {
+  background: var(--gold, #c9a35f);
+  border-color: var(--gold, #c9a35f);
+  color: #241f18;
+}
+.atelier-cover-empty-menu-btn:hover { opacity: 0.85; }
+.atelier-cover-empty-menu-btn:focus-visible { outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
+
 /* Changer la photo / Ajuster le cadrage (2026-09-15, etendu 2026-09-26 avec
    "Changer la photo" — retour utilisateur : "comment je fais si je veux
    changer la photo ?", il n'y avait jusque-la aucun chemin direct). Deux
@@ -1948,6 +2027,39 @@
   border-radius: 999px;
   pointer-events: none;
 }
+
+/* Emplacement photo VIDE : "changer de mise en page" au-dessus de l'etiquette
+   habituelle (2026-10-04, meme principe que .atelier-cover-empty-menu) — le
+   bouton a besoin de ses propres evenements de clic (stopPropagation),
+   contrairement au conteneur et a l'etiquette qui laissent toujours passer
+   le clic de fond vers .atelier-overlay-slot (ouverture directe du choix de
+   photo). */
+.atelier-overlay-slot-empty-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.atelier-overlay-slot-label.is-in-menu { pointer-events: none; }
+.atelier-overlay-slot-menu-btn {
+  pointer-events: auto;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: rgba(36, 31, 24, 0.78);
+  color: var(--white);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.atelier-overlay-slot-menu-btn:hover { background: var(--gold, #c9a35f); color: #241f18; }
+.atelier-overlay-slot-menu-btn:focus-visible { outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
 
 /* Croix "retirer" + oeil "voir en taille reelle" (retour utilisateur,
    2026-09-11 : "afficher une x pour supprimer et un petit oeil pour voir la

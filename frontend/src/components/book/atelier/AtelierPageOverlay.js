@@ -83,7 +83,12 @@ function AtelierPageOverlay({
   // disque (voir AtelierPhotoPickerModal.js, monte par l'appelant). Absent =
   // comportement d'avant (rien ne se passe sur un emplacement vide sans
   // selection prealable dans "Mes photos") — aucun appelant existant cassé.
-  onOpenPhotoPicker
+  onOpenPhotoPicker,
+  // Ouvre le tiroir "Mise en page" (retour utilisateur, 2026-10-04 : meme
+  // menu a deux lignes que la couverture — "changer une mise en forme" au
+  // dessus, "choisir une photo" en dessous). Facultatif : sans lui, le
+  // bouton ne s'affiche simplement pas.
+  onOpenLayoutDrawer
 }) {
   const { t } = useTranslation('atelier');
   // Index de l'emplacement en cours d'edition, et largeur REELLE de
@@ -303,7 +308,20 @@ function AtelierPageOverlay({
                 // la refonte 2026-09-26).
                 : (t(`pageOverlay.slotHints.${slotType}`, { defaultValue: '' }) || undefined)}
             >
-              {!item && <span className="atelier-overlay-slot-label">{t(`pageOverlay.slotLabels.${slotType}`, { defaultValue: t('pageOverlay.slotLabels.empty') })}</span>}
+              {!item && slotType === 'photo' && onOpenLayoutDrawer ? (
+                <div className="atelier-overlay-slot-empty-menu">
+                  <button
+                    type="button"
+                    className="atelier-overlay-slot-menu-btn"
+                    onClick={(event) => { event.stopPropagation(); onOpenLayoutDrawer(); }}
+                  >
+                    {t('pageOverlay.changeLayout')}
+                  </button>
+                  <span className="atelier-overlay-slot-label is-in-menu">{t('pageOverlay.slotLabels.photo')}</span>
+                </div>
+              ) : (
+                !item && <span className="atelier-overlay-slot-label">{t(`pageOverlay.slotLabels.${slotType}`, { defaultValue: t('pageOverlay.slotLabels.empty') })}</span>
+              )}
               {!isPending && (
                 <span className="atelier-overlay-slot-quality">
                   <PhotoFitBadge fit={fit} size="sm" />

@@ -331,18 +331,17 @@ function composeBackCover({ book, items, template, format, frontCoverItemIds = [
     ? 0
     : new Set((items || []).filter((item) => item.contribution_id).map((item) => item.contribution_id)).size;
 
-  // DEUX lignes de chiffres, et ce n'est pas un doublon :
-  //  - `statsLineComplete` sert a DECIDER (un livre a-t-il de quoi remplir
-  //    une 4e "avec chiffres" ?) ;
-  //  - `statsLine` est ce qui sera AFFICHE, une fois retires les chiffres
-  //    que l'utilisateur a decoches (cover_overrides.backStatsHidden).
-  // Les confondre ferait disparaitre la photo de 4e des qu'on decoche le
-  // dernier chiffre — une case a cocher ne doit pas changer la mise en page.
+  // `statsLineComplete` sert UNIQUEMENT a DECIDER (un livre a-t-il de quoi
+  // remplir une 4e "avec chiffres" ?) — jamais affiche. Le TEXTE, lui, a ete
+  // retire pour de bon (retour utilisateur, 2026-10-04 : "enlever le « 1
+  // souvenir, 41 photos », enleve-les completement") : `statsLine` vaut
+  // toujours '', independamment de cover_overrides.backStatsHidden (ancien
+  // reglage par case a cocher, desormais sans effet). Garder
+  // statsLineComplete intact est essentiel : la DECISION de variante
+  // (BACK_STATS/BACK_PHOTO_STATS vs BACK_MINIMAL) ne doit pas changer, seul
+  // le texte affiche a disparu.
   const statsLineComplete = formatStatsLine({ contributeurs, souvenirs, photos });
-  const statsLine = formatStatsLine(
-    { contributeurs, souvenirs, photos },
-    Array.isArray(overrides.backStatsHidden) ? overrides.backStatsHidden : []
-  );
+  const statsLine = '';
   const phrase = resolveClosingPhrase(book, overrides);
   const forcedVariant = resolveForcedBackVariant(overrides);
 

@@ -72,21 +72,27 @@ const ALBUM_STYLES = [
   { token: 'encadre' }
 ];
 
+// `hasPhoto` (retour utilisateur, 2026-10-04 : "mettre une icone d'image
+// lorsqu'il y'a une image... comme ca on saura visuellement en regardant
+// directement le template") — une icone discrete se superpose a la vignette
+// des gabarits qui affichent reellement une photo, pour le reconnaitre d'un
+// coup d'oeil avant meme de cliquer. AUTO n'en porte jamais (il peut, selon
+// le contenu du livre, produire l'un ou l'autre).
 const FRONT_FORMATS = [
   { id: 'AUTO' },
-  { id: 'COVER_PHOTO', shape: 'photo-band' },
-  { id: 'COVER_PHOTO_TITLE', shape: 'photo-full' },
+  { id: 'COVER_PHOTO', shape: 'photo-band', hasPhoto: true },
+  { id: 'COVER_PHOTO_TITLE', shape: 'photo-full', hasPhoto: true },
   { id: 'COVER_MINIMAL', shape: 'text-only' },
-  { id: 'COVER_MULTI_PHOTO', shape: 'photo-trio' },
-  { id: 'COVER_SPLIT', shape: 'split' },
-  { id: 'COVER_FRAMED', shape: 'framed' }
+  { id: 'COVER_MULTI_PHOTO', shape: 'photo-trio', hasPhoto: true },
+  { id: 'COVER_SPLIT', shape: 'split', hasPhoto: true },
+  { id: 'COVER_FRAMED', shape: 'framed', hasPhoto: true }
 ];
 
 const BACK_FORMATS = [
   { id: 'AUTO' },
   { id: 'BACK_MINIMAL', shape: 'back-minimal' },
   { id: 'BACK_STATS', shape: 'back-stats' },
-  { id: 'BACK_PHOTO_STATS', shape: 'back-photo' }
+  { id: 'BACK_PHOTO_STATS', shape: 'back-photo', hasPhoto: true }
 ];
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -173,10 +179,13 @@ function CoverFormatMiniPreview({ shape, ratio }) {
         </div>
       );
     case 'back-stats':
+      // Memes blocs que 'back-minimal' (2026-10-04 : le rendu reel ne
+      // distingue plus les deux, voir backCoverRenderer.renderBackStats) —
+      // la ligne de chiffres a disparu, cette vignette ne doit plus la
+      // promettre.
       return (
         <div className="cvrmini-page cvrmini-center" style={pageStyle}>
           <span className="cvrmini-line cvrmini-line-italic" style={{ width: '65%' }} />
-          <span className="cvrmini-stats"><i /><i /><i /></span>
           <span className="cvrmini-dot" />
         </div>
       );
@@ -185,7 +194,6 @@ function CoverFormatMiniPreview({ shape, ratio }) {
         <div className="cvrmini-page cvrmini-center" style={pageStyle}>
           <span className="cvrmini-photo cvrmini-photo-small" />
           <span className="cvrmini-line cvrmini-line-italic" style={{ width: '55%' }} />
-          <span className="cvrmini-stats"><i /><i /><i /></span>
         </div>
       );
     default:
@@ -195,6 +203,18 @@ function CoverFormatMiniPreview({ shape, ratio }) {
         </div>
       );
   }
+}
+
+function FormatPhotoBadge({ title }) {
+  return (
+    <span className="coverlite-format-photo-badge" title={title} aria-hidden="true">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="8.5" cy="10.5" r="1.5" />
+        <path d="M21 15l-5-5L5 19" />
+      </svg>
+    </span>
+  );
 }
 
 function FormatGallery({ formats, selectedId, onSelect, ratio, labelNamespace }) {
@@ -208,29 +228,16 @@ function FormatGallery({ formats, selectedId, onSelect, ratio, labelNamespace })
           className={`coverlite-format-option ${selectedId === format.id ? 'is-selected' : ''}`}
           onClick={() => onSelect(format.id)}
         >
-          <CoverFormatMiniPreview shape={format.shape} ratio={ratio} />
+          <span className="coverlite-format-preview-wrap">
+            <CoverFormatMiniPreview shape={format.shape} ratio={ratio} />
+            {format.hasPhoto && <FormatPhotoBadge title={t('coverPanel.hasPhotoBadge')} />}
+          </span>
           <span className="coverlite-format-label">{t(`coverPanel.${labelNamespace}.${format.id}`)}</span>
         </button>
       ))}
     </div>
   );
 }
-
-// Les trois chiffres de la 4e de couverture (voir backend coverCopy.js :
-// formatStatsLine). Chacun peut etre retire — demande utilisateur du
-// 2026-09-19 : "donner la possibilite d'enlever le nombre de photos".
-// On memorise ce qui est MASQUE, pas ce qui est affiche : un chiffre
-// ajoute plus tard apparaitra donc par defaut, sans qu'il faille corriger
-// les livres existants.
-const BACK_STATS = [
-  { id: 'contributeurs' },
-  { id: 'souvenirs' },
-  { id: 'photos' }
-];
-
-const normalizeHiddenStats = (value) => (
-  Array.isArray(value) ? value.filter((id) => BACK_STATS.some((stat) => stat.id === id)) : []
-);
 
 const buildInitialState = (book) => {
   const overrides = (book?.cover_overrides && typeof book.cover_overrides === 'object') ? book.cover_overrides : {};
@@ -269,8 +276,7 @@ const buildInitialState = (book) => {
     closingPhraseMode,
     closingPhraseText: normalizeText(overrides.closingPhraseText),
     kickerMode,
-    kickerText: normalizeText(overrides.kickerText),
-    backStatsHidden: normalizeHiddenStats(overrides.backStatsHidden)
+    kickerText: normalizeText(overrides.kickerText)
   };
 };
 
@@ -328,8 +334,7 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
             closingPhraseMode: formState.closingPhraseMode,
             closingPhraseText: formState.closingPhraseText,
             kickerMode: formState.kickerMode,
-            kickerText: formState.kickerText,
-            backStatsHidden: formState.backStatsHidden
+            kickerText: formState.kickerText
           }
         });
         setSavedSignature(stateSignature);
@@ -570,38 +575,6 @@ function AtelierCoverPanel({ book, face, onUpdateBook, onSaved, onSwitchFace }) 
             )}
           </div>
 
-          {/* CHIFFRES DE LA 4e — chacun peut etre retire (2026-09-19).
-              Masque sur le format "Sobre", qui n'affiche aucun chiffre :
-              proposer d'en retirer un qui n'apparait pas n'aurait aucun
-              sens. */}
-          {formState.backVariant !== 'BACK_MINIMAL' && (
-          <div className="coverlite-group">
-            <span className="coverlite-group-label">{t('coverPanel.backStatsLabel')}</span>
-            <div className="coverlite-checks">
-              {BACK_STATS.map((stat) => {
-                const masque = formState.backStatsHidden.includes(stat.id);
-                return (
-                  <label key={stat.id} className="coverlite-check">
-                    <input
-                      type="checkbox"
-                      checked={!masque}
-                      onChange={() => updateField(
-                        'backStatsHidden',
-                        masque
-                          ? formState.backStatsHidden.filter((id) => id !== stat.id)
-                          : [...formState.backStatsHidden, stat.id]
-                      )}
-                    />
-                    <span>{t(`coverPanel.backStats.${stat.id}`)}</span>
-                  </label>
-                );
-              })}
-            </div>
-            <p className="coverlite-hint">
-              {t('coverPanel.backStatsHint')}
-            </p>
-          </div>
-          )}
         </>
       )}
     </aside>

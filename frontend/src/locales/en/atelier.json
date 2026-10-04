@@ -124,6 +124,7 @@
     "hintContain": "The whole photo fits in the frame. Zoom in to fill it more.",
     "hintCover": "Drag the photo to reposition it, zoom in if needed.",
     "modeGroupLabel": "Framing within the slot",
+    "modeDifferenceHint": "Fill the frame: the photo covers the whole slot, even if its edges get cropped. Whole photo: the entire photo stays visible, with a margin if its shape doesn't exactly match the slot.",
     "modeCover": "Fill the frame",
     "modeContain": "Whole photo",
     "replacePhoto": "Change photo",
@@ -230,7 +231,8 @@
   "bookView": {
     "coverPhotoOverlay": {
       "useThisPhoto": "Click to use this photo",
-      "clickToChoosePhoto": "Click to choose a photo",
+      "chooseLayout": "Choose a layout",
+      "clickToChoosePhoto": "Choose a cover photo",
       "changePhotoTitle": "Choose a different photo",
       "changePhoto": "Change photo",
       "adjustTitle": "Adjust this photo's framing",
@@ -244,7 +246,7 @@
     "loadingPage": "Loading page...",
     "coverLabel": "Cover",
     "backCoverLabel": "Back cover",
-    "insideCoverLabel": "Inside cover",
+    "insideCoverLabel": "Inside cover (not editable)",
     "pageLabel": "Page {{number}}",
     "goToCover": "Go to the cover",
     "previousPage": "Previous page",
@@ -288,15 +290,11 @@
     "backFormats": {
       "AUTO": "Automatic",
       "BACK_MINIMAL": "Sentence only",
-      "BACK_STATS": "Sentence and numbers",
-      "BACK_PHOTO_STATS": "Photo and numbers"
-    },
-    "backStats": {
-      "contributeurs": "Number of contributors",
-      "souvenirs": "Number of memories",
-      "photos": "Number of photos"
+      "BACK_STATS": "Sentence only (alternative)",
+      "BACK_PHOTO_STATS": "Photo and sentence"
     },
     "autoPreviewLabel": "Auto",
+    "hasPhotoBadge": "This layout shows a photo",
     "switchToBack": "See the back cover",
     "switchToFront": "Back to the cover",
     "bookTitleLabel": "Book title",
@@ -322,8 +320,6 @@
     "backFormatLabel": "Back cover format",
     "closingPhraseLabel": "Back cover sentence",
     "closingPhrasePlaceholder": "Write your closing sentence...",
-    "backStatsLabel": "Numbers shown on the back cover",
-    "backStatsHint": "An unchecked number won't appear on the back cover. A number at zero is never shown anyway.",
     "saveStatus": {
       "pending": "Change in progress...",
       "saving": "Saving...",
@@ -333,11 +329,12 @@
   },
   "pageOverlay": {
     "slotLabels": {
-      "photo": "Add a photo",
+      "photo": "Choose a photo",
       "text": "Add a memory",
       "title": "Add a title",
       "empty": "Slot"
     },
+    "changeLayout": "Change layout",
     "slotHints": {
       "photo": "Drag a photo here, or click to choose from your library",
       "text": "Drag a memory here, or click to write",

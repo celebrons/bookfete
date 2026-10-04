@@ -141,7 +141,7 @@ export default function BookAtelierLuxe() {
   const [priceDelta, setPriceDelta] = useState(null);
   const priceDeltaTimeoutRef = useRef(null);
 
-  const [viewIndex, setViewIndex] = useState(1); // 0 = couverture, dernier = 4e, sinon double-page
+  const [viewIndex, setViewIndex] = useState(0); // 0 = couverture, dernier = 4e, sinon double-page
   const [selectedSide, setSelectedSide] = useState('left');
   const [selectedSidebarItem, setSelectedSidebarItem] = useState(null);
 
@@ -561,7 +561,17 @@ export default function BookAtelierLuxe() {
   const deepLinkAppliedRef = useRef(false);
   useEffect(() => {
     if (deepLinkAppliedRef.current || !book?.page_count) return;
-    const raw = Number(searchParams.get('page'));
+    // Sans parametre "page" du tout, searchParams.get() renvoie null, et
+    // Number(null) vaut 0 (pas NaN) : sans ce garde explicite, CHAQUE
+    // premier chargement (aucun "?page=" dans l'URL) etait pris pour un lien
+    // profond vers la page 0 et ecrasait l'atterrissage sur la couverture
+    // (retour utilisateur, 2026-10-04 : "il faut arriver sur la couverture
+    // et non la premiere page") — invisible jusque-la seulement parce que
+    // l'ancienne valeur par defaut de viewIndex (1) coincidait par hasard
+    // avec ce que ce calcul produisait.
+    const rawParam = searchParams.get('page');
+    if (rawParam === null) return;
+    const raw = Number(rawParam);
     if (!Number.isInteger(raw) || raw < 0 || raw >= book.page_count) return;
     deepLinkAppliedRef.current = true;
     setViewIndex(spreadOfPage(raw) + 1);
@@ -2162,6 +2172,7 @@ export default function BookAtelierLuxe() {
       textRoles={draftTextRoles}
       textStyles={draftTextStyles}
       onOpenPhotoPicker={handleOpenPhotoPicker}
+      onOpenLayoutDrawer={() => setActiveDrawer('layout')}
     />
   ) : null;
 
@@ -2494,6 +2505,7 @@ export default function BookAtelierLuxe() {
               frontHasPhotoSlot={frontHasPhotoSlot}
               backHasPhotoSlot={backHasPhotoSlot}
               selectedSidebarItem={selectedSidebarItem}
+              onOpenLayoutDrawer={() => setActiveDrawer('layout')}
               />
             </div>
 

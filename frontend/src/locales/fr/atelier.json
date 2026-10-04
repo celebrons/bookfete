@@ -124,6 +124,7 @@
     "hintContain": "La photo entière tient dans le cadre. Zoomez pour la faire remplir davantage.",
     "hintCover": "Faites glisser la photo pour la repositionner, zoomez si besoin.",
     "modeGroupLabel": "Cadrage dans l'emplacement",
+    "modeDifferenceHint": "Remplir le cadre : la photo occupe tout l'emplacement, quitte à en couper les bords. Photo entière : toute la photo est visible, avec une marge si sa forme ne correspond pas exactement au cadre.",
     "modeCover": "Remplir le cadre",
     "modeContain": "Photo entière",
     "replacePhoto": "Changer la photo",
@@ -230,7 +231,8 @@
   "bookView": {
     "coverPhotoOverlay": {
       "useThisPhoto": "Cliquer pour utiliser cette photo",
-      "clickToChoosePhoto": "Cliquer pour choisir une photo",
+      "chooseLayout": "Choisir une mise en page",
+      "clickToChoosePhoto": "Choisir une photo de couverture",
       "changePhotoTitle": "Choisir une autre photo",
       "changePhoto": "Changer la photo",
       "adjustTitle": "Ajuster le cadrage de cette photo",
@@ -244,7 +246,7 @@
     "loadingPage": "Chargement de la page...",
     "coverLabel": "Couverture",
     "backCoverLabel": "4e de couverture",
-    "insideCoverLabel": "Intérieur de couverture",
+    "insideCoverLabel": "Intérieur de couverture (non modifiable)",
     "pageLabel": "Page {{number}}",
     "goToCover": "Aller à la couverture",
     "previousPage": "Page précédente",
@@ -288,15 +290,11 @@
     "backFormats": {
       "AUTO": "Automatique",
       "BACK_MINIMAL": "Phrase seule",
-      "BACK_STATS": "Phrase et chiffres",
-      "BACK_PHOTO_STATS": "Photo et chiffres"
-    },
-    "backStats": {
-      "contributeurs": "Nombre de contributeurs",
-      "souvenirs": "Nombre de souvenirs",
-      "photos": "Nombre de photos"
+      "BACK_STATS": "Phrase seule (alternative)",
+      "BACK_PHOTO_STATS": "Photo et phrase"
     },
     "autoPreviewLabel": "Auto",
+    "hasPhotoBadge": "Ce gabarit affiche une photo",
     "switchToBack": "Voir la 4e de couverture",
     "switchToFront": "Revenir à la couverture",
     "bookTitleLabel": "Titre du livre",
@@ -322,8 +320,6 @@
     "backFormatLabel": "Format de 4e de couverture",
     "closingPhraseLabel": "Phrase de 4e de couverture",
     "closingPhrasePlaceholder": "Écrivez votre phrase de clôture...",
-    "backStatsLabel": "Chiffres affichés en 4e",
-    "backStatsHint": "Un chiffre décoché n'apparaît pas sur la 4e de couverture. Un chiffre à zéro n'est de toute façon jamais affiché.",
     "saveStatus": {
       "pending": "Modification en cours...",
       "saving": "Enregistrement...",
@@ -333,11 +329,12 @@
   },
   "pageOverlay": {
     "slotLabels": {
-      "photo": "Ajouter une photo",
+      "photo": "Choisir une photo",
       "text": "Ajouter un souvenir",
       "title": "Ajouter un titre",
       "empty": "Emplacement"
     },
+    "changeLayout": "Changer de mise en page",
     "slotHints": {
       "photo": "Glissez une photo ici, ou cliquez pour choisir dans votre bibliothèque",
       "text": "Glissez un souvenir ici, ou cliquez pour écrire",

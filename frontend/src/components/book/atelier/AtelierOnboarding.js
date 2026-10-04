@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 // Explications de prise en main de l'atelier — affichees par defaut a la
@@ -29,21 +29,39 @@ const STEPS = [
 
 function AtelierOnboarding({ onDismiss }) {
   const { t } = useTranslation('atelier');
+  // Repliee par defaut (retour utilisateur, 2026-10-04 : "assez gris,
+  // beaucoup d'empilements... quand je cree le livre premiere fois") — avec
+  // la banniere anonyme + l'en-tete + la barre d'outils deja empiles
+  // au-dessus, la carte complete (5 etapes, 2 lignes) repoussait le livre
+  // lui-meme hors de l'ecran au tout premier contact. Un bandeau d'une
+  // ligne suffit a signaler l'aide ; le contenu reste identique a un clic
+  // (et toujours reouvrable via le bouton "?" du header, inchange).
+  const [expanded, setExpanded] = useState(false);
   return (
-    <div className="atelier-onboarding">
+    <div className={`atelier-onboarding ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
       <button type="button" className="atelier-onboarding-close" onClick={onDismiss} aria-label={t('onboarding.close')}>×</button>
-      <p className="atelier-onboarding-title">{t('onboarding.title')}</p>
-      <div className="atelier-onboarding-steps">
-        {STEPS.map((step) => (
-          <div key={step.id} className="atelier-onboarding-step">
-            <span className="atelier-onboarding-step-icon" aria-hidden="true">{step.icon}</span>
-            <div>
-              <p className="atelier-onboarding-step-title">{t(`onboarding.steps.${step.id}.title`)}</p>
-              <p className="atelier-onboarding-step-text">{t(`onboarding.steps.${step.id}.text`)}</p>
+      <button
+        type="button"
+        className="atelier-onboarding-title atelier-onboarding-title-toggle"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+      >
+        {t('onboarding.title')}
+        <span className="atelier-onboarding-chevron" aria-hidden="true">{expanded ? '︿' : '﹀'}</span>
+      </button>
+      {expanded && (
+        <div className="atelier-onboarding-steps">
+          {STEPS.map((step) => (
+            <div key={step.id} className="atelier-onboarding-step">
+              <span className="atelier-onboarding-step-icon" aria-hidden="true">{step.icon}</span>
+              <div>
+                <p className="atelier-onboarding-step-title">{t(`onboarding.steps.${step.id}.title`)}</p>
+                <p className="atelier-onboarding-step-text">{t(`onboarding.steps.${step.id}.text`)}</p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

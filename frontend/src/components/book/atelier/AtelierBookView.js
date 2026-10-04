@@ -51,10 +51,19 @@ function ExpandIcon() {
 // meme "cliquer pour choisir une photo" sur un gabarit qui n'en affiche
 // jamais aucune. Absent (undefined) -> true, pour ne rien casser d'un
 // appelant qui ne le passerait pas.
-function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, onOpenPicker, onRemove, hasPhotoSlot = true }) {
+function CoverPhotoOverlay({
+  onAssign, selectedSidebarItem, onAdjust, hasPhoto, onOpenPicker, onRemove, hasPhotoSlot = true,
+  // Retour utilisateur (2026-10-04) : un emplacement VIDE ne doit pas aller
+  // directement choisir une photo — proposer d'abord "changer de mise en
+  // page" (ce gabarit ne convient peut-etre pas), "choisir une photo" reste
+  // juste en dessous. Facultatif : absent, seul "choisir une photo" reste
+  // affiche (comportement d'avant).
+  onOpenLayout
+}) {
   const { t } = useTranslation('atelier');
   if (!onAssign || !hasPhotoSlot) return null;
   const isPhotoSelected = selectedSidebarItem?.kind === 'photo';
+  const isEmptyIdle = !hasPhoto && !isPhotoSelected;
   // Meme mecanique qu'un emplacement de page interieure vide (retour
   // utilisateur, 2026-09-26 : "les photos seront gerees comme sur les
   // pages, en cliquant a l'interieur de la page couverture... cela va
@@ -73,9 +82,12 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
   // "Ajuster le cadrage" (revele au survol, juste en dessous) porte deja ce
   // message — en afficher un second, superpose au meme endroit, ferait
   // double emploi plutot que d'aider.
+  // Emplacement VIDE, rien de selectionne : l'ancien hint unique ("cliquer
+  // pour choisir une photo") cede la place au menu a deux lignes ci-dessous
+  // — plus de texte de hint ici, pour ne pas le doubler.
   const hint = isPhotoSelected
     ? t('bookView.coverPhotoOverlay.useThisPhoto')
-    : (hasPhoto ? null : t('bookView.coverPhotoOverlay.clickToChoosePhoto'));
+    : null;
   return (
     <div
       className={`atelier-cover-photo-overlay ${isPhotoSelected ? 'is-armed' : ''}`}
@@ -88,6 +100,32 @@ function CoverPhotoOverlay({ onAssign, selectedSidebarItem, onAdjust, hasPhoto, 
       title={hint || undefined}
     >
       {hint && <span className="atelier-cover-photo-overlay-hint">{hint}</span>}
+      {/* Menu a deux lignes sur un emplacement VIDE (retour utilisateur,
+          2026-10-04 : "proposer choisir une mise en page, on garde choisir
+          photo de couverture") — le clic sur le fond du calque ouvre quand
+          meme directement le choix de photo (repli pratique, glisser-deposer
+          inchange), ces deux boutons rendent le detour par "mise en page"
+          visible sans avoir a deviner la barre d'outils. */}
+      {isEmptyIdle && (
+        <div className="atelier-cover-empty-menu">
+          {onOpenLayout && (
+            <button
+              type="button"
+              className="atelier-cover-empty-menu-btn"
+              onClick={(event) => { event.stopPropagation(); onOpenLayout(); }}
+            >
+              {t('bookView.coverPhotoOverlay.chooseLayout')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="atelier-cover-empty-menu-btn is-primary"
+            onClick={(event) => { event.stopPropagation(); if (onOpenPicker) onOpenPicker(); }}
+          >
+            {t('bookView.coverPhotoOverlay.clickToChoosePhoto')}
+          </button>
+        </div>
+      )}
       {/* Deux actions distinctes sur une photo deja en place : la remplacer
           par une AUTRE, ou ajuster son cadrage — des BOUTONS a part, pas un
           clic sur l'image (qui ouvre deja l'ajustement, voir plus haut).
@@ -317,7 +355,11 @@ function AtelierBookView({
   // comme avant pour un appelant qui ne les passerait pas).
   frontHasPhotoSlot,
   backHasPhotoSlot,
-  selectedSidebarItem
+  selectedSidebarItem,
+  // Ouvre le tiroir "Mise en page" (AtelierCoverPanel pour la couverture/4e)
+  // — voir CoverPhotoOverlay. Facultatif : sans lui, seul "choisir une
+  // photo" apparait sur un emplacement vide (repli neutre).
+  onOpenLayoutDrawer
 }) {
   const { t } = useTranslation('atelier');
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -412,6 +454,7 @@ function AtelierBookView({
                 onOpenPicker={onOpenCoverPhotoPicker ? () => onOpenCoverPhotoPicker('front') : null}
                 onRemove={onAssignCoverPhoto ? () => onAssignCoverPhoto('front', null) : null}
                 hasPhotoSlot={frontHasPhotoSlot}
+                onOpenLayout={onOpenLayoutDrawer}
               />
             )}
           />
@@ -433,6 +476,7 @@ function AtelierBookView({
                 onOpenPicker={onOpenCoverPhotoPicker ? () => onOpenCoverPhotoPicker('back') : null}
                 onRemove={onAssignCoverPhoto ? () => onAssignCoverPhoto('back', null) : null}
                 hasPhotoSlot={backHasPhotoSlot}
+                onOpenLayout={onOpenLayoutDrawer}
               />
             )}
           />

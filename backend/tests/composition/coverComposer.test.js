@@ -365,40 +365,37 @@ describe('coverComposer.composeFrontCover — format force explicitement (frontV
 });
 
 describe('coverComposer.composeBackCover — statistiques et repli', () => {
+  // Retour utilisateur (2026-10-04) : "enlever le 1 souvenir, 41 photos,
+  // enleve-les completement" — statsLine est desormais TOUJOURS vide, quel
+  // que soit le contenu du livre ou cover_overrides.backStatsHidden (ancien
+  // reglage par case a cocher, devenu sans effet). Seule la DECISION de
+  // variante (BACK_STATS/BACK_PHOTO_STATS vs BACK_MINIMAL), pilotee par le
+  // compte interne non expose, doit continuer a reagir au contenu reel.
+  it('statsLine est toujours vide, meme quand le livre a du contenu a compter', () => {
+    const items = [greatPhoto('p1'), textItem('t1'), textItem('t2')];
+    const back = composeBackCover({ book: { id: 'b1', collection_mode: 'open' }, items, template: TEMPLATE, format: FORMAT });
+    expect(back.content.statsLine).toBe('');
+  });
+
+  it('cover_overrides.backStatsHidden (ancien reglage) n a plus aucun effet : statsLine reste vide quoi qu il contienne', () => {
+    const items = [greatPhoto('p1'), textItem('t1')];
+    const back = composeBackCover({
+      book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backStatsHidden: [] } },
+      items, template: TEMPLATE, format: FORMAT
+    });
+    expect(back.content.statsLine).toBe('');
+  });
+
   it('les trois stats a 0 -> repli automatique sur BACK_MINIMAL, jamais BACK_STATS avec une ligne vide', () => {
     const back = composeBackCover({ book: { id: 'b1', collection_mode: 'solo' }, items: [], template: TEMPLATE, format: FORMAT });
     expect(back.content.variant).toBe('BACK_MINIMAL');
     expect(back.content.statsLine).toBe('');
   });
 
-  it('stats avec 0 photo -> ligne sans "photos", variante stats quand meme choisie', () => {
+  it('du contenu a compter (meme non affiche) -> variante stats quand meme choisie', () => {
     const items = [textItem('t1'), textItem('t2')];
     const back = composeBackCover({ book: { id: 'b1', collection_mode: 'solo' }, items, template: TEMPLATE, format: FORMAT });
-    expect(back.content.statsLine).not.toContain('photo');
-    expect(back.content.statsLine).toContain('souvenir');
     expect(['BACK_STATS', 'BACK_PHOTO_STATS']).toContain(back.content.variant);
-  });
-
-  it('stats avec 0 contribution (livre solo) -> pas de "contributeurs" dans la ligne', () => {
-    const items = [greatPhoto('p1'), textItem('t1')];
-    const back = composeBackCover({ book: { id: 'b1', collection_mode: 'solo' }, items, template: TEMPLATE, format: FORMAT });
-    expect(back.content.statsLine).not.toContain('contributeur');
-  });
-
-  it('livre solo : contributeurs toujours 0 meme si un item porte un contribution_id errant', () => {
-    const items = [{ ...greatPhoto('p1'), contribution_id: 'contrib-x' }];
-    const back = composeBackCover({ book: { id: 'b1', collection_mode: 'solo' }, items, template: TEMPLATE, format: FORMAT });
-    expect(back.content.statsLine).not.toContain('contributeur');
-  });
-
-  it('livre groupe : compte les contribution_id distincts', () => {
-    const items = [
-      { ...greatPhoto('p1'), contribution_id: 'c1' },
-      { ...textItem('t1'), contribution_id: 'c1' },
-      { ...textItem('t2'), contribution_id: 'c2' }
-    ];
-    const back = composeBackCover({ book: { id: 'b1', collection_mode: 'open' }, items, template: TEMPLATE, format: FORMAT });
-    expect(back.content.statsLine).toContain('2 contributeurs');
   });
 
   it('choisit BACK_PHOTO_STATS avec une photo differente de celle du recto, quand une photo acceptable existe', () => {
@@ -431,7 +428,7 @@ describe('coverComposer.composeBackCover — statistiques et repli', () => {
   // 2026-09-19). Le point delicat : masquer un chiffre ne doit changer que
   // le TEXTE affiche, jamais la mise en page — sinon decocher "nombre de
   // photos" ferait disparaitre la photo de 4e par effet de bord.
-  it('masquer le nombre de photos retire le chiffre sans changer la variante ni la photo', () => {
+  it('un cover_overrides.backStatsHidden partiel (ancien reglage) ne change ni la variante ni la photo : statsLine deja vide des avant', () => {
     const items = [greatPhoto('p1'), mediumPhoto('p2'), textItem('t1')];
     const base = {
       items,
@@ -445,25 +442,7 @@ describe('coverComposer.composeBackCover — statistiques et repli', () => {
       book: { id: 'b1', collection_mode: 'solo', cover_overrides: { backStatsHidden: ['photos'] } }
     });
 
-    expect(avant.content.statsLine).toContain('photo');
-    expect(apres.content.statsLine).not.toContain('photo');
-    expect(apres.content.variant).toBe(avant.content.variant);
-    expect(apres.content.itemIds).toEqual(avant.content.itemIds);
-  });
-
-  it('masquer TOUS les chiffres laisse la 4e intacte (photo comprise), seule la ligne disparait', () => {
-    const items = [greatPhoto('p1'), mediumPhoto('p2'), textItem('t1')];
-    const base = { items, template: TEMPLATE, format: FORMAT, frontCoverItemIds: ['p1'] };
-    const avant = composeBackCover({ ...base, book: { id: 'b1', collection_mode: 'solo' } });
-    const apres = composeBackCover({
-      ...base,
-      book: {
-        id: 'b1',
-        collection_mode: 'solo',
-        cover_overrides: { backStatsHidden: ['contributeurs', 'souvenirs', 'photos'] }
-      }
-    });
-
+    expect(avant.content.statsLine).toBe('');
     expect(apres.content.statsLine).toBe('');
     expect(apres.content.variant).toBe(avant.content.variant);
     expect(apres.content.itemIds).toEqual(avant.content.itemIds);

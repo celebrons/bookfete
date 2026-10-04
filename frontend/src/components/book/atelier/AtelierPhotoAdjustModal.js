@@ -170,26 +170,40 @@ function AtelierPhotoAdjustModal({
         </p>
 
         {/* Choix du mode. Deux options nommees par ce qu'elles FONT, jamais
-            par le terme technique (cover/contain). */}
-        <div className="atelier-adjust-mode" role="group" aria-label={t('photoAdjustModal.modeGroupLabel')}>
-          {[
-            { value: 'cover', label: t('photoAdjustModal.modeCover') },
-            { value: 'contain', label: t('photoAdjustModal.modeContain') }
-          ].map((mode) => (
-            <button
-              key={mode.value}
-              type="button"
-              className={`atelier-adjust-mode-btn ${fitMode === mode.value ? 'is-active' : ''}`}
-              // Repartir de 1 en changeant de mode : le zoom n'a pas la meme
-              // signification de part et d'autre (a partir du cadre rempli
-              // d'un cote, de la photo entiere de l'autre). Conserver la
-              // valeur donnerait un saut incomprehensible.
-              onClick={() => { setFitMode(mode.value); setZoom(1); }}
-              aria-pressed={fitMode === mode.value}
-            >
-              {mode.label}
-            </button>
-          ))}
+            par le terme technique (cover/contain). Bulle d'aide (retour
+            utilisateur, 2026-10-04 : "expliquer la difference... entre
+            remplir le cadre et photo entiere") : le hint au-dessus ne decrit
+            que le mode ACTIF, cette bulle compare les deux avant meme de
+            choisir. */}
+        <div className="atelier-adjust-mode-row">
+          <div className="atelier-adjust-mode" role="group" aria-label={t('photoAdjustModal.modeGroupLabel')}>
+            {[
+              { value: 'cover', label: t('photoAdjustModal.modeCover') },
+              { value: 'contain', label: t('photoAdjustModal.modeContain') }
+            ].map((mode) => (
+              <button
+                key={mode.value}
+                type="button"
+                className={`atelier-adjust-mode-btn ${fitMode === mode.value ? 'is-active' : ''}`}
+                // Repartir de 1 en changeant de mode : le zoom n'a pas la meme
+                // signification de part et d'autre (a partir du cadre rempli
+                // d'un cote, de la photo entiere de l'autre). Conserver la
+                // valeur donnerait un saut incomprehensible.
+                onClick={() => { setFitMode(mode.value); setZoom(1); }}
+                aria-pressed={fitMode === mode.value}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <span
+            className="atelier-adjust-mode-info"
+            tabIndex={0}
+            title={t('photoAdjustModal.modeDifferenceHint')}
+            aria-label={t('photoAdjustModal.modeDifferenceHint')}
+          >
+            ⓘ
+          </span>
         </div>
 
         <div

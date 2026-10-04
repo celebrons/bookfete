@@ -45,10 +45,16 @@ function renderBackMinimal(content, theme, scale) {
 }
 
 function renderBackStats(content, theme, scale) {
+  // statsHtml rend toujours '' depuis le 2026-10-04 (coverComposer.js ne
+  // genere plus jamais de statsLine) : cette variante affiche donc en
+  // pratique la meme chose que BACK_MINIMAL — meme classe
+  // 'cvr-back-phrase-solo' pour que la phrase garde le centrage pense pour
+  // une 4e SANS second bloc, plutot que l'espacement pense pour une ligne de
+  // chiffres qui ne viendra plus jamais.
   return `
     <div class="cvr-safe cvr-back-stack" style="${backgroundStyleFor(theme, theme.bg)};">
       <div class="cvr-back-spacer"></div>
-      ${phraseHtml(content.phrase, pt(TYPE_SCALE.phrase, scale))}
+      ${phraseHtml(content.phrase, pt(TYPE_SCALE.phrase, scale), 'cvr-back-phrase-solo')}
       ${statsHtml(content.statsLine, pt(TYPE_SCALE.stats, scale))}
       <div class="cvr-back-spacer"></div>
       ${brandHtml()}

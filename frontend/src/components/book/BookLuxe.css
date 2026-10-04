@@ -9734,6 +9734,28 @@
   color: var(--ink);
 }
 
+/* Icone "contient une photo" (retour utilisateur, 2026-10-04) — posee sur le
+   coin de la vignette, pas a cote : elle doit se lire comme une propriete du
+   gabarit, au meme endroit quelle que soit sa forme. */
+.coverlite-format-preview-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.coverlite-format-photo-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #241f18;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
 /* Mini-mockups des vignettes : blocs de couleur qui suggerent la
    disposition, jamais une vraie photo ni un rendu live. `aspect-ratio` posee
    en style inline par CoverFormatMiniPreview (le VRAI ratio du format choisi
