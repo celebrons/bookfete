@@ -104,12 +104,13 @@ export function resolveSlotSizeMm(layoutSlug, slotIndex, printFormat) {
   const { widthMm: usableW, heightMm: usableH, gapMm: gap } = resolveUsableAreaMm(printFormat);
   if (rawRatio === 'page') return { widthMm: usableW, heightMm: usableH };
   // Double page : on raisonne sur les dimensions de ROGNE (la photo deborde
-  // volontairement les marges). Largeur PLEINE (2026-10-04) : coupee net a
-  // 50/50, une marge au pli la masque ensuite sans reduire l'etirement reel
-  // — miroir de photoQualityEngine.resolveSlotSizeMm.
+  // volontairement les marges), moins le recouvrement imprime des deux cotes
+  // du pli (retabli le 2026-10-04). Miroir de
+  // photoQualityEngine.resolveSlotSizeMm — SPREAD_OVERLAP_MM y vaut 4, d'ou
+  // les 8 mm retires ici.
   if (rawRatio === 'spread') {
     const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
-    return { widthMm: dims.widthMm * 2, heightMm: dims.heightMm };
+    return { widthMm: Math.max(1, dims.widthMm * 2 - 8), heightMm: dims.heightMm };
   }
 
   const columns = resolveSlotColumns(layoutSlug, slotIndex);

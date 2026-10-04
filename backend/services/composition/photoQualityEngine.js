@@ -26,6 +26,18 @@ const MM_PER_INCH = 25.4;
 // module reste une fonction pure, sans dependance a un parseur CSS.
 const PAGE_PADDING_MM = 14;
 const GRID_GAP_MM = 3;
+// Recouvrement d'une photo sur double page (retabli le 2026-10-04 : voir le
+// commentaire de tete de .photo-spread dans pageRenderer.js — une marge qui
+// MASQUE revient, par construction, a perdre ce qui s'y trouve ; un
+// recouvrement duplique, lui, ne perd jamais rien). La bande centrale est
+// imprimee des DEUX cotes du pli, pour que la reliure ne fasse rien
+// disparaitre. A garder egale a `--spread-gutter-margin` dans le CSS du
+// renderer : les desynchroniser donnerait deux verites sur une meme
+// geometrie.
+//
+// L'image etant dessinee sur une largeur de 2 x page MOINS 2 x ce
+// recouvrement, c'est bien cette largeur-la qui fixe la definition exigee.
+const SPREAD_OVERLAP_MM = 4;
 
 // ZONE DE SECURITE DE GOUTTIERE pour une photo sur double page (2026-10-04).
 // A NE PAS CONFONDRE avec le bleed (marge de securite au bord EXTERIEUR de
@@ -111,9 +123,8 @@ function resolveSlotSizeMm(layoutSlug, slotIndex, formatId) {
   // 'spread' : une seule photo etalee sur DEUX pages, a fond perdu (voir
   // pageRenderer, .photo-spread). On raisonne donc sur les dimensions de
   // ROGNE, pas sur la zone de contenu : la photo deborde volontairement les
-  // marges. Largeur PLEINE (2 x page) depuis le 2026-10-04 : l'image n'est
-  // plus reduite d'un recouvrement, elle est coupee net a 50/50 puis une
-  // marge au pli la masque sans en changer l'etirement reel.
+  // marges. Moins le recouvrement central (retabli le 2026-10-04), imprime
+  // des deux cotes du pli pour que la reliure ne fasse rien disparaitre.
   //
   // C'est le cas ou le controle de resolution compte le plus : la meme image
   // est etiree sur ~42 cm, donc il faut deux fois plus de pixels que pour une
@@ -121,7 +132,7 @@ function resolveSlotSizeMm(layoutSlug, slotIndex, formatId) {
   // photo franchement floue sur la plus spectaculaire des pages.
   if (rawRatio === 'spread') {
     const { trimWidthMm, trimHeightMm } = resolveCoverFormat(formatId);
-    return { widthMm: trimWidthMm * 2, heightMm: trimHeightMm };
+    return { widthMm: Math.max(1, trimWidthMm * 2 - SPREAD_OVERLAP_MM * 2), heightMm: trimHeightMm };
   }
 
   const columns = resolveSlotColumns(layoutSlug, slotIndex);
