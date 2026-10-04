@@ -2191,11 +2191,18 @@ export default function BookAtelierLuxe() {
     };
   })();
 
+  // Retour utilisateur (2026-10-04, capture a l'appui) : "le chiffre de page
+  // ne se met pas a jour en bas lorsque je me mets sur une page impaire" —
+  // ce libelle utilisait toujours leftPageIndex, jamais la PAGE REELLEMENT
+  // SELECTIONNEE (selectedSide peut valoir 'right'). currentPageIndex,
+  // juste au-dessus, fait deja ce calcul correctement (avec le meme repli
+  // sur le cote existant) — le reutiliser ici plutot que de dupliquer la
+  // logique une deuxieme fois, pres a diverger.
   const navLabel = viewKind === 'cover'
     ? t('bookView.coverLabel')
     : viewKind === 'back-cover'
       ? t('bookView.backCoverLabel')
-      : t('bookView.pageLabel', { number: leftPageIndex + 1 });
+      : t('bookView.pageLabel', { number: currentPageIndex + 1 });
 
   if (loading) {
     return <div className="atelier-loading">{t('main.loading')}</div>;
