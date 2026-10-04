@@ -473,6 +473,9 @@
     "tightCrop": "very tight crop",
     "insufficientRes": "insufficient resolution",
     "slightlyLow": "a bit low",
+    "spreadWarning_one": "{{count}} two-page spread photo needs your attention",
+    "spreadWarning_other": "{{count}} two-page spread photos need your attention",
+    "spreadTip": "If a face or an important subject is near the middle of the photo, it risks being cut at printing, at the fold between the two pages. Click a page to move or zoom the photo away from the fold.",
     "viewBook": "View my book",
     "fixInAtelier": "Fix it in the editor",
     "viewAnyway": "View anyway"

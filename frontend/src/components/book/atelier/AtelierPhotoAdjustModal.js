@@ -179,6 +179,19 @@ function AtelierPhotoAdjustModal({
             : t('photoAdjustModal.hintCover')}
         </p>
 
+        {/* Message d'alerte TOUJOURS visible pour une photo sur double page
+            (retour utilisateur, 2026-10-04 : un visage proche du pli peut
+            etre coupe, sans detection automatique possible — voir
+            GUTTER_SAFETY_ZONE_MM dans photoQuality.js). Avant cette passe,
+            la seule explication etait un `title` (infobulle au survol, donc
+            invisible par defaut) sur la zone hachuree plus bas — on la
+            remonte ici en texte permanent, meme contenu. */}
+        {isSpread && (
+          <p className="atelier-adjust-hint atelier-adjust-hint-warning">
+            ⚠️ {t('photoAdjustModal.gutterZoneHint')}
+          </p>
+        )}
+
         {/* Choix du mode. Deux options nommees par ce qu'elles FONT, jamais
             par le terme technique (cover/contain). Bulle d'aide (retour
             utilisateur, 2026-10-04 : "expliquer la difference... entre

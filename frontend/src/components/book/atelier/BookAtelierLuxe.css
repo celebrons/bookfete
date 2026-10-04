@@ -910,6 +910,12 @@
   color: var(--text-light);
 }
 
+/* Meme couleur que .atelier-finish-checklist li.is-warning : un seul ton
+   d'avertissement dans tout l'atelier. */
+.atelier-adjust-hint-warning {
+  color: #b45f13;
+}
+
 /* Remplir le cadre / Photo entiere (fitMode). Deux boutons segmentes plutot
    qu'une case a cocher : ce sont deux etats egaux, pas une option accessoire
    — et le nom de chacun dit ce qu'il fait, jamais "cover"/"contain". */

@@ -32,6 +32,7 @@ function AtelierFinishModal({
   // La liste des pages concernees est REPLIEE par defaut : sur un livre a 37
   // avertissements, la derouler d'office noierait le bouton "Voir mon livre".
   const [listeDepliee, setListeDepliee] = useState(false);
+  const [spreadListeDepliee, setSpreadListeDepliee] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !bookId) {
@@ -60,9 +61,14 @@ function AtelierFinishModal({
   const isReady = stats.incompletePages === 0;
   // Contrat v2 : { warnings: [{pageIndex, itemId, statut, label, thumbnailUrl}], hasWarnings }
   // On ne garde que les PHOTOS : le controle renvoie aussi des avertissements
-  // de texte, qui ne parlent pas de nettete et ont leur propre signalement.
-  const photoWarnings = (qualityCheck?.warnings || []).filter((entry) => entry.kind !== 'texte');
+  // de texte ('texte') et de double-page ('spread', 2026-10-04), qui ne
+  // parlent pas de nettete et ont chacun leur propre signalement ci-dessous.
+  const photoWarnings = (qualityCheck?.warnings || []).filter((entry) => entry.kind !== 'texte' && entry.kind !== 'spread');
   const lowQualityCount = photoWarnings.length;
+  // Photo sur double page : deja dedupliquee par itemId cote backend (le
+  // meme itemId est pose sur les deux pages du vis-a-vis), donc une entree
+  // par photo, jamais deux fois la meme page.
+  const spreadWarnings = (qualityCheck?.warnings || []).filter((entry) => entry.kind === 'spread');
 
   // Continuer DEPUIS CET ECRAN veut dire "j'ai vu ces avertissements (ou
   // leur absence)" — memorise pour que l'ecran Apercu final, plus loin dans
@@ -74,7 +80,11 @@ function AtelierFinishModal({
   // pour un livre jamais vraiment verifie.
   const handleContinuer = () => {
     if (qualityCheck) {
-      acquitterAvertissementsQualite(bookId, photoWarnings.map((entry) => entry.itemId));
+      // Double-page traitee comme les avertissements de nettete (pas comme
+      // 'texte', qui garde son propre signalement) : deja montree et
+      // actionnable ici (lien "Voir les pages concernees" ci-dessous), donc
+      // pas de raison de la redemander sur l'ecran Apercu final juste apres.
+      acquitterAvertissementsQualite(bookId, [...photoWarnings, ...spreadWarnings].map((entry) => entry.itemId));
     }
     onContinue();
   };
@@ -201,6 +211,44 @@ function AtelierFinishModal({
                 )}
               </li>
             )
+          )}
+          {qualityCheck && spreadWarnings.length > 0 && (
+            <li className="is-warning">
+              ⚠️ {t('finishModal.spreadWarning', { count: spreadWarnings.length })}
+              {' — '}
+              <button
+                type="button"
+                className="atelier-finish-quality-link"
+                onClick={() => setSpreadListeDepliee((v) => !v)}
+                aria-expanded={spreadListeDepliee}
+              >
+                {spreadListeDepliee
+                  ? t('finishModal.hidePages')
+                  : t('finishModal.seePages', { count: spreadWarnings.length })}
+              </button>
+
+              {spreadListeDepliee && (
+                <>
+                  <p className="atelier-finish-quality-tip">
+                    {t('finishModal.spreadTip')}
+                  </p>
+                  <ul className="atelier-finish-quality-pages">
+                    {spreadWarnings.map((entree) => (
+                      <li key={entree.pageIndex}>
+                        <button
+                          type="button"
+                          className="atelier-finish-quality-page"
+                          onClick={() => { onClose(); if (onViewPage) onViewPage(entree.pageIndex, entree.itemId); }}
+                          disabled={!onViewPage}
+                        >
+                          <span className="atelier-finish-quality-page-num">{t('finishModal.pageNumber', { number: entree.pageIndex + 1 })}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </li>
           )}
         </ul>
 

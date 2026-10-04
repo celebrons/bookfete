@@ -107,6 +107,16 @@ jest.mock('../config/supabase', () => {
           min_items: 2,
           max_items: 2,
           capacity: { slots: [{ type: 'photo' }, { type: 'text', lengthClass: ['SHORT', 'MEDIUM', 'LONG'] }] }
+        },
+        {
+          id: 'lay-spread',
+          slug: 'FULL_PHOTO_SPREAD',
+          label: 'Photo sur double page',
+          kind: 'photo',
+          active: true,
+          min_items: 1,
+          max_items: 1,
+          capacity: { slots: [{ type: 'photo' }] }
         }
       ],
       book_products: [
@@ -222,7 +232,7 @@ describe('routes/composition', () => {
     it('GET /api/catalog/layouts renvoie les layouts actifs', async () => {
       const response = await request(app).get('/api/catalog/layouts');
       expect(response.status).toBe(200);
-      expect(response.body).toHaveLength(2);
+      expect(response.body).toHaveLength(3); // FULL_PHOTO, PHOTO_TEXT, FULL_PHOTO_SPREAD (voir fixtures)
     });
     // GET /api/catalog/products (book_products) retire (chantier
     // "tarification dynamique", 2026-09-27) : table confirmee inactive
@@ -1251,6 +1261,52 @@ describe('routes/composition', () => {
         .get('/api/books/book-test-5/print-quality-check')
         .set('Authorization', 'Bearer valid-token');
       expect(enContain.body.warnings.find((entry) => entry.itemId === 'item-5-photo-mismatch')).toBeUndefined();
+    });
+
+    // Photo sur double page (retour utilisateur, 2026-10-04) : ce projet
+    // reste sans detection de visage (sans IA), donc impossible de savoir
+    // si un sujet important tombe au pli — on le signale TOUJOURS pour ce
+    // type de mise en page plutot que de deviner, avec confirmation
+    // obligatoire avant commande (meme mecanique que les autres
+    // avertissements de cet ecran, jamais bloquant).
+    it('signale toujours une photo en FULL_PHOTO_SPREAD, meme haute resolution', async () => {
+      await request(app)
+        .put('/api/books/book-test-5/pages/12/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-spread', itemIds: ['item-5-photo-hires'] });
+
+      const response = await request(app)
+        .get('/api/books/book-test-5/print-quality-check')
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(response.status).toBe(200);
+      const flagged = response.body.warnings.find(
+        (entry) => entry.kind === 'spread' && entry.itemId === 'item-5-photo-hires'
+      );
+      expect(flagged).toBeDefined();
+      expect(flagged.pageIndex).toBe(12);
+      expect(flagged.severity).toBe('warning');
+      expect(response.body.hasWarnings).toBe(true);
+    });
+
+    it('ne signale la meme photo sur double page qu\'une seule fois (mirrorSpread pose le meme itemId sur les deux pages du vis-a-vis)', async () => {
+      await request(app)
+        .put('/api/books/book-test-5/pages/12/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-spread', itemIds: ['item-5-photo-hires'] });
+      await request(app)
+        .put('/api/books/book-test-5/pages/13/manual')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ layoutId: 'lay-spread', itemIds: ['item-5-photo-hires'] });
+
+      const response = await request(app)
+        .get('/api/books/book-test-5/print-quality-check')
+        .set('Authorization', 'Bearer valid-token');
+
+      const occurrences = response.body.warnings.filter(
+        (entry) => entry.kind === 'spread' && entry.itemId === 'item-5-photo-hires'
+      );
+      expect(occurrences).toHaveLength(1);
     });
   });
 });

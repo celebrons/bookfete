@@ -473,6 +473,9 @@
     "tightCrop": "cadrage très serré",
     "insufficientRes": "résolution insuffisante",
     "slightlyLow": "un peu juste",
+    "spreadWarning_one": "{{count}} photo sur double page mérite votre attention",
+    "spreadWarning_other": "{{count}} photos sur double page méritent votre attention",
+    "spreadTip": "Si un visage ou un sujet important se trouve près du milieu de la photo, il risque d'être coupé à l'impression, au pli entre les deux pages. Cliquez sur une page pour déplacer ou zoomer la photo et l'éloigner du pli.",
     "viewBook": "Voir mon livre",
     "fixInAtelier": "Corriger dans l'atelier",
     "viewAnyway": "Voir quand même"

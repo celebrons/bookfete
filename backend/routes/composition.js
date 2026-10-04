@@ -1530,6 +1530,10 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
     let textsCount = 0;
     let textsEvaluatedCount = 0;
     const warnings = [];
+    // Photo sur double page (FULL_PHOTO_SPREAD) : le meme itemId est pose
+    // sur les DEUX pages du vis-a-vis (mirrorSpread, cote atelier) — sans
+    // ce suivi, la meme photo serait signalee deux fois (une par page).
+    const spreadItemIdsSignales = new Set();
 
     pages.forEach((page) => {
       const blocks = Array.isArray(page.content?.blocks) ? page.content.blocks : [];
@@ -1541,6 +1545,27 @@ router.get('/api/books/:bookId/print-quality-check', authenticate, requireOwnedB
         (block.itemIds || []).forEach((itemId, slotIndex) => {
           const item = itemId ? itemsById[itemId] : null;
           if (!item) return;
+
+          // --- Photo sur double page (retour utilisateur, 2026-10-04) ------
+          // Ce projet reste sans detection de visage (sans IA) : impossible
+          // de savoir si un sujet important tombe au pli. On le dit donc
+          // TOUJOURS pour ce type de mise en page plutot que de deviner —
+          // c'est a l'utilisateur de verifier et de deplacer/zoomer si
+          // besoin (voir AtelierPhotoAdjustModal), puis de confirmer malgre
+          // l'avertissement (meme mecanique que les avertissements de
+          // qualite photo ci-dessous : jamais bloquant, juste une
+          // confirmation explicite avant la commande).
+          if (slug === 'FULL_PHOTO_SPREAD' && item.kind === 'photo' && !spreadItemIdsSignales.has(itemId)) {
+            spreadItemIdsSignales.add(itemId);
+            warnings.push({
+              kind: 'spread',
+              pageIndex: page.page_index,
+              itemId,
+              severity: 'warning',
+              label: 'Photo sur double page : si un visage ou un sujet important se trouve près du milieu, il risque d\'être coupé à l\'impression. Vous pouvez déplacer ou zoomer la photo pour l\'éloigner du pli.',
+              thumbnailUrl: item.metadata?.thumbnailUrl || item.url || null
+            });
+          }
 
           // --- Textes (cahier des charges typographique §19) ---------------
           // Memes regles que le rendu (typographySystem), donc un texte

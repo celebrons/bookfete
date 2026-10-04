@@ -15,13 +15,21 @@ function PrintQualityRecapModal({ isOpen, warnings = [], onContinueAnyway, onRev
   if (!isOpen) return null;
 
   const count = warnings.length;
+  // Deux familles d'avertissement bien distinctes depuis le 2026-10-04 :
+  // resolution/texte (deja existant) et 'spread' (photo sur double page,
+  // risque de coupure au pli — jamais detecte automatiquement, voir
+  // backend print-quality-check). Le texte d'introduction s'adapte selon
+  // ce qui est reellement present, plutot que de toujours parler de nettete
+  // alors qu'il peut n'y avoir que des double-pages a verifier.
+  const hasSpread = warnings.some((entry) => entry.kind === 'spread');
+  const hasOther = warnings.some((entry) => entry.kind !== 'spread');
 
   return (
     <div className="pq-recap-backdrop" onClick={onClose}>
       <div className="pq-recap-modal" onClick={(event) => event.stopPropagation()}>
         <div className="pq-recap-head">
           <h2 className="pq-recap-title">
-            {count > 1 ? `${count} photos méritent votre attention` : 'Une photo mérite votre attention'}
+            {count > 1 ? `${count} points méritent votre attention` : 'Un point mérite votre attention'}
           </h2>
           <button type="button" className="pq-recap-close" onClick={onClose} aria-label="Fermer">×</button>
         </div>
@@ -31,11 +39,21 @@ function PrintQualityRecapModal({ isOpen, warnings = [], onContinueAnyway, onRev
               montre plus que des photos vraiment trop petites pour la taille
               imprimee. Les photos « un peu justes » (150-250 dpi) n'y
               figurent plus du tout — voir backend print-quality-check. */}
-          <p className="pq-recap-intro">
-            Ces photos ont une résolution trop faible pour la taille à laquelle elles seront
-            imprimées : elles risquent d'apparaître floues sur le livre papier. Vous pouvez les
-            remplacer, les afficher plus petites, ou commander ainsi.
-          </p>
+          {hasOther && (
+            <p className="pq-recap-intro">
+              Ces photos ont une résolution trop faible pour la taille à laquelle elles seront
+              imprimées : elles risquent d'apparaître floues sur le livre papier. Vous pouvez les
+              remplacer, les afficher plus petites, ou commander ainsi.
+            </p>
+          )}
+          {hasSpread && (
+            <p className="pq-recap-intro">
+              {hasOther ? 'Par ailleurs, ' : 'Vous avez utilisé une mise en page « photo sur double page ». '}
+              Si un visage ou un sujet important se trouve près du milieu de cette photo, il risque
+              d'être coupé à l'impression, au pli entre les deux pages. Vous pouvez déplacer ou
+              zoomer la photo pour l'éloigner du pli, ou commander ainsi.
+            </p>
+          )}
 
           <ul className="pq-recap-list">
             {warnings.map((entry) => (
