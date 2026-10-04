@@ -208,8 +208,10 @@ const POLICES = 'Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&fami
     const donnees = fs.readFileSync(dernierChemin);
 
     const nbPages = Number((donnees.toString('latin1').match(/\/Type\s*\/Pages[^>]*\/Count\s+(\d+)/) || [])[1] || 0);
-    // pages composees + couverture + 4e + la page blanche inseree apres la couverture
-    const attendu = pages.length + 1;
+    // pages composees (interieur + couverture + 4e) : aucune page blanche n'est
+    // plus inseree apres la couverture (voir le commentaire de renderPdfFromPages
+    // dans pdfService.js) — le PDF final a donc exactement pages.length pages.
+    const attendu = pages.length;
     check(nbPages === attendu, `le document compte ${attendu} pages`, `trouve : ${nbPages}`);
 
     // Les images sont stockees telles quelles : on peut les relire et mesurer.
