@@ -1,7 +1,7 @@
 {
   "name": "livre-souvenir-backend",
   "version": "1.0.0",
-  "description": "Backend pour Mémoire Collective",
+  "description": "Backend pour Bookipix",
   "main": "server.js",
   "scripts": {
     "postinstall": "node scripts/ensure-browser.js",
@@ -9,15 +9,11 @@
     "dev": "nodemon server.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "prompts:seed": "node scripts/seedPromptTemplates.js",
-    "prompts:seed:question-variants": "node scripts/seedQuestionPromptVariants.js",
-    "prompts:seed:chapter-body-test": "node scripts/seedChapterBodyTestPrompt.js",
     "seed:realistic-project": "node scripts/seedRealisticProject.js",
     "seed:enrich-demo-book": "node scripts/enrichDemoBook.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.0",
-    "axios": "^1.13.5",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
