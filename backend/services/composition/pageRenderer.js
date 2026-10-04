@@ -781,36 +781,30 @@ const BASE_CSS = `
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .photo-solo { margin: 0; height: 100%; }
   /* Une photo sur DOUBLE PAGE (FULL_PHOTO_SPREAD).
-     Chaque page porte la MEME image et n'en montre que sa moitie. Deux
-     decisions a connaitre :
+     Chaque page porte la MEME image et n'en montre que sa moitie — coupe
+     NETTE a 50/50 (l'image est dessinee sur EXACTEMENT 200%, chaque page en
+     montre pile sa moitie depuis son bord exterieur). Jamais de bande
+     retiree, jamais dupliquee, jamais masquee : zero perte, et l'image
+     reste PARFAITEMENT CONTINUE d'une page a l'autre (le point de coupe
+     tombe exactement au milieu de la photo, sans artefact visible a
+     l'ecran ni a l'impression).
 
-     1. PLEIN BORD. La figure est posee en absolu sur toute la page
-        (inset: 0), donc PAR-DESSUS la marge de page — sauf sur la marge
-        INTERIEURE, volontairement reservee (point 2).
-     2. COUPE NETTE A 50/50, PUIS MARGE BLANCHE AU PLI — pas de perte, pas
-        de doublon. L'image est dessinee sur EXACTEMENT 200% (chaque page en
-        montre pile sa moitie, le point de coupe tombe au milieu exact de la
-        photo), et un bandeau --spread-overlap (meme couleur que la page)
-        masque ensuite le bord INTERIEUR de chaque page — la photo ne va
-        donc jamais jusqu'au pli lui-meme.
-
-        Historique : jusqu'au 2026-09-25, on retirait une bande centrale
-        (200% PLUS une gouttiere), en pariant que c'etait exactement ce que
-        la reliure avalait — mais sur une reliure qui ne s'ouvre pas a plat,
-        cette bande etait perdue DEUX fois. Corrige alors en DUPLIQUANT une
-        petite bande plutot qu'en la perdant (200% MOINS un recouvrement,
-        chaque page montrant un peu PLUS que sa moitie) : plus de perte sur
-        le livre imprime et relie (le doublon tombe dans la courbure du
-        pli, invisible), mais le meme doublon reste visible a plat — a
-        l'ecran (atelier, PDF) comme sur une photo imprimee a plat si le pli
-        ne se referme jamais totalement. Retour utilisateur, 2026-10-04,
-        capture a l'appui sur un vrai livre : « la dame au milieu, son bras
-        deborde sur l'autre cote en double ». Remplace par cette marge
-        blanche : aucun des deux defauts (ni perte, ni doublon visible),
-        au prix d'une photo qui ne va plus tout a fait jusqu'au pli — un
-        compromis demande explicitement plutot que devine.
-     3. Valeur absolue, non mise a l'echelle par spaceScale : la marge au
-        pli est un choix d'habillage du pli, pas une densite typographique. */
+     Historique de cette ligne : 2026-09-25, on retirait une bande centrale
+     (perte reelle sur un livre relie qui ne s'ouvre pas a plat) ; corrige
+     en DUPLIQUANT une petite bande a la place (invisible sur un livre relie,
+     mais visible a plat, a l'ecran — retour utilisateur 2026-10-04, « la
+     dame au milieu, son bras deborde en double » sur une vraie photo) ;
+     puis une marge blanche au pli (meme defaut en pire : elle masquait un
+     visage pile positionne au centre, confirme par mesure precise sur la
+     meme photo). Aucune de ces trois approches ne regle le vrai probleme :
+     SAVOIR si quelque chose d'important tombe au centre. Sans detection de
+     visage (ce projet reste volontairement sans IA/reconnaissance faciale),
+     seul un humain peut le voir — d'ou la zone de securite affichee dans
+     l'atelier (AtelierPhotoAdjustModal.js) plutot qu'un traitement du cote
+     du rendu : l'utilisateur decale/zoome la photo jusqu'a ce que rien
+     d'important n'y tombe, ou bascule sur une mise en page page-simple si
+     aucun cadrage ne convient. Le rendu, lui, reste simple et honnete :
+     une coupe nette, rien de plus. */
   .photo-spread { position: absolute; inset: 0; margin: 0; overflow: hidden; }
   .photo-spread .photo-frame {
     position: absolute;
@@ -820,19 +814,6 @@ const BASE_CSS = `
   }
   .photo-spread.is-spread-left .photo-frame { left: 0; }
   .photo-spread.is-spread-right .photo-frame { right: 0; }
-  /* Bandeau qui reserve la marge au pli (point 2 ci-dessus) : pose APRES
-     .photo-frame dans le DOM, donc peint par-dessus sans z-index. Meme
-     couleur que .page (#fffdf8) pour se fondre, jamais du blanc pur. */
-  .photo-spread::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: var(--spread-overlap, 4mm);
-    background: #fffdf8;
-  }
-  .photo-spread.is-spread-left::after { right: 0; }
-  .photo-spread.is-spread-right::after { left: 0; }
   .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
   .photo-inset .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
   .photo-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); height: 100%; }

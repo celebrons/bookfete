@@ -26,13 +26,25 @@ const MM_PER_INCH = 25.4;
 // module reste une fonction pure, sans dependance a un parseur CSS.
 const PAGE_PADDING_MM = 14;
 const GRID_GAP_MM = 3;
-// Marge au pli d'une photo sur double page (2026-10-04 : remplace l'ancien
-// recouvrement duplique, voir le commentaire de tete de .photo-spread dans
-// pageRenderer.js) — un bandeau de la couleur de la page QUI MASQUE le bord
-// interieur de chaque page, la photo elle-meme restant etiree sur la
-// largeur PLEINE (2 x page, sans reduction). Cette constante ne sert donc
-// plus a la geometrie de l'image, seulement a documenter le lien avec
-// `--spread-overlap` cote CSS (meme nom, meme valeur, role different).
+
+// ZONE DE SECURITE DE GOUTTIERE pour une photo sur double page (2026-10-04).
+// A NE PAS CONFONDRE avec le bleed (marge de securite au bord EXTERIEUR de
+// la page, 4mm — voir Gelato, support.gelato.com/en/articles/8996349) : ceci
+// concerne le bord INTERIEUR, cote reliure, que le bleed ne protege pas.
+// Gelato ne publie pas de chiffre specifique a une photo en double page,
+// mais distingue explicitement, pour tout produit relie, une zone de
+// securite plus large cote reliure (12mm, contre 4mm ailleurs, pour les
+// produits relies Wire-O — meme source). Repris ici comme la meilleure
+// valeur verifiee disponible plutot qu'un chiffre invente : 12mm de chaque
+// cote du pli, donc 24mm de large au total.
+//
+// Ce n'est PAS applique au rendu (voir pageRenderer.js : le rendu reste une
+// coupe nette, continue, sans perte ni marge) — seulement une zone affichee
+// a l'utilisateur dans l'atelier (AtelierPhotoAdjustModal.js) pour qu'il
+// decale/zoome lui-meme la photo si un visage ou un sujet important s'y
+// trouve. Sans detection automatique (ce projet reste sans IA/reconnaissance
+// faciale) : la zone est juste un repere visuel, la decision reste humaine.
+const GUTTER_SAFETY_ZONE_MM = 12;
 
 // Surface reellement disponible pour le contenu d'une page (apres marges),
 // et gap de grille effectif — les deux mis a l'echelle par spaceScale
@@ -317,5 +329,6 @@ module.exports = {
   DPI_LIMITE,
   RATIO_GAP_THRESHOLD,
   PAGE_PADDING_MM,
-  GRID_GAP_MM
+  GRID_GAP_MM,
+  GUTTER_SAFETY_ZONE_MM
 };

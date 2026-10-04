@@ -134,7 +134,9 @@
     "seeOtherLayouts": "Voir d'autres mises en page adaptées",
     "noSuggestion": "Aucune mise en page du catalogue n'épouse mieux la forme de cette photo — le recadrage reste la meilleure option ici.",
     "resetCrop": "Réinitialiser le cadrage",
-    "save": "Enregistrer"
+    "save": "Enregistrer",
+    "gutterZoneLabel": "Pli",
+    "gutterZoneHint": "Zone de sécurité au pli de la reliure : évitez d'y placer un visage ou un sujet important — faites glisser ou zoomez la photo pour le déplacer hors de cette zone."
   },
   "main": {
     "errors": {

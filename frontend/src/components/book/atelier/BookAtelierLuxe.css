@@ -1020,6 +1020,44 @@
 }
 .atelier-adjust-replace-btn:hover { background: rgba(31, 28, 23, 0.88); }
 
+/* Zone de securite de gouttiere (photo sur double page, 2026-10-04) — bande
+   verticale toujours CENTREE sur le cadre (voir GUTTER_SAFETY_ZONE_MM dans
+   photoQuality.js), jamais sur la photo : c'est elle qui se deplace
+   derriere au panoramique, pas ce repere. pointer-events:none pour ne
+   jamais voler le glisser-deposer a .atelier-adjust-box en dessous. */
+.atelier-adjust-gutter-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(180, 35, 24, 0.22),
+    rgba(180, 35, 24, 0.22) 6px,
+    rgba(180, 35, 24, 0.32) 6px,
+    rgba(180, 35, 24, 0.32) 12px
+  );
+  border-left: 1px dashed rgba(180, 35, 24, 0.7);
+  border-right: 1px dashed rgba(180, 35, 24, 0.7);
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.atelier-adjust-gutter-zone-label {
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fdfbf6;
+  background: rgba(180, 35, 24, 0.85);
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .atelier-adjust-zoom-row {
   display: flex;
   align-items: center;

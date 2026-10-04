@@ -303,7 +303,7 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     expect(pageAt(7)).toContain('photo-spread is-spread-left');
   });
 
-  it('FULL_PHOTO_SPREAD : la photo va a fond perdu, coupee net a 50/50, avec une marge au pli', () => {
+  it('FULL_PHOTO_SPREAD : la photo va a fond perdu, coupee net a 50/50, sans perte ni doublon ni marge', () => {
     const html = renderBookHtml({
       book: {},
       items: [{ id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
@@ -312,15 +312,15 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     });
     // Fond perdu : la figure est posee sur TOUTE la page, marges comprises.
     expect(html).toMatch(/\.photo-spread \{[^}]*position: absolute;[^}]*inset: 0/);
-    // COUPE NETTE A 50/50 (retour utilisateur, 2026-10-04, remplace le
-    // recouvrement duplique du 2026-09-25 — visible a l'ecran, invisible
-    // seulement sur un livre relie a plat). Largeur pleine, pas de -8mm.
+    // COUPE NETTE A 50/50 (retour utilisateur, 2026-10-04 : ni perte, ni
+    // doublon, ni marge qui masquerait du contenu — voir le commentaire de
+    // tete de .photo-spread pour l'historique complet des trois tentatives
+    // precedentes). La zone de securite de gouttiere est geree cote atelier
+    // (AtelierPhotoAdjustModal.js), jamais dans ce rendu.
     expect(html).toMatch(/\.photo-spread \.photo-frame \{[^}]*width: 200%/);
     expect(html).not.toMatch(/--spread-gutter/);
-    // Bandeau de marge au pli, cote de la page ((#fffdf8), sur chaque face.
-    expect(html).toMatch(/\.photo-spread::after \{[^}]*width: var\(--spread-overlap, 4mm\)[^}]*background: #fffdf8/);
-    expect(html).toMatch(/\.photo-spread\.is-spread-left::after \{ right: 0; \}/);
-    expect(html).toMatch(/\.photo-spread\.is-spread-right::after \{ left: 0; \}/);
+    expect(html).not.toMatch(/--spread-overlap/);
+    expect(html).not.toMatch(/\.photo-spread::after/);
   });
 
   it('TWO_PHOTOS_STACKED : une photo "entiere" garde la meme marge exterieure que sa voisine', () => {

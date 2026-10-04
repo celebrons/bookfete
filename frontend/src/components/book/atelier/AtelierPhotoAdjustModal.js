@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { resolveSlotSizeMm, checkImageFit, suggestLayoutsForPhotoRatio, getFitLabel } from './photoQuality';
+import { resolveSlotSizeMm, checkImageFit, suggestLayoutsForPhotoRatio, getFitLabel, GUTTER_SAFETY_ZONE_MM } from './photoQuality';
 import { ATELIER_LAYOUTS, getLayoutLabel } from './atelierLayouts';
 import PhotoFitBadge from '../../common/PhotoFitBadge';
 
@@ -96,6 +96,16 @@ function AtelierPhotoAdjustModal({
   const frame = frameSizeMm || resolveSlotSizeMm(layoutSlug, slotIndex, printFormat);
   const ratio = frame ? frame.widthMm / frame.heightMm : 1;
   const imageUrl = item.metadata?.previewUrl || item.url;
+  // Photo sur DOUBLE PAGE (retour utilisateur, 2026-10-04 : "la dame au
+  // milieu, son bras deborde... en double", puis "un visage pile au centre"
+  // une fois la marge testee) — ce projet reste sans detection de visage
+  // (sans IA), donc personne d'automatique ne peut verifier que rien
+  // d'important ne tombe au pli. La zone de securite est juste MONTREE ici,
+  // centree sur le cadre (qui fait pile 2x une page) : a l'utilisateur de
+  // decaler/zoomer jusqu'a ce que rien d'important n'y soit, voir le
+  // commentaire de GUTTER_SAFETY_ZONE_MM dans photoQuality.js.
+  const isSpread = layoutSlug === 'FULL_PHOTO_SPREAD';
+  const gutterZoneWidthPct = isSpread && frame ? (GUTTER_SAFETY_ZONE_MM * 2 / frame.widthMm) * 100 : 0;
   const photoRatio = item.metadata?.width && item.metadata?.height
     ? item.metadata.width / item.metadata.height
     : null;
@@ -228,6 +238,22 @@ function AtelierPhotoAdjustModal({
               transformOrigin: `${focalX * 100}% ${focalY * 100}%`
             }}
           />
+
+          {/* Zone de securite de gouttiere (photo sur double page) : repere
+              visuel seul, toujours centre sur le cadre (le pli tombe
+              toujours au milieu exact d'un cadre qui fait pile 2x une page)
+              — ne bouge jamais avec le panoramique, c'est la PHOTO qui doit
+              se deplacer derriere, pas ce repere. pointer-events:none pour
+              ne jamais intercepter le glisser-deposer du panoramique. */}
+          {isSpread && (
+            <div
+              className="atelier-adjust-gutter-zone"
+              style={{ width: `${gutterZoneWidthPct}%` }}
+              title={t('photoAdjustModal.gutterZoneHint')}
+            >
+              <span className="atelier-adjust-gutter-zone-label">{t('photoAdjustModal.gutterZoneLabel')}</span>
+            </div>
+          )}
 
           {/* Changer de photo, DEPUIS cette meme fenetre (retour utilisateur
               2026-09-29) — sur la photo elle-meme, comme un geste d'edition

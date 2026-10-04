@@ -134,7 +134,9 @@
     "seeOtherLayouts": "See other suitable layouts",
     "noSuggestion": "No layout in the catalog fits this photo's shape better — cropping remains the best option here.",
     "resetCrop": "Reset framing",
-    "save": "Save"
+    "save": "Save",
+    "gutterZoneLabel": "Fold",
+    "gutterZoneHint": "Safety zone at the binding fold: avoid placing a face or important subject here — drag or zoom the photo to move it out of this zone."
   },
   "main": {
     "errors": {

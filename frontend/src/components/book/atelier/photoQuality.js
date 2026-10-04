@@ -16,6 +16,11 @@
 const MM_PER_INCH = 25.4;
 const PAGE_PADDING_MM = 14;
 const GRID_GAP_MM = 3;
+// Zone de securite de gouttiere (photo sur double page, 2026-10-04) — miroir
+// de GUTTER_SAFETY_ZONE_MM dans photoQualityEngine.js : voir ce fichier pour
+// la source (Gelato, zone de securite 12mm cote reliure) et le pourquoi
+// (affichage seul, jamais applique au rendu — la decision reste humaine).
+export const GUTTER_SAFETY_ZONE_MM = 12;
 // Les mises en page mixtes utilisent un gap de 5mm (.mixte-ordered), pas le
 // gap de grille photo de 3mm.
 const MIXTE_GAP_MM = 5;
