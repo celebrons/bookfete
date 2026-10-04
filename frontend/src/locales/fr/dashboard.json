@@ -2,7 +2,7 @@
   "lifecycleStatus": {
     "editing": { "label": "Édition en cours", "shortLabel": "Édition" },
     "preview_available": { "label": "Aperçu généré", "shortLabel": "Aperçu" },
-    "finalized": { "label": "Validé définitivement", "shortLabel": "Validé" },
+    "finalized": { "label": "Prêt à commander", "shortLabel": "Prêt" },
     "sent_to_printer": { "label": "Commande en production", "shortLabel": "Commande" },
     "printed": { "label": "Imprimé", "shortLabel": "Imprimé" },
     "shipped": { "label": "Expédié", "shortLabel": "Envoyé" }

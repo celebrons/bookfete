@@ -2,7 +2,7 @@
   "lifecycleStatus": {
     "editing": { "label": "Editing in progress", "shortLabel": "Editing" },
     "preview_available": { "label": "Preview generated", "shortLabel": "Preview" },
-    "finalized": { "label": "Permanently validated", "shortLabel": "Validated" },
+    "finalized": { "label": "Ready to order", "shortLabel": "Ready" },
     "sent_to_printer": { "label": "Order in production", "shortLabel": "Order" },
     "printed": { "label": "Printed", "shortLabel": "Printed" },
     "shipped": { "label": "Shipped", "shortLabel": "Shipped" }
