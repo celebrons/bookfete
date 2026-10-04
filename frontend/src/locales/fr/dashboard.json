@@ -10,7 +10,7 @@
   "journeyStatus": {
     "editing": "Édition en cours",
     "preview_available": "Aperçu disponible",
-    "finalized": "Validé définitivement",
+    "finalized": "Prêt à commander",
     "awaiting_payment": "En attente paiement",
     "paid": "Paiement validé",
     "pdf_generating": "Génération PDF",

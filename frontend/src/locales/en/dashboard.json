@@ -10,7 +10,7 @@
   "journeyStatus": {
     "editing": "Editing in progress",
     "preview_available": "Preview available",
-    "finalized": "Permanently validated",
+    "finalized": "Ready to order",
     "awaiting_payment": "Awaiting payment",
     "paid": "Payment confirmed",
     "pdf_generating": "Generating PDF",
