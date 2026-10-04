@@ -86,12 +86,27 @@ async function convertHeicToJpeg(buffer) {
   try {
     const jpeg = await sharp(buffer).rotate().jpeg({ quality: ORIGINAL_QUALITY }).toBuffer();
     return { buffer: jpeg, converted: true };
-  } catch (_error) {
+  } catch (error) {
     // Format CONFIRME heif, mais conversion impossible (variante non geree
     // par la version de libheif du serveur...) : jamais de store silencieux
     // d'un fichier illisible — l'appelant (uploadFile) renvoie une erreur
     // explicite plutot que de laisser deviner plus tard pourquoi la photo
     // n'apparait nulle part.
+    //
+    // Journalise (diagnostic, 2026-10-05 : premier vrai HEIC d'iPhone teste
+    // en production, echoue alors qu'un conteneur heif de test — code AV1,
+    // seul codec que ce serveur sait ENCODER, voir storageService.test.js —
+    // passait) : seul un vrai message d'erreur libheif dira si c'est le
+    // decodage HEVC qui manque, ou autre chose (variante de pixel format,
+    // HEIC "live photo" multi-image, etc.).
+    console.error('[convertHeicToJpeg] echec conversion heif->jpeg', {
+      message: error.message,
+      heifCompression: metadata.compression,
+      heifChromaSubsampling: metadata.chromaSubsampling,
+      heifPages: metadata.pages,
+      width: metadata.width,
+      height: metadata.height
+    });
     return { buffer, converted: false, failed: true };
   }
 }
