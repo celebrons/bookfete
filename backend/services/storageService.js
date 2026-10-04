@@ -48,6 +48,54 @@ async function normalizeOrientation(buffer) {
   }
 }
 
+// HEIC/HEIF (format par defaut des photos iPhone, retour utilisateur,
+// 2026-10-05 : plusieurs photos rejetees a l'upload avec "format non
+// supporte"). Converti en JPEG ICI, inconditionnellement — jamais seulement
+// quand capOriginalResolution redimensionne (une photo HEIC deja sous
+// ORIGINAL_MAX_PX, ex. un export reduit, traverserait sinon tout le pipeline
+// INCHANGEE et resterait stockee en HEIC : illisible par la plupart des
+// navigateurs (Safari excepte) ET par Puppeteer, le moteur qui capture les
+// pages pour le PDF/fichier imprimeur — l'upload semblerait reussir mais la
+// photo n'apparaitrait nulle part ensuite).
+//
+// sharp.metadata() fait foi, jamais le Content-Type declare par le
+// navigateur (deja peu fiable pour HEIC — beaucoup l'envoient en
+// application/octet-stream, voir middleware/upload.js) ni l'extension du
+// nom de fichier.
+//
+// .rotate() AVANT l'encodage JPEG, pour la meme raison que
+// normalizeOrientation ci-dessus : sharp retire les metadonnees EXIF (dont
+// l'orientation) par defaut a l'encodage — sans ce rotate ici, une photo
+// prise en portrait ressortirait couchee, et normalizeOrientation() ne
+// verrait plus jamais le tag puisqu'il aura deja disparu.
+async function convertHeicToJpeg(buffer) {
+  // Deux essais SEPARES, deliberement : si meme la lecture des metadonnees
+  // echoue, le format est totalement inconnu (pas forcement du HEIC) — on
+  // laisse alors le reste du pipeline (probeImageDimensions, plus bas dans
+  // uploadFile) signaler l'erreur generique habituelle ("pas une image
+  // valide"), jamais le message specifique HEIC ci-dessous qui serait
+  // trompeur sur un fichier qui n'a jamais ete du HEIC.
+  let metadata;
+  try {
+    metadata = await sharp(buffer).metadata();
+  } catch (_error) {
+    return { buffer, converted: false };
+  }
+  if (metadata.format !== 'heif') return { buffer, converted: false };
+
+  try {
+    const jpeg = await sharp(buffer).rotate().jpeg({ quality: ORIGINAL_QUALITY }).toBuffer();
+    return { buffer: jpeg, converted: true };
+  } catch (_error) {
+    // Format CONFIRME heif, mais conversion impossible (variante non geree
+    // par la version de libheif du serveur...) : jamais de store silencieux
+    // d'un fichier illisible — l'appelant (uploadFile) renvoie une erreur
+    // explicite plutot que de laisser deviner plus tard pourquoi la photo
+    // n'apparait nulle part.
+    return { buffer, converted: false, failed: true };
+  }
+}
+
 // Miniature (grille "Mes souvenirs") et version intermediaire (affichage
 // dans l'atelier une fois une photo placee) : deux tailles, jamais
 // l'original tel quel — voir ORIGINAL_MAX_PX ci-dessous pour ce que
@@ -190,13 +238,30 @@ const uploadFile = async (bucket, file, folder = '') => {
   try {
     const baseName = uuidv4();
 
-    // Buffer orientation-corrige (voir normalizeOrientation ci-dessus), puis
-    // plafonne a ORIGINAL_MAX_PX si necessaire (voir capOriginalResolution) —
-    // c'est CE buffer final qui devient "l'original" stocke, et c'est lui qui
+    // HEIC/HEIF d'abord (voir convertHeicToJpeg ci-dessus) : convertit (et
+    // oriente) inconditionnellement, AVANT le reste du pipeline, qui continue
+    // ensuite a ignorer completement ce cas.
+    const heicResult = await convertHeicToJpeg(file.buffer);
+    if (heicResult.failed) {
+      return {
+        success: false,
+        invalidContent: true,
+        error: "Cette photo (HEIC/HEIF) n'a pas pu être convertie. Essayez de l'exporter en JPEG depuis votre téléphone, puis réessayez."
+      };
+    }
+
+    // Buffer orientation-corrige (voir normalizeOrientation ci-dessus — deja
+    // fait par convertHeicToJpeg si la photo etait HEIC), puis plafonne a
+    // ORIGINAL_MAX_PX si necessaire (voir capOriginalResolution) — c'est CE
+    // buffer final qui devient "l'original" stocke, et c'est lui qui
     // alimente la sonde de dimensions + les deux derivees juste en dessous —
     // un seul point de correction, tout le reste du pipeline en herite.
-    const orienteBuffer = await normalizeOrientation(file.buffer);
-    const { buffer: originalBuffer, reencoded } = await capOriginalResolution(orienteBuffer, ORIGINAL_MAX_PX);
+    const orienteBuffer = heicResult.converted ? heicResult.buffer : await normalizeOrientation(file.buffer);
+    const { buffer: originalBuffer, reencoded: redimensionne } = await capOriginalResolution(orienteBuffer, ORIGINAL_MAX_PX);
+    // L'extension/le type MIME stockes doivent suivre les VRAIS octets,
+    // qu'ils aient change pour la taille (redimensionne) ou pour le format
+    // (heicResult.converted) — l'un ou l'autre suffit.
+    const reencoded = redimensionne || heicResult.converted;
 
     // VALIDATION REELLE DU CONTENU (plan de mise en production, "protection
     // des uploads") : jusqu'ici, seul l'EN-TETE Content-Type declare par le

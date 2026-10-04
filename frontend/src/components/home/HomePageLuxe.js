@@ -468,22 +468,6 @@ const homepageEvents = events.slice(0, 0).concat([
                 backgroundColor: 'var(--white)',
                 overflow: 'hidden'
               }}>
-                {/* Chiffre stylisé version luxe */}
-                <div style={{
-                  fontSize: '64px',
-                  fontWeight: '700',
-                  color: 'var(--gold)',
-                  opacity: 0.1,
-                  position: 'absolute',
-                  top: '10px',
-                  right: '20px',
-                  lineHeight: 1,
-                  fontFamily: 'var(--font-primary)',
-                  letterSpacing: '-0.02em'
-                }}>
-                  {step.number}
-                </div>
-                
                 {/* Cercle décoratif */}
                 <div style={{
                   width: '60px',

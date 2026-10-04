@@ -4,17 +4,29 @@ const { t } = require('../services/i18n/t');
 // Configuration de multer pour stocker en mémoire
 const storage = multer.memoryStorage();
 
-// Filtre pour n'accepter que les images
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+// Filtre pour n'accepter que les images. HEIC/HEIF ajoutes le 2026-10-05
+// (retour utilisateur : photos iPhone rejetees) — convertis en JPEG plus
+// loin dans le pipeline (voir storageService.convertHeicToJpeg), jamais
+// stockes tels quels.
+const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+// Beaucoup de navigateurs n'annoncent PAS le bon Content-Type pour un
+// .heic/.heif (souvent 'application/octet-stream', parfois vide) — ce type
+// generique est donc accepte UNIQUEMENT quand le nom de fichier porte
+// l'extension correspondante, jamais en general (il resterait sinon un
+// moyen de contourner ce filtre avec n'importe quel contenu).
+const HEIC_EXTENSIONS = /\.(heic|heif)$/i;
 
-  if (allowedTypes.includes(file.mimetype)) {
+const fileFilter = (req, file, cb) => {
+  const genericType = file.mimetype === 'application/octet-stream' || !file.mimetype;
+  const looksLikeHeic = genericType && HEIC_EXTENSIONS.test(file.originalname || '');
+
+  if (allowedTypes.includes(file.mimetype) || looksLikeHeic) {
     cb(null, true);
   } else {
     cb(new Error(t(
       req,
-      'Format de fichier non supporté. Utilisez JPG, PNG, GIF ou WEBP.',
-      'Unsupported file format. Use JPG, PNG, GIF or WEBP.'
+      'Format de fichier non supporté. Utilisez JPG, PNG, GIF, WEBP ou HEIC.',
+      'Unsupported file format. Use JPG, PNG, GIF, WEBP or HEIC.'
     )), false);
   }
 };

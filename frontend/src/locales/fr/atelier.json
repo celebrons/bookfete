@@ -2,6 +2,11 @@
   "common": {
     "close": "Fermer"
   },
+  "anonymousBanner": {
+    "textStrong": "Votre livre est enregistré",
+    "textRest": "— mais il n'existe que sur cet appareil. Donnez votre e-mail pour le retrouver partout et le commander.",
+    "action": "Enregistrer mon livre"
+  },
   "confirmSwitch": {
     "title": "Passer en mode automatique ?",
     "body": "Bookipix va proposer une nouvelle organisation de votre livre à partir de vos contenus. Les pages que vous avez déjà construites à la main restent intactes — seules les pages encore automatiques seront réorganisées.",

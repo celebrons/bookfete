@@ -2,6 +2,11 @@
   "common": {
     "close": "Close"
   },
+  "anonymousBanner": {
+    "textStrong": "Your book is saved",
+    "textRest": "— but it only exists on this device. Give your e-mail to find it anywhere and order it.",
+    "action": "Save my book"
+  },
   "confirmSwitch": {
     "title": "Switch to automatic mode?",
     "body": "Bookipix will propose a new layout for your book based on your content. Pages you've already built by hand stay untouched — only the pages still on automatic will be reorganized.",

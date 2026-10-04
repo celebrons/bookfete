@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { isCurrentlyAnonymous } from '../../services/anonymousSession';
 import './AnonymousBanner.css';
 
@@ -15,6 +16,7 @@ import './AnonymousBanner.css';
 // justement de ne rien exiger avant que la valeur soit visible. Le compte
 // est demande au moment de commander (garde serveur dans routes/orders.js).
 function AnonymousBanner({ compact = false }) {
+  const { t } = useTranslation('atelier');
   const [anonymous, setAnonymous] = useState(false);
 
   useEffect(() => {
@@ -30,13 +32,12 @@ function AnonymousBanner({ compact = false }) {
   return (
     <div className={`anon-banner ${compact ? 'is-compact' : ''}`} role="status">
       <span className="anon-banner-text">
-        <strong>Votre livre est enregistré</strong> — mais il n'existe que sur cet appareil.
-        Donnez votre e-mail pour le retrouver partout et le commander.
+        <strong>{t('anonymousBanner.textStrong')}</strong> {t('anonymousBanner.textRest')}
       </span>
       {/* Vers l adresse + code, pas vers un mot de passe a inventer
           (2026-09-20). Cette page rattache justement le livre commence
           sur cet appareil — c est exactement ce que ce bandeau promet. */}
-      <Link className="anon-banner-action" to="/mes-livres">Enregistrer mon livre</Link>
+      <Link className="anon-banner-action" to="/mes-livres">{t('anonymousBanner.action')}</Link>
     </div>
   );
 }

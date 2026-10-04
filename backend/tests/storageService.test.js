@@ -147,6 +147,47 @@ describe("storageService.uploadFile — correction d'orientation EXIF", () => {
   });
 });
 
+// HEIC/HEIF (format par defaut des photos iPhone, retour utilisateur,
+// 2026-10-05 : plusieurs photos rejetees a l'upload "format non supporte").
+// sharp ne sait PAS ENCODER du HEVC (licence, verifie manuellement : seul
+// compression:'av1' fonctionne, 'hevc' leve "Unsupported compression") — ce
+// fixture est donc un conteneur HEIF code AV1, pas un vrai .heic d'iPhone
+// (code HEVC). sharp detecte les deux de la meme facon (metadata.format ===
+// 'heif', exactement ce que convertHeicToJpeg verifie) : ce test verifie
+// reellement le chemin de code (detection + conversion + orientation), pas
+// le codec specifique d'un vrai iPhone — a confirmer en conditions reelles
+// avec une vraie photo iPhone.
+describe('storageService.uploadFile — HEIC/HEIF (photos iPhone)', () => {
+  it('une photo HEIF est convertie en JPEG (jamais stockee telle quelle)', async () => {
+    const source = await sharp({ create: { width: 300, height: 200, channels: 3, background: { r: 10, g: 200, b: 30 } } })
+      .jpeg()
+      .toBuffer();
+    const heif = await sharp(source).heif({ quality: 80, compression: 'av1' }).toBuffer();
+    const file = { originalname: 'photo.heic', mimetype: 'image/heic', buffer: heif };
+
+    const result = await uploadFile('contribution-photos', file, 'book-1');
+
+    expect(result.success).toBe(true);
+    expect(result.fileName.endsWith('.jpg')).toBe(true);
+    const originalCall = uploadCalls.find((call) => call.fileName === result.fileName);
+    expect(originalCall.contentType).toBe('image/jpeg');
+    const dims = sizeOf(originalCall.buffer);
+    expect(dims.width).toBe(300);
+    expect(dims.height).toBe(200);
+    expect(result.thumbnailUrl).toBeDefined();
+    expect(result.previewUrl).toBeDefined();
+  });
+
+  it("un fichier non reconnu nomme en .heic garde le message GENERIQUE (jamais le message HEIC specifique sur un fichier qui n'a jamais ete du HEIC)", async () => {
+    const file = { originalname: 'corrompu.heic', mimetype: 'image/heic', buffer: Buffer.from("ceci n'est pas une image") };
+    const result = await uploadFile('contribution-photos', file, 'book-1');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/pas une image valide/);
+    expect(uploadCalls).toHaveLength(0);
+  });
+});
+
 // Plafond du stockage de l'original (retour utilisateur, 2026-09-29 : quota
 // Supabase depasse, 83% du bucket photos venant d'originaux dont les pixels
 // au-dela de 2600px (le plus gros besoin reel, voir scripts/audit-egress.js)
