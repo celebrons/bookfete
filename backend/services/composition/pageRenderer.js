@@ -781,30 +781,32 @@ const BASE_CSS = `
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .photo-solo { margin: 0; height: 100%; }
   /* Une photo sur DOUBLE PAGE (FULL_PHOTO_SPREAD).
-     Chaque page porte la MEME image et n'en montre que sa moitie — coupe
-     NETTE a 50/50 (l'image est dessinee sur EXACTEMENT 200%, chaque page en
-     montre pile sa moitie depuis son bord exterieur). Jamais de bande
-     retiree, jamais dupliquee, jamais masquee : zero perte, et l'image
-     reste PARFAITEMENT CONTINUE d'une page a l'autre (le point de coupe
-     tombe exactement au milieu de la photo, sans artefact visible a
-     l'ecran ni a l'impression).
+     Chaque page porte la MEME image et n'en montre que sa moitie. La coupe
+     elle-meme reste NETTE A 50/50, SANS PERTE : l'image est dessinee sur
+     EXACTEMENT 200%, chaque page en montre pile sa moitie depuis son bord
+     exterieur — mathematiquement continue, rien n'est jamais retire ni
+     duplique. Un bandeau --spread-gutter-margin (couleur de la page) masque
+     ensuite le bord INTERIEUR de chaque page (demande explicite, 2026-10-04 :
+     "au pli interieur de chaque cote on laisse 4mm de marge, la photo doit
+     etre continue sans perte" — "sans perte" qualifie la coupe mathematique
+     ci-dessus, pas ce bandeau, qui lui MASQUE sciemment une bande).
 
-     Historique de cette ligne : 2026-09-25, on retirait une bande centrale
-     (perte reelle sur un livre relie qui ne s'ouvre pas a plat) ; corrige
-     en DUPLIQUANT une petite bande a la place (invisible sur un livre relie,
-     mais visible a plat, a l'ecran — retour utilisateur 2026-10-04, « la
-     dame au milieu, son bras deborde en double » sur une vraie photo) ;
-     puis une marge blanche au pli (meme defaut en pire : elle masquait un
-     visage pile positionne au centre, confirme par mesure precise sur la
-     meme photo). Aucune de ces trois approches ne regle le vrai probleme :
-     SAVOIR si quelque chose d'important tombe au centre. Sans detection de
-     visage (ce projet reste volontairement sans IA/reconnaissance faciale),
-     seul un humain peut le voir — d'ou la zone de securite affichee dans
-     l'atelier (AtelierPhotoAdjustModal.js) plutot qu'un traitement du cote
-     du rendu : l'utilisateur decale/zoome la photo jusqu'a ce que rien
-     d'important n'y tombe, ou bascule sur une mise en page page-simple si
-     aucun cadrage ne convient. Le rendu, lui, reste simple et honnete :
-     une coupe nette, rien de plus. */
+     Historique complet (pour ne pas reessayer ce qui a deja echoue) :
+     2026-09-25, on retirait une bande centrale (perte reelle sur un livre
+     relie qui ne s'ouvre pas a plat) ; corrige en DUPLIQUANT une petite
+     bande a la place (invisible sur un livre relie, mais visible a plat, a
+     l'ecran — retour utilisateur, « la dame au milieu, son bras deborde en
+     double ») ; puis retire au profit d'une coupe nette sans aucune marge
+     (le pli tombait alors exactement sur un visage, confirme par mesure
+     precise) ; cette marge est le reglage final choisi par l'utilisateur
+     apres avoir compare les options — AUCUN mecanisme de marge/duplication
+     ne peut garantir qu'un visage pile au centre soit epargne (ce projet
+     reste sans IA/reconnaissance faciale, personne d'automatique ne peut le
+     verifier) : la marge n'est qu'un filet de securite minimal, la vraie
+     protection reste la zone de securite AFFICHEE dans l'atelier
+     (AtelierPhotoAdjustModal.js, GUTTER_SAFETY_ZONE_MM — volontairement
+     plus large que ce bandeau) avec laquelle l'utilisateur decale/zoome la
+     photo lui-meme, ou bascule sur une page simple si rien ne convient. */
   .photo-spread { position: absolute; inset: 0; margin: 0; overflow: hidden; }
   .photo-spread .photo-frame {
     position: absolute;
@@ -814,6 +816,21 @@ const BASE_CSS = `
   }
   .photo-spread.is-spread-left .photo-frame { left: 0; }
   .photo-spread.is-spread-right .photo-frame { right: 0; }
+  /* Bandeau de marge au pli (voir le commentaire ci-dessus) : pose APRES
+     .photo-frame dans le DOM, donc peint par-dessus sans z-index. Meme
+     couleur que .page (#fffdf8) pour se fondre, jamais du blanc pur.
+     Valeur absolue, non mise a l'echelle par spaceScale : la marge au pli
+     est un choix d'habillage du pli, pas une densite typographique. */
+  .photo-spread::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: var(--spread-gutter-margin, 4mm);
+    background: #fffdf8;
+  }
+  .photo-spread.is-spread-left::after { right: 0; }
+  .photo-spread.is-spread-right::after { left: 0; }
   .photo-inset { padding: calc(8mm * var(--fmt-space-scale, 1)); background: #efe8d8; }
   .photo-inset .photo-frame { border: 1px solid #cbbd9c; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
   .photo-grid { display: grid; gap: calc(3mm * var(--fmt-space-scale, 1)); height: 100%; }

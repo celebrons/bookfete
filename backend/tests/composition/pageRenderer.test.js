@@ -303,7 +303,7 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     expect(pageAt(7)).toContain('photo-spread is-spread-left');
   });
 
-  it('FULL_PHOTO_SPREAD : la photo va a fond perdu, coupee net a 50/50, sans perte ni doublon ni marge', () => {
+  it('FULL_PHOTO_SPREAD : coupe nette 50/50 sans perte ni doublon, avec une marge au pli', () => {
     const html = renderBookHtml({
       book: {},
       items: [{ id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg' }],
@@ -312,15 +312,18 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     });
     // Fond perdu : la figure est posee sur TOUTE la page, marges comprises.
     expect(html).toMatch(/\.photo-spread \{[^}]*position: absolute;[^}]*inset: 0/);
-    // COUPE NETTE A 50/50 (retour utilisateur, 2026-10-04 : ni perte, ni
-    // doublon, ni marge qui masquerait du contenu — voir le commentaire de
-    // tete de .photo-spread pour l'historique complet des trois tentatives
-    // precedentes). La zone de securite de gouttiere est geree cote atelier
-    // (AtelierPhotoAdjustModal.js), jamais dans ce rendu.
+    // COUPE MATHEMATIQUE NETTE A 50/50, SANS PERTE (le cadre fait EXACTEMENT
+    // 200%, jamais reduit) — "sans perte" qualifie cette coupe, pas le
+    // bandeau de marge ci-dessous qui, lui, masque volontairement une bande
+    // (demande explicite de l'utilisateur, 2026-10-04, apres avoir compare
+    // les options — voir le commentaire de tete de .photo-spread).
     expect(html).toMatch(/\.photo-spread \.photo-frame \{[^}]*width: 200%/);
-    expect(html).not.toMatch(/--spread-gutter/);
-    expect(html).not.toMatch(/--spread-overlap/);
-    expect(html).not.toMatch(/\.photo-spread::after/);
+    expect(html).not.toMatch(/--spread-gutter,/); // ancien nom (avant 2026-09-25)
+    expect(html).not.toMatch(/--spread-overlap/); // nom intermediaire (duplication, abandonne)
+    // Bandeau de marge au pli, couleur de la page, sur chaque face.
+    expect(html).toMatch(/\.photo-spread::after \{[^}]*width: var\(--spread-gutter-margin, 4mm\)[^}]*background: #fffdf8/);
+    expect(html).toMatch(/\.photo-spread\.is-spread-left::after \{ right: 0; \}/);
+    expect(html).toMatch(/\.photo-spread\.is-spread-right::after \{ left: 0; \}/);
   });
 
   it('TWO_PHOTOS_STACKED : une photo "entiere" garde la meme marge exterieure que sa voisine', () => {
