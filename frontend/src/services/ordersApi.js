@@ -169,6 +169,20 @@ export const listPrintFormats = async (pageCount) => {
   return response.json();
 };
 
+// Mode de paiement reel (vrai Stripe vs test) : PUBLIQUE, sans secret — sert
+// uniquement a choisir le bon libelle de bouton avant la redirection vers
+// Stripe (voir StepPayment.js). `live:false` en repli sur toute erreur
+// reseau : jamais afficher "argent reel" par erreur si l'appel echoue.
+export const getPaymentMode = async () => {
+  try {
+    const response = await fetchWithRetry(`${buildApiBaseUrl()}/orders/payment-mode`);
+    if (!response.ok) return { live: false };
+    return await response.json();
+  } catch (_error) {
+    return { live: false };
+  }
+};
+
 // --- Emails transactionnels -------------------------------------------------
 // `enabled` dit si une cle Resend est reellement posee cote serveur : il faut
 // pouvoir l'afficher SANS envoyer d'email pour le savoir.

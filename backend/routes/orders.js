@@ -1190,6 +1190,20 @@ router.post('/email/test', authenticate, async (req, res) => {
 // appelait jusqu'ici price-estimate trois fois pour construire ce meme
 // tableau. Absent/invalide -> comportement inchange (formats sans
 // currentPriceCents, seulement startingPriceCents).
+// GET /api/orders/payment-mode
+// Public et minimal : juste de quoi choisir le bon libelle de bouton
+// ("Payer" vs "Payer (test)") AVANT la redirection vers Stripe. Rien de
+// sensible (pas de cle, pas de secret) — seule la DECISION deja prise par
+// l'admin (voir services/settings/appMode.js) est exposee. Necessaire :
+// avant le 2026-10-04 ce libelle etait fige en dur sur "(test)", ce qui
+// restait affiche tel quel meme apres bascule en production reelle (retour
+// utilisateur, capture d'un vrai Stripe Checkout en cs_live_... derriere un
+// bouton qui disait encore "test" — risque reel de confusion sur une vraie
+// carte).
+router.get('/payment-mode', (_req, res) => {
+  res.json({ live: isStripeLiveMode() });
+});
+
 router.get('/formats', (req, res) => {
   const { MIN_BOOK_PAGES, MAX_BOOK_PAGES } = require('../services/composition/bookContentService');
   const { COVER_FORMATS } = require('../services/composition/coverFormat');

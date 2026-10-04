@@ -192,10 +192,12 @@
     "pay": {
       "processing": "Processing...",
       "payPending": "Pay the pending order",
-      "payStripe": "Pay with Stripe (test)"
+      "payStripe": "Pay with Stripe (test)",
+      "payStripeLive": "Pay with Stripe"
     },
     "stripeNote": {
       "enabled": "Stripe Checkout in test mode. Use a Stripe test card.",
+      "enabledLive": "Secure payment by Stripe. Your card will be charged for real.",
       "disabled": "Payment is temporarily unavailable: enable Stripe to place the order."
     }
   },

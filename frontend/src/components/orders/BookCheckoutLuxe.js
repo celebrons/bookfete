@@ -10,6 +10,7 @@ import {
   getApiBaseUrl,
   getGelatoStatus,
   getOrderTracking,
+  getPaymentMode,
   listOrdersByBook,
   updateOrderStatus
 } from '../../services/ordersApi';
@@ -270,6 +271,18 @@ const BookCheckoutLuxe = () => {
     [book]
   );
   const stripeTestEnabled = process.env.REACT_APP_STRIPE_ENABLED === '1';
+  // Vrai Stripe (argent reel) vs test, pour le libelle du bouton de paiement
+  // (retour utilisateur, 2026-10-04 : "il affiche stripe test" alors que la
+  // session Stripe ouverte etait deja une vraie cs_live_... — ce libelle
+  // etait fige en dur sur "test", meme apres bascule en production reelle
+  // depuis /admin). false par defaut (repli prudent tant que l'appel n'a pas
+  // repondu) : ne jamais annoncer "argent reel" avant d'en etre sur.
+  const [stripeLive, setStripeLive] = useState(false);
+  useEffect(() => {
+    let annule = false;
+    getPaymentMode().then(({ live }) => { if (!annule) setStripeLive(Boolean(live)); });
+    return () => { annule = true; };
+  }, []);
   const hasPendingPaymentOrder = (
     String(latestOrder?.status || '').toLowerCase() === 'awaiting_payment'
   );
@@ -1482,6 +1495,7 @@ const BookCheckoutLuxe = () => {
               submitting={submitting}
               canPay={canOrder}
               stripeEnabled={stripeTestEnabled}
+              stripeLive={stripeLive}
               hasPendingPaymentOrder={hasPendingPaymentOrder}
               isAnonymous={anonymousSession}
               onAccountReady={compteVerifie}

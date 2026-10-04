@@ -23,6 +23,11 @@ function StepPayment({
   submitting,
   canPay,
   stripeEnabled,
+  // Vrai Stripe (argent reel) vs test (retour utilisateur, 2026-10-04 : le
+  // bouton annoncait encore "test" derriere une vraie session cs_live_...).
+  // false par defaut : un appelant qui ne le passerait pas garde l'ancien
+  // libelle "test", jamais l'inverse.
+  stripeLive = false,
   hasPendingPaymentOrder,
   isAnonymous = false,
   // Appele une fois l'adresse verifiee : la page de commande reprend la main
@@ -136,12 +141,14 @@ function StepPayment({
               ? t('stepPayment.pay.processing')
               : hasPendingPaymentOrder
                 ? t('stepPayment.pay.payPending')
-                : t('stepPayment.pay.payStripe')}
+                : stripeLive
+                  ? t('stepPayment.pay.payStripeLive')
+                  : t('stepPayment.pay.payStripe')}
           </button>
 
           <p className="orders-disclaimer">
             {stripeEnabled
-              ? t('stepPayment.stripeNote.enabled')
+              ? (stripeLive ? t('stepPayment.stripeNote.enabledLive') : t('stepPayment.stripeNote.enabled'))
               : t('stepPayment.stripeNote.disabled')}
           </p>
         </>
