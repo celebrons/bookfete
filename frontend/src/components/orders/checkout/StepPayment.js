@@ -146,11 +146,19 @@ function StepPayment({
                   : t('stepPayment.pay.payStripe')}
           </button>
 
-          <p className="orders-disclaimer">
-            {stripeEnabled
-              ? (stripeLive ? t('stepPayment.stripeNote.enabledLive') : t('stepPayment.stripeNote.enabled'))
-              : t('stepPayment.stripeNote.disabled')}
-          </p>
+          {/* Retour utilisateur (2026-10-04) : le libelle du bouton
+              ("Payer avec Stripe" / "... (test)") suffit a lui seul -- pas
+              besoin d'une phrase supplementaire en dessous qui repete la
+              meme information, et encore moins d'annoncer "votre carte sera
+              reellement debitee" en production reelle (ca ne sert a rien,
+              c'est le cas normal). Cette note ne reste que pour le seul cas
+              ou il y a vraiment quelque chose a expliquer : Stripe
+              indisponible. */}
+          {!stripeEnabled && (
+            <p className="orders-disclaimer">
+              {t('stepPayment.stripeNote.disabled')}
+            </p>
+          )}
         </>
       )}
     </article>

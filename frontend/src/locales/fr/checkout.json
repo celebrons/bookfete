@@ -196,8 +196,6 @@
       "payStripeLive": "Payer avec Stripe"
     },
     "stripeNote": {
-      "enabled": "Stripe Checkout en mode test. Utilisez une carte de test Stripe.",
-      "enabledLive": "Paiement sécurisé par Stripe. Votre carte sera réellement débitée.",
       "disabled": "Le paiement est temporairement indisponible : activez Stripe pour lancer la commande."
     }
   },
