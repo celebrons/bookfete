@@ -26,15 +26,13 @@ const MM_PER_INCH = 25.4;
 // module reste une fonction pure, sans dependance a un parseur CSS.
 const PAGE_PADDING_MM = 14;
 const GRID_GAP_MM = 3;
-// Recouvrement d'une photo sur double page : la bande centrale imprimee des
-// DEUX cotes du pli, pour que la reliure ne fasse rien disparaitre (voir
-// .photo-spread dans pageRenderer.js). A garder egale a `--spread-overlap`
-// dans le CSS du renderer : les desynchroniser donnerait deux verites sur
-// une meme geometrie.
-//
-// L'image etant dessinee sur une largeur de 2 x page MOINS 2 x ce
-// recouvrement, c'est bien cette largeur-la qui fixe la definition exigee.
-const SPREAD_OVERLAP_MM = 4;
+// Marge au pli d'une photo sur double page (2026-10-04 : remplace l'ancien
+// recouvrement duplique, voir le commentaire de tete de .photo-spread dans
+// pageRenderer.js) — un bandeau de la couleur de la page QUI MASQUE le bord
+// interieur de chaque page, la photo elle-meme restant etiree sur la
+// largeur PLEINE (2 x page, sans reduction). Cette constante ne sert donc
+// plus a la geometrie de l'image, seulement a documenter le lien avec
+// `--spread-overlap` cote CSS (meme nom, meme valeur, role different).
 
 // Surface reellement disponible pour le contenu d'une page (apres marges),
 // et gap de grille effectif — les deux mis a l'echelle par spaceScale
@@ -101,8 +99,9 @@ function resolveSlotSizeMm(layoutSlug, slotIndex, formatId) {
   // 'spread' : une seule photo etalee sur DEUX pages, a fond perdu (voir
   // pageRenderer, .photo-spread). On raisonne donc sur les dimensions de
   // ROGNE, pas sur la zone de contenu : la photo deborde volontairement les
-  // marges. Moins le recouvrement central, imprime des deux cotes du pli
-  // pour que la reliure ne fasse rien disparaitre.
+  // marges. Largeur PLEINE (2 x page) depuis le 2026-10-04 : l'image n'est
+  // plus reduite d'un recouvrement, elle est coupee net a 50/50 puis une
+  // marge au pli la masque sans en changer l'etirement reel.
   //
   // C'est le cas ou le controle de resolution compte le plus : la meme image
   // est etiree sur ~42 cm, donc il faut deux fois plus de pixels que pour une
@@ -110,7 +109,7 @@ function resolveSlotSizeMm(layoutSlug, slotIndex, formatId) {
   // photo franchement floue sur la plus spectaculaire des pages.
   if (rawRatio === 'spread') {
     const { trimWidthMm, trimHeightMm } = resolveCoverFormat(formatId);
-    return { widthMm: Math.max(1, trimWidthMm * 2 - SPREAD_OVERLAP_MM * 2), heightMm: trimHeightMm };
+    return { widthMm: trimWidthMm * 2, heightMm: trimHeightMm };
   }
 
   const columns = resolveSlotColumns(layoutSlug, slotIndex);
