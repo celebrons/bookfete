@@ -2,6 +2,13 @@ const supabase = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
 const sizeOf = require('image-size');
 const sharp = require('../config/sharp');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const fs = require('fs/promises');
+const os = require('os');
+const path = require('path');
+
+const execFileAsync = promisify(execFile);
 
 // Sonde legere (pure JS, aucun binaire natif) les dimensions/orientation
 // d'une image deja en memoire (multer memoryStorage — pas d'I/O supplementaire).
@@ -68,6 +75,37 @@ async function normalizeOrientation(buffer) {
 // l'orientation) par defaut a l'encodage — sans ce rotate ici, une photo
 // prise en portrait ressortirait couchee, et normalizeOrientation() ne
 // verrait plus jamais le tag puisqu'il aura deja disparu.
+// Repli : l'outil SYSTEME heif-convert (paquet apt libheif-examples +
+// libheif-plugin-libde265, installes le 2026-10-05 sur le serveur de
+// production specifiquement pour ceci), pas le decodeur HEIC EMBARQUE dans
+// sharp. Diagnostique en conditions reelles le 2026-10-05 : un vrai HEIC
+// d'iPhone (code HEVC, en tuiles) echoue dans sharp avec "source: bad seek
+// ... heif: Decoder plugin generated an error: Unspecified (7.0)" — bug
+// connu, deja signale sur des projets tiers avec le MEME message au
+// caractere pres (sharp embarque sa propre copie statique de libheif, qui
+// ne gere pas correctement l'acces aleatoire que le decodage par tuiles
+// exige depuis un buffer en memoire). L'outil systeme utilise la
+// bibliotheque libheif normale du serveur (a plugins, acces fichier reel) et
+// n'a pas ce bug — confirme en ligne de commande avant d'ecrire ce code.
+//
+// heif-convert applique deja lui-meme les transformations de rotation
+// HEIF (boites irot/imir, lues et appliquees par libheif au decodage) : pas
+// besoin d'un .rotate() supplementaire ici, contrairement au chemin sharp
+// ci-dessus qui lit l'EXIF JPEG classique.
+async function convertHeicViaSystemTool(buffer) {
+  const id = uuidv4();
+  const inputPath = path.join(os.tmpdir(), `${id}.heic`);
+  const outputPath = path.join(os.tmpdir(), `${id}.jpg`);
+  try {
+    await fs.writeFile(inputPath, buffer);
+    await execFileAsync('/usr/bin/heif-convert', ['-q', String(ORIGINAL_QUALITY), inputPath, outputPath], { timeout: 20000 });
+    return await fs.readFile(outputPath);
+  } finally {
+    await fs.unlink(inputPath).catch(() => {});
+    await fs.unlink(outputPath).catch(() => {});
+  }
+}
+
 async function convertHeicToJpeg(buffer) {
   // Deux essais SEPARES, deliberement : si meme la lecture des metadonnees
   // echoue, le format est totalement inconnu (pas forcement du HEIC) — on
@@ -87,27 +125,29 @@ async function convertHeicToJpeg(buffer) {
     const jpeg = await sharp(buffer).rotate().jpeg({ quality: ORIGINAL_QUALITY }).toBuffer();
     return { buffer: jpeg, converted: true };
   } catch (error) {
-    // Format CONFIRME heif, mais conversion impossible (variante non geree
-    // par la version de libheif du serveur...) : jamais de store silencieux
-    // d'un fichier illisible — l'appelant (uploadFile) renvoie une erreur
-    // explicite plutot que de laisser deviner plus tard pourquoi la photo
-    // n'apparait nulle part.
-    //
-    // Journalise (diagnostic, 2026-10-05 : premier vrai HEIC d'iPhone teste
-    // en production, echoue alors qu'un conteneur heif de test — code AV1,
-    // seul codec que ce serveur sait ENCODER, voir storageService.test.js —
-    // passait) : seul un vrai message d'erreur libheif dira si c'est le
-    // decodage HEVC qui manque, ou autre chose (variante de pixel format,
-    // HEIC "live photo" multi-image, etc.).
-    console.error('[convertHeicToJpeg] echec conversion heif->jpeg', {
+    // Decodeur HEIC EMBARQUE dans sharp : echoue sur un vrai HEIC d'iPhone
+    // (bug connu, voir convertHeicViaSystemTool ci-dessus) alors qu'un
+    // conteneur heif de test (code AV1, seul codec que ce serveur sait
+    // ENCODER, voir storageService.test.js) passait. Journalise avant de
+    // tenter le repli, pour garder une trace si meme l'outil systeme echoue.
+    console.error('[convertHeicToJpeg] sharp a echoue, tentative via heif-convert (outil systeme)', {
       message: error.message,
       heifCompression: metadata.compression,
-      heifChromaSubsampling: metadata.chromaSubsampling,
-      heifPages: metadata.pages,
       width: metadata.width,
       height: metadata.height
     });
-    return { buffer, converted: false, failed: true };
+
+    try {
+      const jpeg = await convertHeicViaSystemTool(buffer);
+      return { buffer: jpeg, converted: true };
+    } catch (fallbackError) {
+      // Les DEUX chemins ont echoue : jamais de store silencieux d'un
+      // fichier illisible — l'appelant (uploadFile) renvoie une erreur
+      // explicite plutot que de laisser deviner plus tard pourquoi la photo
+      // n'apparait nulle part.
+      console.error('[convertHeicToJpeg] heif-convert (outil systeme) a aussi echoue', { message: fallbackError.message });
+      return { buffer, converted: false, failed: true };
+    }
   }
 }
 
