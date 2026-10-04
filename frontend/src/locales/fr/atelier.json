@@ -247,6 +247,7 @@
     "coverLabel": "Couverture",
     "backCoverLabel": "4e de couverture",
     "insideCoverLabel": "Intérieur de couverture (non modifiable)",
+    "insideBackCoverLabel": "Intérieur de la 4e de couverture (non modifiable)",
     "pageLabel": "Page {{number}}",
     "goToCover": "Aller à la couverture",
     "previousPage": "Page précédente",

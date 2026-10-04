@@ -523,6 +523,22 @@ function AtelierBookView({
                 onExpand={() => setIsFullscreenOpen(true)}
               />
             )}
+            {/* Symetrique du contre-plat ci-dessus : la DERNIERE page peut
+                elle aussi etre seule (livre a nombre de pages pair), face au
+                contre-plat de la 4e de couverture cette fois. Retour
+                utilisateur, 2026-10-04, capture a l'appui : sans cet
+                emplacement, la page seule etait le SEUL enfant flex de
+                .atelier-spread et s'etirait donc sur toute la largeur du
+                plateau — deux fois plus grande qu'une page normale,
+                exactement le meme defaut que celui deja corrige pour la
+                premiere page avant l'ajout du bloc ci-dessus. Purement
+                visuel : n'affecte ni le nombre de pages ni le PDF envoye a
+                l'impression (ce bloc ne touche a aucune donnee du livre). */}
+            {rightPageNumber == null && leftPageNumber != null && (
+              <div className="atelier-page-pane is-contreplat" style={pageAspectRatio ? { aspectRatio: pageAspectRatio } : undefined}>
+                <span className="atelier-page-pane-label">{t('bookView.insideBackCoverLabel')}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

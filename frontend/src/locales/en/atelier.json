@@ -247,6 +247,7 @@
     "coverLabel": "Cover",
     "backCoverLabel": "Back cover",
     "insideCoverLabel": "Inside cover (not editable)",
+    "insideBackCoverLabel": "Inside back cover (not editable)",
     "pageLabel": "Page {{number}}",
     "goToCover": "Go to the cover",
     "previousPage": "Previous page",
