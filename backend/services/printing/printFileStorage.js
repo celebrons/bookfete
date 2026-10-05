@@ -10,13 +10,19 @@
 // signature multer-file) qui n'est pas adapte a un Buffer local genere par
 // notre propre pipeline.
 //
-// Fonction volontairement simple (pas de redimensionnement/traitement — ce
-// sont des fichiers d'impression deja finalises) : lit un fichier local,
-// l'uploade tel quel, retourne son URL publique.
+// Lit un fichier local, l'uploade tel quel, retourne son URL publique — SAUF
+// pour un PDF qui depasse MAX_SAFE_PDF_BYTES (voir compressPdfIfTooLarge),
+// seul cas ou ce module retouche le fichier.
 
 const fsp = require('fs/promises');
 const path = require('path');
+const os = require('os');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const { v4: uuidv4 } = require('uuid');
 const supabase = require('../../config/supabase');
+
+const execFileAsync = promisify(execFile);
 
 const PRINT_FILES_BUCKET = 'print-files';
 
@@ -27,24 +33,83 @@ const CONTENT_TYPES = {
   '.jpeg': 'image/jpeg'
 };
 
+// Premiere commande REELLE en echec, 2026-10-05 : "The object exceeded the
+// maximum allowed size" — le bucket print-files (comme tout bucket de ce
+// projet Supabase) est plafonne a 50 Mo PAR LE PROJET, pas juste par le
+// bucket (verifie : impossible de relever cette limite via l'API, meme a
+// 60 Mo, la demande elle-meme est refusee). Un livre de 36 pages (format
+// livret) a produit un PDF de 62,7 Mo — rare, mais pas improbable des que
+// beaucoup de photos haute resolution s'accumulent.
+//
+// 45 Mo (pas 50) : marge de securite, le fichier compresse n'a pas besoin
+// de coller au plus pres de la limite.
+const MAX_SAFE_PDF_BYTES = 45 * 1024 * 1024;
+
+// Ghostscript -dPDFSETTINGS=/printer : preset DESTINE a l'impression (cible
+// 300dpi), pas /ebook ou /screen (penses pour un ecran, visiblement plus
+// degradants). Verifie en conditions reelles sur le PDF de la commande qui a
+// echoue (2026-10-05) : 62,7 Mo -> 36,0 Mo (-42%), memes dimensions de page
+// (MediaBox identique), jamais de perte de page. N'EST APPLIQUE QUE SI LE
+// FICHIER DEPASSE MAX_SAFE_PDF_BYTES — la tres grande majorite des livres
+// continue de partir a l'imprimeur sans la moindre recompression.
+async function compressPdfIfTooLarge(localFilePath) {
+  const { size } = await fsp.stat(localFilePath);
+  if (size <= MAX_SAFE_PDF_BYTES) return { path: localFilePath, compressed: false };
+
+  const compressedPath = path.join(os.tmpdir(), `print-compressed-${uuidv4()}.pdf`);
+  try {
+    await execFileAsync('gs', [
+      '-sDEVICE=pdfwrite',
+      '-dCompatibilityLevel=1.4',
+      '-dPDFSETTINGS=/printer',
+      '-dNOPAUSE', '-dQUIET', '-dBATCH',
+      '-dAutoRotatePages=/None',
+      `-sOutputFile=${compressedPath}`,
+      localFilePath
+    ], { timeout: 180000, maxBuffer: 10 * 1024 * 1024 });
+
+    const { size: compressedSize } = await fsp.stat(compressedPath);
+    console.warn('[compressPdfIfTooLarge] fichier trop volumineux, compresse', {
+      localFilePath, sizeAvant: size, sizeApres: compressedSize
+    });
+    // La compression peut echouer a suffire sur un cas extreme : on renvoie
+    // alors quand meme le fichier compresse (toujours mieux que l'original)
+    // — l'upload lui-meme tranchera, avec un message d'erreur desormais
+    // honnete sur la taille reellement atteinte.
+    return { path: compressedPath, compressed: true, cleanup: () => fsp.unlink(compressedPath).catch(() => {}) };
+  } catch (error) {
+    console.error('[compressPdfIfTooLarge] echec de la compression, tentative avec le fichier original', error.message);
+    await fsp.unlink(compressedPath).catch(() => {});
+    return { path: localFilePath, compressed: false };
+  }
+}
+
 // uploadPath : chemin RELATIF dans le bucket (ex. "orders/<orderId>/interior.pdf")
 // — a l'appelant de garantir l'unicite (typiquement en y incluant book.id +
 // un timestamp/jobId, meme convention que PDF_EXPORT_DIR cote local).
 async function uploadPrintFile(localFilePath, uploadPath) {
-  const buffer = await fsp.readFile(localFilePath);
   const ext = path.extname(localFilePath).toLowerCase();
   const contentType = CONTENT_TYPES[ext] || 'application/octet-stream';
 
-  const { error } = await supabase.storage
-    .from(PRINT_FILES_BUCKET)
-    .upload(uploadPath, buffer, { contentType, cacheControl: '3600', upsert: true });
+  // Seul un PDF peut etre compresse ainsi (ghostscript) : un fichier de
+  // couverture (image) suit son chemin habituel, inchange.
+  const source = ext === '.pdf' ? await compressPdfIfTooLarge(localFilePath) : { path: localFilePath };
+  try {
+    const buffer = await fsp.readFile(source.path);
 
-  if (error) {
-    throw new Error(`Upload fichier impression echoue (${uploadPath}): ${error.message}`);
+    const { error } = await supabase.storage
+      .from(PRINT_FILES_BUCKET)
+      .upload(uploadPath, buffer, { contentType, cacheControl: '3600', upsert: true });
+
+    if (error) {
+      throw new Error(`Upload fichier impression echoue (${uploadPath}): ${error.message}`);
+    }
+
+    const { data } = supabase.storage.from(PRINT_FILES_BUCKET).getPublicUrl(uploadPath);
+    return data.publicUrl;
+  } finally {
+    if (source.cleanup) await source.cleanup();
   }
-
-  const { data } = supabase.storage.from(PRINT_FILES_BUCKET).getPublicUrl(uploadPath);
-  return data.publicUrl;
 }
 
 // Supprime tous les fichiers d'impression d'une commande.
@@ -87,5 +152,7 @@ async function removePrintFilesForOrder(orderId) {
 module.exports = {
   PRINT_FILES_BUCKET,
   uploadPrintFile,
-  removePrintFilesForOrder
+  removePrintFilesForOrder,
+  compressPdfIfTooLarge,
+  MAX_SAFE_PDF_BYTES
 };
