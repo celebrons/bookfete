@@ -253,3 +253,99 @@ describe('Webhook Stripe — paiement echoue/expire', () => {
     expect(emails.envoyerAlerteAdmin).not.toHaveBeenCalled();
   });
 });
+
+// Retour utilisateur (2026-10-05) : "je veux recuperer son statut
+// remboursement partiel/remboursement entier lorsqu'un remboursement
+// intervient dans Stripe, sans impact sur la commande (pas d'annulation ou
+// autre)" — purement informatif, order.status ne doit JAMAIS bouger ici.
+describe('Webhook Stripe — remboursement (charge.refunded)', () => {
+  const PAYMENT_INTENT_ID = 'pi_test_webhook';
+
+  const evenementRemboursement = (amount, amountRefunded, overrides = {}) => ({
+    id: `evt_refund_${amountRefunded}_${Math.random()}`,
+    type: 'charge.refunded',
+    data: {
+      object: {
+        id: 'ch_test_refund',
+        payment_intent: PAYMENT_INTENT_ID,
+        amount,
+        amount_refunded: amountRefunded,
+        currency: 'eur',
+        ...overrides
+      }
+    }
+  });
+
+  beforeEach(() => {
+    const commande = enBase();
+    commande.status = 'paid';
+    commande.payment_reference = PAYMENT_INTENT_ID;
+    commande.currency = 'EUR';
+    commande.metadata = { stripeCheckoutSessionId: SESSION_ID };
+    const emails = require('../services/email/transactionalEmails');
+    emails.envoyerAlerteAdmin.mockClear();
+  });
+
+  it('remboursement PARTIEL : statut enregistre en metadata, order.status JAMAIS touche', async () => {
+    const reponse = await envoyer(evenementRemboursement(9450, 3000));
+
+    expect(reponse.status).toBe(200);
+    expect(reponse.body.status).toBe('refund_recorded');
+
+    const commande = enBase();
+    expect(commande.status).toBe('paid'); // inchange, volontairement
+    expect(commande.metadata.refundStatus).toBe('partial');
+    expect(commande.metadata.refundedAmountCents).toBe(3000);
+    expect(commande.metadata.chargeAmountCents).toBe(9450);
+
+    const emails = require('../services/email/transactionalEmails');
+    expect(emails.envoyerAlerteAdmin).toHaveBeenCalledTimes(1);
+    const alerte = emails.envoyerAlerteAdmin.mock.calls[0][0];
+    expect(alerte.sujet).toMatch(/partiel/);
+    expect(alerte.details).toEqual(expect.arrayContaining([['Type', 'Remboursement partiel']]));
+  });
+
+  it('remboursement ENTIER (amount_refunded === amount) : statut "full"', async () => {
+    const reponse = await envoyer(evenementRemboursement(9450, 9450));
+
+    expect(reponse.status).toBe(200);
+    const commande = enBase();
+    expect(commande.status).toBe('paid');
+    expect(commande.metadata.refundStatus).toBe('full');
+
+    const emails = require('../services/email/transactionalEmails');
+    const alerte = emails.envoyerAlerteAdmin.mock.calls[0][0];
+    expect(alerte.sujet).toMatch(/total/);
+  });
+
+  it('un DEUXIEME remboursement partiel qui atteint le total fait passer partiel -> entier (recalcule sur le CUMUL, pas additionne)', async () => {
+    await envoyer(evenementRemboursement(9450, 3000));
+    expect(enBase().metadata.refundStatus).toBe('partial');
+
+    // Stripe envoie le CUMUL dans amount_refunded, pas seulement ce dernier
+    // remboursement.
+    await envoyer(evenementRemboursement(9450, 9450));
+    expect(enBase().metadata.refundStatus).toBe('full');
+  });
+
+  it('idempotent : le meme evenement Stripe envoye deux fois ne duplique rien et n\'alerte qu\'une fois', async () => {
+    const evenement = evenementRemboursement(9450, 3000);
+
+    await envoyer(evenement);
+    const emails = require('../services/email/transactionalEmails');
+    emails.envoyerAlerteAdmin.mockClear();
+
+    const reponse = await envoyer(evenement); // meme id d'evenement
+
+    expect(reponse.status).toBe(200);
+    expect(enBase().metadata.stripeRefundEventIds).toHaveLength(1);
+    expect(emails.envoyerAlerteAdmin).not.toHaveBeenCalled();
+  });
+
+  it('aucune commande associee (payment_intent inconnu) : ignore silencieusement, jamais d\'erreur', async () => {
+    const reponse = await envoyer(evenementRemboursement(9450, 3000, { payment_intent: 'pi_inconnu' }));
+
+    expect(reponse.status).toBe(200);
+    expect(enBase().metadata.refundStatus).toBeUndefined();
+  });
+});

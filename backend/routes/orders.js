@@ -1015,6 +1015,78 @@ const recordFailedCheckoutSession = async ({ db, session, eventType }) => {
   }
 };
 
+// Remboursement Stripe (retour utilisateur, 2026-10-05 : "je veux recuperer
+// son statut remboursement partiel/entier... sans impact sur la commande,
+// pas d'annulation ou autre") — PUREMENT INFORMATIF. Ne touche JAMAIS a
+// order.status : un remboursement n'implique pas forcement d'annuler
+// l'impression (qui a pu deja partir chez l'imprimeur) — cette decision
+// reste humaine, juste alertee ici, jamais automatisee.
+//
+// charge.refunded porte le montant CUMULE rembourse sur cette charge (pas
+// seulement ce dernier remboursement) : le statut est donc RECALCULE a
+// chaque evenement a partir de ce cumul plutot qu'additionne, pour rester
+// juste meme apres plusieurs remboursements partiels successifs (le
+// troisieme evenement peut faire passer partiel -> entier).
+const recordStripeRefund = async ({ db, charge, eventId }) => {
+  try {
+    if (!charge) return;
+    const paymentIntentId = cleanString(String(charge.payment_intent || ''), 120);
+    if (!paymentIntentId) return;
+
+    const { data: order, error } = await db
+      .from('orders')
+      .select('*')
+      .eq('payment_reference', paymentIntentId)
+      .maybeSingle();
+    if (error || !order) return; // Aucune commande associee (paiement hors Bookipix, etc.) : rien a faire.
+
+    // Idempotence : meme principe que stripeEventIds plus haut (webhook
+    // Stripe garanti "au moins une fois", jamais exactement une fois).
+    const refundEventIds = Array.isArray(order.metadata?.stripeRefundEventIds) ? order.metadata.stripeRefundEventIds : [];
+    const normalizedEventId = cleanString(String(eventId || ''), 180);
+    if (normalizedEventId && refundEventIds.includes(normalizedEventId)) return;
+
+    const amountTotal = Number(charge.amount) || 0;
+    const amountRefunded = Number(charge.amount_refunded) || 0;
+    if (amountRefunded <= 0) return; // Rien de reellement rembourse sur cet evenement : rien a signaler.
+    const refundStatus = amountRefunded >= amountTotal ? 'full' : 'partial';
+
+    const nowIso = getNowIso();
+    const nextMetadata = mergeMetadata(order.metadata, {
+      refundStatus,
+      refundedAmountCents: amountRefunded,
+      chargeAmountCents: amountTotal,
+      refundedAt: nowIso,
+      stripeRefundEventIds: normalizedEventId
+        ? [...refundEventIds, normalizedEventId].slice(-MAX_STRIPE_EVENT_IDS)
+        : refundEventIds
+    });
+
+    // order.status INCHANGE, volontairement (voir commentaire de tete) :
+    // seule metadata bouge.
+    await db.from('orders').update({ metadata: nextMetadata, updated_at: nowIso }).eq('id', order.id);
+
+    const devise = String(charge.currency || order.currency || '').toUpperCase();
+    await emails.envoyerAlerteAdmin({
+      sujet: `Remboursement Stripe (${refundStatus === 'full' ? 'total' : 'partiel'}) - commande ${order.order_number || order.id}`,
+      lignes: [
+        refundStatus === 'full'
+          ? 'Cette commande a ete integralement remboursee sur Stripe.'
+          : 'Cette commande a ete partiellement remboursee sur Stripe.',
+        "Le statut de la commande n'a PAS ete modifie automatiquement : c'est a vous de decider si l'impression doit etre annulee."
+      ],
+      details: [
+        ['Commande', order.order_number || order.id],
+        ['Type', refundStatus === 'full' ? 'Remboursement entier' : 'Remboursement partiel'],
+        ['Montant rembourse', `${(amountRefunded / 100).toFixed(2)} ${devise}`],
+        ['Montant total de la charge', `${(amountTotal / 100).toFixed(2)} ${devise}`]
+      ]
+    }).catch(() => {});
+  } catch (error) {
+    console.error('Erreur enregistrement remboursement Stripe:', error);
+  }
+};
+
 const handleStripeWebhook = async (req, res) => {
   try {
     const event = buildStripeWebhookEvent(req);
@@ -1052,6 +1124,17 @@ const handleStripeWebhook = async (req, res) => {
         eventType
       });
       return res.json({ received: true, status: 'payment_failure_recorded' });
+    }
+
+    // Remboursement (retour utilisateur, 2026-10-05) : voir recordStripeRefund
+    // ci-dessus — purement informatif, aucun impact sur order.status.
+    if (eventType === 'charge.refunded') {
+      await recordStripeRefund({
+        db: supabase,
+        charge: event?.data?.object,
+        eventId: event?.id
+      });
+      return res.json({ received: true, status: 'refund_recorded' });
     }
 
     const isCheckoutCompleted = (
