@@ -73,6 +73,27 @@
 }
 .atelier-test-banner-close:hover { color: #8b6a2f; }
 
+/* Bandeau "Livre verrouille" (retour utilisateur, 2026-10-05, sur une
+   commande reellement payee en production) : meme structure que le bandeau
+   "Mode test" ci-dessus, mais jamais les deux a la fois (mutuellement
+   exclusifs, voir book.bookEditBypassed dans BookAtelierLuxe.js) — ton
+   rouge discret (meme couleur que .atelier-save-status.is-error) plutot que
+   l'ambre du mode test : contrairement a lui, celui-ci signale un vrai
+   blocage, pas une simple information de developpement. */
+.atelier-locked-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-sm);
+  padding: 7px 14px;
+  border: 1px solid rgba(180, 35, 24, 0.28);
+  border-radius: 8px;
+  background: rgba(180, 35, 24, 0.07);
+  font-size: 12px;
+  color: #b42318;
+}
+.atelier-locked-banner b { font-weight: 700; }
+
 .atelier-back-link {
   color: var(--ink);
   opacity: 0.7;

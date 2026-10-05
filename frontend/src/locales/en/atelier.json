@@ -214,6 +214,10 @@
       "hide": "Hide",
       "hideAria": "Hide the test mode banner"
     },
+    "lockedBanner": {
+      "title": "Book locked",
+      "body": "an order has already been paid for this book: it can no longer be edited. Any changes you make will not be saved."
+    },
     "header": {
       "back": "Back",
       "untitledBook": "My book",

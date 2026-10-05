@@ -214,6 +214,10 @@
       "hide": "Masquer",
       "hideAria": "Masquer le bandeau mode test"
     },
+    "lockedBanner": {
+      "title": "Livre verrouillé",
+      "body": "une commande a déjà été payée pour ce livre : il ne peut plus être modifié. Vos éventuelles modifications ne seront pas enregistrées."
+    },
     "header": {
       "back": "Retour",
       "untitledBook": "Mon livre",

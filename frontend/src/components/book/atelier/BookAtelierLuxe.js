@@ -2250,6 +2250,17 @@ export default function BookAtelierLuxe() {
           </button>
         </div>
       )}
+      {/* Pendant qu'une commande reelle bloquait vraiment la sauvegarde
+          (423, verifie), rien ne le signalait a l'ecran : l'utilisateur
+          pouvait continuer a glisser des photos, taper du texte, sans
+          jamais savoir que rien n'etait enregistre (retour utilisateur,
+          2026-10-05 : "pourtant je peux modifier le livre" — vrai a
+          l'ecran, faux une fois la sauvegarde tentee). */}
+      {book.locked_at && !book.bookEditBypassed && (
+        <div className="atelier-locked-banner">
+          <span aria-hidden="true">🔒</span> <b>{t('main.lockedBanner.title')}</b> — {t('main.lockedBanner.body')}
+        </div>
+      )}
 
       <header className="atelier-header">
         <div className="atelier-header-top">
