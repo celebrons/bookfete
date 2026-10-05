@@ -2230,7 +2230,13 @@ export default function BookAtelierLuxe() {
           plutot que disperse sur plusieurs lignes/sections. Le mode
           automatique reste un lien texte, explique au survol seulement
           (§9 de la demande initiale). */}
-      {book.locked_at && showTestBanner && (
+      {/* book.locked_at seul ne suffit pas : un livre verrouille en
+          PRODUCTION reelle affichait quand meme "Mode test, modifiable
+          malgre le paiement" (retour utilisateur, 2026-10-05, sur une
+          commande reellement payee) alors que le serveur bloquait deja
+          toute modification (423). book.bookEditBypassed (routes/books.js)
+          reflete le VRAI etat : locked_at ET le bypass de mode test actif. */}
+      {book.bookEditBypassed && showTestBanner && (
         <div className="atelier-test-banner">
           <span aria-hidden="true">🔧</span> <b>{t('main.testBanner.title')}</b> — {t('main.testBanner.body')}
           <button

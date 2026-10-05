@@ -189,7 +189,15 @@ router.get('/:id', authenticate, async (req, res) => {
       throw error;
     }
 
-    res.json(data);
+    // Meme calcul que la route PUT plus bas : l'atelier (BookAtelierLuxe.js)
+    // s'en sert pour savoir si le bandeau "Mode test" doit s'afficher.
+    // AVANT ce correctif (retour utilisateur, 2026-10-05, sur un livre
+    // REELLEMENT paye en production), le bandeau se basait seulement sur
+    // `locked_at` — donc s'affichait aussi en PRODUCTION reelle, des qu'un
+    // livre etait verrouille, alors que la modification est bel et bien
+    // bloquee cote serveur (verifie : 423 sur ce meme livre). Le bandeau
+    // mentait, pas le verrou.
+    res.json({ ...data, bookEditBypassed: Boolean(data.locked_at) && isBookEditBypassActive() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
