@@ -979,6 +979,30 @@ describe('renderBookHtml — legende par photo (content.photoCaptions)', () => {
     expect(body).toContain('&lt;img onerror=x&gt; &amp; co');
     expect(body).not.toContain('<img onerror=x>');
   });
+
+  // Regression (retour utilisateur, 2026-10-05) : en mode "photo entiere"
+  // (fitMode: 'contain'), rien ne garantit une marge sous l'image — une
+  // photo dont le ratio est proche de celui du cadre peut remplir presque
+  // toute la hauteur, et la legende (toujours au bas du CADRE) retombe alors
+  // sur la photo elle-meme. Le fond "none" + texte encre + italique
+  // (essaye le 2026-09-13) y devenait illisible, faute de contraste.
+  it('en mode "photo entiere", la legende garde un fond LISIBLE (jamais transparent), qu elle retombe sur une marge ou sur la photo', () => {
+    const html = renderBookHtml({
+      book: {}, items, layouts,
+      pages: [pageAvec('FULL_PHOTO', ['photo-1'], { 'photo-1': 'Jean souffle ses bougies' })]
+    });
+    // Capture tout le bloc de regle (borne par la premiere accolade fermante
+    // rencontree) : une regex non ancree au bloc entier retomberait, en
+    // backtrackant, sur une AUTRE regle "font-style: italic" plus loin dans
+    // la feuille de style — un faux negatif deja constate en ecrivant ce test.
+    const regle = html.match(/\.photo-frame\.is-contain \.photo-caption,\s*\.photo-frame\.is-contain \.photo-caption\.is-blanc,\s*\.photo-frame\.is-contain \.photo-caption\.is-noir \{([^}]*)\}/);
+    expect(regle).toBeTruthy();
+    const bloc = regle[1];
+    expect(bloc).toContain('background: #fffdf8;');
+    expect(bloc).toContain('color: #241f18;');
+    expect(bloc).not.toContain('background: none');
+    expect(bloc).not.toContain('font-style: italic');
+  });
 });
 
 // Quelle version de chaque photo part dans le HTML ?
