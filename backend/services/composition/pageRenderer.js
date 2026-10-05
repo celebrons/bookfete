@@ -767,29 +767,16 @@ const BASE_CSS = `
     color: #241f18;
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
   }
-  /* En mode "photo entiere", l'image ne touche plus forcement les bords —
-     mais RIEN ne garantit une marge sous elle : une photo dont le ratio est
-     proche de celui du cadre peut remplir presque toute la hauteur, et la
-     legende (toujours posee au bas du CADRE, jamais de l'image) se
-     retrouve alors sur la photo elle-meme. Un degrade transparent (comme en
-     mode normal) y ferait une barre franche sur la marge blanche quand elle
-     existe ; AUCUN fond (essaye le 2026-09-13) devient illisible des que la
-     legende retombe sur la photo (retour utilisateur, 2026-10-05, photo
-     presque plein cadre en "photo entiere" : legende en italique sans
-     contraste, illisible).
-     Un bandeau PLEIN de la couleur du papier (#fffdf8) resout les deux cas
-     a la fois : fondu dans la marge quand elle existe, toujours lisible
-     (texte encre sur fond clair opaque) quand la legende retombe sur la
-     photo. Une seule variante (is-blanc/is-noir n'ont plus de sens ici :
-     le fond ne depend plus de la photo dessous). */
-  .photo-frame.is-contain .photo-caption,
-  .photo-frame.is-contain .photo-caption.is-blanc,
-  .photo-frame.is-contain .photo-caption.is-noir {
-    background: #fffdf8;
-    color: #241f18;
-    text-shadow: none;
-    font-style: normal;
-  }
+  /* Meme traitement qu'en mode normal, y compris en "photo entiere"
+     (retour utilisateur, 2026-10-05, apres deux essais rates : un essai
+     sans fond + italique rendait la legende illisible des qu'elle retombe
+     sur la photo ; un essai avec un bandeau plein couleur papier a ensuite
+     ete explicitement refuse — "pas sur une bandelette blanche", "comme sur
+     la premiere photo" — voulu directement pose sur la photo, degrade et
+     texte blanc/noir, jamais un bandeau separe). Le degrade reste
+     acceptable meme sur la marge blanche qui peut apparaitre en mode
+     "photo entiere" (fondu, jamais une barre franche) — aucune regle
+     speciale n'est donc plus necessaire ici. */
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .photo-solo { margin: 0; height: 100%; }
   /* Une photo sur DOUBLE PAGE (FULL_PHOTO_SPREAD).
