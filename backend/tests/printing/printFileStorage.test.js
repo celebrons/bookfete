@@ -101,6 +101,68 @@ describe('printFileStorage.uploadPrintFile — fichier au-dessus de la limite (c
     await fsp.unlink(filePath);
   });
 
+  // DEUXIEME commande reelle en echec, meme jour (2026-10-05) : la passe
+  // /printer a bien tourne (gs n'a pas echoue) mais n'a presque rien gagne
+  // (52 989 945 -> 52 922 806 octets, -0,13%) — /printer peut renoncer a
+  // reencoder une image deja JPEG qu'il juge "assez bonne". Une seule passe
+  // ne suffisait donc pas a garantir de repasser sous la limite.
+  it("quand /printer seul ne suffit pas, tente une passe plus agressive (reencodage JPEG force)", async () => {
+    const filePath = await writeTempFile(MAX_SAFE_PDF_BYTES + 1000);
+    const tailleParPasse = [MAX_SAFE_PDF_BYTES + 900, 1000]; // /printer : presque rien gagne ; passe suivante : suffit
+    let appel = 0;
+
+    mockExecFile.mockImplementation(async (bin, args) => {
+      const outputArg = args.find((a) => a.startsWith('-sOutputFile='));
+      const outputPath = outputArg.slice('-sOutputFile='.length);
+      await fsp.writeFile(outputPath, Buffer.alloc(tailleParPasse[appel], appel + 1));
+      appel += 1;
+      return {};
+    });
+
+    const url = await uploadPrintFile(filePath, 'orders/test-5/print-ready.pdf');
+
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+    // La 2e passe force un reencodage JPEG (AutoFilter desactive), la ou la
+    // 1ere se contente du preset /printer.
+    const deuxiemeAppel = mockExecFile.mock.calls[1];
+    expect(deuxiemeAppel[1]).toEqual(expect.arrayContaining([
+      '-dAutoFilterColorImages=false', '-dColorImageFilter=/DCTEncode', '-dJPEGQ=75'
+    ]));
+    expect(uploadCalls).toHaveLength(1);
+    expect(uploadCalls[0].size).toBe(1000); // le resultat de la 2e passe, pas la 1ere
+
+    await fsp.unlink(filePath);
+  });
+
+  // Cas extreme, jamais rencontre en conditions reelles a ce jour : meme la
+  // passe la plus agressive ne suffit pas. On part quand meme avec le
+  // MEILLEUR resultat obtenu (jamais l'original, toujours plus petit) —
+  // l'upload tranchera, avec un message d'erreur honnete sur la taille
+  // reellement atteinte si Supabase le refuse encore.
+  it("si AUCUNE passe ne suffit, uploade quand meme le meilleur resultat obtenu (jamais l'original)", async () => {
+    const filePath = await writeTempFile(MAX_SAFE_PDF_BYTES + 3000);
+    const tailleParPasse = [MAX_SAFE_PDF_BYTES + 2000, MAX_SAFE_PDF_BYTES + 1500, MAX_SAFE_PDF_BYTES + 500];
+    let appel = 0;
+
+    mockExecFile.mockImplementation(async (bin, args) => {
+      const outputArg = args.find((a) => a.startsWith('-sOutputFile='));
+      const outputPath = outputArg.slice('-sOutputFile='.length);
+      await fsp.writeFile(outputPath, Buffer.alloc(tailleParPasse[appel], appel + 1));
+      appel += 1;
+      return {};
+    });
+
+    const url = await uploadPrintFile(filePath, 'orders/test-6/print-ready.pdf');
+
+    expect(mockExecFile).toHaveBeenCalledTimes(3);
+    expect(uploadCalls).toHaveLength(1);
+    // Le plus petit des trois resultats (3e passe), jamais l'original.
+    expect(uploadCalls[0].size).toBe(MAX_SAFE_PDF_BYTES + 500);
+    expect(url).toContain('orders/test-6/print-ready.pdf');
+
+    await fsp.unlink(filePath);
+  });
+
   it("un echec de ghostscript n'empeche pas l'upload : retombe sur le fichier ORIGINAL", async () => {
     const filePath = await writeTempFile(MAX_SAFE_PDF_BYTES + 1000);
     mockExecFile.mockRejectedValue(new Error('gs: commande introuvable'));

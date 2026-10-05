@@ -67,44 +67,118 @@ const MAX_SAFE_PDF_BYTES = 45 * 1024 * 1024;
 //      conversion, celui-ci retrouve la compression tout en eliminant le
 //      profil fautif.
 //
-// Verifie en conditions reelles sur le PDF de la commande qui a echoue :
-// 62,7 Mo -> 47,4 Mo (-24%), memes dimensions de page (MediaBox
-// identique), jamais de perte de page, aucun profil ICC dans le resultat.
-// N'EST APPLIQUE QUE SI LE FICHIER DEPASSE MAX_SAFE_PDF_BYTES — la tres
-// grande majorite des livres continue de partir a l'imprimeur sans la
-// moindre recompression, couleurs d'origine (bogue Skia ou non) inchangees.
+// DEUXIEME commande reelle en echec, meme jour (2026-10-05) : l'etape
+// /printer seule a tourne (gs n'a pas echoue) mais n'a quasiment rien
+// gagne — 52 989 945 -> 52 922 806 octets (-0,13%). Cause : /printer laisse
+// `AutoFilterColorImages=true`, qui choisit de NE PAS reencoder une image
+// deja JPEG si Ghostscript la juge "assez bonne" — exactement le cas ici,
+// a l'inverse du tout premier fichier (2026-09-05, 62,7 Mo) dont les
+// photos, elles, avaient encore de la marge. Une seule passe ne suffit
+// donc pas a GARANTIR de repasser sous la limite : on essaie maintenant
+// plusieurs passes, de la moins agressive (qualite inchangee) a la plus
+// agressive (reencodage JPEG force, resolution et qualite reduites),
+// et on s'arrete des que l'une d'elles suffit.
+const COMPRESSION_LADDER = [
+  // Identique a l'unique passe d'avant : suffit pour l'ecrasante majorite
+  // des livres qui depassent MAX_SAFE_PDF_BYTES (teste en conditions
+  // reelles, -24% sur le tout premier cas).
+  { label: 'printer', args: ['-dPDFSETTINGS=/printer'] },
+  // Force un REENCODAGE JPEG explicite (AutoFilter desactive) a 200dpi/q75 :
+  // la ou /printer pouvait renoncer a toucher une image deja "assez bonne",
+  // ceci la reencode TOUJOURS, donc gagne reellement de la place meme sur
+  // des photos deja compressees cote client.
+  { label: '200dpi-q75', args: [
+    '-dPDFSETTINGS=/printer',
+    '-dDownsampleColorImages=true', '-dColorImageDownsampleType=/Bicubic', '-dColorImageResolution=200',
+    '-dDownsampleGrayImages=true', '-dGrayImageDownsampleType=/Bicubic', '-dGrayImageResolution=200',
+    '-dAutoFilterColorImages=false', '-dColorImageFilter=/DCTEncode',
+    '-dAutoFilterGrayImages=false', '-dGrayImageFilter=/DCTEncode',
+    '-dJPEGQ=75'
+  ] },
+  // Dernier recours, jamais rencontre a ce jour : 150dpi reste lisible a
+  // l'impression (un format livret/standard n'a pas besoin de 300dpi pour
+  // une photo pleine page), q60 degrade visiblement mais reste tres loin
+  // d'un artefact JPEG grossier.
+  { label: '150dpi-q60', args: [
+    '-dPDFSETTINGS=/printer',
+    '-dDownsampleColorImages=true', '-dColorImageDownsampleType=/Bicubic', '-dColorImageResolution=150',
+    '-dDownsampleGrayImages=true', '-dGrayImageDownsampleType=/Bicubic', '-dGrayImageResolution=150',
+    '-dAutoFilterColorImages=false', '-dColorImageFilter=/DCTEncode',
+    '-dAutoFilterGrayImages=false', '-dGrayImageFilter=/DCTEncode',
+    '-dJPEGQ=60'
+  ] }
+];
+
+// Arguments communs a CHAQUE passe, quelle que soit son agressivite :
+// -dColorConversionStrategy(ForImages)=/RGB est ce qui a corrige le bug
+// ICC du 2026-10-05 (voir historique ci-dessus) — jamais a retirer d'une
+// seule passe, sous peine de le reintroduire silencieusement.
+const GS_BASE_ARGS = [
+  '-sDEVICE=pdfwrite',
+  '-dCompatibilityLevel=1.4',
+  '-dColorConversionStrategy=/RGB',
+  '-dColorConversionStrategyForImages=/RGB',
+  '-dNOPAUSE', '-dQUIET', '-dBATCH',
+  '-dAutoRotatePages=/None'
+];
+
+async function runGhostscript(sourcePath, outputPath, extraArgs) {
+  await execFileAsync('gs', [
+    ...GS_BASE_ARGS,
+    ...extraArgs,
+    `-sOutputFile=${outputPath}`,
+    sourcePath
+  ], { timeout: 180000, maxBuffer: 10 * 1024 * 1024 });
+  return (await fsp.stat(outputPath)).size;
+}
+
+// Verifie en conditions reelles sur le PDF de la toute premiere commande
+// qui a echoue : 62,7 Mo -> 47,4 Mo (-24%), memes dimensions de page
+// (MediaBox identique), jamais de perte de page, aucun profil ICC dans le
+// resultat. N'EST APPLIQUE QUE SI LE FICHIER DEPASSE MAX_SAFE_PDF_BYTES —
+// la tres grande majorite des livres continue de partir a l'imprimeur sans
+// la moindre recompression, couleurs d'origine (bogue Skia ou non) inchangees.
 async function compressPdfIfTooLarge(localFilePath) {
   const { size } = await fsp.stat(localFilePath);
   if (size <= MAX_SAFE_PDF_BYTES) return { path: localFilePath, compressed: false };
 
-  const compressedPath = path.join(os.tmpdir(), `print-compressed-${uuidv4()}.pdf`);
-  try {
-    await execFileAsync('gs', [
-      '-sDEVICE=pdfwrite',
-      '-dCompatibilityLevel=1.4',
-      '-dPDFSETTINGS=/printer',
-      '-dColorConversionStrategy=/RGB',
-      '-dColorConversionStrategyForImages=/RGB',
-      '-dNOPAUSE', '-dQUIET', '-dBATCH',
-      '-dAutoRotatePages=/None',
-      `-sOutputFile=${compressedPath}`,
-      localFilePath
-    ], { timeout: 180000, maxBuffer: 10 * 1024 * 1024 });
+  let meilleurChemin = null;
+  let meilleureTaille = Infinity;
+  const nettoyerIntermediaire = async (chemin) => {
+    if (chemin && chemin !== meilleurChemin) await fsp.unlink(chemin).catch(() => {});
+  };
 
-    const { size: compressedSize } = await fsp.stat(compressedPath);
-    console.warn('[compressPdfIfTooLarge] fichier trop volumineux, compresse', {
-      localFilePath, sizeAvant: size, sizeApres: compressedSize
-    });
-    // La compression peut echouer a suffire sur un cas extreme : on renvoie
-    // alors quand meme le fichier compresse (toujours mieux que l'original)
-    // — l'upload lui-meme tranchera, avec un message d'erreur desormais
-    // honnete sur la taille reellement atteinte.
-    return { path: compressedPath, compressed: true, cleanup: () => fsp.unlink(compressedPath).catch(() => {}) };
-  } catch (error) {
-    console.error('[compressPdfIfTooLarge] echec de la compression, tentative avec le fichier original', error.message);
-    await fsp.unlink(compressedPath).catch(() => {});
+  for (const etape of COMPRESSION_LADDER) {
+    const essaiPath = path.join(os.tmpdir(), `print-compressed-${etape.label}-${uuidv4()}.pdf`);
+    try {
+      const tailleObtenue = await runGhostscript(localFilePath, essaiPath, etape.args);
+      console.warn('[compressPdfIfTooLarge] passe ' + etape.label, {
+        localFilePath, sizeAvant: size, sizeApres: tailleObtenue
+      });
+      if (tailleObtenue < meilleureTaille) {
+        await nettoyerIntermediaire(meilleurChemin);
+        meilleurChemin = essaiPath;
+        meilleureTaille = tailleObtenue;
+      } else {
+        await fsp.unlink(essaiPath).catch(() => {});
+      }
+      if (meilleureTaille <= MAX_SAFE_PDF_BYTES) break;
+    } catch (error) {
+      console.error('[compressPdfIfTooLarge] passe ' + etape.label + ' en echec, tentative suivante', error.message);
+      await fsp.unlink(essaiPath).catch(() => {});
+    }
+  }
+
+  if (!meilleurChemin) {
+    // Les TROIS passes ont echoue a s'executer (gs manquant/casse) : seul
+    // cas ou l'on retombe sur l'original, comme avant.
     return { path: localFilePath, compressed: false };
   }
+  // Meme la plus agressive des trois passes peut, en theorie, ne pas
+  // suffire : on renvoie alors quand meme le meilleur resultat obtenu
+  // (toujours mieux que l'original) — l'upload lui-meme tranchera, avec un
+  // message d'erreur desormais honnete sur la taille reellement atteinte.
+  return { path: meilleurChemin, compressed: true, cleanup: () => fsp.unlink(meilleurChemin).catch(() => {}) };
 }
 
 // uploadPath : chemin RELATIF dans le bucket (ex. "orders/<orderId>/interior.pdf")
