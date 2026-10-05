@@ -16,7 +16,7 @@ const {
   resolveCurrencyForCountry, convertEurCentsTo
 } = require('../services/pricing/pricingConfig');
 const { resolveCountry } = require('../services/pricing/resolveCountry');
-const { resolveCountryIso2 } = require('../services/printing/countryCodes');
+const { resolveCountryIso2, exigeUnEtat } = require('../services/printing/countryCodes');
 
 // Envois a l'imprimeur EN COURS, par commande.
 //
@@ -260,6 +260,12 @@ const sanitizeAddress = (rawAddress) => {
     postalCode: cleanString(address.postalCode, 24),
     city: cleanString(address.city, 120),
     country: cleanString(address.country, 120) || 'France',
+    // Etat/province (2026-10-05, apres une premiere vraie commande vers le
+    // Canada rejetee par Gelato, "Field is required") : 35 caracteres,
+    // meme borne que le champ `state` de l'API Gelato (voir
+    // gelatoOrderService.js/mapShippingAddress) — jamais verifie au-dela,
+    // ce module reste un simple nettoyage de saisie libre.
+    state: cleanString(address.state, 35),
     phone: cleanString(address.phone, 40),
     // EMAIL PORTE PAR LA COMMANDE, et pas seulement par le compte.
     //
@@ -278,8 +284,13 @@ const sanitizeAddress = (rawAddress) => {
   };
 };
 
+// L'Etat/la Province n'est exige QUE pour les pays ou Gelato le demande
+// reellement (US/CA/AU, voir countryCodes.js) — ailleurs, le champ reste
+// facultatif comme avant (la tres grande majorite des commandes, Europe
+// francophone en tete, n'en a jamais eu besoin).
 const isAddressValid = (address) => (
   Boolean(address?.fullName && address?.line1 && address?.postalCode && address?.city && address?.country)
+  && (!exigeUnEtat(address?.country) || Boolean(address?.state))
 );
 
 // Grille tarifaire : voir services/pricing/pricingConfig.js (source unique,

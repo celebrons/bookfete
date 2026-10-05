@@ -156,6 +156,7 @@
       "line2": "Additional info",
       "postalCode": "Postal code",
       "city": "City",
+      "state": "State / Province",
       "country": "Country",
       "phone": "Phone"
     },

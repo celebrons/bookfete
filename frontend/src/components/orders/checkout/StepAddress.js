@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import AddressAutocomplete from '../../common/AddressAutocomplete';
+import { requiresStateField } from '../../../utils/countryCodes';
 
 // Ecran 2 : adresse de livraison pour un livre imprime, ou facturation
 // seule pour une commande PDF (prop `billingOnly`, voir BookCheckoutLuxe.js:
@@ -29,12 +30,18 @@ const FIELDS = [
   { name: 'line2' },
   { name: 'postalCode', autocomplete: true },
   { name: 'city' },
+  // state : AVANT country, pas apres — vient d'etre saisi/choisi juste au
+  // moment ou son pays le rend pertinent (voir plus bas, affiche seulement
+  // pour US/CA/AU).
+  { name: 'state' },
   { name: 'country' },
   { name: 'phone' }
 ];
 
 // Facturation : sous-ensemble de FIELDS — ni email ni telephone, deja portes
-// par l'adresse de livraison et sans rapport avec une facture.
+// par l'adresse de livraison et sans rapport avec une facture. Pas de
+// `state` non plus : la facturation n'est jamais envoyee a Gelato (voir
+// gelatoOrderService.js), seul le champ "livraison" en a besoin.
 const BILLING_FIELDS = [
   { name: 'fullName' },
   { name: 'line1', autocomplete: true },
@@ -44,10 +51,11 @@ const BILLING_FIELDS = [
   { name: 'country' }
 ];
 
-// Les SEULS champs realement obligatoires (meme liste que addressComplete/
+// Les champs TOUJOURS obligatoires (meme liste que addressComplete/
 // billingComplete dans BookCheckoutLuxe.js, et que isAddressValid cote
 // serveur) — email/telephone/complement restent facultatifs partout, jamais
-// marques en erreur meme vides.
+// marques en erreur meme vides. `state` n'y figure pas : il est obligatoire
+// seulement pour certains pays (voir requiresStateField plus bas).
 const CHAMPS_OBLIGATOIRES = new Set(['fullName', 'line1', 'postalCode', 'city', 'country']);
 
 // Partage entre l'adresse de livraison, le bloc facturation conditionnel et
@@ -61,9 +69,18 @@ const CHAMPS_OBLIGATOIRES = new Set(['fullName', 'line1', 'postalCode', 'city', 
 // declenche `showErrors` pour entourer en rouge chaque champ obligatoire
 // encore vide. Jamais affiche avant une premiere tentative : un formulaire
 // vierge n'a pas besoin de s'annoncer en erreur.
+//
+// `state` (2026-10-05) : n'est ni affiche ni obligatoire pour la tres
+// grande majorite des pays (jamais demande en France/Europe) — seulement
+// pour US/CA/AU, ou Gelato le rejette sans lui (premiere vraie commande
+// vers le Canada perdue pour cette raison). Filtre ici, avant le rendu,
+// plutot qu'un champ toujours visible qui serait vide et confus ailleurs.
 function renderFields(fields, values, onChange, locked, t, showErrors) {
-  return fields.map((field) => {
-    const manquant = showErrors && CHAMPS_OBLIGATOIRES.has(field.name) && !String(values[field.name] || '').trim();
+  const etatRequis = requiresStateField(values.country);
+  const champsAffiches = fields.filter((field) => field.name !== 'state' || etatRequis);
+  return champsAffiches.map((field) => {
+    const estObligatoire = CHAMPS_OBLIGATOIRES.has(field.name) || (field.name === 'state' && etatRequis);
+    const manquant = showErrors && estObligatoire && !String(values[field.name] || '').trim();
     const className = `input-luxe${manquant ? ' input-error' : ''}`;
     return field.autocomplete ? (
       <AddressAutocomplete

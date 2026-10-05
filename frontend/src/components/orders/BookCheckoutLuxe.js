@@ -20,6 +20,7 @@ import { isCurrentlyAnonymous } from '../../services/anonymousSession';
 // suivi les blocs d'affichage dans checkout/ (StepProduct, StepPayment,
 // StepTracking), qui sont desormais seuls responsables du rendu.
 import { includesPdf, includesPrint, isOrderPaid, isPdfReady, pdfJobIdOf } from '../../utils/orderWorkflow';
+import { requiresStateField } from '../../utils/countryCodes';
 import {
   getBookLifecycleStatusFromBook,
   isBookLifecycleAtLeast
@@ -342,9 +343,13 @@ const BookCheckoutLuxe = () => {
     return list;
   }, [effectiveOrderType]);
 
+  // state (2026-10-05) : obligatoire seulement pour US/CA/AU (voir
+  // countryCodes.js/StepAddress.js) — premiere vraie commande vers le
+  // Canada rejetee par Gelato ("Field is required") faute de ce champ.
   const addressComplete = useMemo(() => (
     ['fullName', 'line1', 'postalCode', 'city', 'country']
       .every((field) => String(address?.[field] || '').trim().length > 0)
+    && (!requiresStateField(address?.country) || String(address?.state || '').trim().length > 0)
   ), [address]);
 
   // Meme exigence que l'adresse de livraison. Pour l'impression, seulement

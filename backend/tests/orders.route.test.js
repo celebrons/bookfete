@@ -764,7 +764,7 @@ describe('POST /api/orders — international', () => {
         quantity: 1,
         shippingAddress: {
           email: 'client@test.local', fullName: 'Jean Client', line1: '1 rue Sainte-Catherine',
-          postalCode: 'H3B 1A1', city: 'Montreal', country: 'Canada'
+          postalCode: 'H3B 1A1', city: 'Montreal', country: 'Canada', state: 'QC'
         },
         cgvAccepted: true
       });
@@ -809,6 +809,91 @@ describe('POST /api/orders — international', () => {
     expect(response.status).toBe(201);
     expect(response.body.currency).toBe('EUR');
     expect(response.body.unit_cents).toBe(799);
+  });
+});
+
+// Etat/Province (2026-10-05) : premiere vraie commande vers le Canada
+// rejetee par Gelato ("Field is required") — le formulaire ne demandait
+// jamais ce champ, donc rien ne pouvait le detecter avant le paiement.
+describe('POST /api/orders — Etat/Province (US/CA/AU)', () => {
+  let app;
+  const FINALIZED_BOOK_ID = 'order-book-finalise';
+
+  beforeAll(() => {
+    app = buildApp();
+  });
+
+  it('refuse une livraison au Canada SANS Etat/Province (ce qui a fait echouer la premiere vraie commande)', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        bookId: FINALIZED_BOOK_ID,
+        type: 'print',
+        quantity: 1,
+        shippingAddress: {
+          email: 'client@test.local', fullName: 'Jean Client', line1: '1 rue Sainte-Catherine',
+          postalCode: 'H3B 1A1', city: 'Montreal', country: 'Canada'
+        },
+        cgvAccepted: true
+      });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('accepte et conserve l Etat/Province quand il est fourni (Canada)', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        bookId: FINALIZED_BOOK_ID,
+        type: 'print',
+        quantity: 1,
+        shippingAddress: {
+          email: 'client@test.local', fullName: 'Jean Client', line1: '1 rue Sainte-Catherine',
+          postalCode: 'H3B 1A1', city: 'Montreal', country: 'Canada', state: 'QC'
+        },
+        cgvAccepted: true
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.shipping_address.state).toBe('QC');
+  });
+
+  it('une livraison en France SANS Etat/Province reste acceptee (jamais exige hors US/CA/AU)', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        bookId: FINALIZED_BOOK_ID,
+        type: 'print',
+        quantity: 1,
+        shippingAddress: {
+          email: 'client@test.local', fullName: 'Jean Client', line1: '10 rue de la Paix',
+          postalCode: '75002', city: 'Paris', country: 'France'
+        },
+        cgvAccepted: true
+      });
+
+    expect(response.status).toBe(201);
+  });
+
+  it('refuse une livraison aux Etats-Unis sans Etat', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        bookId: FINALIZED_BOOK_ID,
+        type: 'print',
+        quantity: 1,
+        shippingAddress: {
+          email: 'client@test.local', fullName: 'Jean Client', line1: '1 Main Street',
+          postalCode: '10001', city: 'New York', country: 'United States'
+        },
+        cgvAccepted: true
+      });
+
+    expect(response.status).toBe(400);
   });
 });
 

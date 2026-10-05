@@ -75,6 +75,12 @@ function mapShippingAddress(address, ownerEmail) {
     addressLine2: address?.line2 || undefined,
     city: address?.city || '',
     postCode: address?.postalCode || '',
+    // Exige par Gelato pour US/CA/AU (verifie aupres de leur documentation,
+    // 2026-10-05) — sanitizeAddress (routes/orders.js) le rend obligatoire
+    // a la saisie pour ces memes pays, donc toujours present ici quand il
+    // compte vraiment ; undefined ailleurs, jamais une chaine vide envoyee
+    // a l'API pour un pays qui n'en a pas besoin.
+    state: address?.state || undefined,
     country: resolveCountryIso2(address?.country),
     email: ownerEmail || undefined,
     phone: address?.phone || undefined

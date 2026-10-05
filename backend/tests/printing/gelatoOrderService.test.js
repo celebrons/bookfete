@@ -248,5 +248,18 @@ describe('gelatoOrderService', () => {
       expect(mapped.firstName).toBeTruthy();
       expect(mapped.lastName).toBeTruthy();
     });
+
+    // Premiere vraie commande vers le Canada (2026-10-05) rejetee par
+    // Gelato ("Field is required") : ce champ manquait completement ici.
+    it('transmet state quand il est fourni (Canada/US/Australie)', () => {
+      const mapped = mapShippingAddress({ ...baseOrder.shipping_address, country: 'Canada', state: 'QC' }, 'marie@test.local');
+      expect(mapped.state).toBe('QC');
+      expect(mapped.country).toBe('CA');
+    });
+
+    it('state reste absent (jamais une chaine vide) quand il n est pas fourni', () => {
+      const mapped = mapShippingAddress(baseOrder.shipping_address, 'marie@test.local');
+      expect(mapped.state).toBeUndefined();
+    });
   });
 });

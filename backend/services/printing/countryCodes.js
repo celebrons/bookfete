@@ -43,7 +43,9 @@ const COUNTRY_NAME_TO_ISO2 = {
   tunisie: 'TN',
   tunisia: 'TN',
   algerie: 'DZ',
-  algeria: 'DZ'
+  algeria: 'DZ',
+  australie: 'AU',
+  australia: 'AU'
 };
 
 const DEFAULT_ISO2 = 'FR';
@@ -67,4 +69,15 @@ function resolveCountryIso2(rawValue) {
   return COUNTRY_NAME_TO_ISO2[key] || DEFAULT_ISO2;
 }
 
-module.exports = { resolveCountryIso2, DEFAULT_ISO2 };
+// Premiere commande reelle vers le Canada (2026-10-05) : rejetee par Gelato
+// ("Field is required"), decouvert APRES paiement — le formulaire de
+// livraison ne demandait jamais l'Etat/la Province. Verifie aupres de
+// Gelato (support.gelato.com) : le champ `state` de shippingAddress est
+// EXIGE (pas juste accepte) pour ces 3 pays precis, jamais pour les autres.
+const PAYS_EXIGEANT_UN_ETAT = new Set(['US', 'CA', 'AU']);
+
+function exigeUnEtat(rawCountryValue) {
+  return PAYS_EXIGEANT_UN_ETAT.has(resolveCountryIso2(rawCountryValue));
+}
+
+module.exports = { resolveCountryIso2, DEFAULT_ISO2, exigeUnEtat, PAYS_EXIGEANT_UN_ETAT };
