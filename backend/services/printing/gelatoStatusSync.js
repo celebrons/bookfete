@@ -78,6 +78,19 @@ async function refreshGelatoTracking(order, { consulteePar } = {}) {
     gelatoOrder = await gelatoClient.getOrder(gelatoOrderId);
   } catch (error) {
     if (error.status === 404) {
+      // UN BROUILLON (gelatoOrderType !== 'order') n'est jamais une vraie
+      // commande d'impression engagee — Gelato peut le nettoyer de son
+      // tableau de bord a tout moment (normal en mode pre-lancement,
+      // GELATO_LIVE_ORDERS non active). Son 404 ne dit RIEN sur la commande
+      // Bookipix elle-meme, qui elle a bien ete payee : avant ce correctif,
+      // un brouillon nettoye annulait a tort la commande du client (constate
+      // le 2026-10-03 ET le 2026-10-05 sur deux commandes reelles du meme
+      // client, CMD-260927 et CMD-260930). Seule une commande REELLEMENT
+      // soumise (gelatoOrderType === 'order') doit encore etre consideree
+      // annulee si Gelato ne la retrouve plus.
+      if (order.metadata?.gelatoOrderType !== 'order') {
+        return { ...localState, source: 'local', stale: false };
+      }
       supprimeeChezGelato = true;
     } else {
       console.error('Suivi Gelato indisponible pour la commande', order.id, ':', error.message);

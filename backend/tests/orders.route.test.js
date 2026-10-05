@@ -48,7 +48,13 @@ jest.mock('../config/supabase', () => {
           order_number: 'CMD-TEST-PRINT',
           type: 'print',
           status: 'shipped',
-          metadata: { gelatoOrderId: 'gelato-abc' },
+          // gelatoOrderType: 'order' (2026-10-05) : une commande deja
+          // EXPEDIEE a forcement ete REELLEMENT soumise a Gelato (un
+          // brouillon ne peut jamais atteindre ce statut) — voir
+          // gelatoStatusSync.js, qui ne traite plus un 404 comme une
+          // annulation que pour ce cas precis (un brouillon nettoye par
+          // Gelato, lui, est ephemere par nature et ne doit RIEN annuler).
+          metadata: { gelatoOrderId: 'gelato-abc', gelatoOrderType: 'order' },
           updated_at: '2026-09-11T10:00:00.000Z'
         },
         { id: 'order-autre', owner_id: 'someone-else', book_id: 'order-book-2', type: 'print', status: 'paid', metadata: {} },

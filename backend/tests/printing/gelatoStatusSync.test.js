@@ -100,6 +100,23 @@ describe('gelatoStatusSync.refreshGelatoTracking', () => {
     }));
   });
 
+  // Regression (2026-10-05) : un BROUILLON Gelato (jamais une vraie
+  // commande d'impression engagee) nettoye par Gelato annulait a tort la
+  // commande Bookipix deja payee du client — constate sur deux commandes
+  // reelles du meme client. Un brouillon est ephemere par nature ; seule une
+  // commande REELLEMENT soumise doit encore etre consideree annulee sur 404.
+  it("un brouillon Gelato supprime (404) ne touche JAMAIS a la commande (ephemere par nature, pas une vraie annulation)", async () => {
+    gelatoClient.getOrder.mockRejectedValue({ status: 404, message: 'not found' });
+    const commandeBrouillon = { ...ORDRE_BASE, metadata: { gelatoOrderId: 'gelato-1', gelatoOrderType: 'draft' } };
+
+    const resultat = await refreshGelatoTracking(commandeBrouillon);
+
+    expect(resultat.status).toBe('sent_to_printer'); // inchange
+    expect(resultat.source).toBe('local');
+    expect(logEvent).not.toHaveBeenCalled();
+    expect(emails.envoyerEtapeFabrication).not.toHaveBeenCalled();
+  });
+
   it('un livre deja livre ne redevient jamais "annule" sur un 404 tardif (etat definitif)', async () => {
     gelatoClient.getOrder.mockRejectedValue({ status: 404, message: 'not found' });
     const resultat = await refreshGelatoTracking({ ...ORDRE_BASE, status: 'delivered' });
