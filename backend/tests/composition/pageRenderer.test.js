@@ -980,23 +980,61 @@ describe('renderBookHtml — legende par photo (content.photoCaptions)', () => {
     expect(body).not.toContain('<img onerror=x>');
   });
 
-  // Regression (retour utilisateur, 2026-10-05, deux essais rates avant
-  // celui-ci) : en mode "photo entiere" (fitMode: 'contain'), la legende
-  // doit avoir EXACTEMENT le meme traitement qu'en mode normal — degrade +
-  // texte blanc/noir pose directement sur la photo. Un premier essai (fond
-  // "none" + texte encre + italique) etait illisible des que la legende
-  // retombe sur la photo (rien ne garantit une marge en dessous) ; un
-  // second essai (bandeau plein couleur papier) a ete explicitement refuse
-  // ("pas sur une bandelette blanche", "comme sur la premiere photo").
-  it('en mode "photo entiere", la legende a EXACTEMENT le meme style qu en mode normal (aucune regle .is-contain specifique)', () => {
+  // Regression (retour utilisateur, 2026-10-05, troisieme et dernier essai) :
+  // la legende doit avoir EXACTEMENT le meme traitement en mode normal et en
+  // "photo entiere" — aucune regle .is-contain specifique. Deux essais
+  // precedents rejetes : fond "none" + texte encre + italique (illisible des
+  // que la legende retombe sur la photo, rien ne garantit une marge en
+  // dessous) ; puis un bandeau plein couleur papier ("pas sur une
+  // bandelette blanche"). Troisieme demande, finale : AUCUN effet/bandeau du
+  // tout (ni degrade ni fond plein) — juste le texte, blanc ou noir, au
+  // choix, pose directement sur la photo.
+  it('en mode "photo entiere" comme en mode normal : la legende est juste du texte colore, sans aucun fond/degrade', () => {
     const html = renderBookHtml({
       book: {}, items, layouts,
       pages: [pageAvec('FULL_PHOTO', ['photo-1'], { 'photo-1': 'Jean souffle ses bougies' })]
     });
     expect(html).not.toMatch(/\.photo-frame\.is-contain \.photo-caption/);
-    // Les regles is-blanc/is-noir normales restent, elles, bien presentes et
-    // inchangees — c'est elles qui s'appliquent desormais dans tous les cas.
-    expect(html).toMatch(/\.photo-frame \.photo-caption\.is-blanc \{[^}]*linear-gradient\(to top, rgba\(0, 0, 0, 0\.55\)/);
+    const blanc = html.match(/\.photo-frame \.photo-caption\.is-blanc \{([^}]*)\}/);
+    const noir = html.match(/\.photo-frame \.photo-caption\.is-noir \{([^}]*)\}/);
+    expect(blanc).toBeTruthy();
+    expect(noir).toBeTruthy();
+    expect(blanc[1]).toContain('color: #fff;');
+    expect(noir[1]).toContain('color: #241f18;');
+    [blanc[1], noir[1]].forEach((bloc) => {
+      expect(bloc).not.toContain('background');
+      expect(bloc).not.toContain('font-style: italic');
+    });
+  });
+
+  // Regression (retour utilisateur, 2026-10-05) : "il faudra poser la
+  // legende sur le bas gauche de la photo quel que soit le choix" — en mode
+  // "photo entiere", le cadre doit prendre la forme EXACTE de la photo
+  // (via --photo-ratio, meme mecanisme deja verifie pour les grilles) pour
+  // que la legende (toujours posee au bas du cadre) tombe bien sur la photo
+  // elle-meme, pas sur un cadre plus grand qu'elle.
+  it('en mode "photo entiere" (photo seule), le ratio reel de la photo est transmis au cadre pour qu il prenne sa forme exacte', () => {
+    const html = renderBookHtml({
+      book: {},
+      items: [{ id: 'photo-1', kind: 'photo', url: 'https://cdn.test/1.jpg', metadata: { ratio: 1.5 } }],
+      layouts,
+      pages: [{
+        page_index: 0,
+        content: {
+          kind: 'photo',
+          blocks: [{ kind: 'photo', itemIds: ['photo-1'], layoutId: 'l1' }],
+          photoAdjustments: { 'photo-1': { fitMode: 'contain' } },
+          photoCaptions: { 'photo-1': 'Legende' }
+        }
+      }]
+    });
+    expect(html).toContain('<span class="photo-frame is-contain" style="--photo-ratio:1.5;');
+    expect(html).toMatch(/\.photo-solo \.photo-frame\.is-contain \{[^}]*aspect-ratio: var\(--photo-ratio, auto\)/);
+    // Garde-fou grid-blowout (verifie a la main par mesure Puppeteer reelle
+    // qu'aucune photo, meme etroite/tres haute, ne pousse le cadre a
+    // deborder de la page) : la rangee implicite de .photo-solo ne doit
+    // jamais pouvoir grandir au-dela de l'espace reellement disponible.
+    expect(html).toMatch(/\.photo-solo \{[^}]*grid-template-rows: minmax\(0, 1fr\)/);
   });
 });
 

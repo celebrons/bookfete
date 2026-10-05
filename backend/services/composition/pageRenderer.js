@@ -292,11 +292,18 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsBy
 
     const inset = slug === 'photo-avec-marge' || (slug === 'FULL_PHOTO' && presentationVariant === 1);
     const cls = inset ? 'block-photo photo-solo photo-inset' : 'block-photo photo-solo';
-    return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id])}</figure>`;
+    // Le ratio reel (item.metadata?.ratio) est transmis ici aussi depuis le
+    // 2026-10-05 : en mode "photo entiere", c'est lui qui permet au cadre de
+    // prendre la forme exacte de la photo (voir .photo-solo .photo-frame.is-contain)
+    // — necessaire pour que la legende se pose sur le bas-gauche de la PHOTO,
+    // pas du cadre entier quand celui-ci est plus grand qu'elle.
+    return `<figure class="${cls}" data-layout="${escapeHtml(slug || '')}">${imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id], item.metadata?.ratio)}</figure>`;
   }
-  // Le ratio reel de la photo n'est transmis QUE dans une grille : c'est la
-  // seule situation ou deux photos voisines doivent aligner leurs bords
-  // exterieurs (voir `.photo-grid .photo-frame.is-contain`).
+  // Le ratio reel de la photo est transmis a chaque cellule : dans une
+  // grille, c'est ce qui permet a deux photos voisines d'aligner leurs
+  // bords exterieurs (voir `.photo-grid .photo-frame.is-contain`) ; seule
+  // une photo, c'est le meme mecanisme qui cale la legende sur la photo
+  // elle-meme plutot que sur un cadre plus grand qu'elle.
   const cells = orderedItems.map((item) => (item ? imgFrame(item.url, adjustmentsByItemId[item.id], captionsByItemId[item.id], item.metadata?.ratio) : '<span class="photo-frame" aria-hidden="true"></span>'));
   // "duo-v" = les deux photos EMPILEES (une colonne, deux rangees), donc deux
   // cadres larges et bas. Piege de vocabulaire a garder en tete : l'empilement
@@ -752,33 +759,67 @@ const BASE_CSS = `
     line-height: 1.3;
     letter-spacing: 0.01em;
   }
-  /* Deux couleurs, et le VOILE SUIT LE TEXTE. C'est lui qui fait la
-     lisibilite, pas la couleur seule : un texte blanc sur une photo
-     surexposee disparait sans voile sombre, et un texte noir sur une photo
-     sombre disparait sans voile clair. Les deux sont indissociables — d'ou
-     un degrade par couleur, jamais une simple bascule de color. */
+  /* Deux couleurs, texte SEUL — aucun degrade/bandeau derriere (retour
+     utilisateur, 2026-10-05 : "il ne faut pas rajouter d'effet sur la photo
+     (bande grise ou blanche), je veux juste choisir blanc sur fond noir ou
+     noir sur fond blanc" — "fond" designe ici la photo elle-meme au point ou
+     se pose la legende, pas un bandeau ajoute : a l'utilisateur de choisir
+     la couleur de texte qui se voit a cet endroit precis de SA photo).
+     Un text-shadow leger reste seul garant de lisibilite — ce n'est pas une
+     "bande", juste un contour discret autour des lettres. */
   .photo-frame .photo-caption.is-blanc {
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
     color: #fff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
   }
   .photo-frame .photo-caption.is-noir {
-    background: linear-gradient(to top, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0));
     color: #241f18;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.75);
   }
-  /* Meme traitement qu'en mode normal, y compris en "photo entiere"
-     (retour utilisateur, 2026-10-05, apres deux essais rates : un essai
-     sans fond + italique rendait la legende illisible des qu'elle retombe
-     sur la photo ; un essai avec un bandeau plein couleur papier a ensuite
-     ete explicitement refuse — "pas sur une bandelette blanche", "comme sur
-     la premiere photo" — voulu directement pose sur la photo, degrade et
-     texte blanc/noir, jamais un bandeau separe). Le degrade reste
-     acceptable meme sur la marge blanche qui peut apparaitre en mode
-     "photo entiere" (fondu, jamais une barre franche) — aucune regle
-     speciale n'est donc plus necessaire ici. */
+  /* Meme traitement qu'en mode normal, y compris en "photo entiere" —
+     aucune regle .is-contain specifique pour la legende (retour
+     utilisateur, 2026-10-05, apres trois essais) : (1) fond "none" + texte
+     encre + italique, illisible des que la legende retombe sur la photo ;
+     (2) bandeau plein couleur papier, explicitement refuse ("pas sur une
+     bandelette blanche") ; (3) degrade translucide (comme en mode normal),
+     refuse a son tour ("il ne faut pas rajouter d'effet... bande grise ou
+     blanche"). Design final : juste le texte (blanc ou noir, choisi par
+     l'utilisateur), sans aucun fond — voir .photo-caption.is-blanc/is-noir
+     plus haut. Le positionnement, lui, se regle juste en dessous
+     (.photo-solo .photo-frame.is-contain) : le cadre prend la forme de la
+     photo pour que cette legende tombe sur son bas-gauche a elle, pas sur
+     un cadre plus grand qu'elle. */
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .photo-solo { margin: 0; height: 100%; }
+  /* display:grid (pas flex) : c'est ce qui permet a .photo-frame.is-contain
+     ci-dessous de prendre la forme reelle de la photo plutot que de rester
+     en boite dans un cadre plein format — voir le meme mecanisme deja en
+     place pour .photo-grid .photo-frame.is-contain, ici etendu a une photo
+     seule (retour utilisateur, 2026-10-05 : la legende doit se poser sur le
+     bas-gauche de la PHOTO, pas du cadre entier). Sans effet sur le mode
+     normal (cover) : le cadre y garde width/height:100% (non modifie),
+     identique a avant. */
+  /* grid-template-rows: minmax(0, 1fr), pas "auto" (par defaut) : empeche
+     par precaution la rangee implicite de grandir au-dela de l'espace
+     reellement disponible si jamais aspect-ratio demandait au cadre plus de
+     hauteur qu'il n'en a — meme garde-fou que min-height:0 sur .block-photo
+     en flexbox juste au-dessus (meme piege connu, deux mecanismes de mise
+     en page differents). */
+  .photo-solo { margin: 0; height: 100%; display: grid; grid-template-rows: minmax(0, 1fr); }
+  /* max-height:100% protege le cas d'une photo si "haute" (etroite) qu'elle
+     ne tient pas a pleine largeur : aspect-ratio demanderait alors une
+     hauteur superieure a l'espace disponible, elle est donc plafonnee et le
+     cadre retombe en boite plein format (comme avant ce correctif) — meme
+     limite deja acceptee pour .photo-grid .photo-frame.is-contain
+     ci-dessous. Verifie empiriquement (Puppeteer, mesure des rectangles
+     reels) : fonctionne exactement comme voulu pour une photo plus LARGE
+     que haute (cas rapporte par l'utilisateur, legende bien au bas-gauche
+     de la photo) ; retombe en boite pour une photo etroite/tres haute, sans
+     jamais deborder de la page. */
+  .photo-solo .photo-frame.is-contain {
+    height: auto;
+    max-height: 100%;
+    aspect-ratio: var(--photo-ratio, auto);
+    align-self: center;
+  }
   /* Une photo sur DOUBLE PAGE (FULL_PHOTO_SPREAD).
      Chaque page porte la MEME image et n'en montre que sa moitie. L'image
      est dessinee sur 200% MOINS 2 x un recouvrement, et chaque page en
