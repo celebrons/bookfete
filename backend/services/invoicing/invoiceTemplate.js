@@ -18,10 +18,17 @@ const echapper = (valeur) => String(valeur ?? '')
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;');
 
-const prix = (cents) => {
+// Retour utilisateur (2026-10-05, premiere vraie commande internationale) :
+// une facture payee en CAD affichait quand meme "€" sur chaque ligne — le
+// symbole etait code en dur, la devise REELLE de la commande (order.currency,
+// toujours celle du pays du client, voir pricingConfig.js) n'etait jamais
+// transmise jusqu'ici. Intl.NumberFormat plutot qu'une table de symboles
+// maintenue a la main : gere nativement les 5 devises de ce projet
+// (EUR/CAD/CHF/GBP/USD) et toute autre qui s'ajouterait plus tard.
+const prix = (cents, currency = 'EUR') => {
   const n = Number(cents);
   if (!Number.isFinite(n)) return '';
-  return `${(n / 100).toFixed(2).replace('.', ',')} €`;
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(n / 100);
 };
 
 const dateLongue = (valeur) => {
@@ -36,11 +43,12 @@ const dateLongue = (valeur) => {
  * @param {string} params.issuedAt - ISO
  * @param {object} params.seller - { name, siret, address, email, vatMention, statusMention }
  * @param {object} params.buyer - { name, email, address: {line1, line2, postalCode, city, country} | null }
- * @param {object} params.order - { orderNumber, paidAt }
+ * @param {object} params.order - { orderNumber, paidAt, currency }
  * @param {Array<{label, detail, quantity, unitCents, amountCents}>} params.lineItems
  * @param {{totalCents:number}} params.totals
  */
 function renderInvoiceHtml({ invoiceNumber, issuedAt, seller, buyer, order, lineItems, totals }) {
+  const currency = order?.currency || 'EUR';
   const lignesHtml = (lineItems || []).map((ligne) => `
     <tr>
       <td class="desc">
@@ -48,8 +56,8 @@ function renderInvoiceHtml({ invoiceNumber, issuedAt, seller, buyer, order, line
         ${ligne.detail ? `<div class="desc-detail">${echapper(ligne.detail)}</div>` : ''}
       </td>
       <td class="num">${ligne.quantity ?? 1}</td>
-      <td class="num">${echapper(prix(ligne.unitCents))}</td>
-      <td class="num montant">${echapper(prix(ligne.amountCents))}</td>
+      <td class="num">${echapper(prix(ligne.unitCents, currency))}</td>
+      <td class="num montant">${echapper(prix(ligne.amountCents, currency))}</td>
     </tr>
   `).join('');
 
@@ -153,7 +161,7 @@ function renderInvoiceHtml({ invoiceNumber, issuedAt, seller, buyer, order, line
 
   <div class="totaux">
     <table>
-      <tr class="ligne-total"><td>Total</td><td>${echapper(prix(totals.totalCents))}</td></tr>
+      <tr class="ligne-total"><td>Total</td><td>${echapper(prix(totals.totalCents, currency))}</td></tr>
     </table>
   </div>
   <p class="mention-tva">${echapper(seller.vatMention)}</p>

@@ -179,7 +179,7 @@ async function generateInvoiceForOrder(order) {
     issuedAt,
     seller,
     buyer,
-    order: { orderNumber: order.order_number || order.id, paidAt: order.paid_at },
+    order: { orderNumber: order.order_number || order.id, paidAt: order.paid_at, currency: order.currency },
     lineItems,
     totals
   });

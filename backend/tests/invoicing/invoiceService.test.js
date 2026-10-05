@@ -100,6 +100,22 @@ describe('generateInvoiceForOrder', () => {
     expect(mockSupabase.__inserted[0].storage_path).toBe('orders/order-1/F-2026-000007.pdf');
   });
 
+  // Retour utilisateur (2026-10-05) : premiere vraie commande internationale
+  // (Canada, payee en CAD) — la facture affichait "€" malgre tout.
+  // order.currency n'etait simplement jamais transmis a renderInvoiceHtml.
+  it("transmet order.currency au rendu HTML (une commande en CAD n'affiche jamais €)", async () => {
+    const mockSupabase = makeSupabaseMock({ rpcNumber: 1 });
+    jest.doMock('../../config/supabase', () => mockSupabase);
+    const pdfService = require('../../services/composition/pdfService');
+    const { generateInvoiceForOrder } = require('../../services/invoicing/invoiceService');
+
+    await generateInvoiceForOrder({ ...ORDER, currency: 'CAD', total_cents: 6690 });
+
+    const htmlRendu = pdfService.renderPdfFromHtml.mock.calls[0][0];
+    expect(htmlRendu).toContain('$CA');
+    expect(htmlRendu).not.toContain('€');
+  });
+
   it('idempotent : une facture deja existante pour cette commande est retournee SANS regenerer', async () => {
     const dejaLa = { id: 'invoice-existante', order_id: 'order-1', invoice_number: 'F-2026-000003' };
     const mockSupabase = makeSupabaseMock({ existingInvoice: dejaLa });
