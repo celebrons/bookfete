@@ -45,27 +45,34 @@ const CONTENT_TYPES = {
 // de coller au plus pres de la limite.
 const MAX_SAFE_PDF_BYTES = 45 * 1024 * 1024;
 
-// Ghostscript -dPDFSETTINGS=/prepress : preset DESTINE a l'impression
-// professionnelle (cible 300dpi), pas /ebook ou /screen (penses pour un
-// ecran, visiblement plus degradants).
+// TROIS essais le meme jour avant celui-ci (2026-10-05), sur la meme
+// commande reelle :
+//   1. /printer (defaut ColorConversionStrategy=UseDeviceIndependentColor) :
+//      rejete par Gelato, "ICC profile is not valid".
+//   2. /prepress + ColorConversionStrategy=LeaveColorUnchanged : MEME rejet.
+//      Cause reelle trouvee en inspectant le PDF ORIGINAL (avant toute
+//      compression, via qpdf --qdf) : Chrome (Page.printToPDF, moteur Skia)
+//      embarque pour CHAQUE photo un profil ICC "sRGB" MAISON, tres
+//      minimal (536 octets, description "Google/Skia/<hash>... Google Inc.
+//      2016") — pas un profil standard. "Laisser inchange" le preservait
+//      donc fidelement... invalide. Le probleme preexistait a toute
+//      compression, simplement jamais revele avant (aucune commande n'avait
+//      encore depasse l'etape taille chez Gelato).
+//   3. CETTE version : ColorConversionStrategy(ForImages)=/RGB (pas
+//      UseDeviceIndependentColor, pas LeaveColorUnchanged) convertit vers
+//      du DeviceRGB simple, SANS AUCUN profil ICC embarque — confirme par
+//      inspection du fichier produit (zero occurrence de "ICCBased" ou
+//      "Skia"). /printer reste le preset (downsampling ~300dpi) : la ou
+//      l'essai 2 perdait l'essentiel du gain de taille en renoncant a toute
+//      conversion, celui-ci retrouve la compression tout en eliminant le
+//      profil fautif.
 //
-// PREMIER ESSAI (le meme jour) avec /printer rejete par Gelato : "ICC
-// profile is not valid... syntaxiquement incorrect", sur TOUTES les pages
-// du fichier compresse. Cause identifiee : /printer a pour
-// ColorConversionStrategy par defaut UseDeviceIndependentColor (/prepress
-// et /screen, eux, par defaut LeaveColorUnchanged) — cette conversion
-// deforme ou reconstruit mal le profil ICC d'origine. Les deux options
-// ci-dessous sont donc posees EXPLICITEMENT plutot que de compter sur le
-// defaut d'un preset : aucune conversion de couleur, le profil ICC
-// d'origine (pose par sharp/Chrome plus tot dans le pipeline) traverse
-// intact.
-//
-// Verifie en conditions reelles sur le PDF de la commande qui a echoue
-// (2026-10-05) : 62,7 Mo -> 42,0 Mo (-33%, un peu moins qu'avec /printer,
-// le prix de ne plus toucher aux couleurs), memes dimensions de page
-// (MediaBox identique), jamais de perte de page. N'EST APPLIQUE QUE SI LE
-// FICHIER DEPASSE MAX_SAFE_PDF_BYTES — la tres grande majorite des livres
-// continue de partir a l'imprimeur sans la moindre recompression.
+// Verifie en conditions reelles sur le PDF de la commande qui a echoue :
+// 62,7 Mo -> 47,4 Mo (-24%), memes dimensions de page (MediaBox
+// identique), jamais de perte de page, aucun profil ICC dans le resultat.
+// N'EST APPLIQUE QUE SI LE FICHIER DEPASSE MAX_SAFE_PDF_BYTES — la tres
+// grande majorite des livres continue de partir a l'imprimeur sans la
+// moindre recompression, couleurs d'origine (bogue Skia ou non) inchangees.
 async function compressPdfIfTooLarge(localFilePath) {
   const { size } = await fsp.stat(localFilePath);
   if (size <= MAX_SAFE_PDF_BYTES) return { path: localFilePath, compressed: false };
@@ -75,9 +82,9 @@ async function compressPdfIfTooLarge(localFilePath) {
     await execFileAsync('gs', [
       '-sDEVICE=pdfwrite',
       '-dCompatibilityLevel=1.4',
-      '-dPDFSETTINGS=/prepress',
-      '-dColorConversionStrategy=/LeaveColorUnchanged',
-      '-dColorConversionStrategyForImages=/LeaveColorUnchanged',
+      '-dPDFSETTINGS=/printer',
+      '-dColorConversionStrategy=/RGB',
+      '-dColorConversionStrategyForImages=/RGB',
       '-dNOPAUSE', '-dQUIET', '-dBATCH',
       '-dAutoRotatePages=/None',
       `-sOutputFile=${compressedPath}`,

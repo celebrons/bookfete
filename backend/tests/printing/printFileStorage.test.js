@@ -66,13 +66,18 @@ describe('printFileStorage.uploadPrintFile — fichier au-dessus de la limite (c
 
     mockExecFile.mockImplementation(async (bin, args) => {
       expect(bin).toBe('gs');
-      // /prepress + LeaveColorUnchanged explicite (pas /printer, dont le
-      // defaut UseDeviceIndependentColor a produit un ICC invalide, rejete
-      // par Gelato sur une vraie commande le 2026-10-05).
+      // /printer + ColorConversionStrategy(ForImages)=/RGB : le reglage qui
+      // a fini par marcher en conditions reelles le 2026-10-05, apres deux
+      // essais rejetes par Gelato ("ICC profile is not valid") — Chrome
+      // embarque un profil ICC "sRGB" maison (Skia) non standard pour
+      // chaque photo ; /RGB convertit vers du DeviceRGB simple, sans aucun
+      // profil ICC embarque (contrairement a UseDeviceIndependentColor, le
+      // defaut de /printer, et a LeaveColorUnchanged, qui preservaient tous
+      // deux le profil fautif).
       expect(args).toEqual(expect.arrayContaining([
-        '-dPDFSETTINGS=/prepress',
-        '-dColorConversionStrategy=/LeaveColorUnchanged',
-        '-dColorConversionStrategyForImages=/LeaveColorUnchanged'
+        '-dPDFSETTINGS=/printer',
+        '-dColorConversionStrategy=/RGB',
+        '-dColorConversionStrategyForImages=/RGB'
       ]));
       const outputArg = args.find((a) => a.startsWith('-sOutputFile='));
       compressedPathUtilise = outputArg.slice('-sOutputFile='.length);
