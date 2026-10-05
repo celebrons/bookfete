@@ -45,10 +45,24 @@ const CONTENT_TYPES = {
 // de coller au plus pres de la limite.
 const MAX_SAFE_PDF_BYTES = 45 * 1024 * 1024;
 
-// Ghostscript -dPDFSETTINGS=/printer : preset DESTINE a l'impression (cible
-// 300dpi), pas /ebook ou /screen (penses pour un ecran, visiblement plus
-// degradants). Verifie en conditions reelles sur le PDF de la commande qui a
-// echoue (2026-10-05) : 62,7 Mo -> 36,0 Mo (-42%), memes dimensions de page
+// Ghostscript -dPDFSETTINGS=/prepress : preset DESTINE a l'impression
+// professionnelle (cible 300dpi), pas /ebook ou /screen (penses pour un
+// ecran, visiblement plus degradants).
+//
+// PREMIER ESSAI (le meme jour) avec /printer rejete par Gelato : "ICC
+// profile is not valid... syntaxiquement incorrect", sur TOUTES les pages
+// du fichier compresse. Cause identifiee : /printer a pour
+// ColorConversionStrategy par defaut UseDeviceIndependentColor (/prepress
+// et /screen, eux, par defaut LeaveColorUnchanged) — cette conversion
+// deforme ou reconstruit mal le profil ICC d'origine. Les deux options
+// ci-dessous sont donc posees EXPLICITEMENT plutot que de compter sur le
+// defaut d'un preset : aucune conversion de couleur, le profil ICC
+// d'origine (pose par sharp/Chrome plus tot dans le pipeline) traverse
+// intact.
+//
+// Verifie en conditions reelles sur le PDF de la commande qui a echoue
+// (2026-10-05) : 62,7 Mo -> 42,0 Mo (-33%, un peu moins qu'avec /printer,
+// le prix de ne plus toucher aux couleurs), memes dimensions de page
 // (MediaBox identique), jamais de perte de page. N'EST APPLIQUE QUE SI LE
 // FICHIER DEPASSE MAX_SAFE_PDF_BYTES — la tres grande majorite des livres
 // continue de partir a l'imprimeur sans la moindre recompression.
@@ -61,7 +75,9 @@ async function compressPdfIfTooLarge(localFilePath) {
     await execFileAsync('gs', [
       '-sDEVICE=pdfwrite',
       '-dCompatibilityLevel=1.4',
-      '-dPDFSETTINGS=/printer',
+      '-dPDFSETTINGS=/prepress',
+      '-dColorConversionStrategy=/LeaveColorUnchanged',
+      '-dColorConversionStrategyForImages=/LeaveColorUnchanged',
       '-dNOPAUSE', '-dQUIET', '-dBATCH',
       '-dAutoRotatePages=/None',
       `-sOutputFile=${compressedPath}`,

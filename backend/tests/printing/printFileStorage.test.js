@@ -66,7 +66,14 @@ describe('printFileStorage.uploadPrintFile — fichier au-dessus de la limite (c
 
     mockExecFile.mockImplementation(async (bin, args) => {
       expect(bin).toBe('gs');
-      expect(args).toEqual(expect.arrayContaining(['-dPDFSETTINGS=/printer']));
+      // /prepress + LeaveColorUnchanged explicite (pas /printer, dont le
+      // defaut UseDeviceIndependentColor a produit un ICC invalide, rejete
+      // par Gelato sur une vraie commande le 2026-10-05).
+      expect(args).toEqual(expect.arrayContaining([
+        '-dPDFSETTINGS=/prepress',
+        '-dColorConversionStrategy=/LeaveColorUnchanged',
+        '-dColorConversionStrategyForImages=/LeaveColorUnchanged'
+      ]));
       const outputArg = args.find((a) => a.startsWith('-sOutputFile='));
       compressedPathUtilise = outputArg.slice('-sOutputFile='.length);
       // Simule une vraie compression : ecrit un fichier plus petit.
