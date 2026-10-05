@@ -789,36 +789,24 @@ const BASE_CSS = `
      photo pour que cette legende tombe sur son bas-gauche a elle, pas sur
      un cadre plus grand qu'elle. */
   .block-photo, .block-texte, .block-contribution, .block-mixte, .block-title-text, .block-title-photos { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  /* display:grid (pas flex) : c'est ce qui permet a .photo-frame.is-contain
-     ci-dessous de prendre la forme reelle de la photo plutot que de rester
-     en boite dans un cadre plein format — voir le meme mecanisme deja en
-     place pour .photo-grid .photo-frame.is-contain, ici etendu a une photo
-     seule (retour utilisateur, 2026-10-05 : la legende doit se poser sur le
-     bas-gauche de la PHOTO, pas du cadre entier). Sans effet sur le mode
-     normal (cover) : le cadre y garde width/height:100% (non modifie),
-     identique a avant. */
-  /* grid-template-rows: minmax(0, 1fr), pas "auto" (par defaut) : empeche
-     par precaution la rangee implicite de grandir au-dela de l'espace
-     reellement disponible si jamais aspect-ratio demandait au cadre plus de
-     hauteur qu'il n'en a — meme garde-fou que min-height:0 sur .block-photo
-     en flexbox juste au-dessus (meme piege connu, deux mecanismes de mise
-     en page differents). */
-  .photo-solo { margin: 0; height: 100%; display: grid; grid-template-rows: minmax(0, 1fr); }
-  /* max-height:100% protege le cas d'une photo si "haute" (etroite) qu'elle
-     ne tient pas a pleine largeur : aspect-ratio demanderait alors une
-     hauteur superieure a l'espace disponible, elle est donc plafonnee et le
-     cadre retombe en boite plein format (comme avant ce correctif) — meme
-     limite deja acceptee pour .photo-grid .photo-frame.is-contain
-     ci-dessous. Verifie empiriquement (Puppeteer, mesure des rectangles
-     reels) : fonctionne exactement comme voulu pour une photo plus LARGE
-     que haute (cas rapporte par l'utilisateur, legende bien au bas-gauche
-     de la photo) ; retombe en boite pour une photo etroite/tres haute, sans
-     jamais deborder de la page. */
+  /* container-type:size + unites de requete de conteneur (cqw/cqh) : SEUL
+     moyen trouve de donner au cadre la forme EXACTE de la photo dans LES
+     DEUX orientations a la fois (retour utilisateur, 2026-10-05, 4e essai —
+     un premier essai avec grid+aspect-ratio+max-height ne fonctionnait QUE
+     pour une photo plus large que haute ; une photo etroite/haute
+     retombait en boite plein format, constate en conditions reelles sur le
+     livre de Fayza : la legende depassait alors la photo).
+     width:min(100cqw, 100cqh*ratio) / height:min(100cqh, 100cqw/ratio)
+     reproduit EXACTEMENT le calcul de object-fit:contain (scale =
+     min(cadreW/photoW, cadreH/photoH)), mais applique au CADRE lui-meme
+     plutot qu'a la seule image — c'est ce qui permet a .photo-caption
+     (toujours positionnee par rapport au cadre) de tomber pile sur la
+     photo, quelle que soit sa forme. Verifie par mesure Puppeteer reelle
+     dans les deux sens (photo large ET photo haute) avant d'etre deploye. */
+  .photo-solo { margin: 0; height: 100%; display: grid; place-items: center; container-type: size; }
   .photo-solo .photo-frame.is-contain {
-    height: auto;
-    max-height: 100%;
-    aspect-ratio: var(--photo-ratio, auto);
-    align-self: center;
+    width: min(100cqw, 100cqh * var(--photo-ratio, 1));
+    height: min(100cqh, 100cqw / var(--photo-ratio, 1));
   }
   /* Une photo sur DOUBLE PAGE (FULL_PHOTO_SPREAD).
      Chaque page porte la MEME image et n'en montre que sa moitie. L'image

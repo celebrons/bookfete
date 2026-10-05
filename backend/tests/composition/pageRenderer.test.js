@@ -1029,12 +1029,14 @@ describe('renderBookHtml — legende par photo (content.photoCaptions)', () => {
       }]
     });
     expect(html).toContain('<span class="photo-frame is-contain" style="--photo-ratio:1.5;');
-    expect(html).toMatch(/\.photo-solo \.photo-frame\.is-contain \{[^}]*aspect-ratio: var\(--photo-ratio, auto\)/);
-    // Garde-fou grid-blowout (verifie a la main par mesure Puppeteer reelle
-    // qu'aucune photo, meme etroite/tres haute, ne pousse le cadre a
-    // deborder de la page) : la rangee implicite de .photo-solo ne doit
-    // jamais pouvoir grandir au-dela de l'espace reellement disponible.
-    expect(html).toMatch(/\.photo-solo \{[^}]*grid-template-rows: minmax\(0, 1fr\)/);
+    // container-type:size + unites cqw/cqh (pas grid+aspect-ratio, qui ne
+    // fonctionnait que pour une photo plus large que haute — constate en
+    // conditions reelles sur une photo etroite/haute, qui en debordait) :
+    // width/height en min(...) reproduisent le calcul d'object-fit:contain
+    // sur le CADRE lui-meme, dans les deux orientations a la fois.
+    expect(html).toMatch(/\.photo-solo \{[^}]*container-type: size/);
+    expect(html).toMatch(/\.photo-solo \.photo-frame\.is-contain \{[^}]*width: min\(100cqw, 100cqh \* var\(--photo-ratio, 1\)\)/);
+    expect(html).toMatch(/\.photo-solo \.photo-frame\.is-contain \{[^}]*height: min\(100cqh, 100cqw \/ var\(--photo-ratio, 1\)\)/);
   });
 });
 
