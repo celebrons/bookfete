@@ -286,8 +286,20 @@ function renderPhotoBlock(rawItems, slug, presentationVariant = 0, adjustmentsBy
     // Aucune donnee supplementaire a stocker : la position de la page porte
     // deja l'information.
     if (slug === 'FULL_PHOTO_SPREAD') {
-      const moitie = pageParity.isLeftPage(pageIndex) ? 'is-spread-left' : 'is-spread-right';
-      return `<figure class="block-photo photo-spread ${moitie}" data-layout="${escapeHtml(slug)}">${imgFrame(item.url, adjustmentsByItemId[item.id])}</figure>`;
+      const estPageGauche = pageParity.isLeftPage(pageIndex);
+      const moitie = estPageGauche ? 'is-spread-left' : 'is-spread-right';
+      // La legende n'est posee qu'UNE SEULE fois pour toute la double page,
+      // sur la moitie gauche (bas-gauche, comme .photo-solo) : son cadre
+      // fait deux fois la largeur d'une page et demarre pile sur le bord
+      // visible de CETTE moitie, donc le texte tombe au bon endroit sans
+      // calcul supplementaire. La reposer aussi sur la moitie droite la
+      // dupliquerait (deux fois le meme texte sur la meme double page) et,
+      // pire, la ferait tomber hors-page de ce cote : le cadre y demarre a
+      // l'oppose (`right:0`), donc une legende `left:0` partirait d'un bord
+      // invisible, a 100% de large hors champ (bug remonte le 2026-10-05 :
+      // "sur une photo double page, la legende n'apparait pas").
+      const legende = estPageGauche ? captionsByItemId[item.id] : undefined;
+      return `<figure class="block-photo photo-spread ${moitie}" data-layout="${escapeHtml(slug)}">${imgFrame(item.url, adjustmentsByItemId[item.id], legende)}</figure>`;
     }
 
     const inset = slug === 'photo-avec-marge' || (slug === 'FULL_PHOTO' && presentationVariant === 1);

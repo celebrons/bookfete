@@ -324,6 +324,42 @@ describe('renderBookHtml — nouveaux layouts v2', () => {
     expect(html).not.toMatch(/photo-spread::after/); // plus de bandeau qui masque
   });
 
+  // Retour utilisateur (2026-10-05) : "sur une photo double page, la legende
+  // n'apparait pas". photoCaptions n'etait tout simplement jamais transmis a
+  // imgFrame() pour FULL_PHOTO_SPREAD (seul le mode photo-solo le faisait) —
+  // aucune legende ne pouvait donc jamais s'afficher, sur aucune des deux
+  // moities. mirrorSpread (cote atelier, BookAtelierLuxe.js) ecrit la MEME
+  // valeur de photoCaptions sur les deux pages du vis-a-vis : elle est donc
+  // bien presente des DEUX cotes en base, d'ou le choix de ne la poser
+  // qu'UNE fois (moitie gauche) plutot que d'en profiter pour l'afficher
+  // deux fois sur la meme double page.
+  it('FULL_PHOTO_SPREAD : la legende apparait sur la moitie GAUCHE, jamais dupliquee sur la droite', () => {
+    const layouts = [{ id: 'l-spread', slug: 'FULL_PHOTO_SPREAD', kind: 'photo' }];
+    const items = [{ id: 'p1', kind: 'photo', url: 'https://cdn.test/1.jpg' }];
+    // mirrorSpread copie la meme photoCaptions sur les deux pages jumelles :
+    // le test la fournit donc des deux cotes, comme en vrai en base.
+    const pageAt = (pageIndex) => bodyOf(renderBookHtml({
+      book: {},
+      items,
+      layouts,
+      pages: [{
+        page_index: pageIndex,
+        content: {
+          kind: 'photo',
+          blocks: [{ kind: 'photo', itemIds: ['p1'], layoutId: 'l-spread' }],
+          photoCaptions: { p1: 'Le lac, ete 2025' }
+        }
+      }]
+    }));
+
+    const pageGauche = pageAt(1); // index impair -> moitie gauche
+    const pageDroite = pageAt(0); // index pair -> moitie droite
+    expect(pageGauche).toContain('photo-spread is-spread-left');
+    expect(pageGauche).toContain('<span class="photo-caption is-blanc">Le lac, ete 2025</span>');
+    expect(pageDroite).toContain('photo-spread is-spread-right');
+    expect(pageDroite).not.toContain('photo-caption');
+  });
+
   it('TWO_PHOTOS_STACKED : une photo "entiere" garde la meme marge exterieure que sa voisine', () => {
     // Retour du livre imprime (2026-09-25) : « en page 3 les photos n'ont pas
     // la meme marge exterieure ». La photo en mode "photo entiere" flottait,
