@@ -21,6 +21,7 @@ const supabase = require('../config/supabase');
 const authenticate = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
 const { listEvents, logEvent, purgeEvents } = require('../services/events/eventLog');
+const { pageViewsSummary } = require('../services/analytics/pageViews');
 const { etatServeur } = require('../services/events/serverHealth');
 const bookContentService = require('../services/composition/bookContentService');
 const templateCatalog = require('../services/composition/templateCatalog');
@@ -283,6 +284,20 @@ router.get('/events', authenticate, requireAdmin, async (req, res) => {
     return res.status(500).json({
       error: error.message,
       indice: "Avez-vous execute sql/phase21_app_events.sql dans Supabase ?"
+    });
+  }
+});
+
+// GET /api/admin/analytics/summary — trafic du site (voir routes/analytics.js
+// pour l'enregistrement, services/analytics/pageViews.js pour l'agregation).
+router.get('/analytics/summary', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const resume = await pageViewsSummary({ days: req.query.days });
+    return res.json(resume);
+  } catch (error) {
+    return res.status(500).json({
+      error: error.message,
+      indice: "Avez-vous execute sql/phase28_page_views.sql dans Supabase ?"
     });
   }
 });

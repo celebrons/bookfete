@@ -218,6 +218,7 @@ app.use('/api/books', bookRoutes);
 app.use('/api/chapters', chapterRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/', require('./routes/analytics'));
 app.use('/', compositionRoutes);
 app.use('/', collectiveRoutes);
 

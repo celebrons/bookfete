@@ -7,6 +7,7 @@ import '../../styles/luxe-theme.css';
 import AdminModeToggle from './AdminModeToggle';
 import AdminHealth from './AdminHealth';
 import AdminEvents from './AdminEvents';
+import AdminAnalytics from './AdminAnalytics';
 import AdminJobs from './AdminJobs';
 import AdminAnonymousPurge from './AdminAnonymousPurge';
 import AdminSection from './AdminSection';
@@ -326,6 +327,10 @@ export default function AdminBooksLuxe() {
           </div>
         </div>
       )}
+
+      <AdminSection title="Trafic">
+        <AdminAnalytics />
+      </AdminSection>
 
       <AdminSection title="Exploitation">
         {/* Ce que fait la machine en ce moment. */}

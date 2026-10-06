@@ -151,6 +151,14 @@ export const setAppModeRemote = (mode) => action('/mode', { mode });
 // backend/services/events/eventLog.js.
 export const purgeEventsRemote = () => action('/events/purge');
 
+// Trafic du site (2026-10-06) — voir backend/services/analytics/pageViews.js.
+export const getAnalyticsSummary = ({ days } = {}) => {
+  const params = new URLSearchParams();
+  if (days) params.set('days', String(days));
+  const suffixe = params.toString();
+  return request(`/analytics/summary${suffixe ? `?${suffixe}` : ''}`);
+};
+
 // Livres non finalises et sans aucune commande — a previsualiser avant de
 // supprimer (voir backend/routes/admin.js, listUnfinalizedCandidates).
 export const listUnfinalizedBooks = () => request('/books/unfinalized');
