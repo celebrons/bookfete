@@ -502,6 +502,8 @@
     "positionError": "Enter a number between 1 and {{total}}.",
     "moving": "Moving…",
     "moveHint": "Other pages shift accordingly. You can also drag the thumbnail in the strip below.",
+    "movePending": "New position chosen: page {{position}}. Confirm to apply.",
+    "confirmMove": "Confirm",
     "clearTitle": "Clear this page",
     "clearConfirmTitle": "Clear this page?",
     "clearHint": "Memories stay in your library, only the page is cleared.",

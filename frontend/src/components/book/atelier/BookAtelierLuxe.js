@@ -211,7 +211,14 @@ export default function BookAtelierLuxe() {
   // Un seul a la fois : deux tiroirs superposes seraient illisibles, meme
   // principe deja etabli par AtelierPageActions (son etat `open`).
   // 'photos' | 'layout' | 'pages' | null.
-  const [activeDrawer, setActiveDrawer] = useState(null);
+  // Defaut 'photos' (retour utilisateur, 2026-10-06 : "je prefere que
+  // l'onglet Photo reste toujours affiche par defaut") — avant, l'atelier
+  // s'ouvrait sans aucun tiroir visible (null), exigeant un clic pour voir
+  // quoi que ce soit. Les actions qui ouvrent explicitement un AUTRE tiroir
+  // (icone mise en page sur une page, "changer la mise en page" sur un
+  // emplacement vide) restent inchangees : ce sont des choix explicites de
+  // l'utilisateur, pas une perte du defaut.
+  const [activeDrawer, setActiveDrawer] = useState('photos');
   const toggleDrawer = (name) => setActiveDrawer((previous) => (previous === name ? null : name));
 
   const [coverHtml, setCoverHtml] = useState(null);
@@ -1845,51 +1852,121 @@ export default function BookAtelierLuxe() {
   // On SUIT la page deplacee (setViewIndex/selectedSide sur sa nouvelle
   // position) : la relacher et ne plus savoir ou elle est atterri serait la
   // pire facon de finir le geste.
+  // Meme correspondance que bookContentService.movePage cote serveur (miroir
+  // assume, comme ailleurs dans ce projet) : ou atterrit la page `index`
+  // apres un deplacement fromIndex -> toIndex ? Extraite en fonction pure
+  // (plutot qu'une fermeture locale a handleMovePage) pour pouvoir aussi
+  // predire, SANS second aller-retour reseau, ou atterrit la JUMELLE d'une
+  // double page apres avoir deplace sa moitie (voir handleMoveSpreadPages).
+  const nextIndexAfterMove = (index, fromIndex, toIndex) => {
+    if (index === fromIndex) return toIndex;
+    if (fromIndex < toIndex) return index > fromIndex && index <= toIndex ? index - 1 : index;
+    return index >= toIndex && index < fromIndex ? index + 1 : index;
+  };
+
+  // Deplacement BAS NIVEAU d'UNE SEULE page cote serveur + mise a jour du
+  // cache local. Ne touche PAS viewIndex/selectedSide : l'appelant (simple
+  // ou double page) decide une seule fois, a la toute fin, quelle page
+  // suivre — sinon un deplacement en deux temps (voir plus bas) ferait
+  // suivre la jumelle au lieu de la page que l'utilisateur a reellement
+  // saisie.
+  const moveSinglePageOnly = async (fromIndex, toIndex) => {
+    if (!book?.id || fromIndex === toIndex) return;
+    const result = await movePage(book.id, fromIndex, toIndex);
+    setPages(result?.pages || []);
+
+    // L'apercu d'une page deplacee n'a pas change : c'est la MEME page, a
+    // une autre place. On permute donc les entrees deja en memoire plutot
+    // que de recharger — un rechargement donnait un resultat INTERMITTENT
+    // puis systematiquement faux (mesure en pilotant l'application : 2
+    // essais sur 3, puis 4 sur 4) : plusieurs rechargements se croisaient et
+    // l'ancien apercu restait affiche ("la 2 va bien vers le 1 mais elle
+    // reste affichee dans le 2", 2026-09-13). Permuter est instantane et ne
+    // peut pas se tromper : aucune requete a arbitrer.
+    //
+    // SEULE reserve : en format Luxe, la page porte un petit numero en
+    // coin, qui restera l'ancien jusqu'au prochain chargement naturel de
+    // cette page. Un detail de quelques millimetres, contre une regression
+    // d'affichage certaine — l'arbitrage est vite fait.
+    setPagePreviewCache((previous) => {
+      const next = {};
+      Object.entries(previous).forEach(([key, html]) => {
+        next[nextIndexAfterMove(Number(key), fromIndex, toIndex)] = html;
+      });
+      return next;
+    });
+    setContentVersion((previous) => previous + 1);
+  };
+
+  // Retour utilisateur (2026-10-06) : "deplacer toute la photo lorsqu'il
+  // s'agit du deplacement d'une photo qui occupe une double page" —
+  // handleMovePage ne connaissait rien des doubles pages : deplacer UNE
+  // moitie la detachait de sa jumelle (restee derriere, a son ancienne
+  // place), desynchronisant le photo-spread (chaque moitie se met ensuite a
+  // afficher selon sa PROPRE parite d'index — voir pageRenderer.js — donc
+  // potentiellement les DEUX memes moitie, ou deux moities qui ne se font
+  // plus face du tout).
+  //
+  // La cible `toIndex` (une position simple, 1..totalPages, choisie par le
+  // popover ou le glisser-deposer) est donc interpretee comme "dans quel
+  // vis-a-vis cette double page doit-elle atterrir" (spreadOfPage), jamais
+  // comme une position page-a-page brute. Le vis-a-vis 0 (la toute premiere
+  // page, seule a droite) ne peut structurellement pas porter de double
+  // page ; de meme, un livre a pagination PAIRE se termine sur une page
+  // gauche sans vis-a-vis (voir doublePagePossible) — dans les deux cas on
+  // se rabat sur le dernier vis-a-vis pleinement valide.
+  //
+  // DEUX appels sequentiels au deplacement SIMPLE deja eprouve, jamais un
+  // SEUL calcul de decalage de bloc ecrit a la main — mais l'ORDRE compte :
+  // chaque moitie vise TOUJOURS sa propre place finale (jamais celle de
+  // l'autre), et c'est seulement le sens du deplacement qui decide laquelle
+  // part en premier (vers l'avant : la DROITE d'abord, puis la GAUCHE ;
+  // vers l'arriere : l'inverse). L'ordre inverse echange systematiquement
+  // gauche et droite au lieu de les preserver — verifie par un balayage
+  // exhaustif de tous les deplacements possibles sur deux tailles de livre
+  // avant d'ecrire cette version.
+  const handleMoveSpreadPages = async (fromIndex, toIndex) => {
+    const otherIndex = facingPageIndex(fromIndex);
+    if (otherIndex == null) return; // jamais vrai en pratique (voir doublePagePossible), filet de securite
+    const fromIsLeft = isLeftPage(fromIndex);
+    const leftIdx = fromIsLeft ? fromIndex : otherIndex;
+    const rightIdx = fromIsLeft ? otherIndex : fromIndex;
+
+    const maxValidSpread = Math.floor((totalPages - 1) / 2);
+    const targetSpread = Math.max(1, Math.min(spreadOfPage(toIndex), maxValidSpread));
+    const { left: targetLeft, right: targetRight } = spreadPair(targetSpread);
+
+    if (targetLeft > leftIdx) {
+      if (rightIdx !== targetRight) await moveSinglePageOnly(rightIdx, targetRight);
+      const leftAfter = nextIndexAfterMove(leftIdx, rightIdx, targetRight);
+      if (leftAfter !== targetLeft) await moveSinglePageOnly(leftAfter, targetLeft);
+    } else if (targetLeft < leftIdx) {
+      if (leftIdx !== targetLeft) await moveSinglePageOnly(leftIdx, targetLeft);
+      const rightAfter = nextIndexAfterMove(rightIdx, leftIdx, targetLeft);
+      if (rightAfter !== targetRight) await moveSinglePageOnly(rightAfter, targetRight);
+    }
+    // targetLeft === leftIdx : deja a la bonne place, rien a deplacer.
+
+    setViewIndex(targetSpread + 1);
+    setSelectedSide(fromIsLeft ? 'left' : 'right');
+  };
+
   const handleMovePage = async (fromIndex, toIndex) => {
     if (!book?.id || fromIndex === toIndex) return;
     setMovingPage(true);
     setSaveError('');
     try {
-      const result = await movePage(book.id, fromIndex, toIndex);
-      setPages(result?.pages || []);
-
-      // L'apercu d'une page deplacee n'a pas change : c'est la MEME page, a
-      // une autre place. On permute donc les entrees deja en memoire, avec
-      // exactement la meme correspondance que le serveur applique aux pages
-      // (bookContentService.movePage) — miroir assume, comme ailleurs dans ce
-      // projet.
-      //
-      // Pourquoi pas un rechargement : essaye d'abord, il donnait un resultat
-      // INTERMITTENT puis systematiquement faux (mesure en pilotant
-      // l'application : 2 essais sur 3, puis 4 sur 4). Plusieurs
-      // rechargements se croisaient et l'ancien apercu restait affiche —
-      // "la 2 va bien vers le 1 mais elle reste affichee dans le 2"
-      // (2026-09-13). Permuter est instantane et ne peut pas se tromper :
-      // aucune requete a arbitrer.
-      //
-      // SEULE reserve : en format Luxe, la page porte un petit numero en
-      // coin, qui restera l'ancien jusqu'au prochain chargement naturel de
-      // cette page. Un detail de quelques millimetres, contre une regression
-      // d'affichage certaine — l'arbitrage est vite fait.
-      setPagePreviewCache((previous) => {
-        const nextIndexFor = (index) => {
-          if (index === fromIndex) return toIndex;
-          if (fromIndex < toIndex) return index > fromIndex && index <= toIndex ? index - 1 : index;
-          return index >= toIndex && index < fromIndex ? index + 1 : index;
-        };
-        const next = {};
-        Object.entries(previous).forEach(([key, html]) => {
-          next[nextIndexFor(Number(key))] = html;
-        });
-        return next;
-      });
-
-      setContentVersion((previous) => previous + 1);
-      setViewIndex(spreadOfPage(toIndex) + 1);
-      setSelectedSide(isLeftPage(toIndex) ? 'left' : 'right');
+      if (savedPageIsSpread(fromIndex)) {
+        await handleMoveSpreadPages(fromIndex, toIndex);
+      } else {
+        await moveSinglePageOnly(fromIndex, toIndex);
+        setViewIndex(spreadOfPage(toIndex) + 1);
+        setSelectedSide(isLeftPage(toIndex) ? 'left' : 'right');
+      }
       // Volontairement AUCUN rechargement d'apercu ici (ni setRefreshToken,
-      // ni refreshPagePreview) : la permutation ci-dessus suffit, et toute
-      // requete supplementaire ne ferait que reintroduire la course.
+      // ni refreshPagePreview) : la permutation locale suffit, et toute
+      // requete supplementaire ne ferait que reintroduire la course decrite
+      // plus haut.
     } catch (err) {
       setSaveError(err.message || t('main.errors.moveFailed'));
     } finally {

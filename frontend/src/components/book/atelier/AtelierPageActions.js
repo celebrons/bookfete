@@ -95,24 +95,51 @@ function AtelierPageActions({
     };
   }, [open]);
 
-  // Voir AtelierLayoutPanel avant deplacement : Entree valide puis provoque
-  // une perte de focus, qui validerait une seconde fois.
-  const committedRef = useRef(null);
+  // Retour utilisateur (2026-10-06) : "ajouter un petit bouton 'valider' au
+  // moment de deplacer une page" — avant, TOUT (perte de focus, Entree, les
+  // fleches ◀/▶) deplacait la page immediatement, sans jamais pouvoir
+  // revoir/annuler la position avant qu'elle ne parte. Desormais, saisir un
+  // numero ou cliquer ◀/▶ ne fait que PROPOSER une position (positionDraft) ;
+  // seul le bouton Valider (confirmMove) declenche reellement onMoveToPosition
+  // — meme principe en deux temps que "Vider cette page" juste en dessous.
   const [positionError, setPositionError] = useState('');
 
-  const commitPosition = (value) => {
+  // Pure : jamais appelee pendant le rendu avec un effet de bord. Renvoie
+  // l'entier voulu, ou null si hors bornes.
+  const validDraftValue = (value) => {
     const wanted = Number(value);
-    if (wanted === pageNumber) { setPositionError(''); return; }
-    if (!Number.isInteger(wanted) || wanted < 1 || wanted > totalPages) {
-      setPositionError(t('pageActions.positionError', { total: totalPages }));
-      setPositionDraft(String(pageNumber));
-      return;
-    }
-    if (committedRef.current === wanted) return;
-    committedRef.current = wanted;
-    setPositionError('');
-    onMoveToPosition(wanted);
+    return (Number.isInteger(wanted) && wanted >= 1 && wanted <= totalPages) ? wanted : null;
   };
+
+  const adjustDraft = (delta) => {
+    const base = validDraftValue(positionDraft) ?? pageNumber;
+    const next = Math.min(totalPages, Math.max(1, base + delta));
+    setPositionError('');
+    setPositionDraft(String(next));
+  };
+
+  // Appelee a la perte de focus / Entree : valide et affiche une erreur le
+  // cas echeant, mais ne commet JAMAIS le deplacement — seul Valider le fait.
+  const validateDraft = (value) => {
+    setPositionError(validDraftValue(value) === null ? t('pageActions.positionError', { total: totalPages }) : '');
+  };
+
+  const confirmMove = () => {
+    const wanted = validDraftValue(positionDraft);
+    if (wanted === null) { setPositionError(t('pageActions.positionError', { total: totalPages })); return; }
+    if (wanted === pageNumber) { setOpen(null); return; }
+    onMoveToPosition(wanted);
+    setOpen(null);
+  };
+
+  const cancelMove = () => {
+    setPositionDraft(String(pageNumber));
+    setPositionError('');
+    setOpen(null);
+  };
+
+  const pendingPosition = validDraftValue(positionDraft);
+  const hasPendingChange = pendingPosition !== null && pendingPosition !== pageNumber;
 
   const canMove = Boolean(onMoveToPosition) && pageNumber != null && totalPages > 1;
   const canClear = Boolean(onClearPage) && hasContent;
@@ -162,8 +189,8 @@ function AtelierPageActions({
                 <button
                   type="button"
                   className="atelier-page-position-step"
-                  onClick={() => onMoveToPosition(pageNumber - 1)}
-                  disabled={movingPage || pageNumber <= 1}
+                  onClick={() => adjustDraft(-1)}
+                  disabled={movingPage || (pendingPosition ?? pageNumber) <= 1}
                   title={t('pageActions.moveBackward')}
                   aria-label={t('pageActions.moveBackward')}
                 >
@@ -189,20 +216,19 @@ function AtelierPageActions({
                     onFocus={(event) => event.currentTarget.select()}
                     onClick={(event) => event.currentTarget.select()}
                     onChange={(event) => {
-                      committedRef.current = null;
                       setPositionError('');
                       setPositionDraft(event.target.value);
                     }}
-                    onBlur={(event) => commitPosition(event.target.value)}
+                    onBlur={(event) => validateDraft(event.target.value)}
                     onKeyDown={(event) => {
+                      // Entree = raccourci clavier pour Valider (meme action
+                      // que le bouton), jamais un chemin de validation a part.
                       if (event.key === 'Enter') {
                         event.preventDefault();
-                        commitPosition(event.currentTarget.value);
-                        event.currentTarget.blur();
+                        confirmMove();
                       }
                       if (event.key === 'Escape') {
-                        setPositionDraft(String(pageNumber));
-                        committedRef.current = null;
+                        cancelMove();
                       }
                     }}
                     aria-label={t('pageActions.positionAriaLabel', { total: totalPages })}
@@ -212,8 +238,8 @@ function AtelierPageActions({
                 <button
                   type="button"
                   className="atelier-page-position-step"
-                  onClick={() => onMoveToPosition(pageNumber + 1)}
-                  disabled={movingPage || pageNumber >= totalPages}
+                  onClick={() => adjustDraft(1)}
+                  disabled={movingPage || (pendingPosition ?? pageNumber) >= totalPages}
                   title={t('pageActions.moveForward')}
                   aria-label={t('pageActions.moveForward')}
                 >
@@ -223,8 +249,29 @@ function AtelierPageActions({
               <p className={`atelier-page-popover-hint ${positionError ? 'is-error' : ''}`}>
                 {positionError || (movingPage
                   ? t('pageActions.moving')
-                  : t('pageActions.moveHint'))}
+                  : (hasPendingChange ? t('pageActions.movePending', { position: pendingPosition }) : t('pageActions.moveHint')))}
               </p>
+              {/* Deux temps, meme principe que "Vider cette page" ci-dessous :
+                  rien ne part sans un clic explicite sur Valider (retour
+                  utilisateur, 2026-10-06). */}
+              <div className="atelier-page-popover-actions">
+                <button
+                  type="button"
+                  className="atelier-page-popover-cancel"
+                  onClick={cancelMove}
+                  disabled={movingPage}
+                >
+                  {t('pageActions.cancel')}
+                </button>
+                <button
+                  type="button"
+                  className="atelier-page-popover-confirm"
+                  onClick={confirmMove}
+                  disabled={movingPage || !hasPendingChange}
+                >
+                  {t('pageActions.confirmMove')}
+                </button>
+              </div>
             </div>
           )}
         </div>

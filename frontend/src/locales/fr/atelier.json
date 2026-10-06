@@ -502,6 +502,8 @@
     "positionError": "Entrez un numéro entre 1 et {{total}}.",
     "moving": "Déplacement en cours…",
     "moveHint": "Les autres pages se décalent. Vous pouvez aussi glisser la vignette dans la bande du bas.",
+    "movePending": "Nouvelle position choisie : page {{position}}. Validez pour confirmer.",
+    "confirmMove": "Valider",
     "clearTitle": "Vider cette page",
     "clearConfirmTitle": "Vider cette page ?",
     "clearHint": "Les souvenirs restent dans votre bibliothèque, seule la page est vidée.",
