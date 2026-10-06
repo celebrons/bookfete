@@ -30,7 +30,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const os = require('os');
 const path = require('path');
-const { execFile, spawn } = require('child_process');
+const { spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 const PDFDocument = require('pdfkit');
 const sharp = require('../../config/sharp');
@@ -137,23 +137,6 @@ async function resolveBrowserPath() {
   return resolvePuppeteerBrowserPath();
 }
 
-function cleanText(value = '') {
-  return String(value).replace(/\s+/g, ' ').trim().slice(0, 400);
-}
-
-function execFilePromise(command, args, options) {
-  return new Promise((resolve, reject) => {
-    execFile(command, args, options, (error, stdout, stderr) => {
-      if (error) {
-        error.message += ` | stdout: ${cleanText(stdout)} | stderr: ${cleanText(stderr)}`;
-        reject(error);
-        return;
-      }
-      resolve({ stdout, stderr });
-    });
-  });
-}
-
 // Rend un document HTML complet (deja autonome : <html>...<style>...</html>)
 // en PDF. Renvoie le chemin du fichier PDF genere. Leve une erreur explicite
 // si aucun navigateur headless n'est disponible.
@@ -219,6 +202,20 @@ function nombreDeRendusEnFile() {
   return rendusEnFile;
 }
 
+// CORRIGE 2026-10-06 : ce rendu passait par la ligne de commande Chrome
+// (--print-to-pdf + --print-to-pdf-no-header) plutot que par CDP comme le
+// reste de ce fichier. Sur la version de Chromium embarquee par puppeteer
+// (152.0.7977.75), --print-to-pdf-no-header n'a PLUS AUCUN EFFET — verifie
+// en reproduisant l'appel exact sur le serveur : la date et
+// "file:///chemin/local 1/1" restaient imprimes en bas de PAGE, dans le
+// contenu meme du PDF (pas un artefact du lecteur). Une facture client
+// affichait donc le chemin interne du serveur. L'appel CDP Page.printToPDF,
+// lui, a `displayHeaderFooter: false` par defaut — c'est deja ce que
+// renderPdfByPrintingDirect utilise pour le livre, jamais touche par ce
+// bogue. `preferCSSPageSize: true` est indispensable ici : la facture fixe
+// sa taille ET ses marges via `@page` (voir invoiceTemplate.js) — sans ce
+// reglage, printToPDF ignore cette regle et applique ses propres marges par
+// defaut par-dessus.
 async function renderPdfFromHtmlDirect(html, { fileBaseName = 'preview' } = {}) {
   const browserPath = await resolveBrowserPath();
   if (!browserPath) {
@@ -232,25 +229,34 @@ async function renderPdfFromHtmlDirect(html, { fileBaseName = 'preview' } = {}) 
   const htmlPath = path.join(PDF_PREVIEW_DIR, `${fileBaseName}-${stamp}.html`);
   const outputPath = path.join(PDF_PREVIEW_DIR, `${fileBaseName}-${stamp}.pdf`);
 
+  const port = cdpPort();
+  const child = lancerLeNavigateur(browserPath, argumentsDuNavigateur(port));
+
   try {
     await fsp.writeFile(htmlPath, html, 'utf8');
-    const htmlUrl = pathToFileURL(htmlPath).href;
+    const wsUrl = await openCdpTarget(port);
+    const cdp = cdpClient(wsUrl);
+    await cdp.call('Page.enable', {});
 
-    await execFilePromise(
-      browserPath,
-      [
-        '--headless=new',
-        '--disable-gpu',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        '--run-all-compositor-stages-before-draw',
-        '--virtual-time-budget=15000',
-        '--print-to-pdf-no-header',
-        `--print-to-pdf=${outputPath}`,
-        htmlUrl
-      ],
-      { timeout: 90000 }
-    );
+    const chargement = cdp.waitForEvent('Page.loadEventFired', PAGE_LOAD_TIMEOUT_MS);
+    await cdp.call('Page.navigate', { url: pathToFileURL(htmlPath).href });
+    await chargement;
+    await waitForImages(cdp);
+
+    const resultat = await cdp.call('Page.printToPDF', {
+      printBackground: true,
+      displayHeaderFooter: false,
+      preferCSSPageSize: true,
+      transferMode: 'ReturnAsStream'
+    });
+
+    if (resultat?.stream) {
+      await lirePdfEnFlux(cdp, resultat.stream, outputPath);
+    } else {
+      await fsp.writeFile(outputPath, Buffer.from(resultat.data, 'base64'));
+    }
+
+    cdp.close();
 
     if (!fs.existsSync(outputPath)) {
       throw new Error("Le navigateur n'a pas produit de fichier PDF.");
@@ -258,6 +264,7 @@ async function renderPdfFromHtmlDirect(html, { fileBaseName = 'preview' } = {}) 
 
     return outputPath;
   } finally {
+    child.kill();
     fsp.unlink(htmlPath).catch(() => {});
   }
 }
