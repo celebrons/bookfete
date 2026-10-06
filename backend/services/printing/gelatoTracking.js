@@ -85,6 +85,16 @@ function extractTracking(gelatoOrder) {
   // niveau de l'expedition ET/OU de chaque article selon les cas.
   const itemFulfillments = items.flatMap((item) => (Array.isArray(item?.fulfillments) ? item.fulfillments : []));
   const firstFulfillment = itemFulfillments[0] || {};
+  // Premiere vraie reponse getOrder observee en conditions reelles
+  // (2026-10-06, commandes CMD-261005-MUVCHDVJ-532/MUVQJK8N-625, deux
+  // commandes "en production" chez Gelato) : le code et l'URL de suivi ne
+  // vivent ni sur `shipment` ni sur un `fulfillment` d'item (les deux
+  // absents, laisses en place par prudence pour d'autres versions d'API),
+  // mais sur chaque PAQUET de l'expedition — `shipment.packages[]`. Les deux
+  // commandes reelles l'ont confirme : carrier deja remonte correctement,
+  // code/url toujours null jusqu'a ce correctif alors que Gelato les
+  // affichait deja sur son propre tableau de bord.
+  const firstPackage = Array.isArray(shipment.packages) ? (shipment.packages[0] || {}) : {};
 
   return {
     carrier: firstNonEmpty(
@@ -97,11 +107,14 @@ function extractTracking(gelatoOrder) {
       shipment.trackingCode,
       shipment.trackingNumber,
       firstFulfillment.trackingCode,
-      firstFulfillment.trackingNumber
+      firstFulfillment.trackingNumber,
+      firstPackage.trackingCode,
+      firstPackage.trackingNumber
     ),
     url: firstNonEmpty(
       shipment.trackingUrl,
-      firstFulfillment.trackingUrl
+      firstFulfillment.trackingUrl,
+      firstPackage.trackingUrl
     )
   };
 }

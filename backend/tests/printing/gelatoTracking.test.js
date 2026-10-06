@@ -68,6 +68,27 @@ describe('extractTracking', () => {
     expect(() => extractTracking(null)).not.toThrow();
     expect(() => extractTracking({ items: 'pas un tableau' })).not.toThrow();
   });
+
+  // Retour utilisateur (2026-10-06) : "Gelato affiche un numero de suivi,
+  // pourquoi ca ne remonte pas chez Bookipix ?" — premiere vraie reponse
+  // getOrder observee (deux commandes reelles "in_production"). Le code et
+  // l'URL de suivi n'etaient ni sur `shipment` ni sur un fulfillment d'item
+  // (les deux testes ci-dessus, ecrits a l'aveugle faute d'exemple reel a
+  // l'epoque) mais sur `shipment.packages[]` — carrier deja correct,
+  // code/url toujours null jusqu'a ce correctif.
+  it('lit le suivi porte par un PAQUET de l\'expedition (forme reelle observee le 2026-10-06)', () => {
+    const tracking = extractTracking({
+      shipment: {
+        shipmentMethodName: 'FleetOptics Ground',
+        packages: [{ trackingCode: 'FGEL261000001740019', trackingUrl: 'https://fleetopticsinc.ca/?tracking_number=FGEL261000001740019' }]
+      }
+    });
+    expect(tracking).toEqual({
+      carrier: 'FleetOptics Ground',
+      code: 'FGEL261000001740019',
+      url: 'https://fleetopticsinc.ca/?tracking_number=FGEL261000001740019'
+    });
+  });
 });
 
 describe('readGelatoFulfillmentStatus', () => {
