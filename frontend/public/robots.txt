@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /account
+Disallow: /orders
+Disallow: /book/
+Disallow: /invite/
+Disallow: /contribute/
+Disallow: /participer/
+Disallow: /collectif/
+
+Sitemap: https://bookipix.com/sitemap.xml
