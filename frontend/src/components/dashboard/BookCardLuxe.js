@@ -116,11 +116,22 @@ const BookCardLuxe = ({
     return date.toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit' });
   };
   const resolvePrimaryActionPath = () => {
-    if (primaryAction.key === 'follow_order' || primaryAction.key === 'open_orders') {
+    // "Suivre la commande" (livre paye, pas encore livre) pointait vers la
+    // liste generique /orders, qui affiche sa propre carte "Suivre la
+    // livraison" a recliquer — une etape redondante pour un livre dont la
+    // commande est deja connue sans ambiguite (retour utilisateur,
+    // 2026-10-06). derivedStep (BookCheckoutLuxe.js) saute deja directement
+    // a l'etape "tracking" des qu'une commande existe hors awaiting_payment
+    // : il suffit d'y naviguer directement, comme les autres actions
+    // ci-dessous. open_orders (commande LIVREE) reste sur /orders a
+    // dessein : une fois le livre arrive, il n'y a plus de suivi temps reel
+    // propre a CE livre a afficher directement.
+    if (primaryAction.key === 'open_orders') {
       return '/orders';
     }
     if (
-      primaryAction.key === 'open_checkout'
+      primaryAction.key === 'follow_order'
+      || primaryAction.key === 'open_checkout'
       || primaryAction.key === 'pay_pending_order'
       || primaryAction.key === 'follow_pdf_generation'
       || primaryAction.key === 'download_pdf'
