@@ -12,7 +12,7 @@ const { recordPageView } = require('../services/analytics/pageViews');
 // Jamais bloquant pour le visiteur : repond vite, quoi qu'il arrive.
 // Deja couvert par le limiteur general pose sur /api (voir server.js).
 router.post('/api/analytics/pageview', (req, res) => {
-  recordPageView({ path: req.body?.path, referrer: req.body?.referrer }).catch(() => {});
+  recordPageView({ path: req.body?.path, referrer: req.body?.referrer, ip: req.ip }).catch(() => {});
   res.status(204).end();
 });
 

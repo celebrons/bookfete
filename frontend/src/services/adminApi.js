@@ -159,6 +159,23 @@ export const getAnalyticsSummary = ({ days } = {}) => {
   return request(`/analytics/summary${suffixe ? `?${suffixe}` : ''}`);
 };
 
+// Tarifs des livres (2026-10-07) — voir backend/services/pricing/pricingSettings.js.
+export const getPricingSettingsRemote = () => request('/pricing');
+export const setPricingSettingsRemote = async (reglages) => {
+  const response = await fetch(`${getApiBaseUrl()}/admin/pricing`, {
+    method: 'PUT',
+    headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+    body: JSON.stringify(reglages)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.error || 'Mise à jour des tarifs refusée.');
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+};
+
 // Livres non finalises et sans aucune commande — a previsualiser avant de
 // supprimer (voir backend/routes/admin.js, listUnfinalizedCandidates).
 export const listUnfinalizedBooks = () => request('/books/unfinalized');

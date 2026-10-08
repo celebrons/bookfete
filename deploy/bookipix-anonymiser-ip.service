@@ -1,0 +1,18 @@
+# Anonymise les IP de trafic de plus de 90 jours (voir
+# backend/scripts/anonymiser-ip-trafic.js). Declenche par
+# bookipix-anonymiser-ip.timer.
+
+[Unit]
+Description=Anonymisation des IP de trafic de plus de 90 jours
+After=bookipix.service
+
+[Service]
+Type=oneshot
+User=celebrons
+WorkingDirectory=/home/celebrons/bookfete/backend
+EnvironmentFile=/home/celebrons/bookfete/backend/.env
+ExecStart=/usr/bin/node scripts/anonymiser-ip-trafic.js
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bookipix-anonymiser-ip

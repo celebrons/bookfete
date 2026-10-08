@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { getAnalyticsSummary } from '../../services/adminApi';
 import './AdminEvents.css';
 
-// Trafic du site (2026-10-06) — voir backend/services/analytics/pageViews.js.
-// Volontairement sobre : total, pages et provenances les plus visitees,
-// visites par jour. Pas de graphique : a ce volume, un tableau se lit aussi
-// bien et coute infiniment moins a construire/maintenir.
+// Trafic du site (2026-10-06, IP ajoutee le 2026-10-07) — voir
+// backend/services/analytics/pageViews.js. Volontairement sobre : total,
+// pages et provenances les plus visitees, visites par jour. Pas de
+// graphique : a ce volume, un tableau se lit aussi bien et coute infiniment
+// moins a construire/maintenir.
 
 function AdminAnalytics() {
   const [resume, setResume] = useState(null);
@@ -89,6 +90,42 @@ function AdminAnalytics() {
                 </tbody>
               </table>
             </div>
+
+            {/* IP (2026-10-07) : donnee personnelle (CNIL), anonymisee au
+                bout de 90 jours cote serveur (voir purgeOldIps) — reservee
+                a cet espace admin, jamais partagee. */}
+            <div className="admin-events-table-wrap" style={{ flex: '1 1 320px' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem' }}>IP les plus fréquentes</h3>
+              <table className="admin-events-table">
+                <thead><tr><th>IP</th><th>Visites</th></tr></thead>
+                <tbody>
+                  {resume.topIps.map((i) => (
+                    <tr key={i.key}><td>{i.key}</td><td>{i.count}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="admin-events-table-wrap" style={{ marginTop: '1.5rem' }}>
+            <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem' }}>Visites récentes</h3>
+            <table className="admin-events-table">
+              <thead><tr><th>Quand</th><th>IP</th><th>Page</th><th>Provenance</th></tr></thead>
+              <tbody>
+                {resume.recent.length === 0 && (
+                  <tr><td colSpan={4}>Aucune visite sur cette période.</td></tr>
+                )}
+                {resume.recent.map((v, i) => (
+                  // eslint-disable-next-line react/no-array-index-key
+                  <tr key={`${v.createdAt}-${i}`}>
+                    <td>{new Date(v.createdAt).toLocaleString('fr-FR')}</td>
+                    <td>{v.ip || '—'}</td>
+                    <td>{v.path}</td>
+                    <td>{v.referrer || '(direct)'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </>
       )}

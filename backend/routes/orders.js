@@ -12,9 +12,15 @@ const { removePrintFilesForOrder } = require('../services/printing/printFileStor
 const { logEvent } = require('../services/events/eventLog');
 const { calculateBookPrice } = require('../services/pricing/calculateBookPrice');
 const {
-  PDF_PRICE_CENTS, PACK_DISCOUNT_PERCENT, DEFAULT_COUNTRY, PRICING_CONFIG,
+  DEFAULT_COUNTRY,
   resolveCurrencyForCountry, convertEurCentsTo
 } = require('../services/pricing/pricingConfig');
+// PDF/pack/prix-par-2-pages : modifiables depuis l'espace admin, voir
+// services/pricing/pricingSettings.js (jamais plus les constantes statiques
+// de pricingConfig.js pour ces trois valeurs-la).
+const {
+  getPdfPriceCentsSync, getPackDiscountPercentSync, getPricingConfigSync
+} = require('../services/pricing/pricingSettings');
 const { resolveCountry } = require('../services/pricing/resolveCountry');
 const { resolveCountryIso2, exigeUnEtat } = require('../services/printing/countryCodes');
 
@@ -331,11 +337,12 @@ const computeOrderPricing = ({ book, type, quantity, country = DEFAULT_COUNTRY }
   const printFormat = pricing.format;
   const printUnitCents = pricing.bookPriceCents;
   const currency = pricing.currency;
-  // PDF_PRICE_CENTS : hors grille (aucun exemplaire physique, aucune
-  // livraison) — 7,99€ (retour utilisateur 2026-09-27), TOUJOURS calcule en
+  // Prix du PDF seul : hors grille (aucun exemplaire physique, aucune
+  // livraison) — 7,99€ par defaut, modifiable en admin (retour utilisateur
+  // 2026-09-27), TOUJOURS calcule en
   // euros puis converti (meme principe que le prix du livre imprime, voir
   // calculateBookPrice.js — jamais une deuxieme formule par devise).
-  const pdfUnitCents = convertEurCentsTo(PDF_PRICE_CENTS, currency);
+  const pdfUnitCents = convertEurCentsTo(getPdfPriceCentsSync(), currency);
 
   let unitCents = pdfUnitCents;
   let shippingCents = 0;
@@ -343,11 +350,11 @@ const computeOrderPricing = ({ book, type, quantity, country = DEFAULT_COUNTRY }
     unitCents = printUnitCents;
     shippingCents = pricing.shippingPriceCents;
   } else if (type === 'pack') {
-    // PDF + imprime, moins PACK_DISCOUNT_PERCENT sur ce total (hors
-    // livraison) — retour utilisateur 2026-09-27, remplace l'ancien
-    // supplement fixe (+20 EUR) qui ignorait le prix reel du PDF/du format.
+    // PDF + imprime, moins la remise du pack (hors livraison) — retour
+    // utilisateur 2026-09-27, remplace l'ancien supplement fixe (+20 EUR)
+    // qui ignorait le prix reel du PDF/du format.
     const pdfPlusPrintCents = pdfUnitCents + printUnitCents;
-    unitCents = Math.round(pdfPlusPrintCents * (100 - PACK_DISCOUNT_PERCENT) / 100);
+    unitCents = Math.round(pdfPlusPrintCents * (100 - getPackDiscountPercentSync()) / 100);
     shippingCents = pricing.shippingPriceCents;
   }
 
@@ -1349,7 +1356,7 @@ router.get('/formats', (req, res) => {
       // frontend n'ait plus besoin de sa propre copie (TarifsLuxe.js en
       // gardait une recopiee a la main, risque de desynchronisation deja
       // signale dans son propre commentaire).
-      pricePer2PagesCents: convertEurCentsTo(PRICING_CONFIG[formatId].pricePer2PagesCents, currency),
+      pricePer2PagesCents: convertEurCentsTo(getPricingConfigSync()[formatId].pricePer2PagesCents, currency),
       // Tarif REEL du pays resolu ci-dessus (chantier international,
       // 2026-10-02 — relevé auprès de l'API Gelato, voir pricingConfig.js).
       // Deja dans la bonne devise, jamais une conversion a la volee.
@@ -1366,8 +1373,8 @@ router.get('/formats', (req, res) => {
     defaultFormatId: DEFAULT_PRINT_FORMAT,
     country,
     currency,
-    pdfPriceCents: convertEurCentsTo(PDF_PRICE_CENTS, currency),
-    packDiscountPercent: PACK_DISCOUNT_PERCENT
+    pdfPriceCents: convertEurCentsTo(getPdfPriceCentsSync(), currency),
+    packDiscountPercent: getPackDiscountPercentSync()
   });
 });
 

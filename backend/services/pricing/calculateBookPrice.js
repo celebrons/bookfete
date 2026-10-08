@@ -8,15 +8,18 @@
 // redefinir une copie ici.
 
 const {
-  PRICING_CONFIG,
   DEFAULT_FORMAT,
   DEFAULT_COUNTRY,
   PRICING_VERSION,
-  resolveFormatConfig,
   resolveShippingCents,
   resolveCurrencyForCountry,
   convertEurCentsTo
 } = require('./pricingConfig');
+// Base/prix-par-2-pages : modifiables depuis l'espace admin (voir
+// pricingSettings.js) — plus jamais lus depuis la constante statique
+// PRICING_CONFIG de pricingConfig.js, qui ne sert plus que de valeur de
+// DEPART/repli si la base n'a jamais ete configuree.
+const { getPricingConfigSync } = require('./pricingSettings');
 const { MIN_BOOK_PAGES, MAX_BOOK_PAGES } = require('../composition/bookContentService');
 
 // prix_livre = prix_base_30_pages + ((pages - 30) / 2 x prix_par_2_pages)
@@ -33,12 +36,13 @@ const { MIN_BOOK_PAGES, MAX_BOOK_PAGES } = require('../composition/bookContentSe
 // pricingConfig.js, obtenu directement depuis l'API Gelato dans la bonne
 // devise).
 function calculateBookPrice({ format, pageCount, country = DEFAULT_COUNTRY } = {}) {
+  const pricingConfig = getPricingConfigSync();
   // Format REELLEMENT connu (pas juste le repli) : la reponse doit dire la
   // verite sur le format applique, meme quand l'entree etait invalide/absente
   // — meme filet de securite que l'ancien FORMAT_PRICING (jamais d'erreur,
   // jamais NaN, toujours un prix standard par defaut).
-  const resolvedFormat = Object.prototype.hasOwnProperty.call(PRICING_CONFIG, format) ? format : DEFAULT_FORMAT;
-  const config = resolveFormatConfig(resolvedFormat);
+  const resolvedFormat = Object.prototype.hasOwnProperty.call(pricingConfig, format) ? format : DEFAULT_FORMAT;
+  const config = pricingConfig[resolvedFormat];
   const currency = resolveCurrencyForCountry(country);
 
   const safePageCount = Number.isFinite(Number(pageCount)) && Number(pageCount) > 0

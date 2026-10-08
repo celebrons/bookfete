@@ -8,6 +8,7 @@ import AdminModeToggle from './AdminModeToggle';
 import AdminHealth from './AdminHealth';
 import AdminEvents from './AdminEvents';
 import AdminAnalytics from './AdminAnalytics';
+import AdminPricing from './AdminPricing';
 import AdminJobs from './AdminJobs';
 import AdminAnonymousPurge from './AdminAnonymousPurge';
 import AdminSection from './AdminSection';
@@ -224,6 +225,10 @@ export default function AdminBooksLuxe() {
       </header>
 
       <AdminModeToggle />
+
+      <AdminSection title="Tarifs">
+        <AdminPricing />
+      </AdminSection>
 
       <AdminSection title="Livres" badge={total} defaultOpen>
       <div className="admin-books-toolbar">

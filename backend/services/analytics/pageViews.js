@@ -1,8 +1,13 @@
 // backend/services/analytics/pageViews.js
 //
 // Suivi de trafic minimal (2026-10-06, voir sql/phase28_page_views.sql pour
-// le choix de ne rien stocker d'identifiant). Deux operations : enregistrer
-// une visite, et en tirer un resume pour l'espace d'administration.
+// le choix initial de ne rien stocker d'identifiant). L'IP a ete ajoutee le
+// 2026-10-07 (sql/phase29_page_views_ip.sql, demande : "afficher les @IP") —
+// seule donnee personnelle du lot, anonymisee automatiquement au bout de 90
+// jours (voir purgeOldIps/scripts/anonymiser-ip-trafic.js) plutot que
+// conservee indefiniment. Trois operations : enregistrer une visite, en
+// tirer un resume pour l'espace d'administration, et anonymiser les IP
+// anciennes.
 
 const supabase = require('../../config/supabase');
 
@@ -54,10 +59,11 @@ function origineSeule(valeur, max) {
  * ecriture de trafic ratee ne doit jamais faire echouer la navigation d'un
  * visiteur.
  */
-async function recordPageView({ path, referrer } = {}) {
+async function recordPageView({ path, referrer, ip } = {}) {
   const ligne = {
     path: cheminSeul(path, 300) || '/',
-    referrer: referrer ? origineSeule(referrer, 300) : null
+    referrer: referrer ? origineSeule(referrer, 300) : null,
+    ip: texte(ip, 64)
   };
   try {
     await supabase.from('page_views').insert(ligne);
@@ -74,7 +80,7 @@ async function pageViewsSummary({ days = 30 } = {}) {
   const depuis = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('page_views')
-    .select('path, referrer, created_at')
+    .select('path, referrer, ip, created_at')
     .gte('created_at', depuis)
     .order('created_at', { ascending: false })
     .limit(20000);
@@ -84,6 +90,7 @@ async function pageViewsSummary({ days = 30 } = {}) {
   const parJour = new Map();
   const parChemin = new Map();
   const parReferrer = new Map();
+  const parIp = new Map();
 
   rows.forEach((row) => {
     const jour = (row.created_at || '').slice(0, 10);
@@ -91,6 +98,8 @@ async function pageViewsSummary({ days = 30 } = {}) {
     parChemin.set(row.path, (parChemin.get(row.path) || 0) + 1);
     const ref = row.referrer || '(direct)';
     parReferrer.set(ref, (parReferrer.get(ref) || 0) + 1);
+    const ip = row.ip || '(inconnue)';
+    parIp.set(ip, (parIp.get(ip) || 0) + 1);
   });
 
   const topN = (map, n) => [...map.entries()]
@@ -103,8 +112,37 @@ async function pageViewsSummary({ days = 30 } = {}) {
     windowDays: days,
     byDay: [...parJour.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count })),
     topPaths: topN(parChemin, 15),
-    topReferrers: topN(parReferrer, 15)
+    topReferrers: topN(parReferrer, 15),
+    topIps: topN(parIp, 15),
+    // Visites individuelles les plus recentes, IP comprise — demande du
+    // 2026-10-07 ("afficher les @IP"). Le resume par IP ci-dessus repond a
+    // "qui revient souvent", cette liste repond a "qui vient de passer".
+    recent: rows.slice(0, 50).map((row) => ({
+      path: row.path,
+      referrer: row.referrer,
+      ip: row.ip || null,
+      createdAt: row.created_at
+    }))
   };
 }
 
-module.exports = { recordPageView, pageViewsSummary };
+/**
+ * Purge les visites trop anciennes — une IP est une donnee personnelle,
+ * elle ne doit pas s'accumuler indefiniment (meme principe que
+ * purgeEvents). N'efface PAS le reste (path/referrer/created_at), qui reste
+ * utile aux statistiques agregees sur une duree plus longue : seule l'IP
+ * est effacee passe ce delai.
+ */
+async function purgeOldIps({ jours = 90 } = {}) {
+  const limite = new Date(Date.now() - jours * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('page_views')
+    .update({ ip: null })
+    .lt('created_at', limite)
+    .not('ip', 'is', null)
+    .select('id');
+  if (error) throw error;
+  return { anonymized: Array.isArray(data) ? data.length : 0 };
+}
+
+module.exports = { recordPageView, pageViewsSummary, purgeOldIps };

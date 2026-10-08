@@ -19,14 +19,21 @@ function buildApp() {
 describe('POST /api/analytics/pageview', () => {
   beforeEach(() => { recordPageView.mockReset(); });
 
-  it('repond 204 et transmet chemin/referrer', async () => {
+  it('repond 204 et transmet chemin/referrer/IP', async () => {
     recordPageView.mockResolvedValue(undefined);
     const response = await request(buildApp())
       .post('/api/analytics/pageview')
       .send({ path: '/tarifs', referrer: 'https://www.google.com' });
 
     expect(response.status).toBe(204);
-    expect(recordPageView).toHaveBeenCalledWith({ path: '/tarifs', referrer: 'https://www.google.com' });
+    // L'IP vient de la connexion de test elle-meme (supertest), jamais la
+    // meme valeur exacte d'un environnement a l'autre : seule sa PRESENCE
+    // compte ici, le detail de son extraction/nettoyage est teste dans
+    // analytics.pageViews.test.js.
+    expect(recordPageView).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/tarifs', referrer: 'https://www.google.com'
+    }));
+    expect(typeof recordPageView.mock.calls[0][0].ip).toBe('string');
   });
 
   it("repond 204 meme si l'enregistrement echoue : jamais bloquant pour le visiteur", async () => {

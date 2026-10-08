@@ -38,7 +38,21 @@ jest.mock('../config/supabase', () => {
     layout_definitions: [],
     book_templates: [],
     app_settings: [{ id: 'global', mode: 'test', updated_at: '2026-10-01T00:00:00Z', updated_by: null }],
-    app_events: []
+    app_events: [],
+    pricing_settings: [{
+      id: 'global',
+      config: {
+        formats: {
+          livret: { basePriceCents: 2990, pricePer2PagesCents: 190 },
+          standard: { basePriceCents: 3990, pricePer2PagesCents: 220 },
+          luxe: { basePriceCents: 4990, pricePer2PagesCents: 290 }
+        },
+        pdfPriceCents: 799,
+        packDiscountPercent: 10
+      },
+      updated_at: '2026-10-07T00:00:00Z',
+      updated_by: null
+    }]
   });
 
   mock.auth = {
@@ -466,5 +480,61 @@ describe('Espace admin — comptes anonymes abandonnes', () => {
     expect(response.status).toBe(200);
     expect(response.body.removed).toBe(1);
     expect(global.__adminSupabaseMock.auth.admin.deleteUser).toHaveBeenCalledWith('u-abandon');
+  });
+});
+
+// Tarifs des livres (2026-10-07) : voir services/pricing/pricingSettings.js.
+// Le cache en memoire du module est un singleton partage par tout ce
+// fichier de test (pas de jest.resetModules() ici, contraire a
+// appMode.test.js) : un PUT suivi d'un GET doit donc refleter le PUT sans
+// attendre un rafraichissement depuis la base.
+describe('Espace admin — tarifs des livres', () => {
+  let app;
+  beforeAll(() => { app = buildApp(); });
+  beforeEach(() => { process.env.ADMIN_EMAILS = ADMIN_EMAIL; });
+
+  it('GET /pricing refuse un non-administrateur', async () => {
+    const response = await request(app).get('/api/admin/pricing').set('Authorization', 'Bearer user-token');
+    expect(response.status).toBe(404);
+  });
+
+  it('GET /pricing renvoie les tarifs courants et une reference (basePages/couts Gelato)', async () => {
+    const response = await request(app).get('/api/admin/pricing').set('Authorization', 'Bearer admin-token');
+    expect(response.status).toBe(200);
+    expect(response.body.formats.standard.basePriceCents).toBe(3990);
+    expect(response.body.reference.standard.basePages).toBe(30);
+    expect(response.body.reference.standard.gelatoCostCents).toBe(1196);
+  });
+
+  it('PUT /pricing refuse un non-administrateur, sans rien modifier', async () => {
+    const response = await request(app)
+      .put('/api/admin/pricing')
+      .set('Authorization', 'Bearer user-token')
+      .send({ formats: { standard: { basePriceCents: 5000, pricePer2PagesCents: 300 } } });
+    expect(response.status).toBe(404);
+  });
+
+  it('PUT /pricing modifie un tarif, et un GET suivant le reflete immediatement', async () => {
+    const miseAJour = await request(app)
+      .put('/api/admin/pricing')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        formats: {
+          livret: { basePriceCents: 2990, pricePer2PagesCents: 190 },
+          standard: { basePriceCents: 4300, pricePer2PagesCents: 235 },
+          luxe: { basePriceCents: 4990, pricePer2PagesCents: 290 }
+        },
+        pdfPriceCents: 850,
+        packDiscountPercent: 12
+      });
+    expect(miseAJour.status).toBe(200);
+    expect(miseAJour.body.formats.standard.basePriceCents).toBe(4300);
+
+    const lecture = await request(app).get('/api/admin/pricing').set('Authorization', 'Bearer admin-token');
+    expect(lecture.body.formats.standard.basePriceCents).toBe(4300);
+    expect(lecture.body.pdfPriceCents).toBe(850);
+    expect(lecture.body.packDiscountPercent).toBe(12);
+    // basePages/couts Gelato (reference) restent ceux d'usine, jamais ecrases.
+    expect(lecture.body.reference.standard.basePages).toBe(30);
   });
 });

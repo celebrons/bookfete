@@ -1,0 +1,18 @@
+# Une fois par jour suffit : les IP de plus de 90 jours ne sont pas
+# sensibles a l'heure pres.
+#
+# Installer :
+#   systemctl enable --now bookipix-anonymiser-ip.timer
+
+[Unit]
+Description=Anonymisation quotidienne des IP de trafic de plus de 90 jours
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1d
+AccuracySec=10min
+Persistent=true
+Unit=bookipix-anonymiser-ip.service
+
+[Install]
+WantedBy=timers.target

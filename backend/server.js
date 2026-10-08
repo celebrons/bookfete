@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { logEvent } = require('./services/events/eventLog');
 const { initAppMode } = require('./services/settings/appMode');
+const { initPricingCache } = require('./services/pricing/pricingSettings');
 require('dotenv').config();
 
 const quietStartup = process.env.QUIET_STARTUP !== '0';
@@ -339,7 +340,7 @@ app.use((err, req, res, _next) => {
 // apres un redemarrage verraient le repli 'test' par defaut pendant
 // quelques secondes, meme si la base dit deja 'production'.
 let server;
-initAppMode().finally(() => {
+Promise.all([initAppMode(), initPricingCache()]).finally(() => {
   server = app.listen(PORT, () => {
     console.log(`API started on http://localhost:${PORT}`);
   });

@@ -30,6 +30,7 @@ const coverComposer = require('../services/composition/coverComposer');
 const { resolveCoverFormat, COVER_FORMATS, DEFAULT_COVER_FORMAT_ID } = require('../services/composition/coverFormat');
 const { resolveFormatDensity } = require('../services/composition/formatDensity');
 const { getAppMode, setAppMode, missingLiveRequirements } = require('../services/settings/appMode');
+const { getPricingSettings, setPricingSettings, getPricingConfigSync } = require('../services/pricing/pricingSettings');
 const storageService = require('../services/storageService');
 const { listAbandonedAnonymousAccounts, purgeAbandonedAnonymousAccounts } = require('../services/accounts/anonymousPurge');
 
@@ -601,6 +602,33 @@ router.post('/mode', authenticate, requireAdmin, async (req, res) => {
     res.json({ mode: applique });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message, missing: error.missing });
+  }
+});
+
+// GET /api/admin/pricing
+// Tarifs actuels des livres (voir services/pricing/pricingSettings.js) —
+// basePages/couts Gelato (reference de marge, jamais factures tels quels)
+// ajoutes a titre informatif, jamais modifiables depuis cette route.
+router.get('/pricing', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const settings = await getPricingSettings();
+    res.json({ ...settings, reference: getPricingConfigSync() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/admin/pricing
+// Modifie les tarifs. Validation complete deja faite par setPricingSettings
+// (un champ absent/invalide retombe sur sa valeur actuelle, jamais une
+// erreur qui laisserait les tarifs dans un etat incoherent) — journalise
+// (pricing.updated), comme toute bascule qui touche a de l'argent reel.
+router.put('/pricing', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const config = await setPricingSettings(req.body, req.user?.email);
+    res.json({ ...config, reference: getPricingConfigSync() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
