@@ -3,8 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <!-- favicon.ico n'a jamais existe dans ce depot (404 constate le
-       2026-10-07) : favicon.png (PNG simple) est servi partout en 2026,
-       aucun navigateur courant n'exige plus le format .ico historique. -->
+       2026-10-07, puis Google affichant une icone generique a la place de
+       la vraie dans ses resultats, 2026-10-08 — Google verifie
+       specifiquement /favicon.ico a la racine, independamment de ce lien).
+       Les deux sont desormais servis : /favicon.ico (PNG encapsule dans un
+       conteneur .ico minimal, format reconnu partout depuis Windows Vista)
+       pour les robots/anciens outils qui ne regardent QUE ce chemin par
+       convention, et ce lien explicite pour tout le reste. -->
+  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
   <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />

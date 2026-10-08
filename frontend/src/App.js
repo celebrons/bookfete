@@ -47,6 +47,7 @@ import ExemplesLuxe from './components/legal/ExemplesLuxe';
 
 import ScrollToTop from './components/common/ScrollToTop';
 import PageViewTracker from './components/common/PageViewTracker';
+import PageMeta from './components/common/PageMeta';
 
 // ============================================
 // COMPOSANT DE ROUTE PROTÉGÉE
@@ -105,6 +106,7 @@ function App() {
     <Router>
       <ScrollToTop />
       <PageViewTracker />
+      <PageMeta />
       <Layout>
         <Routes>
   
