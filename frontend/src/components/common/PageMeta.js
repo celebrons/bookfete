@@ -35,6 +35,9 @@ const PAGES = {
 const TITRE_DEFAUT = document.title;
 const DESCRIPTION_META = document.querySelector('meta[name="description"]');
 const DESCRIPTION_PAR_DEFAUT_INITIALE = DESCRIPTION_META?.getAttribute('content') || DESCRIPTION_DEFAUT;
+const CANONICAL_LINK = document.querySelector('link[rel="canonical"]');
+const CANONICAL_PAR_DEFAUT = CANONICAL_LINK?.getAttribute('href') || 'https://bookipix.com/';
+const ORIGINE_CANONIQUE = 'https://bookipix.com';
 
 const PageMeta = () => {
   const { pathname } = useLocation();
@@ -44,6 +47,13 @@ const PageMeta = () => {
     document.title = page?.title || TITRE_DEFAUT;
     if (DESCRIPTION_META) {
       DESCRIPTION_META.setAttribute('content', page?.description || DESCRIPTION_PAR_DEFAUT_INITIALE);
+    }
+    // index.html ne declare qu'un seul <link rel="canonical"> (vers la
+    // racine) : sans cette correction, Google voit la MEME URL canonique
+    // sur /tarifs, /how-it-works, etc., et peut choisir de ne jamais les
+    // indexer separement — contraire au but meme de ce chantier.
+    if (CANONICAL_LINK) {
+      CANONICAL_LINK.setAttribute('href', page ? `${ORIGINE_CANONIQUE}${pathname}` : CANONICAL_PAR_DEFAUT);
     }
   }, [pathname]);
 
