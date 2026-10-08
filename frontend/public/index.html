@@ -2,7 +2,10 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+  <!-- favicon.ico n'a jamais existe dans ce depot (404 constate le
+       2026-10-07) : favicon.png (PNG simple) est servi partout en 2026,
+       aucun navigateur courant n'exige plus le format .ico historique. -->
+  <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -10,7 +13,10 @@
     href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Playfair+Display:wght@400;500&display=swap"
     rel="stylesheet"
   />
-  <meta name="theme-color" content="#764ba2" />
+  <!-- #764ba2 (violet) etait un reste de l'ancienne identite "Memoire
+       Collective" : la vraie palette (voir src/styles/luxe-theme.css,
+       --gold) est or/encre/creme, jamais violette. -->
+  <meta name="theme-color" content="#b8924a" />
   <meta
     name="description"
     content="Bookipix : créez un album photo collaboratif ou un livre souvenir avec vos proches, puis commandez-le imprimé en quelques clics."
@@ -21,9 +27,31 @@
   <meta property="og:title" content="Bookipix – Album photo et livre souvenir collaboratifs" />
   <meta property="og:description" content="Créez un album photo collaboratif ou un livre souvenir avec vos proches, puis commandez-le imprimé en quelques clics." />
   <meta property="og:url" content="https://bookipix.com/" />
+  <meta property="og:image" content="https://bookipix.com/images/og-image.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="fr_FR" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Bookipix – Album photo et livre souvenir collaboratifs" />
+  <meta name="twitter:description" content="Créez un album photo collaboratif ou un livre souvenir avec vos proches, puis commandez-le imprimé en quelques clics." />
+  <meta name="twitter:image" content="https://bookipix.com/images/og-image.jpg" />
   <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
   <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
   <title>Bookipix – Album photo et livre souvenir collaboratifs</title>
+  <!-- Donnees structurees (2026-10-08) : aide Google a comprendre QUI est
+       Bookipix (nom, logo, site) independamment du texte de la page —
+       n'affirme que des faits verifiables, jamais un avis/une note
+       inventee. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Bookipix",
+    "url": "https://bookipix.com/",
+    "logo": "https://bookipix.com/logo512.png",
+    "description": "Créez un album photo collaboratif ou un livre souvenir avec vos proches, puis commandez-le imprimé."
+  }
+  </script>
 </head>
 <body>
   <noscript>Vous devez activer JavaScript pour utiliser cette application.</noscript>
