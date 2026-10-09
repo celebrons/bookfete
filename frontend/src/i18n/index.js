@@ -24,6 +24,8 @@ import collectiveFr from '../locales/fr/collective.json';
 import collectiveEn from '../locales/en/collective.json';
 import legalFr from '../locales/fr/legal.json';
 import legalEn from '../locales/en/legal.json';
+import exemplesFr from '../locales/fr/exemples.json';
+import exemplesEn from '../locales/en/exemples.json';
 
 // Chantier bilingue (2026-09-30) : un namespace par grand domaine de l'app
 // (mirroring frontend/src/components/<dossier>) plutot qu'un fichier de
@@ -33,8 +35,8 @@ import legalEn from '../locales/en/legal.json';
 // chaque phase suivante ajoute le sien (checkout, atelier, collective,
 // legal...) sans jamais toucher a celui-ci.
 const resources = {
-  fr: { common: commonFr, auth: authFr, home: homeFr, createBook: createBookFr, checkout: checkoutFr, account: accountFr, atelier: atelierFr, preview: previewFr, dashboard: dashboardFr, collective: collectiveFr, legal: legalFr },
-  en: { common: commonEn, auth: authEn, home: homeEn, createBook: createBookEn, checkout: checkoutEn, account: accountEn, atelier: atelierEn, preview: previewEn, dashboard: dashboardEn, collective: collectiveEn, legal: legalEn }
+  fr: { common: commonFr, auth: authFr, home: homeFr, createBook: createBookFr, checkout: checkoutFr, account: accountFr, atelier: atelierFr, preview: previewFr, dashboard: dashboardFr, collective: collectiveFr, legal: legalFr, exemples: exemplesFr },
+  en: { common: commonEn, auth: authEn, home: homeEn, createBook: createBookEn, checkout: checkoutEn, account: accountEn, atelier: atelierEn, preview: previewEn, dashboard: dashboardEn, collective: collectiveEn, legal: legalEn, exemples: exemplesEn }
 };
 
 i18n
@@ -49,7 +51,7 @@ i18n
     // pour 'en-US'/'en-GB'.
     nonExplicitSupportedLngs: true,
     load: 'languageOnly',
-    ns: ['common', 'auth', 'home', 'createBook', 'checkout', 'account', 'atelier', 'preview', 'dashboard', 'collective', 'legal'],
+    ns: ['common', 'auth', 'home', 'createBook', 'checkout', 'account', 'atelier', 'preview', 'dashboard', 'collective', 'legal', 'exemples'],
     defaultNS: 'common',
     detection: {
       // localStorage d'abord (dernier choix explicite fait sur CE

@@ -1,0 +1,212 @@
+{
+  "hero": {
+    "titlePre": "Flip through a real album. Then ",
+    "titleEm": "make your own.",
+    "lead": "Each example has 30 pages and uses every layout the editor offers. Turn the pages, zoom in on the photos, see who added what.",
+    "ctaCreate": "Create my album",
+    "ctaGallery": "See the layouts"
+  },
+  "viewer": {
+    "layouts": "Layouts",
+    "layoutsAria": "Show layouts",
+    "contributors": "Contributors",
+    "contributorsAria": "Show contributors",
+    "zoom": "Zoom",
+    "zoomAria": "Zoom in on the page",
+    "fullscreen": "Fullscreen",
+    "fullscreenAria": "Fullscreen",
+    "fullscreenUnavailable": "Fullscreen isn't available here.",
+    "hint": "Click a page corner or drag it",
+    "prevAria": "Previous page",
+    "nextAria": "Next page",
+    "cover": "Cover",
+    "coverShort": "Cover",
+    "backCover": "Back cover",
+    "backCoverShort": "Back",
+    "page": "Page {{n}}",
+    "pagesPair": "Pages {{a}} and {{b}}",
+    "of": "of {{total}}"
+  },
+  "collab": {
+    "eyebrow": "Collaborative album",
+    "title": "One album, many hands.",
+    "lead": "You invite your loved ones with a link. Everyone adds their photos and words from their own phone. You put the album together and order it once.",
+    "cardTitle": "Who added what?",
+    "cardSub": "In the album above. Click a name to jump to their pages.",
+    "photoWord_one": "photo",
+    "photoWord_other": "photos",
+    "textWord_one": "note",
+    "textWord_other": "notes",
+    "steps": [
+      { "title": "Invite your loved ones", "text": "Send a link by message. No account needed to send photos." },
+      { "title": "Everyone adds photos and words", "text": "Contributions land in your album, with their author's name attached." },
+      { "title": "You compose it and order it", "text": "You choose the layouts and the pages. One album, one order." }
+    ],
+    "scenarios": [
+      { "title": "Wedding", "text": "Guests add their photos from the evening, you keep the best ones.", "fmt": 1 },
+      { "title": "Trip with friends", "text": "Everyone took their own photos. They all end up in the same album.", "fmt": 3 },
+      { "title": "New baby", "text": "Grandparents, aunts and uncles write a note and add their photos.", "fmt": 2 },
+      { "title": "Group trip", "text": "One album for the whole crew, with everyone's name on their pages.", "fmt": 0 }
+    ],
+    "scenarioLink": "See the album ›"
+  },
+  "gallery": {
+    "eyebrow": "Layouts",
+    "title": "Every page you can build.",
+    "lead": "Click a layout to find it in the album, on the page where it appears.",
+    "items": {
+      "cover": { "label": "Cover", "text": "A title, a photo, your contributors." },
+      "chap": { "label": "Chapter title", "text": "To open a new part of the album." },
+      "pano": { "label": "Spread", "text": "One photo across two pages." },
+      "four": { "label": "4 photos", "text": "Four photos that talk to each other." },
+      "three": { "label": "3 photos", "text": "One big photo, two small ones." },
+      "six": { "label": "6 photos", "text": "Six photos for a rich moment." },
+      "two": { "label": "2 photos", "text": "Two photos, one contrast." },
+      "cap": { "label": "Photo + caption", "text": "A photo and a short note." },
+      "tp": { "label": "Text + photo", "text": "A photo with words written by a loved one." },
+      "full": { "label": "Full page", "text": "The photo filling the whole page." },
+      "quote": { "label": "Quote", "text": "A few words, with their author's name." },
+      "collage": { "label": "Collage", "text": "Photos laid out like on a table." },
+      "thanks": { "label": "Thank you", "text": "Every contributor, one by one." },
+      "back": { "label": "Back cover", "text": "The last page, in your own style." },
+      "ded": { "label": "Dedication", "text": "A few words to open the album." }
+    }
+  },
+  "thanks": {
+    "title": "Thank you",
+    "lead": "To everyone who filled this album.",
+    "footer": "One album, ordered together."
+  },
+  "final": {
+    "titleDefault": "Your album starts here.",
+    "leadDefault": "Pick a format, invite your loved ones, and fill the pages.",
+    "titleFormat": "Your {{format}} album starts here.",
+    "leadFormat": "{{format}} format, {{size}}. Invite your loved ones and fill the pages together.",
+    "ctaFormat": "Create my {{format}} album",
+    "ctaTemplate": "Start from this example",
+    "footerCredit": "Photos in these examples are royalty-free (Wikimedia Commons, CC0/CC BY/CC BY-SA licenses) chosen to illustrate the album — the albums you create use your own photos. The people and stories shown here are fictional.",
+    "madeWith": "Made with Bookipix"
+  },
+  "zoomModal": {
+    "hint": "Scroll or use the buttons to zoom, drag to pan",
+    "zoomOutAria": "Zoom out",
+    "resetAria": "Reset zoom",
+    "zoomInAria": "Zoom in",
+    "closeAria": "Close",
+    "close": "Close"
+  },
+  "formats": {
+    "carre": {
+      "name": "Square",
+      "theme": "Trip with friends",
+      "people": {
+        "camille": "Camille", "marc": "Marc", "ines": "Inès", "lea": "Léa", "tom": "Tom"
+      },
+      "album": {
+        "title": "Iceland, eight days",
+        "sub": "August 2026",
+        "dedT": "For",
+        "ded": "the eight days when the weather changed every ten minutes, and nobody complained.",
+        "ch1n": "Chapter 1", "ch1t": "Reykjavik and the south coast",
+        "ch2n": "Chapter 2", "ch2t": "The far north",
+        "cap1": "First waterfall, first fit of laughter.",
+        "cap2": "Dinner at 11pm, still broad daylight.",
+        "cap3": "Black sand beach, wind in our faces.",
+        "full1": "The northern lights weren't on the plan.",
+        "full2": "End of the road, start of the memories.",
+        "tp1t": "Day 3, the glacier",
+        "tp1p": "We walked two hours across the glacier tongue. Marc lost a glove, Inès found a blue ice cave, Tom filmed the whole thing upside down.",
+        "tp2t": "Day 6, the hot springs",
+        "tp2p": "Forty degrees in the water, six outside. The best moment of the trip, by that evening's show of hands.",
+        "q1": "We drove 1,400 km and had exactly one argument, about the playlist.",
+        "q2": "The northern lights weren't on the plan. They showed up anyway.",
+        "note1": "Day 4!", "note2": "On the road",
+        "back": "Iceland, August 2026"
+      }
+    },
+    "paysage": {
+      "name": "Landscape",
+      "theme": "Wedding",
+      "people": {
+        "sarah": "Sarah", "hugo": "Hugo", "claire": "Claire", "julien": "Julien", "jean": "Grandpa Jean"
+      },
+      "album": {
+        "title": "Sarah & Hugo",
+        "sub": "The wedding · September 20, 2026",
+        "dedT": "To everyone",
+        "ded": "who danced until the very last song.",
+        "ch1n": "Part one", "ch1t": "The ceremony",
+        "ch2n": "Part two", "ch2t": "The party",
+        "cap1": "The moment Hugo saw Sarah.",
+        "cap2": "The bouquet, right before it flew.",
+        "cap3": "Grandpa Jean on the dance floor, of course.",
+        "full1": "The sun waited for the vows to end.",
+        "full2": "The last dance.",
+        "tp1t": "The best man's speech",
+        "tp1p": "Julien promised five minutes and took twelve. Nobody checked their watch. The photos come from table 4, who caught it all.",
+        "tp2t": "The cake",
+        "tp2p": "Three tiers, a strawberry filling, and a candle Grandpa Jean insisted on lighting himself.",
+        "q1": "We wanted a simple wedding. We got a hundred and thirty witnesses to our happiness.",
+        "q2": "Thank you for taking photos for us while we were busy dancing.",
+        "note1": "Table 4!", "note2": "First slow dance",
+        "back": "Sarah & Hugo, September 20, 2026"
+      }
+    },
+    "portrait": {
+      "name": "Portrait",
+      "theme": "New baby",
+      "people": {
+        "papa": "Dad", "maman": "Mum", "mamie": "Grandma Odile", "leo": "Uncle Léo"
+      },
+      "album": {
+        "title": "Louise",
+        "sub": "The first few months",
+        "dedT": "For Louise",
+        "ded": "so she knows how much we were waiting for her.",
+        "ch1n": "Chapter 1", "ch1t": "The first weeks",
+        "ch2n": "Chapter 2", "ch2t": "The first smiles",
+        "cap1": "First bath, first tears (ours).",
+        "cap2": "Grandma Odile's blanket.",
+        "cap3": "Ten fingers, ten toes, a hat way too big.",
+        "full1": "Sunday, cuddle day.",
+        "full2": "She sleeps, we watch.",
+        "tp1t": "The first month",
+        "tp1p": "Nights are short, photos are many. Grandma knitted everything, Uncle Léo photographed everything.",
+        "tp2t": "First smile",
+        "tp2p": "A Tuesday, 7:40am. Dad swears it was for him. Mum has the photo.",
+        "q1": "She holds my finger like she never wants to let go.",
+        "q2": "My grandchildren taught me you can love a little more every day.",
+        "note1": "Nap time", "note2": "7:40am",
+        "back": "Louise, born spring 2026"
+      }
+    },
+    "grand": {
+      "name": "Large square",
+      "theme": "Road trip",
+      "people": {
+        "nina": "Nina", "sam": "Sam", "yanis": "Yanis", "chloe": "Chloé"
+      },
+      "album": {
+        "title": "American West",
+        "sub": "Road trip · three weeks",
+        "dedT": "To the",
+        "ded": "rental car, which never broke down. Almost.",
+        "ch1n": "Chapter 1", "ch1t": "Desert and canyons",
+        "ch2n": "Chapter 2", "ch2t": "The coast road",
+        "cap1": "Mile 1,500, still no signal.",
+        "cap2": "Sunrise at 4:50am, for five minutes of magic.",
+        "cap3": "The diner where Yanis ordered the same burger three times.",
+        "full1": "Highway 1, windows down.",
+        "full2": "The last sunset.",
+        "tp1t": "The canyon at dawn",
+        "tp1p": "We left before everyone else. Chloé shot the cover photo here, phone propped on a rock.",
+        "tp2t": "The last stretch",
+        "tp2p": "The road hugged the ocean for 120 miles. We drove with the windows down, quiet for once.",
+        "q1": "The best view was the back seat, with everyone fast asleep.",
+        "q2": "Three weeks, four friends, one trunk. We pulled it off.",
+        "note1": "4:50am", "note2": "Highway 1",
+        "back": "Road trip, American West"
+      }
+    }
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "hero": {
+    "titlePre": "Feuilletez un vrai album. Puis ",
+    "titleEm": "faites le vôtre.",
+    "lead": "Chaque exemple compte 30 pages et utilise toutes les mises en page de l'éditeur. Tournez les pages, zoomez sur les photos, voyez qui a ajouté quoi.",
+    "ctaCreate": "Créer mon album",
+    "ctaGallery": "Voir les mises en page"
+  },
+  "viewer": {
+    "layouts": "Mises en page",
+    "layoutsAria": "Afficher les mises en page",
+    "contributors": "Contributeurs",
+    "contributorsAria": "Afficher les contributeurs",
+    "zoom": "Zoom",
+    "zoomAria": "Zoomer sur la page",
+    "fullscreen": "Plein écran",
+    "fullscreenAria": "Plein écran",
+    "fullscreenUnavailable": "Le plein écran n'est pas disponible ici.",
+    "hint": "Cliquez sur un coin de page ou faites-la glisser",
+    "prevAria": "Page précédente",
+    "nextAria": "Page suivante",
+    "cover": "Couverture",
+    "coverShort": "Couv.",
+    "backCover": "4ème de couverture",
+    "backCoverShort": "4ème",
+    "page": "Page {{n}}",
+    "pagesPair": "Pages {{a}} et {{b}}",
+    "of": "sur {{total}}"
+  },
+  "collab": {
+    "eyebrow": "Album collaboratif",
+    "title": "Un album, plusieurs mains.",
+    "lead": "Vous invitez vos proches avec un lien. Chacun ajoute ses photos et ses textes depuis son téléphone. Vous composez l'album ensemble et vous le commandez une seule fois.",
+    "cardTitle": "Qui a ajouté quoi ?",
+    "cardSub": "Dans l'album ci-dessus. Cliquez sur un prénom pour retrouver ses pages.",
+    "photoWord_one": "photo",
+    "photoWord_other": "photos",
+    "textWord_one": "texte",
+    "textWord_other": "textes",
+    "steps": [
+      { "title": "Invitez vos proches", "text": "Un lien à envoyer par message. Pas de compte à créer pour envoyer des photos." },
+      { "title": "Chacun ajoute ses photos et ses textes", "text": "Les contributions arrivent dans votre album, avec le nom de leur auteur." },
+      { "title": "Vous composez et vous commandez", "text": "Vous choisissez les mises en page et les pages. Un seul album, une seule commande." }
+    ],
+    "scenarios": [
+      { "title": "Mariage", "text": "Les invités ajoutent leurs photos de la soirée, vous gardez les meilleures.", "fmt": 1 },
+      { "title": "Voyage entre amis", "text": "Chacun a pris des photos de son côté. Elles finissent toutes dans le même album.", "fmt": 3 },
+      { "title": "Naissance", "text": "Grands-parents, oncles et tantes écrivent un mot et ajoutent leurs photos.", "fmt": 2 },
+      { "title": "Voyage en groupe", "text": "Un seul album pour toute la bande, avec le nom de chacun sur ses pages.", "fmt": 0 }
+    ],
+    "scenarioLink": "Voir l'album ›"
+  },
+  "gallery": {
+    "eyebrow": "Mises en page",
+    "title": "Toutes les pages que vous pouvez composer.",
+    "lead": "Cliquez sur une mise en page pour la retrouver dans l'album, à la page où elle apparaît.",
+    "items": {
+      "cover": { "label": "Couverture", "text": "Un titre, une photo, vos contributeurs." },
+      "chap": { "label": "Titre de chapitre", "text": "Pour ouvrir une partie de l'album." },
+      "pano": { "label": "Double page", "text": "Une photo sur deux pages." },
+      "four": { "label": "4 photos", "text": "Quatre photos qui se répondent." },
+      "three": { "label": "3 photos", "text": "Une grande photo, deux petites." },
+      "six": { "label": "6 photos", "text": "Six photos pour un moment riche." },
+      "two": { "label": "2 photos", "text": "Deux photos, un contraste." },
+      "cap": { "label": "Photo + légende", "text": "Une photo et son petit mot." },
+      "tp": { "label": "Texte + photo", "text": "Une photo et un texte écrit par un proche." },
+      "full": { "label": "Pleine page", "text": "La photo à fond de page." },
+      "quote": { "label": "Citation", "text": "Un mot, avec le nom de son auteur." },
+      "collage": { "label": "Collage", "text": "Des photos posées comme sur une table." },
+      "thanks": { "label": "Remerciements", "text": "Les contributeurs, un par un." },
+      "back": { "label": "4ème de couverture", "text": "La dernière page, à votre image." },
+      "ded": { "label": "Dédicace", "text": "Quelques mots pour commencer." }
+    }
+  },
+  "thanks": {
+    "title": "Merci",
+    "lead": "À tous ceux qui ont rempli cet album.",
+    "footer": "Un seul album, commandé ensemble."
+  },
+  "final": {
+    "titleDefault": "Votre album commence ici.",
+    "leadDefault": "Choisissez un format, invitez vos proches et remplissez les pages.",
+    "titleFormat": "Votre album {{format}} commence ici.",
+    "leadFormat": "Format {{format}}, {{size}}. Invitez vos proches et remplissez les pages ensemble.",
+    "ctaFormat": "Créer mon album {{format}}",
+    "ctaTemplate": "Partir de cet exemple",
+    "footerCredit": "Les photos de ces exemples sont des photos libres de droits (Wikimedia Commons, licences CC0/CC BY/CC BY-SA) choisies pour illustrer l'album — les albums que vous créez utilisent vos propres photos. Les personnes et récits illustrés ici sont fictifs.",
+    "madeWith": "Fait avec Bookipix"
+  },
+  "zoomModal": {
+    "hint": "Molette ou boutons pour zoomer, glissez pour déplacer",
+    "zoomOutAria": "Dézoomer",
+    "resetAria": "Réinitialiser le zoom",
+    "zoomInAria": "Zoomer",
+    "closeAria": "Fermer",
+    "close": "Fermer"
+  },
+  "formats": {
+    "carre": {
+      "name": "Carré",
+      "theme": "Voyage entre amis",
+      "people": {
+        "camille": "Camille", "marc": "Marc", "ines": "Inès", "lea": "Léa", "tom": "Tom"
+      },
+      "album": {
+        "title": "Islande, huit jours",
+        "sub": "Août 2026",
+        "dedT": "Pour",
+        "ded": "les huit jours où la météo a changé toutes les dix minutes, et où personne ne s'est plaint.",
+        "ch1n": "Chapitre 1", "ch1t": "Reykjavik et la route du sud",
+        "ch2n": "Chapitre 2", "ch2t": "Le grand nord",
+        "cap1": "Première cascade, premier fou rire.",
+        "cap2": "Dîner à 23 h, il fait encore jour.",
+        "cap3": "Plage de sable noir, vent de face.",
+        "full1": "Les aurores n'étaient pas prévues.",
+        "full2": "Fin de la route, début des souvenirs.",
+        "tp1t": "Jour 3, le glacier",
+        "tp1p": "On a marché deux heures sur la langue de glace. Marc a perdu un gant, Inès a trouvé une grotte bleue, Tom a tout filmé à l'envers.",
+        "tp2t": "Jour 6, les sources chaudes",
+        "tp2p": "Quarante degrés dans l'eau, six dehors. Le meilleur moment du voyage, selon le vote à main levée du soir.",
+        "q1": "On a roulé 1 400 km et il n'y a eu qu'une seule dispute, à propos de la playlist.",
+        "q2": "Les aurores n'étaient pas prévues. Elles sont venues quand même.",
+        "note1": "Jour 4 !", "note2": "Sur la route",
+        "back": "Islande, août 2026"
+      }
+    },
+    "paysage": {
+      "name": "Paysage",
+      "theme": "Mariage",
+      "people": {
+        "sarah": "Sarah", "hugo": "Hugo", "claire": "Claire", "julien": "Julien", "jean": "Papi Jean"
+      },
+      "album": {
+        "title": "Sarah & Hugo",
+        "sub": "Le mariage · 20 septembre 2026",
+        "dedT": "À tous ceux",
+        "ded": "qui ont dansé jusqu'à la dernière chanson.",
+        "ch1n": "Première partie", "ch1t": "La cérémonie",
+        "ch2n": "Deuxième partie", "ch2t": "La fête",
+        "cap1": "Le moment où Hugo a vu Sarah.",
+        "cap2": "Le bouquet, juste avant qu'il ne vole.",
+        "cap3": "Papi Jean sur la piste, évidemment.",
+        "full1": "Le soleil a attendu la fin des vœux.",
+        "full2": "La dernière danse.",
+        "tp1t": "Le discours du témoin",
+        "tp1p": "Julien avait promis cinq minutes, il en a pris douze. Personne n'a regardé sa montre. Les photos viennent de la table 4, qui a tout capturé.",
+        "tp2t": "Le gâteau",
+        "tp2p": "Trois étages, un fraisier, et une bougie que Papi Jean a voulu allumer lui-même.",
+        "q1": "On voulait un mariage simple. On a eu cent trente témoins de notre bonheur.",
+        "q2": "Merci d'avoir pris des photos à notre place pendant qu'on dansait.",
+        "note1": "Table 4 !", "note2": "Premier slow",
+        "back": "Sarah & Hugo, 20 septembre 2026"
+      }
+    },
+    "portrait": {
+      "name": "Portrait",
+      "theme": "Naissance",
+      "people": {
+        "papa": "Papa", "maman": "Maman", "mamie": "Mamie Odile", "leo": "Tonton Léo"
+      },
+      "album": {
+        "title": "Louise",
+        "sub": "Les premiers mois",
+        "dedT": "Pour Louise",
+        "ded": "pour qu'elle sache combien on l'attendait.",
+        "ch1n": "Chapitre 1", "ch1t": "Les premières semaines",
+        "ch2n": "Chapitre 2", "ch2t": "Les premiers sourires",
+        "cap1": "Premier bain, premières larmes (les nôtres).",
+        "cap2": "La couverture de Mamie Odile.",
+        "cap3": "Dix doigts, dix orteils, un bonnet trop grand.",
+        "full1": "Dimanche, jour de câlins.",
+        "full2": "Elle dort, on la regarde.",
+        "tp1t": "Le premier mois",
+        "tp1p": "Les nuits sont courtes, les photos sont nombreuses. Mamie a tout tricoté, Tonton Léo a tout photographié.",
+        "tp2t": "Premier sourire",
+        "tp2p": "Un mardi, 7 h 40. Papa jure que c'était pour lui. Maman a la photo.",
+        "q1": "Elle tient mon doigt comme si elle ne voulait plus jamais le lâcher.",
+        "q2": "Mes petits-enfants m'ont appris qu'on pouvait aimer plus fort chaque jour.",
+        "note1": "Dodo", "note2": "7 h 40",
+        "back": "Louise, née au printemps 2026"
+      }
+    },
+    "grand": {
+      "name": "Grand carré",
+      "theme": "Road trip",
+      "people": {
+        "nina": "Nina", "sam": "Sam", "yanis": "Yanis", "chloe": "Chloé"
+      },
+      "album": {
+        "title": "Ouest américain",
+        "sub": "Road trip · trois semaines",
+        "dedT": "À la voiture",
+        "ded": "de location, qui n'est jamais tombée en panne. Presque.",
+        "ch1n": "Chapitre 1", "ch1t": "Désert et canyons",
+        "ch2n": "Chapitre 2", "ch2t": "La route de la côte",
+        "cap1": "Kilomètre 2 400, toujours pas de réseau.",
+        "cap2": "Lever de soleil à 4 h 50, pour cinq minutes de magie.",
+        "cap3": "Le diner où Yanis a commandé trois fois le même burger.",
+        "full1": "Route 1, fenêtres ouvertes.",
+        "full2": "Dernier coucher de soleil.",
+        "tp1t": "Le canyon au petit matin",
+        "tp1p": "On est partis avant tout le monde. Chloé a pris la photo de couverture ici, le téléphone posé sur un rocher.",
+        "tp2t": "Les derniers kilomètres",
+        "tp2p": "La route longeait l'océan sur 200 km. On a roulé fenêtres ouvertes, en silence, pour une fois.",
+        "q1": "Le plus beau paysage, c'était l'arrière de la voiture, avec tout le monde endormi.",
+        "q2": "Trois semaines, quatre amis, un seul coffre. On a réussi.",
+        "note1": "4 h 50", "note2": "Route 1",
+        "back": "Road trip, ouest américain"
+      }
+    }
+  }
+}

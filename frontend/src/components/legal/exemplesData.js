@@ -9,10 +9,17 @@
 //
 // Photos : vraies photos libres de droits (Wikimedia Commons, licences
 // CC0/CC BY/CC BY-SA — voir le credit en pied de page), remplacant les
-// illustrations procedurales de l'artefact d'origine. Un petit nombre de
-// photos par album (6 environ), reutilisees plusieurs fois sur les 30 pages
-// — exactement comme l'artefact reutilisait chaque "genre" d'illustration
-// plusieurs fois plutot que d'en generer une par emplacement.
+// illustrations procedurales de l'artefact d'origine.
+//
+// 2026-10-11 (chantier bilingue) : tout le texte narratif (titres,
+// dedicaces, citations, prenoms des contributeurs...) vient desormais de
+// locales/{fr,en}/exemples.json via la fonction `t` passee a buildFormats —
+// plus rien de fixe en francais ici. Les ids/couleurs/photos des
+// contributeurs restent structurels (identiques dans les deux langues),
+// seul leur NOM affiche change ; l'initiale de l'avatar se deduit du nom
+// traduit (voir `initiale`) plutot que d'etre fixee a part, pour rester
+// coherente meme quand la traduction change le mot (ex. "Papi Jean" ->
+// "Grandpa Jean").
 const PHOTO_BASE = '/images/exemples-stock/';
 const ph = (nom) => `${PHOTO_BASE}${nom}.jpg`;
 
@@ -38,136 +45,96 @@ export const PHOTOS = {
   }
 };
 
-export const FORMATS = [
+// Structure fixe (jamais traduite) : ids, couleurs, genres de photo cycles,
+// panoramas. Tout le texte vient de `t('exemples.formats.<id>...')`.
+const STRUCTURE = [
   {
-    id: 'carre', name: 'Carré', size: '21 × 21 cm', ratio: 1,
-    album: {
-      title: 'Islande, huit jours', sub: 'Août 2026', theme: 'Voyage entre amis',
-      kinds: ['peaks', 'night', 'sea', 'road', 'town', 'forest'], pano: ['peaks', 'sea'],
-      people: [
-        { id: 'camille', name: 'Camille', ini: 'C', color: '#d9482d' },
-        { id: 'marc', name: 'Marc', ini: 'M', color: '#0b8a7b' },
-        { id: 'ines', name: 'Inès', ini: 'I', color: '#7b5cf0' },
-        { id: 'lea', name: 'Léa', ini: 'L', color: '#b98300' },
-        { id: 'tom', name: 'Tom', ini: 'T', color: '#2f7de1' }
-      ],
-      tx: {
-        dedT: 'Pour', ded: 'les huit jours où la météo a changé toutes les dix minutes, et où personne ne s\'est plaint.',
-        ch1: { n: 'Chapitre 1', t: 'Reykjavik et la route du sud' }, ch2: { n: 'Chapitre 2', t: 'Le grand nord' },
-        caps: ['Première cascade, premier fou rire.', 'Dîner à 23 h, il fait encore jour.', 'Plage de sable noir, vent de face.'],
-        full: ['Les aurores n\'étaient pas prévues.', 'Fin de la route, début des souvenirs.'],
-        tp: [
-          { t: 'Jour 3, le glacier', p: 'On a marché deux heures sur la langue de glace. Marc a perdu un gant, Inès a trouvé une grotte bleue, Tom a tout filmé à l\'envers.', who: 'marc' },
-          { t: 'Jour 6, les sources chaudes', p: 'Quarante degrés dans l\'eau, six dehors. Le meilleur moment du voyage, selon le vote à main levée du soir.', who: 'ines' }
-        ],
-        q: [
-          { t: 'On a roulé 1 400 km et il n\'y a eu qu\'une seule dispute, à propos de la playlist.', who: 'lea' },
-          { t: 'Les aurores n\'étaient pas prévues. Elles sont venues quand même.', who: 'camille' }
-        ],
-        note: ['Jour 4 !', 'Sur la route'], back: 'Islande, août 2026'
-      }
-    }
+    id: 'carre', ratio: 1, size: '21 × 21 cm',
+    kinds: ['peaks', 'night', 'sea', 'road', 'town', 'forest'], pano: ['peaks', 'sea'],
+    // tpWho/qWho : qui a ecrit chaque texte+photo / citation — un choix
+    // narratif structurel, identique dans les deux langues (seul le TEXTE
+    // vient de la traduction).
+    tpWho: ['marc', 'ines'], qWho: ['lea', 'camille'],
+    people: [
+      { id: 'camille', color: '#d9482d' }, { id: 'marc', color: '#0b8a7b' },
+      { id: 'ines', color: '#7b5cf0' }, { id: 'lea', color: '#b98300' }, { id: 'tom', color: '#2f7de1' }
+    ]
   },
   {
-    id: 'paysage', name: 'Paysage', size: '30 × 21 cm', ratio: 30 / 21,
-    album: {
-      title: 'Sarah & Hugo', sub: 'Le mariage · 20 septembre 2026', theme: 'Mariage',
-      kinds: ['flowers', 'arch', 'bokeh', 'group', 'rings', 'balloons'], pano: ['bokeh', 'flowers'],
-      people: [
-        { id: 'sarah', name: 'Sarah', ini: 'S', color: '#d4476b' },
-        { id: 'hugo', name: 'Hugo', ini: 'H', color: '#2f7de1' },
-        { id: 'claire', name: 'Claire', ini: 'C', color: '#0b8a7b' },
-        { id: 'julien', name: 'Julien', ini: 'J', color: '#7b5cf0' },
-        { id: 'jean', name: 'Papi Jean', ini: 'P', color: '#b98300' }
-      ],
-      tx: {
-        dedT: 'À tous ceux', ded: 'qui ont dansé jusqu\'à la dernière chanson.',
-        ch1: { n: 'Première partie', t: 'La cérémonie' }, ch2: { n: 'Deuxième partie', t: 'La fête' },
-        caps: ['Le moment où Hugo a vu Sarah.', 'Le bouquet, juste avant qu\'il ne vole.', 'Papi Jean sur la piste, évidemment.'],
-        full: ['Le soleil a attendu la fin des vœux.', 'La dernière danse.'],
-        tp: [
-          { t: 'Le discours du témoin', p: 'Julien avait promis cinq minutes, il en a pris douze. Personne n\'a regardé sa montre. Les photos viennent de la table 4, qui a tout capturé.', who: 'julien' },
-          { t: 'Le gâteau', p: 'Trois étages, un fraisier, et une bougie que Papi Jean a voulu allumer lui-même.', who: 'claire' }
-        ],
-        q: [
-          { t: 'On voulait un mariage simple. On a eu cent trente témoins de notre bonheur.', who: 'sarah' },
-          { t: 'Merci d\'avoir pris des photos à notre place pendant qu\'on dansait.', who: 'hugo' }
-        ],
-        note: ['Table 4 !', 'Premier slow'], back: 'Sarah & Hugo, 20 septembre 2026'
-      }
-    }
+    id: 'paysage', ratio: 30 / 21, size: '30 × 21 cm',
+    kinds: ['flowers', 'arch', 'bokeh', 'group', 'rings', 'balloons'], pano: ['bokeh', 'flowers'],
+    tpWho: ['julien', 'claire'], qWho: ['sarah', 'hugo'],
+    people: [
+      { id: 'sarah', color: '#d4476b' }, { id: 'hugo', color: '#2f7de1' }, { id: 'claire', color: '#0b8a7b' },
+      { id: 'julien', color: '#7b5cf0' }, { id: 'jean', color: '#b98300' }
+    ]
   },
   {
-    id: 'portrait', name: 'Portrait', size: '21 × 30 cm', ratio: 21 / 30,
-    album: {
-      title: 'Louise', sub: 'Les premiers mois', theme: 'Naissance',
-      kinds: ['rainbow', 'balloons', 'moon', 'flowers', 'group'], pano: ['flowers', 'rainbow'],
-      people: [
-        { id: 'papa', name: 'Papa', ini: 'P', color: '#2f7de1' },
-        { id: 'maman', name: 'Maman', ini: 'M', color: '#d4476b' },
-        { id: 'mamie', name: 'Mamie Odile', ini: 'O', color: '#b98300' },
-        { id: 'leo', name: 'Tonton Léo', ini: 'L', color: '#0b8a7b' }
-      ],
-      tx: {
-        dedT: 'Pour Louise', ded: 'pour qu\'elle sache combien on l\'attendait.',
-        ch1: { n: 'Chapitre 1', t: 'Les premières semaines' }, ch2: { n: 'Chapitre 2', t: 'Les premiers sourires' },
-        caps: ['Premier bain, premières larmes (les nôtres).', 'La couverture de Mamie Odile.', 'Dix doigts, dix orteils, un bonnet trop grand.'],
-        full: ['Dimanche, jour de câlins.', 'Elle dort, on la regarde.'],
-        tp: [
-          { t: 'Le premier mois', p: 'Les nuits sont courtes, les photos sont nombreuses. Mamie a tout tricoté, Tonton Léo a tout photographié.', who: 'papa' },
-          { t: 'Premier sourire', p: 'Un mardi, 7 h 40. Papa jure que c\'était pour lui. Maman a la photo.', who: 'leo' }
-        ],
-        q: [
-          { t: 'Elle tient mon doigt comme si elle ne voulait plus jamais le lâcher.', who: 'maman' },
-          { t: 'Mes petits-enfants m\'ont appris qu\'on pouvait aimer plus fort chaque jour.', who: 'mamie' }
-        ],
-        note: ['Dodo', '7 h 40'], back: 'Louise, née au printemps 2026'
-      }
-    }
+    id: 'portrait', ratio: 21 / 30, size: '21 × 30 cm',
+    kinds: ['rainbow', 'balloons', 'moon', 'flowers', 'group'], pano: ['flowers', 'rainbow'],
+    tpWho: ['papa', 'leo'], qWho: ['maman', 'mamie'],
+    people: [
+      { id: 'papa', color: '#2f7de1' }, { id: 'maman', color: '#d4476b' },
+      { id: 'mamie', color: '#b98300' }, { id: 'leo', color: '#0b8a7b' }
+    ]
   },
   {
-    id: 'grand', name: 'Grand carré', size: '30 × 30 cm', ratio: 1,
-    album: {
-      title: 'Ouest américain', sub: 'Road trip · trois semaines', theme: 'Road trip',
-      kinds: ['road', 'dunes', 'peaks', 'sea', 'town', 'night'], pano: ['dunes', 'road'],
-      people: [
-        { id: 'nina', name: 'Nina', ini: 'N', color: '#d4476b' },
-        { id: 'sam', name: 'Sam', ini: 'S', color: '#2f7de1' },
-        { id: 'yanis', name: 'Yanis', ini: 'Y', color: '#0b8a7b' },
-        { id: 'chloe', name: 'Chloé', ini: 'C', color: '#7b5cf0' }
-      ],
-      tx: {
-        dedT: 'À la voiture', ded: 'de location, qui n\'est jamais tombée en panne. Presque.',
-        ch1: { n: 'Chapitre 1', t: 'Désert et canyons' }, ch2: { n: 'Chapitre 2', t: 'La route de la côte' },
-        caps: ['Kilomètre 2 400, toujours pas de réseau.', 'Lever de soleil à 4 h 50, pour cinq minutes de magie.', 'Le diner où Yanis a commandé trois fois le même burger.'],
-        full: ['Route 1, fenêtres ouvertes.', 'Dernier coucher de soleil.'],
-        tp: [
-          { t: 'Le canyon au petit matin', p: 'On est partis avant tout le monde. Chloé a pris la photo de couverture ici, le téléphone posé sur un rocher.', who: 'chloe' },
-          { t: 'Les derniers kilomètres', p: 'La route longeait l\'océan sur 200 km. On a roulé fenêtres ouvertes, en silence, pour une fois.', who: 'yanis' }
-        ],
-        q: [
-          { t: 'Le plus beau paysage, c\'était l\'arrière de la voiture, avec tout le monde endormi.', who: 'sam' },
-          { t: 'Trois semaines, quatre amis, un seul coffre. On a réussi.', who: 'nina' }
-        ],
-        note: ['4 h 50', 'Route 1'], back: 'Road trip, ouest américain'
-      }
-    }
+    id: 'grand', ratio: 1, size: '30 × 30 cm',
+    kinds: ['road', 'dunes', 'peaks', 'sea', 'town', 'night'], pano: ['dunes', 'road'],
+    tpWho: ['chloe', 'yanis'], qWho: ['sam', 'nina'],
+    people: [
+      { id: 'nina', color: '#d4476b' }, { id: 'sam', color: '#2f7de1' },
+      { id: 'yanis', color: '#0b8a7b' }, { id: 'chloe', color: '#7b5cf0' }
+    ]
   }
 ];
 
-export const LAY = {
-  cover: 'Couverture', ded: 'Dédicace', chap: 'Titre de chapitre', pano: 'Double page',
-  four: '4 photos', three: '3 photos', six: '6 photos', two: '2 photos',
-  cap: 'Photo + légende', tp: 'Texte + photo', full: 'Pleine page', quote: 'Citation',
-  collage: 'Collage', thanks: 'Remerciements', back: '4ème de couverture'
-};
+const initiale = (nom) => (nom || '?').trim().charAt(0).toUpperCase();
+
 export const LAST = 29;
+
+// ---------- Construction des 4 albums dans la langue courante -------------
+// Appelee a chaque chargement de page ET a chaque changement de langue (voir
+// ExemplesLuxe.js) : `t` est deja namespace sur 'exemples' (useTranslation
+// ('exemples')). Reconstruit tout depuis zero (le cout est negligeable : 4
+// albums x 30 pages de donnees, pas de rendu).
+export function buildFormats(t) {
+  return STRUCTURE.map((s) => {
+    const name = t(`formats.${s.id}.name`);
+    const theme = t(`formats.${s.id}.theme`);
+    const people = s.people.map((p) => ({ ...p, name: t(`formats.${s.id}.people.${p.id}`), ini: initiale(t(`formats.${s.id}.people.${p.id}`)) }));
+    const A = {
+      title: t(`formats.${s.id}.album.title`), sub: t(`formats.${s.id}.album.sub`), theme,
+      kinds: s.kinds, pano: s.pano, people,
+      tx: {
+        dedT: t(`formats.${s.id}.album.dedT`), ded: t(`formats.${s.id}.album.ded`),
+        ch1: { n: t(`formats.${s.id}.album.ch1n`), t: t(`formats.${s.id}.album.ch1t`) },
+        ch2: { n: t(`formats.${s.id}.album.ch2n`), t: t(`formats.${s.id}.album.ch2t`) },
+        caps: [t(`formats.${s.id}.album.cap1`), t(`formats.${s.id}.album.cap2`), t(`formats.${s.id}.album.cap3`)],
+        full: [t(`formats.${s.id}.album.full1`), t(`formats.${s.id}.album.full2`)],
+        tp: [
+          { t: t(`formats.${s.id}.album.tp1t`), p: t(`formats.${s.id}.album.tp1p`), who: s.tpWho[0] },
+          { t: t(`formats.${s.id}.album.tp2t`), p: t(`formats.${s.id}.album.tp2p`), who: s.tpWho[1] }
+        ],
+        q: [
+          { t: t(`formats.${s.id}.album.q1`), who: s.qWho[0] }, { t: t(`formats.${s.id}.album.q2`), who: s.qWho[1] }
+        ],
+        note: [t(`formats.${s.id}.album.note1`), t(`formats.${s.id}.album.note2`)],
+        back: t(`formats.${s.id}.album.back`)
+      }
+    };
+    const fmt = { id: s.id, name, size: s.size, ratio: s.ratio, album: A };
+    buildAlbum(fmt);
+    return fmt;
+  });
+}
 
 // ---------- Construction des 30 pages d'un album --------------------------
 // Port direct de la logique de l'artefact (meme sequence de mises en page,
 // meme cycle sur les "genres" de photo) — seule differe la source de
-// l'image (PHOTOS[fmt.id][genre] au lieu d'un generateur SVG).
-export function buildAlbum(fmt) {
+// l'image (PHOTOS[fmt.id][genre] au lieu d'un generateur SVG) et le texte
+// (deja traduit dans A.tx par buildFormats ci-dessus).
+function buildAlbum(fmt) {
   const A = fmt.album, T = A.tx, people = A.people, n = people.length;
   const photos = PHOTOS[fmt.id];
   let c = 0;
@@ -229,7 +196,6 @@ export function buildAlbum(fmt) {
   fmt.pages = pg; fmt.counts = counts; fmt.first = first; fmt.pageSets = pageSets;
 }
 
-FORMATS.forEach(buildAlbum);
 export const personOf = (fmt, id) => fmt.album.people.find((p) => p.id === id);
 
 // ---------- Rendu HTML d'une page ------------------------------------------
@@ -237,7 +203,9 @@ export const personOf = (fmt, id) => fmt.album.people.find((p) => p.id === id);
 // innerHTML puis prises en charge directement par page-flip (bibliotheque
 // qui gere elle-meme le DOM de ses pages) — exactement le meme choix que
 // l'artefact d'origine, indispensable pour que page-flip fonctionne.
-export function pageHTML(s, i, fmt, opt = {}) {
+// `lay` (le libelle de chaque mise en page, deja traduit) est fourni par
+// l'appelant plutot que recalcule ici, pour ne pas dupliquer l'appel a `t`.
+export function pageHTML(s, i, fmt, lay, opt = {}) {
   const side = i % 2 ? 'ex-pl' : 'ex-pr';
   const person = (id) => personOf(fmt, id);
   const bgs = (o) => `background-image:url('${o.url}')`;
@@ -247,7 +215,7 @@ export function pageHTML(s, i, fmt, opt = {}) {
   let h = '';
   switch (s.lay) {
     case 'cover':
-      h = big(s.ph, 'ex-cover', `<div class="ex-cv-top">Album collaboratif</div><div class="ex-cv-bot"><h3>${s.title}</h3><p>${s.sub}</p><div class="ex-avs">${fmt.album.people.map((p) => `<i style="--c:${p.color}">${p.ini}</i>`).join('')}</div></div>`);
+      h = big(s.ph, 'ex-cover', `<div class="ex-cv-top">${opt.collabEyebrow || ''}</div><div class="ex-cv-bot"><h3>${s.title}</h3><p>${s.sub}</p><div class="ex-avs">${fmt.album.people.map((p) => `<i style="--c:${p.color}">${p.ini}</i>`).join('')}</div></div>`);
       break;
     case 'ded':
       h = `<div class="ex-in ex-ded"><div class="ex-orn"></div><h4>${s.t}</h4><p>${s.text}</p><div class="ex-orn"></div></div>`;
@@ -266,7 +234,7 @@ export function pageHTML(s, i, fmt, opt = {}) {
       break;
     case 'tp': {
       const w = person(s.who);
-      h = `<div class="ex-in ex-tp">${ph(s.ph)}<div class="ex-tx" data-by="${s.who}"><h4>${s.t}</h4><p>${s.p}</p><span class="ex-wr" style="--c:${w.color}"><i>${w.ini}</i>Texte de ${w.name}</span></div></div>`;
+      h = `<div class="ex-in ex-tp">${ph(s.ph)}<div class="ex-tx" data-by="${s.who}"><h4>${s.t}</h4><p>${s.p}</p><span class="ex-wr" style="--c:${w.color}"><i>${w.ini}</i>${w.name}</span></div></div>`;
       break;
     }
     case 'full':
@@ -288,18 +256,20 @@ export function pageHTML(s, i, fmt, opt = {}) {
       break;
     }
     case 'thanks':
-      h = `<div class="ex-in ex-thanks"><h4>Merci</h4><p>À tous ceux qui ont rempli cet album.</p><ul>${fmt.album.people.map((p) => {
+      h = `<div class="ex-in ex-thanks"><h4>${opt.thanksTitle || ''}</h4><p>${opt.thanksLead || ''}</p><ul>${fmt.album.people.map((p) => {
         const cnt = fmt.counts[p.id];
-        return `<li><i style="--c:${p.color}">${p.ini}</i><b>${p.name}</b><span>${cnt.photos} photo${cnt.photos > 1 ? 's' : ''}${cnt.texts ? ` · ${cnt.texts} texte${cnt.texts > 1 ? 's' : ''}` : ''}</span></li>`;
-      }).join('')}</ul><small>Un seul album, commandé ensemble.</small></div>`;
+        const photoWord = opt.photoWord ? opt.photoWord(cnt.photos) : '';
+        const textWord = cnt.texts && opt.textWord ? ` · ${opt.textWord(cnt.texts)}` : '';
+        return `<li><i style="--c:${p.color}">${p.ini}</i><b>${p.name}</b><span>${cnt.photos} ${photoWord}${textWord}</span></li>`;
+      }).join('')}</ul><small>${opt.thanksFooter || ''}</small></div>`;
       break;
     case 'back':
-      h = `<div class="ex-in ex-back"><div class="ex-bk" style="${bgs(s.ph)}"></div><p>${fmt.album.tx.back}</p><div class="ex-bc"></div><span class="ex-mk">Fait avec Bookipix</span></div>`;
+      h = `<div class="ex-in ex-back"><div class="ex-bk" style="${bgs(s.ph)}"></div><p>${fmt.album.tx.back}</p><div class="ex-bc"></div><span class="ex-mk">${opt.madeWith || 'Bookipix'}</span></div>`;
       break;
     default:
       h = '';
   }
   const num = (i > 0 && i < LAST) ? `<span class="ex-num">${i}</span>` : '';
-  const lbl = opt.bare ? '' : `<span class="ex-lbl">${LAY[s.lay]}</span>`;
+  const lbl = opt.bare ? '' : `<span class="ex-lbl">${lay}</span>`;
   return `<div class="ex-pg ${side}${fmt.ratio > 1.2 ? ' ex-wide' : ''}">${h}${num}${lbl}</div>`;
 }
