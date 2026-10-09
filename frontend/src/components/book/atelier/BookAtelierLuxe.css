@@ -52,11 +52,11 @@
   gap: 8px;
   margin-bottom: var(--space-sm);
   padding: 7px 14px;
-  border: 1px solid rgba(184, 146, 74, 0.28);
+  border: 1px solid rgba(51, 69, 232, 0.28);
   border-radius: 8px;
-  background: rgba(184, 146, 74, 0.08);
+  background: rgba(51, 69, 232, 0.08);
   font-size: 12px;
-  color: #8b6a2f;
+  color: #2a3bc4;
 }
 .atelier-test-banner b { font-weight: 700; }
 .atelier-test-banner-close {
@@ -71,7 +71,7 @@
   cursor: pointer;
   padding: 2px 4px;
 }
-.atelier-test-banner-close:hover { color: #8b6a2f; }
+.atelier-test-banner-close:hover { color: #2a3bc4; }
 
 /* Bandeau "Livre verrouille" (retour utilisateur, 2026-10-05, sur une
    commande reellement payee en production) : meme structure que le bandeau
@@ -133,7 +133,7 @@
   margin-left: 8px;
   padding: 1px 8px;
   border-radius: 999px;
-  background: rgba(184, 146, 74, 0.14);
+  background: rgba(51, 69, 232, 0.14);
   color: #7a5c2a;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -193,7 +193,7 @@
   height: 26px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid rgba(184, 146, 74, 0.4);
+  border: 1px solid rgba(51, 69, 232, 0.4);
   background: transparent;
   color: var(--text-light);
   font-weight: 700;
@@ -244,7 +244,7 @@
   align-items: center;
   column-gap: var(--space-md);
   padding-top: var(--space-sm);
-  border-top: 1px solid rgba(184, 146, 74, 0.18);
+  border-top: 1px solid rgba(51, 69, 232, 0.18);
 }
 
 /* Meme la grille a ses limites : Inviter + Composer automatiquement + ?
@@ -286,9 +286,9 @@
   align-items: center;
   gap: 6px;
   padding: 7px 16px;
-  border: 1px solid rgba(184, 146, 74, 0.22);
+  border: 1px solid rgba(51, 69, 232, 0.22);
   border-radius: 999px;
-  background: rgba(184, 146, 74, 0.05);
+  background: rgba(51, 69, 232, 0.05);
   color: var(--text-light);
   font-family: var(--font-primary);
   font-size: 13.5px;
@@ -300,12 +300,12 @@
 }
 .atelier-tool-btn:hover {
   color: var(--ink);
-  border-color: rgba(184, 146, 74, 0.4);
-  background: rgba(184, 146, 74, 0.1);
+  border-color: rgba(51, 69, 232, 0.4);
+  background: rgba(51, 69, 232, 0.1);
 }
 .atelier-tool-btn.is-active {
   border-color: var(--gold);
-  background: rgba(184, 146, 74, 0.18);
+  background: rgba(51, 69, 232, 0.18);
   color: var(--ink);
 }
 
@@ -477,16 +477,16 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-filmstrip-cell:hover { border-color: rgba(184, 146, 74, 0.6); }
+.atelier-filmstrip-cell:hover { border-color: rgba(51, 69, 232, 0.6); }
 .atelier-filmstrip-cell.is-partial {
   border-style: solid;
-  border-color: rgba(184, 146, 74, 0.5);
+  border-color: rgba(51, 69, 232, 0.5);
   color: var(--ink);
 }
 .atelier-filmstrip-cell.is-complete {
   border-style: solid;
   border-color: var(--gold);
-  background: rgba(184, 146, 74, 0.12);
+  background: rgba(51, 69, 232, 0.12);
   color: var(--ink);
 }
 .atelier-filmstrip-cell.is-cover {
@@ -498,7 +498,7 @@
 }
 .atelier-filmstrip-cell.is-active {
   border-color: var(--gold);
-  box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.3);
+  box-shadow: 0 0 0 2px rgba(51, 69, 232, 0.3);
 }
 .atelier-filmstrip-cell-check {
   position: absolute;
@@ -643,14 +643,14 @@
   justify-content: center;
   border-radius: 4px;
   border: 1.5px dashed var(--gold);
-  background: rgba(184, 146, 74, 0.08);
+  background: rgba(51, 69, 232, 0.08);
   color: var(--gold);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-filmstrip-add:hover { background: rgba(184, 146, 74, 0.16); }
+.atelier-filmstrip-add:hover { background: rgba(51, 69, 232, 0.16); }
 .atelier-filmstrip-add:disabled { opacity: 0.6; cursor: progress; }
 
 /* Retrait de pages ("-2") : meme gabarit que l'ajout, teinte neutre plutot
@@ -739,8 +739,8 @@
 }
 
 .atelier-finish-quality-page:hover:not(:disabled) {
-  border-color: var(--gold, #c9a35f);
-  background: rgba(201, 163, 95, 0.08);
+  border-color: var(--gold, #5c6bef);
+  background: rgba(92, 107, 239, 0.08);
 }
 
 .atelier-finish-quality-page:disabled { cursor: default; opacity: 0.7; }
@@ -973,7 +973,7 @@
 .atelier-photo-picker-upload {
   display: block;
   text-align: center;
-  border: 1px dashed rgba(184, 146, 74, 0.55);
+  border: 1px dashed rgba(51, 69, 232, 0.55);
   border-radius: 10px;
   padding: 14px;
   font-size: 13px;
@@ -982,7 +982,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-photo-picker-upload:hover { background: rgba(184, 146, 74, 0.08); }
+.atelier-photo-picker-upload:hover { background: rgba(51, 69, 232, 0.08); }
 .atelier-photo-picker-upload.is-disabled { opacity: 0.6; cursor: default; }
 
 .atelier-photo-picker-error {
@@ -1204,7 +1204,7 @@
   margin-top: 8px;
 }
 .atelier-adjust-suggest-option {
-  border: 1px solid rgba(184, 146, 74, 0.5);
+  border: 1px solid rgba(51, 69, 232, 0.5);
   background: var(--white);
   border-radius: 999px;
   padding: 5px 12px;
@@ -1234,8 +1234,8 @@
   gap: 4px;
   transition: var(--transition-fast);
 }
-.atelier-mood-card:hover { border-color: rgba(184, 146, 74, 0.5); }
-.atelier-mood-card.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+.atelier-mood-card:hover { border-color: rgba(51, 69, 232, 0.5); }
+.atelier-mood-card.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(51, 69, 232, 0.18); }
 .atelier-mood-card:disabled { opacity: 0.6; cursor: default; }
 
 .atelier-mood-card-label {
@@ -1390,7 +1390,7 @@
 .atelier-sidebar-add-btn {
   display: block;
   text-align: center;
-  border: 1px dashed rgba(184, 146, 74, 0.55);
+  border: 1px dashed rgba(51, 69, 232, 0.55);
   border-radius: 10px;
   padding: 8px;
   font-size: 12px;
@@ -1399,7 +1399,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-sidebar-add-btn:hover { background: rgba(184, 146, 74, 0.08); }
+.atelier-sidebar-add-btn:hover { background: rgba(51, 69, 232, 0.08); }
 .atelier-sidebar-add-btn.is-disabled { opacity: 0.6; cursor: default; }
 
 .atelier-sidebar-add-text {
@@ -1453,8 +1453,8 @@
   background: var(--silk);
   transition: var(--transition-fast);
 }
-.atelier-sidebar-item:hover { border-color: rgba(184, 146, 74, 0.35); }
-.atelier-sidebar-item.is-selected { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+.atelier-sidebar-item:hover { border-color: rgba(51, 69, 232, 0.35); }
+.atelier-sidebar-item.is-selected { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(51, 69, 232, 0.18); }
 .atelier-sidebar-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* Deja placee sur une page interieure du livre (voir usedItemIds,
@@ -1477,7 +1477,7 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--gold, #c9a35f);
+  background: var(--gold, #5c6bef);
   border: 1.5px solid rgba(255, 253, 248, 0.9);
   box-shadow: 0 1px 3px rgba(20, 16, 10, 0.35);
   pointer-events: none;
@@ -1528,8 +1528,8 @@
 }
 
 .atelier-sidebar-item-wrap:hover .atelier-sidebar-item-zoom { opacity: 1; }
-.atelier-sidebar-item-zoom:hover { background: var(--gold, #c9a35f); color: #241f18; }
-.atelier-sidebar-item-zoom:focus-visible { opacity: 1; outline: 2px solid var(--gold, #c9a35f); outline-offset: 1px; }
+.atelier-sidebar-item-zoom:hover { background: var(--gold, #5c6bef); color: #241f18; }
+.atelier-sidebar-item-zoom:focus-visible { opacity: 1; outline: 2px solid var(--gold, #5c6bef); outline-offset: 1px; }
 
 /* Apercu au survol. Position FIXE, calculee en JS depuis la vignette : la
    bibliotheque defile et rogne son contenu, un apercu pose dedans serait
@@ -1655,7 +1655,7 @@
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  border: 1px solid rgba(184, 146, 74, 0.4);
+  border: 1px solid rgba(51, 69, 232, 0.4);
   background: rgba(255, 255, 255, 0.9);
   color: var(--ink);
   cursor: pointer;
@@ -1727,8 +1727,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border: 1px solid rgba(184, 146, 74, 0.45);
-  background: rgba(184, 146, 74, 0.08);
+  border: 1px solid rgba(51, 69, 232, 0.45);
+  background: rgba(51, 69, 232, 0.08);
   color: var(--ink);
   border-radius: 999px;
   padding: 7px 14px 7px 11px;
@@ -1737,7 +1737,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-realsize-toggle-btn:hover { background: rgba(184, 146, 74, 0.16); border-color: var(--gold); }
+.atelier-realsize-toggle-btn:hover { background: rgba(51, 69, 232, 0.16); border-color: var(--gold); }
 .atelier-realsize-toggle-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Quasi-opaque (retour utilisateur, 2026-09-27 : "il apparait superposé
@@ -2007,7 +2007,7 @@
   padding-bottom: 10%;
   transition: var(--transition-fast);
 }
-.atelier-cover-photo-overlay.is-armed:hover { background: rgba(184, 146, 74, 0.14); }
+.atelier-cover-photo-overlay.is-armed:hover { background: rgba(51, 69, 232, 0.14); }
 .atelier-cover-photo-overlay-hint {
   opacity: 0;
   font-size: 12px;
@@ -2047,12 +2047,12 @@
   transition: var(--transition-fast);
 }
 .atelier-cover-empty-menu-btn.is-primary {
-  background: var(--gold, #c9a35f);
-  border-color: var(--gold, #c9a35f);
+  background: var(--gold, #5c6bef);
+  border-color: var(--gold, #5c6bef);
   color: #241f18;
 }
 .atelier-cover-empty-menu-btn:hover { opacity: 0.85; }
-.atelier-cover-empty-menu-btn:focus-visible { outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
+.atelier-cover-empty-menu-btn:focus-visible { outline: 2px solid var(--gold, #5c6bef); outline-offset: 2px; }
 
 /* Changer la photo / Ajuster le cadrage (2026-09-15, etendu 2026-09-26 avec
    "Changer la photo" — retour utilisateur : "comment je fais si je veux
@@ -2098,8 +2098,8 @@
   transition: var(--transition-fast);
 }
 .atelier-cover-action-btn svg { width: 12px; height: 12px; }
-.atelier-cover-action-btn:hover { background: var(--gold, #c9a35f); color: #241f18; }
-.atelier-cover-action-btn:focus-visible { outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
+.atelier-cover-action-btn:hover { background: var(--gold, #5c6bef); color: #241f18; }
+.atelier-cover-action-btn:focus-visible { outline: 2px solid var(--gold, #5c6bef); outline-offset: 2px; }
 
 /* Revenir a "Automatique" (2026-09-26) — coin oppose au bouton d'ajustement
    (haut-droite plutot que bas-centre), meme pastille rouge que la croix de
@@ -2124,7 +2124,7 @@
 }
 .atelier-cover-photo-overlay:hover .atelier-cover-remove-btn { opacity: 1; }
 .atelier-cover-remove-btn:hover { background: #b42318; }
-.atelier-cover-remove-btn:focus-visible { opacity: 1; outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
+.atelier-cover-remove-btn:focus-visible { opacity: 1; outline: 2px solid var(--gold, #5c6bef); outline-offset: 2px; }
 
 /* UN EMPLACEMENT VIDE NE PORTE PLUS DE POINTILLES EN PERMANENCE (refonte
    2026-09-26, §1 : "les pointillés doivent être un état d'interaction, pas
@@ -2149,15 +2149,15 @@
   transition: var(--transition-fast);
 }
 .atelier-overlay-slot:hover {
-  border: 1px dashed rgba(184, 146, 74, 0.55);
-  background: rgba(184, 146, 74, 0.06);
+  border: 1px dashed rgba(51, 69, 232, 0.55);
+  background: rgba(51, 69, 232, 0.06);
 }
 /* La ou la photo tomberait MAINTENANT (§1 : "les pointillés peuvent
    apparaitre... comme indication de zone de depot") — plus marque que le
    simple survol a la souris. */
 .atelier-overlay-slot.is-drag-target {
   border: 2px dashed var(--gold);
-  background: rgba(184, 146, 74, 0.16);
+  background: rgba(51, 69, 232, 0.16);
 }
 .atelier-overlay-slot.is-filled {
   border: 1px solid transparent;
@@ -2223,8 +2223,8 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-overlay-slot-menu-btn:hover { background: var(--gold, #c9a35f); color: #241f18; }
-.atelier-overlay-slot-menu-btn:focus-visible { outline: 2px solid var(--gold, #c9a35f); outline-offset: 2px; }
+.atelier-overlay-slot-menu-btn:hover { background: var(--gold, #5c6bef); color: #241f18; }
+.atelier-overlay-slot-menu-btn:focus-visible { outline: 2px solid var(--gold, #5c6bef); outline-offset: 2px; }
 
 /* Croix "retirer" + oeil "voir en taille reelle" (retour utilisateur,
    2026-09-11 : "afficher une x pour supprimer et un petit oeil pour voir la
@@ -2263,7 +2263,7 @@
    ca, rien ne distinguerait "ajouter" de "modifier" avant de cliquer. */
 .atelier-overlay-slot-caption-btn { background: rgba(36, 31, 24, 0.65); }
 .atelier-overlay-slot-caption-btn:hover { background: rgba(36, 31, 24, 0.85); }
-.atelier-overlay-slot-caption-btn.is-set { background: var(--gold, #c9a35f); color: #241f18; }
+.atelier-overlay-slot-caption-btn.is-set { background: var(--gold, #5c6bef); color: #241f18; }
 
 /* Saisie de la legende, posee la ou elle s'imprimera (bas de la photo) —
    voir pageRenderer .photo-caption pour le rendu reel. */
@@ -2291,7 +2291,7 @@
   color: #241f18;
   background: #fff;
 }
-.atelier-overlay-caption-form input:focus { outline: none; border-color: var(--gold, #c9a35f); }
+.atelier-overlay-caption-form input:focus { outline: none; border-color: var(--gold, #5c6bef); }
 /* Blanc / noir (2026-09-15). Les deux pastilles montrent le RESULTAT — texte
    clair sur fond sombre, texte sombre sur fond clair — plutot qu'un carre de
    couleur : c'est le contraste qu'on choisit, pas la teinte. */
@@ -2318,8 +2318,8 @@
 .atelier-overlay-caption-color.is-noir { background: #fff; color: #241f18; }
 
 .atelier-overlay-caption-color.is-active {
-  border-color: var(--gold, #c9a35f);
-  box-shadow: 0 0 0 2px rgba(201, 163, 95, 0.4);
+  border-color: var(--gold, #5c6bef);
+  box-shadow: 0 0 0 2px rgba(92, 107, 239, 0.4);
 }
 
 /* Le champ de saisie prend la couleur choisie : on juge la lisibilite AVANT
@@ -2336,7 +2336,7 @@
   border: none;
   border-radius: 4px;
   padding: 4px 8px;
-  background: var(--gold, #c9a35f);
+  background: var(--gold, #5c6bef);
   color: #241f18;
   font-family: inherit;
   font-size: 11px;
@@ -2486,7 +2486,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-book-nav-arrow:hover:not(:disabled) { background: rgba(184, 146, 74, 0.14); color: var(--gold-deep, var(--gold)); }
+.atelier-book-nav-arrow:hover:not(:disabled) { background: rgba(51, 69, 232, 0.14); color: var(--gold-deep, var(--gold)); }
 .atelier-book-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* Sauts directs couverture/4e, icone seule — memes valeurs que
@@ -2508,7 +2508,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-book-nav-jump:hover:not(:disabled) { color: var(--gold-deep, var(--gold)); background: rgba(184, 146, 74, 0.14); }
+.atelier-book-nav-jump:hover:not(:disabled) { color: var(--gold-deep, var(--gold)); background: rgba(51, 69, 232, 0.14); }
 .atelier-book-nav-jump:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .atelier-book-nav-label {
@@ -2603,7 +2603,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-category-btn:hover { border-color: rgba(184, 146, 74, 0.4); }
+.atelier-category-btn:hover { border-color: rgba(51, 69, 232, 0.4); }
 .atelier-category-btn.is-active { background: var(--gold-light); border-color: var(--gold); }
 
 .atelier-category-icon { font-size: 15px; }
@@ -2626,8 +2626,8 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-format-option:hover { border-color: rgba(184, 146, 74, 0.35); }
-.atelier-format-option.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+.atelier-format-option:hover { border-color: rgba(51, 69, 232, 0.35); }
+.atelier-format-option.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(51, 69, 232, 0.18); }
 
 .atelier-format-label {
   font-size: 9.5px;
@@ -2668,7 +2668,7 @@
   transition: var(--transition-fast);
 }
 .atelier-page-action-btn:hover { color: var(--ink); border-color: var(--gold); background: #fff; }
-.atelier-page-action-btn.is-open { color: var(--ink); border-color: var(--gold); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.25); }
+.atelier-page-action-btn.is-open { color: var(--ink); border-color: var(--gold); box-shadow: 0 0 0 2px rgba(51, 69, 232, 0.25); }
 .atelier-page-action-btn.is-danger:hover { color: #8c3225; border-color: rgba(160, 58, 45, 0.6); }
 .atelier-page-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -2757,7 +2757,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-page-position-step:hover:not(:disabled) { border-color: var(--gold); background: rgba(184, 146, 74, 0.12); }
+.atelier-page-position-step:hover:not(:disabled) { border-color: var(--gold); background: rgba(51, 69, 232, 0.12); }
 .atelier-page-position-step:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .atelier-page-position-field {
@@ -2783,7 +2783,7 @@
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
-.atelier-page-position-field input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+.atelier-page-position-field input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(51, 69, 232, 0.18); }
 
 
 /* "Annuler" : retablit la mise en page precedente AVEC son contenu. Assez
@@ -2811,10 +2811,10 @@
   gap: 10px;
   margin-bottom: 10px;
   padding: 10px 14px;
-  border: 1px solid rgba(184, 146, 74, 0.45);
-  border-left: 3px solid var(--gold, #c9a35f);
+  border: 1px solid rgba(51, 69, 232, 0.45);
+  border-left: 3px solid var(--gold, #5c6bef);
   border-radius: 0 10px 10px 0;
-  background: rgba(201, 163, 95, 0.09);
+  background: rgba(92, 107, 239, 0.09);
 }
 
 .atelier-snapshot-bar-text {
@@ -2834,7 +2834,7 @@
   border: none;
   border-radius: 999px;
   padding: 8px 16px;
-  background: var(--gold, #c9a35f);
+  background: var(--gold, #5c6bef);
   color: #241f18;
   font-family: inherit;
   font-size: 13px;
@@ -2897,7 +2897,7 @@
   width: 100%;
   margin-bottom: var(--space-sm);
   padding: 10px 14px;
-  border: 1px solid rgba(184, 135, 58, 0.45);
+  border: 1px solid rgba(45, 61, 210, 0.45);
   border-radius: 8px;
   background: #fdf1de;
   color: #8a6329;
@@ -2908,7 +2908,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-undo-bar:hover { background: #fbe8cc; border-color: rgba(184, 135, 58, 0.7); }
+.atelier-undo-bar:hover { background: #fbe8cc; border-color: rgba(45, 61, 210, 0.7); }
 /* Colonnes empilees (telephone et tablette etroite) : le bandeau s'ancre EN
    BAS DE L'ECRAN. Mesure le 2026-09-14 : place au-dessus du livre, il se
    retrouvait a 467 px au-dessus du champ de vision au moment ou l'on venait
@@ -3067,7 +3067,7 @@
 .atelier-format-slot {
   position: absolute;
   box-sizing: border-box;
-  border: 2px dashed rgba(184, 146, 74, 0.5);
+  border: 2px dashed rgba(51, 69, 232, 0.5);
   border-radius: 4px;
   background: var(--silk);
   display: flex;
@@ -3076,7 +3076,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.atelier-format-slot:hover { border-color: var(--gold); background: rgba(184, 146, 74, 0.12); }
+.atelier-format-slot:hover { border-color: var(--gold); background: rgba(51, 69, 232, 0.12); }
 .atelier-format-slot.is-filled {
   border-style: solid;
   border-color: rgba(31, 122, 61, 0.35);
@@ -3465,7 +3465,7 @@
   position: absolute;
   inset: 0 0 auto 0;
   padding: 3px 4px;
-  background: rgba(184, 146, 74, 0.92);
+  background: rgba(51, 69, 232, 0.92);
   color: #fffdf7;
   font-size: 9px;
   font-weight: 700;

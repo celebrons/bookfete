@@ -63,7 +63,7 @@
 }
 
 .account-panel {
-  border: 1px solid rgba(184, 146, 74, 0.22);
+  border: 1px solid rgba(51, 69, 232, 0.22);
   border-radius: 18px;
   padding: 20px;
   background: linear-gradient(170deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 245, 238, 0.75) 100%);
@@ -88,7 +88,7 @@
   height: 28px;
   padding: 0 8px;
   border-radius: 999px;
-  background: rgba(184, 146, 74, 0.15);
+  background: rgba(51, 69, 232, 0.15);
   color: #8b6b33;
   display: inline-flex;
   align-items: center;
@@ -112,7 +112,7 @@
 }
 
 .account-list-item {
-  border: 1px solid rgba(184, 146, 74, 0.18);
+  border: 1px solid rgba(51, 69, 232, 0.18);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
   display: flex;
@@ -197,9 +197,9 @@
    saisie en cours. */
 .account-address-saved {
   border: 1px solid var(--border-soft, #e3ddd0);
-  border-left: 3px solid var(--gold, #c9a35f);
+  border-left: 3px solid var(--gold, #5c6bef);
   border-radius: 0 10px 10px 0;
-  background: rgba(201, 163, 95, 0.07);
+  background: rgba(92, 107, 239, 0.07);
   padding: 12px 16px;
   margin: 0 0 18px;
 }

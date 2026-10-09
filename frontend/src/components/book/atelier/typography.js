@@ -65,7 +65,7 @@ export const TEXT_COLORS = {
   ivory: { hex: '#fffdf8', onDark: true },
   beige: { hex: '#efe8d8', onDark: true },
   taupe: { hex: '#8f8a7c' },
-  // Or de TEXTE (plus sombre que l'or decoratif #c9a35f, illisible en texte
+  // Or de TEXTE (plus sombre que l'or decoratif #5c6bef, illisible en texte
   // sur papier ivoire) — voir typographySystem.js cote backend.
   accent: { hex: '#8a6a1f', accentOnly: true }
 };

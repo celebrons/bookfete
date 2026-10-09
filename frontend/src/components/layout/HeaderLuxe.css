@@ -72,8 +72,8 @@
 }
 .site-nav-icon:hover {
   color: var(--gold);
-  border-color: rgba(184, 146, 74, 0.45);
-  background-color: rgba(184, 146, 74, 0.08);
+  border-color: rgba(51, 69, 232, 0.45);
+  background-color: rgba(51, 69, 232, 0.08);
 }
 
 .site-nav .btn { padding: 8px 24px; cursor: pointer; white-space: nowrap; }
@@ -102,7 +102,7 @@
   cursor: pointer;
   transition: all var(--transition-fast);
 }
-.site-header-burger:hover { border-color: rgba(184, 146, 74, 0.45); color: var(--gold); }
+.site-header-burger:hover { border-color: rgba(51, 69, 232, 0.45); color: var(--gold); }
 
 /* --- Ecrans etroits ---------------------------------------------------
    1200 px et non 860 : releve le 2026-10-03, le seuil de 860px datait du
@@ -148,7 +148,7 @@
     text-align: left;
     justify-content: flex-start;
   }
-  .site-nav-link:hover { background: rgba(184, 146, 74, 0.08); }
+  .site-nav-link:hover { background: rgba(51, 69, 232, 0.08); }
   .site-nav-icon { gap: 10px; }
   /* L'engrenage seul ne dit rien dans une liste : on lui ajoute son nom. */
   .site-nav-icon-label { display: inline; }

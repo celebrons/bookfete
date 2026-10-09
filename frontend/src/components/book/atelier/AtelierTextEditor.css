@@ -39,15 +39,15 @@
 .atelier-text-editor-field:focus {
   outline: none;
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(184, 146, 74, 0.2);
+  box-shadow: 0 0 0 3px rgba(51, 69, 232, 0.2);
 }
 
 /* Approche de la limite, puis limite atteinte : le cadre lui-meme change de
    couleur, pour que le signal soit visible sans quitter le texte des yeux. */
 .atelier-text-editor-field.is-near-limit,
 .atelier-text-editor-field.is-near-limit:focus {
-  border-color: #b8873a;
-  box-shadow: 0 0 0 3px rgba(184, 135, 58, 0.18);
+  border-color: #2d3dd2;
+  box-shadow: 0 0 0 3px rgba(45, 61, 210, 0.18);
 }
 .atelier-text-editor-field.is-at-limit,
 .atelier-text-editor-field.is-at-limit:focus {
@@ -78,7 +78,7 @@
   background: #1f7a3d;
   transition: width 0.15s ease;
 }
-.atelier-text-fill.is-near-limit .atelier-text-fill-level { background: #b8873a; }
+.atelier-text-fill.is-near-limit .atelier-text-fill-level { background: #2d3dd2; }
 .atelier-text-fill.is-at-limit .atelier-text-fill-level { background: #a03a2d; }
 
 .atelier-text-fill-value {
@@ -216,7 +216,7 @@
   transition: var(--transition-fast);
 }
 .atelier-text-toolbar-btn:hover { background: rgba(36, 31, 24, 0.07); color: var(--ink); }
-.atelier-text-toolbar-btn.is-active { background: rgba(184, 146, 74, 0.18); color: var(--ink); }
+.atelier-text-toolbar-btn.is-active { background: rgba(51, 69, 232, 0.18); color: var(--ink); }
 
 /* Contour franc : les teintes claires etaient invisibles sur le fond blanc
    de la barre. La palette ne propose plus de couleur illisible sur le papier
@@ -269,7 +269,7 @@
   font-size: 11.5px;
   line-height: 1.35;
   background: #fdf6e6;
-  border: 1px solid rgba(184, 146, 74, 0.45);
+  border: 1px solid rgba(51, 69, 232, 0.45);
   color: #6b5320;
   text-align: center;
   box-shadow: 0 3px 14px rgba(36, 31, 24, 0.3);
@@ -285,7 +285,7 @@
    un probleme, c'est une marge qui se reduit. */
 .atelier-text-alert.is-warning {
   background: #fdf1de;
-  border-color: rgba(184, 135, 58, 0.5);
+  border-color: rgba(45, 61, 210, 0.5);
   color: #8a6329;
 }
 

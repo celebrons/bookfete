@@ -69,14 +69,14 @@
 
 .admin-health-jauge-remplie {
   height: 100%;
-  background: #c9a35f;
+  background: #5c6bef;
   transition: width 400ms ease;
 }
 
 /* Deux seuils, deux couleurs. Ce n'est pas une alerte — juste de quoi voir
    sans lire ce qui approche de ses limites. */
 .admin-health-carte.is-tendu {
-  border-color: rgba(201, 163, 95, 0.8);
+  border-color: rgba(92, 107, 239, 0.8);
 }
 
 .admin-health-carte.is-critique {

@@ -64,7 +64,7 @@
   margin: 0 auto 14px;
   height: 8px;
   border-radius: 999px;
-  background: rgba(184, 146, 74, 0.14);
+  background: rgba(51, 69, 232, 0.14);
   overflow: hidden;
 }
 .collective-progress-fill {
@@ -130,8 +130,8 @@
   flex-direction: column;
   gap: 10px;
   padding: var(--space-md);
-  background: rgba(184, 146, 74, 0.04);
-  border: 1px solid rgba(184, 146, 74, 0.18);
+  background: rgba(51, 69, 232, 0.04);
+  border: 1px solid rgba(51, 69, 232, 0.18);
   border-radius: 12px;
 }
 .collective-invite-form .btn { align-self: flex-start; }
@@ -246,7 +246,7 @@
 }
 
 .collective-share-menu button:hover {
-  background: rgba(184, 146, 74, 0.1);
+  background: rgba(51, 69, 232, 0.1);
 }
 
 .collective-icon-btn {
@@ -297,7 +297,7 @@
 
 .collective-contribution-detail {
   padding: var(--space-md);
-  background: rgba(184, 146, 74, 0.04);
+  background: rgba(51, 69, 232, 0.04);
   border-top: 1px solid rgba(223, 216, 201, 0.7);
   display: flex;
   flex-direction: column;

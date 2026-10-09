@@ -92,7 +92,7 @@
   min-height: 34px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid rgba(184, 146, 74, 0.28);
+  border: 1px solid rgba(51, 69, 232, 0.28);
   background: rgba(255, 255, 255, 0.92);
   color: var(--ink);
   font-size: 13px;
@@ -106,7 +106,7 @@
 
 .contribution-trigger-pill.is-active {
   color: var(--gold-deep);
-  border-color: rgba(184, 146, 74, 0.45);
+  border-color: rgba(51, 69, 232, 0.45);
   background: rgba(247, 241, 231, 0.92);
 }
 
@@ -187,7 +187,7 @@
   aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(184, 146, 74, 0.25);
+  border: 1px solid rgba(51, 69, 232, 0.25);
   background: var(--silk);
 }
 

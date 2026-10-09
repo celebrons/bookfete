@@ -67,18 +67,18 @@
 }
 
 .format-choice-card:hover {
-  border-color: var(--gold, #c9a35f);
+  border-color: var(--gold, #5c6bef);
   transform: translateY(-2px);
 }
 
 .format-choice-card.is-selected {
-  border-color: var(--gold, #c9a35f);
-  box-shadow: 0 0 0 2px rgba(201, 163, 95, 0.32);
+  border-color: var(--gold, #5c6bef);
+  box-shadow: 0 0 0 2px rgba(92, 107, 239, 0.32);
 }
 
 /* La recommandation se voit AVANT la selection : c'est un conseil, pas un
    etat. Une carte recommandee mais non choisie garde donc son liseré. */
-.format-choice-card.is-recommended { border-color: rgba(201, 163, 95, 0.55); }
+.format-choice-card.is-recommended { border-color: rgba(92, 107, 239, 0.55); }
 
 .format-choice-badge {
   position: absolute;
@@ -86,7 +86,7 @@
   left: 14px;
   padding: 2px 9px;
   border-radius: 999px;
-  background: var(--gold, #c9a35f);
+  background: var(--gold, #5c6bef);
   color: #241f18;
   font-size: 10px;
   font-weight: 700;

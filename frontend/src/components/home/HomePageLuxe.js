@@ -35,10 +35,10 @@ const HomePageLuxe = () => {
 
 const IconChampagne = () => (
   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8 4L6 8H18L16 4H8Z" fill="#F4E3C6" stroke="#B8924A" strokeWidth="1.2"/>
-    <path d="M12 8V20" stroke="#B8924A" strokeWidth="1.5" strokeLinecap="round"/>
-    <path d="M9 20H15" stroke="#B8924A" strokeWidth="1.5" strokeLinecap="round"/>
-    <path d="M14 12C14 12 15 13 16 13C17 13 18 12 18 12" stroke="#B8924A" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M8 4L6 8H18L16 4H8Z" fill="#F4E3C6" stroke="#3345e8" strokeWidth="1.2"/>
+    <path d="M12 8V20" stroke="#3345e8" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M9 20H15" stroke="#3345e8" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M14 12C14 12 15 13 16 13C17 13 18 12 18 12" stroke="#3345e8" strokeWidth="1.5" strokeLinecap="round"/>
     <circle cx="12" cy="16" r="1.5" fill="#E6B87A" opacity="0.6"/>
   </svg>
 );
@@ -131,9 +131,9 @@ const IconFamily = () => (
 
 const IconSpark = () => (
   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 4L13.6 8.4L18 10L13.6 11.6L12 16L10.4 11.6L6 10L10.4 8.4L12 4Z" fill="#FFF4E8" stroke="#B8924A" strokeWidth="1.2"/>
-    <path d="M18.5 4.5L19.2 6.3L21 7L19.2 7.7L18.5 9.5L17.8 7.7L16 7L17.8 6.3L18.5 4.5Z" fill="#FFF4E8" stroke="#B8924A" strokeWidth="1"/>
-    <path d="M5.5 15.5L6.1 17L7.5 17.6L6.1 18.2L5.5 19.7L4.9 18.2L3.5 17.6L4.9 17L5.5 15.5Z" fill="#FFF4E8" stroke="#B8924A" strokeWidth="1"/>
+    <path d="M12 4L13.6 8.4L18 10L13.6 11.6L12 16L10.4 11.6L6 10L10.4 8.4L12 4Z" fill="#FFF4E8" stroke="#3345e8" strokeWidth="1.2"/>
+    <path d="M18.5 4.5L19.2 6.3L21 7L19.2 7.7L18.5 9.5L17.8 7.7L16 7L17.8 6.3L18.5 4.5Z" fill="#FFF4E8" stroke="#3345e8" strokeWidth="1"/>
+    <path d="M5.5 15.5L6.1 17L7.5 17.6L6.1 18.2L5.5 19.7L4.9 18.2L3.5 17.6L4.9 17L5.5 15.5Z" fill="#FFF4E8" stroke="#3345e8" strokeWidth="1"/>
   </svg>
 );
 

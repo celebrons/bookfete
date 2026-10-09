@@ -43,7 +43,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #8b6a2f;
+  color: var(--gold);
 }
 
 .dashboard-header h1 {
@@ -127,7 +127,7 @@
 }
 
 .stats-line-sep {
-  color: rgba(184, 146, 74, 0.5);
+  color: rgba(51, 69, 232, 0.5);
 }
 
 .quick-actions {
@@ -163,8 +163,8 @@
 
 .btn-new {
   background: transparent;
-  border-color: rgba(184, 146, 74, 0.45);
-  color: #8b5e11;
+  border-color: rgba(51, 69, 232, 0.45);
+  color: var(--gold);
 }
 
 .btn-admin {
@@ -175,7 +175,7 @@
 .btn-new:hover,
 .btn-admin:hover {
   transform: translateY(-1px);
-  border-color: rgba(184, 146, 74, 0.55);
+  border-color: rgba(51, 69, 232, 0.55);
   background: var(--gold-light);
 }
 
@@ -203,7 +203,7 @@
 }
 
 .btn-archive-toggle.active {
-  color: #8b5e11;
+  color: var(--gold);
 }
 
 .btn-new svg,
@@ -241,7 +241,7 @@
   min-width: 34px;
   min-height: 28px;
   border-radius: 999px;
-  border: 1px solid rgba(184, 146, 74, 0.35);
+  border: 1px solid rgba(51, 69, 232, 0.35);
   background: rgba(255, 255, 255, 0.64);
   color: var(--gold);
   font-size: 12px;
@@ -262,7 +262,7 @@
 
 .empty-state {
   background: rgba(255, 255, 255, 0.88);
-  border: 1px dashed rgba(184, 146, 74, 0.35);
+  border: 1px dashed rgba(51, 69, 232, 0.35);
   border-radius: 14px;
   text-align: center;
   padding: var(--space-xl);
@@ -273,7 +273,7 @@
   height: 54px;
   margin: 0 auto var(--space-sm);
   border-radius: 14px;
-  background: rgba(184, 146, 74, 0.12);
+  background: rgba(51, 69, 232, 0.12);
   color: var(--gold);
   display: inline-flex;
   align-items: center;
@@ -411,8 +411,8 @@
 }
 
 .dashboard-mini-action:hover {
-  border-color: rgba(184, 146, 74, 0.4);
-  background: rgba(184, 146, 74, 0.08);
+  border-color: rgba(51, 69, 232, 0.4);
+  background: rgba(51, 69, 232, 0.08);
 }
 
 .dashboard-mini-action.is-danger {
@@ -441,8 +441,8 @@
 
 .dashboard-book-menu-btn:hover,
 .dashboard-book-menu-btn.is-open {
-  border-color: rgba(184, 146, 74, 0.4);
-  background: rgba(184, 146, 74, 0.08);
+  border-color: rgba(51, 69, 232, 0.4);
+  background: rgba(51, 69, 232, 0.08);
 }
 
 .dashboard-book-menu-panel {
@@ -485,7 +485,7 @@
 }
 
 .dashboard-book-menu-panel button:hover {
-  background: rgba(184, 146, 74, 0.1);
+  background: rgba(51, 69, 232, 0.1);
 }
 
 .dashboard-book-menu-panel button.is-danger {
@@ -556,7 +556,7 @@
 .dashboard-book-primary-btn {
   font-size: 13.5px;
   font-weight: 700;
-  color: #8b5e11;
+  color: var(--gold);
   text-decoration: none;
 }
 
@@ -636,8 +636,8 @@
 
 .modal-select:focus {
   outline: none;
-  border-color: rgba(184, 146, 74, 0.6);
-  box-shadow: 0 0 0 3px rgba(184, 146, 74, 0.12);
+  border-color: rgba(51, 69, 232, 0.6);
+  box-shadow: 0 0 0 3px rgba(51, 69, 232, 0.12);
 }
 
 .modal-actions {

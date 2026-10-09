@@ -58,7 +58,7 @@ function FormatMockup({ widthMm, heightMm, reliure = 'souple' }) {
       )}
       <path
         d={`M0.5 2.5 A2 2 0 0 1 2.5 0.5 H${tranche} V${HAUTEUR_VUE - 0.5} H2.5 A2 2 0 0 1 0.5 ${HAUTEUR_VUE - 2.5} Z`}
-        fill="var(--gold, #b8924a)"
+        fill="var(--gold, #3345e8)"
       />
     </svg>
   );

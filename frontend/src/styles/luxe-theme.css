@@ -1,16 +1,25 @@
-/* C:\Users\USER\bookfete\frontend\src\styles\luxe-theme.css */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+/* C:\Users\USER\bookfete\frontend\src\styles\luxe-theme.css
+ *
+ * REBRAND 2026-10-11 (a partir de l'artefact Claude "Bookipix Exemples") :
+ * identite bleu/jaune, Bricolage Grotesque, generalisee a tout le site.
+ * Remplace l'ancienne identite or/creme — "--gold" garde son NOM pour ne
+ * casser aucun des tres nombreux composants qui le lisent deja via
+ * var(--gold) ; seule sa VALEUR change, ce qui suffit a repeindre tout ce
+ * qui passe deja par ce jeton. Les couleurs des COUVERTURES IMPRIMEES
+ * (coverTheme.js) sont un systeme totalement separe, jamais touche ici.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
 :root {
-  --gold: #b8924a;
-  --gold-light: rgba(184, 146, 74, 0.1);
-  --silk: #f4f0e6;
-  --ink: #1f1f1f;
+  --gold: #3345e8;
+  --gold-light: rgba(51, 69, 232, 0.1);
+  --silk: #f3f4fb;
+  --ink: #181c3a;
   --white: #ffffff;
-  --mist: #e8e8e8;
-  --gray-soft: #fafafa;
-  --text-light: #666666;
-  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mist: #dcdff0;
+  --gray-soft: #f3f4fb;
+  --text-light: #565c82;
+  --font-primary: 'Bricolage Grotesque', 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
   /* Serif editorial (refonte visuelle 2026-09-26, §14 : "typographie type
      Newsreader/Playfair pour certains elements editoriaux"). AVEC RETENUE :
      seuls les moments reellement editoriaux la portent (titre du livre dans

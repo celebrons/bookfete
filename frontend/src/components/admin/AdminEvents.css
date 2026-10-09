@@ -97,7 +97,7 @@
 /* Le niveau se lit d'un coup d'oeil, par un filet a gauche : assez pour
    reperer une erreur en balayant, assez sobre pour ne pas crier. */
 .admin-events-table tr.is-warn td:first-child {
-  box-shadow: inset 3px 0 0 #c9a35f;
+  box-shadow: inset 3px 0 0 #5c6bef;
 }
 
 .admin-events-table tr.is-error td:first-child {

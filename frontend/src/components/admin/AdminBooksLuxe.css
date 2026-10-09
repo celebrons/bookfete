@@ -75,7 +75,7 @@
   vertical-align: top;
 }
 .admin-table tr:last-child td { border-bottom: none; }
-.admin-table tbody tr:hover { background: rgba(184, 146, 74, 0.05); }
+.admin-table tbody tr:hover { background: rgba(51, 69, 232, 0.05); }
 
 .admin-table .is-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .admin-sep { color: rgba(36, 31, 24, 0.3); }
@@ -106,7 +106,7 @@
 }
 .admin-chip + .admin-chip { margin-left: 5px; }
 .admin-chip.is-draft { background: rgba(36, 31, 24, 0.08); color: var(--text-light); }
-.admin-chip.is-ready { background: rgba(184, 146, 74, 0.18); color: #8a6329; }
+.admin-chip.is-ready { background: rgba(51, 69, 232, 0.18); color: #8a6329; }
 .admin-chip.is-progress { background: rgba(31, 90, 122, 0.14); color: #1f5a7a; }
 .admin-chip.is-done { background: rgba(31, 122, 61, 0.14); color: #1f7a3d; }
 .admin-chip.is-mode { background: rgba(122, 61, 122, 0.12); color: #7a3d7a; }

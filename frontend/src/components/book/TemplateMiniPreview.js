@@ -9,11 +9,11 @@ import './BookComposeLuxe.css';
 // de style dans tout le projet, jamais deux implementations qui pourraient
 // diverger.
 export const TEMPLATE_PALETTES = {
-  'ivoire-or': { bg: '#f4f0e6', block: '#c9a35f', page: '#fffdf8' },
+  'ivoire-or': { bg: '#f4f0e6', block: '#5c6bef', page: '#fffdf8' },
   'encre-papier': { bg: '#eceae4', block: '#2b2620', page: '#ffffff' },
   'noir-blanc': { bg: '#f2f2f2', block: '#1a1a1a', page: '#ffffff' }
 };
-export const DEFAULT_PALETTE = { bg: '#f4f0e6', block: '#c9a35f', page: '#fffdf8' };
+export const DEFAULT_PALETTE = { bg: '#f4f0e6', block: '#5c6bef', page: '#fffdf8' };
 
 // Mini gabarit de page reproduisant la densité du template (slotsPerPage)
 // pour donner une vraie idée de "aéré" vs "dense" avant même d'avoir du contenu.

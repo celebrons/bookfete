@@ -26,7 +26,7 @@
   padding: 7px 14px;
   transition: var(--transition-fast);
 }
-.preview-final-back-link:hover { color: var(--ink); border-color: rgba(184, 146, 74, 0.4); }
+.preview-final-back-link:hover { color: var(--ink); border-color: rgba(51, 69, 232, 0.4); }
 
 .preview-final-title {
   margin: 0;
@@ -246,7 +246,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.preview-final-nav-arrow:hover:not(:disabled) { background: rgba(184, 146, 74, 0.14); color: var(--gold-deep, var(--gold)); }
+.preview-final-nav-arrow:hover:not(:disabled) { background: rgba(51, 69, 232, 0.14); color: var(--gold-deep, var(--gold)); }
 .preview-final-nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* Sauts directs aux extremites (2026-09-15, icone seule depuis le
@@ -273,7 +273,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.preview-final-nav-jump:hover:not(:disabled) { color: var(--gold-deep, var(--gold)); background: rgba(184, 146, 74, 0.14); }
+.preview-final-nav-jump:hover:not(:disabled) { color: var(--gold-deep, var(--gold)); background: rgba(51, 69, 232, 0.14); }
 .preview-final-nav-jump:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .preview-final-nav-label {
@@ -311,7 +311,7 @@
   cursor: pointer;
   transition: var(--transition-fast);
 }
-.preview-final-fullscreen-btn:hover { border-color: rgba(184, 146, 74, 0.4); }
+.preview-final-fullscreen-btn:hover { border-color: rgba(51, 69, 232, 0.4); }
 .preview-final-fullscreen-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* --- Colonne resume permanente ------------------------------------------ */
@@ -376,8 +376,8 @@
   column-gap: 8px;
   transition: var(--transition-fast);
 }
-.preview-final-format-card:hover { border-color: rgba(184, 146, 74, 0.45); }
-.preview-final-format-card.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(184, 146, 74, 0.18); }
+.preview-final-format-card:hover { border-color: rgba(51, 69, 232, 0.45); }
+.preview-final-format-card.is-selected { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 2px rgba(51, 69, 232, 0.18); }
 .preview-final-format-card:disabled { opacity: 0.6; cursor: progress; }
 
 /* Tranche du livre : purement decorative (voir le composant, --spine-thickness
@@ -392,7 +392,7 @@
   border-radius: 2px;
 }
 .preview-final-format-spine.is-soft {
-  background: rgba(184, 146, 74, 0.4);
+  background: rgba(51, 69, 232, 0.4);
   box-shadow: 0 1px 2px rgba(70, 54, 24, 0.15);
 }
 .preview-final-format-spine.is-rigid {
@@ -479,7 +479,7 @@
   margin: 0 0 8px;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(184, 146, 74, 0.14);
+  background: rgba(51, 69, 232, 0.14);
   color: #7a5c2a;
   font-size: 12px;
   font-weight: 700;

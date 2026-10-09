@@ -6,9 +6,9 @@
 .tracking-thanks {
   margin-bottom: var(--space-lg);
   padding: var(--space-lg);
-  border: 1px solid rgba(201, 163, 95, 0.45);
+  border: 1px solid rgba(92, 107, 239, 0.45);
   border-radius: 14px;
-  background: rgba(201, 163, 95, 0.1);
+  background: rgba(92, 107, 239, 0.1);
   text-align: center;
 }
 
@@ -82,7 +82,7 @@
 .tracking-step.is-current .tracking-dot {
   border-color: var(--gold);
   background: var(--gold);
-  box-shadow: 0 0 0 4px rgba(184, 146, 74, 0.18);
+  box-shadow: 0 0 0 4px rgba(51, 69, 232, 0.18);
 }
 .tracking-step.is-current .tracking-label { color: var(--ink); font-weight: 700; }
 
@@ -162,9 +162,9 @@
 .pdf-build-block {
   margin-top: var(--space-md);
   padding: var(--space-sm) var(--space-md);
-  border: 1px solid rgba(201, 163, 95, 0.45);
+  border: 1px solid rgba(92, 107, 239, 0.45);
   border-radius: 10px;
-  background: rgba(201, 163, 95, 0.07);
+  background: rgba(92, 107, 239, 0.07);
 }
 
 .pdf-build-block h3 {
@@ -206,7 +206,7 @@
 
 .tracking-pane {
   padding: 14px 16px;
-  border: 1px solid rgba(184, 146, 74, 0.24);
+  border: 1px solid rgba(51, 69, 232, 0.24);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
 }
@@ -332,7 +332,7 @@
 .tracking-delais {
   margin: var(--space-md) 0 0;
   padding-top: var(--space-sm);
-  border-top: 1px solid rgba(184, 146, 74, 0.2);
+  border-top: 1px solid rgba(51, 69, 232, 0.2);
   font-size: 13px;
   line-height: 1.55;
   color: var(--text-light);
