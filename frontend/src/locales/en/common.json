@@ -3,7 +3,11 @@
   "header": {
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
+    "mainNav": "Main navigation",
+    "home": "Home",
     "howItWorks": "How it works",
+    "examples": "Examples",
+    "pricing": "Pricing",
     "dashboard": "Dashboard",
     "accountSpace": "My account",
     "noAccountTitle": "You're working without an account — create one to find your book again",

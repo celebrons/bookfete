@@ -19,6 +19,11 @@
   --mist: #dcdff0;
   --gray-soft: #f3f4fb;
   --text-light: #565c82;
+  /* Jaune secondaire de l'artefact (surbrillance du lien actif, marque du
+     logo) — jamais utilise comme couleur de texte/fond principale, toujours
+     en petite touche (voir .site-header-mark/.site-nav-link[aria-current]). */
+  --hi: #ffcf3f;
+  --hi-ink: #2b2200;
   --font-primary: 'Bricolage Grotesque', 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
   /* Serif editorial (refonte visuelle 2026-09-26, §14 : "typographie type
      Newsreader/Playfair pour certains elements editoriaux"). AVEC RETENUE :

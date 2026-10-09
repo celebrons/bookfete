@@ -3,7 +3,11 @@
   "header": {
     "openMenu": "Ouvrir le menu",
     "closeMenu": "Fermer le menu",
+    "mainNav": "Navigation principale",
+    "home": "Accueil",
     "howItWorks": "Comment ça marche",
+    "examples": "Exemples",
+    "pricing": "Tarifs",
     "dashboard": "Tableau de bord",
     "accountSpace": "Espace client",
     "noAccountTitle": "Vous composez sans compte : créez-en un pour retrouver votre livre",

@@ -24,6 +24,9 @@
 
 .site-header-logo {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   text-decoration: none;
   font-family: var(--font-primary);
   font-size: 24px;
@@ -34,13 +37,53 @@
 }
 .site-header-logo-dot { color: var(--gold); }
 
+/* Marque a deux tons (retour utilisateur 2026-10-11, maquette de l'artefact
+   Exemples) : deux carres arrondis superposes, jamais une image — aucun
+   fichier a charger, se recolore avec les memes jetons que le reste du
+   site si la marque change encore. */
+.site-header-mark {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.site-header-mark::before,
+.site-header-mark::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 18px;
+  border-radius: 4px;
+}
+.site-header-mark::before { left: 0; top: 4px; background: var(--gold); }
+.site-header-mark::after { right: 0; top: 0; background: var(--hi); box-shadow: -3px 3px 0 var(--white); }
+
+/* Nav + cluster utilitaire (compte/langue/pays/deconnexion) cote a cote —
+   ensemble toujours replies derriere le meme bouton burger qu'avant sur
+   ecran etroit (voir hidden plus bas), la encore pour ne jamais rouvrir le
+   bug de debordement mobile du 2026-09-14/2026-10-03 deja corrige ici. */
+.site-nav-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  margin-left: var(--space-xl);
+  gap: var(--space-md);
+}
+
+.site-nav-public {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
 /* Gap volontairement plus serre que --space-xl (60px, pensee pour separer
    des sections de page, pas des liens de menu) : avec 7-8 elements dans la
    nav connectee (accueil, tableau de bord, Administration, compte, email,
    langue, pays, deconnexion), 60px entre chaque poussait Deconnexion hors
    champ bien avant le seuil "ecran etroit" — voir le seuil @media plus bas,
    recalcule pour cette largeur de nav. */
-.site-nav {
+.site-nav-utility {
   display: flex;
   align-items: center;
   gap: var(--space-md);
@@ -56,6 +99,13 @@
 }
 .site-nav-link:hover { color: var(--gold); }
 .site-nav-link.is-admin { color: var(--gold); font-weight: 700; }
+/* Page courante (maquette de l'artefact Exemples) : gras + trait jaune,
+   jamais la couleur de marque seule — elle sert deja au survol. */
+.site-nav-link[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: inset 0 -3px 0 var(--hi);
+}
 
 .site-nav-icon {
   display: inline-flex;
@@ -76,7 +126,7 @@
   background-color: rgba(51, 69, 232, 0.08);
 }
 
-.site-nav .btn { padding: 8px 24px; cursor: pointer; white-space: nowrap; }
+.site-nav-utility .btn { padding: 8px 24px; cursor: pointer; white-space: nowrap; }
 
 /* Le libelle de l'engrenage n'existe QUE dans le menu deroulant : dans la
    barre horizontale, l'icone seule suffit et le texte l'allongerait.
@@ -115,8 +165,10 @@
   .site-header-inner { padding: var(--space-sm) var(--space-md); }
   .site-header-burger { display: inline-flex; }
 
-  /* Le menu passe en panneau deroulant sous l'en-tete, pleine largeur. */
-  .site-nav {
+  /* Le menu passe en panneau deroulant sous l'en-tete, pleine largeur —
+     nav publique et cluster utilitaire empiles, memes classes qu'en large,
+     juste redisposees en colonne. */
+  .site-nav-wrap {
     position: absolute;
     top: 100%;
     left: 0;
@@ -124,6 +176,7 @@
     flex-direction: column;
     align-items: stretch;
     gap: 0;
+    margin-left: 0;
     padding: 6px;
     background: var(--white);
     border-bottom: var(--border-fine);
@@ -131,13 +184,20 @@
     max-height: calc(100vh - 100%);
     overflow-y: auto;
   }
-  .site-nav[hidden] { display: none; }
+  .site-nav-wrap[hidden] { display: none; }
+  .site-nav-public,
+  .site-nav-utility {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .site-nav-public { border-bottom: var(--border-fine); padding-bottom: 6px; margin-bottom: 6px; }
 
   /* Cibles tactiles : 44 px de haut, la hauteur communement retenue pour
      etre atteinte au doigt sans viser. */
   .site-nav-link,
   .site-nav-icon,
-  .site-nav .btn {
+  .site-nav-utility .btn {
     display: flex;
     align-items: center;
     width: 100%;
@@ -149,10 +209,11 @@
     justify-content: flex-start;
   }
   .site-nav-link:hover { background: rgba(51, 69, 232, 0.08); }
+  .site-nav-link[aria-current="page"] { box-shadow: none; background: var(--gold-light); }
   .site-nav-icon { gap: 10px; }
   /* L'engrenage seul ne dit rien dans une liste : on lui ajoute son nom. */
   .site-nav-icon-label { display: inline; }
-  .site-nav .btn { justify-content: center; margin-top: 6px; }
+  .site-nav-utility .btn { justify-content: center; margin-top: 6px; }
 }
 
 /* Qui est connecte, a cote du bouton Deconnexion.

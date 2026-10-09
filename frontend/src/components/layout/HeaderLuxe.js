@@ -110,11 +110,24 @@ const HeaderLuxe = () => {
     navigate('/');
   };
 
+  // Les 4 pages publiques toujours affichees (retour utilisateur 2026-10-11 :
+  // "mets le menu du haut comme sur la capture" — reprend la maquette de
+  // l'artefact Exemples) : separees du reste (compte/langue/pays/deconnexion,
+  // voir .site-nav-utility) pour garder cette meme lisibilite simple, sans
+  // retirer aucune fonction existante — seulement regroupee differemment.
+  const PUBLIC_LINKS = [
+    { to: '/', label: t('header.home') },
+    { to: '/how-it-works', label: t('header.howItWorks') },
+    { to: '/exemples', label: t('header.examples') },
+    { to: '/tarifs', label: t('header.pricing') }
+  ];
+
   return (
     <header className="site-header">
       <div className="container-luxe site-header-inner">
         <Link to="/" className="site-header-logo">
-          Bookipix<span className="site-header-logo-dot">.</span>
+          <span className="site-header-mark" aria-hidden="true" />
+          Bookipix
         </Link>
 
         <button
@@ -130,11 +143,21 @@ const HeaderLuxe = () => {
 
         {/* `hidden` seulement en mode compact : en large, la navigation est
             toujours la, quel que soit l'etat du menu. */}
-        <nav id="site-nav" className="site-nav" hidden={compact && !menuOpen}>
-          <Link to="/how-it-works" className="site-nav-link">
-            {t('header.howItWorks')}
-          </Link>
+        <div id="site-nav" className="site-nav-wrap" hidden={compact && !menuOpen}>
+          <nav className="site-nav-public" aria-label={t('header.mainNav')}>
+            {PUBLIC_LINKS.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="site-nav-link"
+                aria-current={location.pathname === link.to ? 'page' : undefined}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
 
+          <nav className="site-nav-utility">
           {user ? (
             <>
               <Link to="/dashboard" className="site-nav-link">
@@ -196,7 +219,8 @@ const HeaderLuxe = () => {
               </Link>
             </>
           )}
-        </nav>
+          </nav>
+        </div>
       </div>
     </header>
   );
