@@ -521,6 +521,72 @@
   pointer-events: none;
 }
 
+/* --- Vraies miniatures (2026-10-09) -------------------------------------
+   Couche purement visuelle : jamais d'evenement (pointer-events: none sur
+   tout, draggable={false} deja pose cote JSX sur chaque <img> — sans les
+   deux, le navigateur demarrerait son propre glisser-image natif a la
+   place du deplacement de page). Arrondi aligne sur celui de la cellule
+   (4px) pour que l'image ne depasse jamais le cadre. */
+.atelier-filmstrip-cell-thumb {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.atelier-filmstrip-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+/* Repere "texte" (illisible a cette taille, voir FilmstripSlot) — centre
+   dans son emplacement, discret. */
+.atelier-filmstrip-slot-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  opacity: 0.55;
+  background: rgba(223, 216, 201, 0.4);
+}
+
+/* Le numero doit rester visible (regle produit) une fois une photo derriere
+   lui — fond uniquement quand une vraie image est affichee, jamais sur les
+   pages restees sans photo (apparence inchangee). */
+.atelier-filmstrip-cell.has-visual .atelier-filmstrip-cell-label {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  background: rgba(20, 16, 10, 0.55);
+  padding: 0 4px;
+  border-radius: 3px;
+  text-shadow: none;
+}
+.atelier-filmstrip-cell.has-visual .atelier-filmstrip-cell-check {
+  z-index: 1;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.85);
+}
+
+/* Double page : fusion visuelle des deux vignettes voisines plutot qu'une
+   icone dediee — le bord commun disparait pour qu'elles se lisent comme une
+   seule image continue. Le -6px annule exactement le `gap` du conteneur
+   (.atelier-filmstrip) : UNIQUEMENT pour cette paire, le reste de la bande
+   garde son espacement normal. */
+.atelier-filmstrip-cell.is-spread-left {
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.atelier-filmstrip-cell.is-spread-right {
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -6px;
+}
+
 /* Le lisere rend la page reperable SANS lire la pastille : sur un livre de
    40 vignettes on balaie la bande du regard, on ne lit pas chaque coin. */
 .atelier-filmstrip-cell.has-quality-warning {

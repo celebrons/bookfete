@@ -46,6 +46,7 @@ import AtelierPageActions from './AtelierPageActions';
 import AtelierDrawer from './AtelierDrawer';
 import AtelierToolsBar from './AtelierToolsBar';
 import { findAtelierLayout, getLayoutLabel } from './atelierLayouts';
+import { getOverlayGeometry } from './atelierLayoutGeometry';
 import { FORMAT_DIMENSIONS_MM } from './photoQuality';
 import { spreadPair, spreadCount, spreadOfPage, facingPageIndex, isLeftPage } from '../../../utils/pageParity';
 import AnonymousBanner from '../../common/AnonymousBanner';
@@ -531,7 +532,12 @@ export default function BookAtelierLuxe() {
   // absente se rend comme une page vide plutot qu'une 404).
   // pageStatuses (meme passage) alimente aussi le filmstrip de pages
   // ci-dessous — un seul parcours de `pages`, pas une deuxieme boucle
-  // dupliquee pour un besoin d'affichage tres proche.
+  // dupliquee pour un besoin d'affichage tres proche. `preview` (2026-10-09,
+  // vraies miniatures du filmstrip) suit le meme principe : aucun appel
+  // reseau ici, uniquement des URLs deja en memoire (metadata.thumbnailUrl,
+  // le JPEG 480px genere a l'upload — voir storageService.js) et la
+  // geometrie en % de la mise en page (atelierLayoutGeometry.js, deja
+  // utilisee pour l'incrustation de glisser-deposer sur la page reelle).
   const finishStats = useMemo(() => {
     let incompletePages = 0;
     const pageStatuses = [];
@@ -548,7 +554,31 @@ export default function BookAtelierLuxe() {
         : filledCount > 0
           ? 'partial'
           : 'empty';
-      pageStatuses.push({ pageIndex: index, status });
+
+      const slug = layout?.slug || null;
+      const atelierLayout = slug ? findAtelierLayout(slug) : null;
+      const geometry = slug ? getOverlayGeometry(slug) : null;
+      const itemIds = Array.isArray(pageRow?.content?.itemIds) ? pageRow.content.itemIds : [];
+      // Double page (FULL_PHOTO_SPREAD) : la MEME photo est enregistree sur
+      // les deux pages (voir pageRenderer.js/.photo-spread cote serveur) —
+      // ici on ne fait que reproduire en CSS le meme recadrage gauche/droite
+      // (background-size 200% + position left/right), jamais une deuxieme
+      // source de verite sur quelle moitie afficher.
+      const isSpread = atelierLayout?.spread === true;
+      const slots = geometry && atelierLayout
+        ? geometry.map((rect, slotIndex) => {
+          const kind = atelierLayout.slots[slotIndex];
+          const item = itemIds[slotIndex] ? itemsById[itemIds[slotIndex]] : null;
+          return {
+            rect,
+            kind,
+            thumbnailUrl: item?.kind === 'photo' ? (item.metadata?.thumbnailUrl || item.url) : null
+          };
+        })
+        : null;
+      const preview = slots ? { slots, isSpread, spreadSide: isSpread ? (isLeftPage(index) ? 'left' : 'right') : null } : null;
+
+      pageStatuses.push({ pageIndex: index, status, preview });
     }
     return {
       photosCount: photos.length,
@@ -557,7 +587,7 @@ export default function BookAtelierLuxe() {
       incompletePages,
       pageStatuses
     };
-  }, [totalPages, pages, layoutsById, photos.length, souvenirs.length]);
+  }, [totalPages, pages, layoutsById, itemsById, photos.length, souvenirs.length]);
   const lastViewIndex = totalViews - 1;
 
   // Lien profond "?page=N" — utilise par "Revoir ces pages" depuis l'ecran

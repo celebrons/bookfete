@@ -4,18 +4,27 @@ import { useTranslation } from 'react-i18next';
 // Bande de vignettes en bas de l'atelier — navigation directe vers
 // n'importe quelle page sans repasser par precedente/suivante (retour
 // utilisateur : gain d'ergonomie important sur un livre de 16+ pages, ou
-// atteindre la page 14 depuis la page 2 demandait 12 clics). Vignettes
-// SCHEMATIQUES (numero + statut), pas de vrai rendu miniature — meme choix
-// deja fait pour LayoutFormatMiniature (AtelierLayoutPanel.js) suite a un
-// retour utilisateur explicite ("je ne sais pas s'il est pertinent
-// d'afficher les images ici") : la vraie page s'affiche deja au centre,
-// dupliquer son contenu en dizaines de miniatures visuelles n'apporterait
-// rien de plus qu'un cout de performance (autant d'iframes que de pages).
+// atteindre la page 14 depuis la page 2 demandait 12 clics).
 //
-// Toujours visible (pleine largeur, sous les 3 colonnes de travail), donc
-// accessible depuis n'importe quelle vue (couverture/interieur/4e) —
-// contrairement a la navigation precedente/suivante qui vit dans la colonne
-// centrale et change de forme selon viewKind.
+// 2026-10-09 : vraies miniatures visuelles (retour utilisateur), remplacant
+// les vignettes purement schematiques d'avant (numero + statut seulement —
+// ce choix avait ete fait suite a un retour anterieur, "je ne sais pas s'il
+// est pertinent d'afficher les images ici", et pour eviter un cout de rendu
+// HTML/iframe par page). La nouvelle version ne reouvre PAS ce cout : aucun
+// rendu HTML serveur ni PDF ici, uniquement un pavage CSS reconstruit a
+// partir de donnees deja en memoire — voir `preview` dans
+// BookAtelierLuxe.js:finishStats (geometrie en % de atelierLayoutGeometry.js
+// + metadata.thumbnailUrl des items, le JPEG 480px deja genere a l'upload).
+// Zero appel reseau supplementaire ; les images elles-memes profitent du
+// chargement differe natif (`loading="lazy"`) et d'un repli silencieux vers
+// la cellule neutre en cas d'echec (onError plus bas).
+//
+// Vit dans le tiroir "Pages" (voir BookAtelierLuxe.js, AtelierDrawer) depuis
+// la refonte en tiroirs contextuels du 2026-09-26 — plus "toujours visible"
+// comme a l'origine, mais accessible depuis n'importe quelle vue
+// (couverture/interieur/4e) via cet onglet, contrairement a la navigation
+// precedente/suivante qui vit dans la colonne centrale et change de forme
+// selon viewKind.
 
 // Alignees sur les memes constantes que AtelierBookView.js/AtelierLayoutPanel.js
 // (convention deja etablie dans ce projet pour ces petites tables format ->
@@ -33,13 +42,69 @@ const FORMAT_DIMENSIONS_MM = {
 // interprete comme un deplacement de page.
 const PAGE_DRAG_TYPE = 'application/x-bookipix-page';
 
+// Une case par emplacement de la mise en page, positionnee en % (meme
+// geometrie que l'incrustation de glisser-deposer sur la vraie page — jamais
+// une deuxieme source de verite sur les proportions). Composant a part pour
+// pouvoir garder un etat d'echec PAR IMAGE (useState) sans alourdir
+// FilmstripCell.
+function FilmstripSlot({ slot, spreadSide }) {
+  const [failed, setFailed] = useState(false);
+  const { rect, kind, thumbnailUrl } = slot;
+  const style = {
+    position: 'absolute',
+    top: `${rect.top}%`,
+    left: `${rect.left}%`,
+    width: `${rect.width}%`,
+    height: `${rect.height}%`,
+    overflow: spreadSide ? 'hidden' : undefined
+  };
+  if (kind === 'photo' && thumbnailUrl && !failed) {
+    // Double page : meme recadrage que le rendu serveur
+    // (pageRenderer.js: .photo-spread .photo-frame) — une image deux fois
+    // plus large que la case, ancree a gauche ou a droite selon la moitie.
+    // Jamais la photo entiere deux fois identique : ca se lirait comme une
+    // erreur plutot que comme une seule image continue.
+    const imgStyle = spreadSide
+      ? {
+        position: 'absolute', top: 0, height: '100%', width: '200%',
+        objectFit: 'cover', [spreadSide === 'left' ? 'left' : 'right']: 0
+      }
+      : undefined;
+    return (
+      <span className="atelier-filmstrip-slot" style={style}>
+        <img
+          src={thumbnailUrl}
+          alt=""
+          loading="lazy"
+          draggable={false}
+          style={imgStyle}
+          onError={() => setFailed(true)}
+        />
+      </span>
+    );
+  }
+  if (kind === 'text' || kind === 'title') {
+    // Illisible a cette taille (cellule de 46px de haut) : un simple repere
+    // d'identification ("c'est du texte"), jamais une tentative de rendu
+    // fidele du contenu.
+    return (
+      <span className="atelier-filmstrip-slot atelier-filmstrip-slot-text" style={style} aria-hidden="true">✍️</span>
+    );
+  }
+  return null;
+}
+
 function FilmstripCell({
   target, label, status, isActive, aspectRatio, onSelect,
   // Nombre de photos signalees sur CETTE page (0 = rien a signaler).
   qualityWarnings = 0,
   // Deplacement : seules les pages interieures sont concernees (une
   // couverture ne se deplace pas), d'ou `onMove` absent sur les autres.
-  onMove, dropSide, onDragOverCell, onDragLeaveCell, isDragging
+  onMove, dropSide, onDragOverCell, onDragLeaveCell, isDragging,
+  // { slots: [{rect, kind, thumbnailUrl}], isSpread, spreadSide } — absent
+  // sur la couverture/4e (restent schematiques, voir BookAtelierLuxe.js) et
+  // sur une page sans mise en page choisie (reste la cellule neutre actuelle).
+  preview
 }) {
   const { t } = useTranslation('atelier');
   const ref = useRef(null);
@@ -73,6 +138,12 @@ function FilmstripCell({
   }, [isActive]);
 
   const movable = Boolean(onMove);
+  // Le numero (regle : toujours visible) a besoin d'un fond pour rester
+  // lisible une fois qu'une vraie photo passe derriere lui — inutile (et
+  // visuellement different d'avant sans raison) sur les pages qui restent
+  // sans aucune image, d'ou cette classe conditionnelle plutot qu'un style
+  // permanent.
+  const hasVisual = Boolean(preview?.slots?.some((slot) => slot.kind === 'photo' && slot.thumbnailUrl));
   const statusText = status ? t(`pageFilmstrip.status.${status}`) : '';
   // L'avertissement passe AVANT le reste dans l'infobulle : c'est la seule
   // information qui demande une action.
@@ -95,7 +166,13 @@ function FilmstripCell({
         movable ? 'is-movable' : '',
         qualityWarnings > 0 ? 'has-quality-warning' : '',
         isDragging ? 'is-dragging' : '',
-        dropSide ? `is-drop-${dropSide}` : ''
+        dropSide ? `is-drop-${dropSide}` : '',
+        hasVisual ? 'has-visual' : '',
+        // Fusion visuelle d'une double page : les deux vignettes voisines
+        // perdent la bordure/l'arrondi de leur bord commun pour se lire
+        // comme une seule image continue (choix retenu plutot qu'une icone
+        // dediee — voir AtelierPageFilmstrip, commentaire de tete).
+        preview?.isSpread ? `is-spread-${preview.spreadSide}` : ''
       ].filter(Boolean).join(' ')}
       style={{ aspectRatio }}
       draggable={movable}
@@ -125,6 +202,22 @@ function FilmstripCell({
       onClick={() => onSelect(target)}
       title={title}
     >
+      {/* Couche purement visuelle : jamais de `draggable`/gestionnaire
+          propre (voir FilmstripSlot : draggable={false} sur chaque <img>,
+          sinon le navigateur demarre son propre glisser-image natif a la
+          place du deplacement de page gere par ce bouton — risque identifie
+          a l'audit, pas une hypothese). */}
+      {preview?.slots && (
+        <span className="atelier-filmstrip-cell-thumb" aria-hidden="true">
+          {preview.slots.map((slot, slotIndex) => (
+            <FilmstripSlot
+              key={slotIndex}
+              slot={slot}
+              spreadSide={preview.isSpread ? preview.spreadSide : null}
+            />
+          ))}
+        </span>
+      )}
       <span className="atelier-filmstrip-cell-label">{label}</span>
       {/* Le ⚠️ REMPLACE le ✓ : une page peut etre complete ET porter une photo
           trop peu definie — afficher les deux cote a cote donnerait un signal
@@ -206,7 +299,7 @@ function AtelierPageFilmstrip({
         onSelect={onSelect}
       />
       <div className="atelier-filmstrip-sep" aria-hidden="true" />
-      {pageStatuses.map(({ pageIndex, status }) => (
+      {pageStatuses.map(({ pageIndex, status, preview }) => (
         <FilmstripCell
           key={pageIndex}
           target={pageIndex}
@@ -216,6 +309,7 @@ function AtelierPageFilmstrip({
           aspectRatio={aspectRatio}
           onSelect={onSelect}
           qualityWarnings={qualityWarningsByPage[pageIndex] || 0}
+          preview={preview}
           {...cellMoveProps(pageIndex)}
         />
       ))}
