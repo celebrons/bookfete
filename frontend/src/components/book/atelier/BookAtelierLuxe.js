@@ -676,6 +676,33 @@ export default function BookAtelierLuxe() {
     }
   }, [book?.id]);
 
+  // Apercu au survol d'une vignette du filmstrip (2026-10-10, retour
+  // utilisateur : "comme on fait avec les photos" — voir AtelierSidebar,
+  // meme principe de survol differe). Reutilise TEL QUEL le meme cache que
+  // la vue centrale (pagePreviewCache/coverHtml/backCoverHtml) : survoler une
+  // page deja vue au centre est instantane et gratuit, et une page jamais
+  // vue ne coute qu'UN appel, au moment reel du survol — jamais prechargee
+  // pour les dizaines de pages non survolees.
+  const requestFilmstripPreview = useCallback(async (target) => {
+    if (!book?.id) return null;
+    if (target === 'cover') {
+      if (coverHtml != null) return coverHtml;
+      const html = await fetchCoverPreviewHtml(book.id, 'front');
+      setCoverHtml(html);
+      return html;
+    }
+    if (target === 'back-cover') {
+      if (backCoverHtml != null) return backCoverHtml;
+      const html = await fetchCoverPreviewHtml(book.id, 'back');
+      setBackCoverHtml(html);
+      return html;
+    }
+    if (pagePreviewCache[target] != null) return pagePreviewCache[target];
+    const html = await fetchInteriorPagePreviewHtml(book.id, target);
+    setPagePreviewCache((previous) => ({ ...previous, [target]: html }));
+    return html;
+  }, [book?.id, coverHtml, backCoverHtml, pagePreviewCache]);
+
   // Charge l'apercu de la vue courante (couverture, 4e, ou double-page) —
   // uniquement ce qui n'est pas deja en cache. Le cache lui-meme n'est pas
   // une dependance ici (deliberement) : sinon chaque mise a jour du cache
@@ -2746,6 +2773,7 @@ export default function BookAtelierLuxe() {
             minPages={MIN_AUTO_PAGES}
             onMovePage={handleMovePage}
             movingPage={movingPage}
+            onRequestPreview={requestFilmstripPreview}
           />
         </AtelierDrawer>
       ) : null}

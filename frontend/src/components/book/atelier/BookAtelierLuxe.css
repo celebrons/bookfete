@@ -1572,6 +1572,40 @@
   .atelier-sidebar-item-zoom { opacity: 1; }
 }
 
+/* Apercu agrandi d'une page au survol de sa vignette dans le filmstrip
+   (2026-10-10) — meme famille visuelle que .atelier-sidebar-hover-preview
+   ci-dessus, mais le contenu est un <iframe> (vrai rendu serveur) et non une
+   <img>. z-index au-dessus de .atelier-drawer-backdrop (55) : le filmstrip
+   vit DANS le tiroir "Pages", l'apercu doit en sortir visuellement. */
+.atelier-filmstrip-hover-preview {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--white, #fffdf8);
+  border: 1px solid rgba(223, 216, 201, 0.9);
+  box-shadow: 0 12px 34px rgba(36, 31, 24, 0.24);
+  animation: apercu-apparition 0.12s ease-out;
+  overflow: hidden;
+}
+.atelier-filmstrip-hover-preview iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 6px;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .atelier-filmstrip-hover-preview { animation: none; }
+}
+/* Pas de survol sur ecran tactile : un appui court selectionne deja
+   directement la page (voir onClick), rien a ajouter cote mobile. */
+@media (hover: none) {
+  .atelier-filmstrip-hover-preview { display: none; }
+}
+
 .atelier-sidebar-text-preview {
   display: -webkit-box;
   -webkit-line-clamp: 4;

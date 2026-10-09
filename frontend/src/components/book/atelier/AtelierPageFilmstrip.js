@@ -42,6 +42,38 @@ const FORMAT_DIMENSIONS_MM = {
 // interprete comme un deplacement de page.
 const PAGE_DRAG_TYPE = 'application/x-bookipix-page';
 
+// Apercu AGRANDI d'une page au survol de sa vignette (2026-10-10, retour
+// utilisateur : "comme on fait avec les photos" — voir AtelierSidebar,
+// PhotoHoverPreview, meme delai et meme logique de bascule gauche/droite).
+// Contrairement aux miniatures ci-dessus (reconstruction CSS legere), cet
+// apercu affiche le VRAI rendu serveur (onRequestPreview, fourni par
+// BookAtelierLuxe.js — reutilise le meme cache que la vue centrale) : plus
+// couteux qu'une miniature, donc jamais precharge, seulement au moment reel
+// du survol.
+const APERCU_LARGEUR = 220;
+const APERCU_MARGE = 12;
+const APERCU_DELAI_MS = 220;
+
+function FilmstripHoverPreview({ apercu, aspectRatio }) {
+  if (!apercu || apercu.html == null) return null;
+  const hauteur = Math.round(APERCU_LARGEUR / (() => {
+    const [l, h] = String(aspectRatio).split('/').map(Number);
+    return l && h ? l / h : 1;
+  })());
+  const placeADroite = apercu.rect.right + APERCU_MARGE + APERCU_LARGEUR <= window.innerWidth;
+  const left = placeADroite
+    ? apercu.rect.right + APERCU_MARGE
+    : Math.max(APERCU_MARGE, apercu.rect.left - APERCU_MARGE - APERCU_LARGEUR);
+  // Au-dessus de la vignette, jamais en dessous : le filmstrip est tout en
+  // bas du tiroir, un apercu pose sous la vignette sortirait de l'ecran.
+  const top = Math.max(APERCU_MARGE, apercu.rect.top - hauteur - APERCU_MARGE);
+  return (
+    <div className="atelier-filmstrip-hover-preview" style={{ left, top, width: APERCU_LARGEUR, height: hauteur }}>
+      <iframe title={apercu.label} srcDoc={apercu.html} />
+    </div>
+  );
+}
+
 // Une case par emplacement de la mise en page, positionnee en % (meme
 // geometrie que l'incrustation de glisser-deposer sur la vraie page — jamais
 // une deuxieme source de verite sur les proportions). Composant a part pour
@@ -104,7 +136,11 @@ function FilmstripCell({
   // { slots: [{rect, kind, thumbnailUrl}], isSpread, spreadSide } — absent
   // sur la couverture/4e (restent schematiques, voir BookAtelierLuxe.js) et
   // sur une page sans mise en page choisie (reste la cellule neutre actuelle).
-  preview
+  preview,
+  // { start(event, target, label), end(target) } — apercu agrandi au survol
+  // (voir FilmstripHoverPreview). Present sur TOUTES les cellules, y compris
+  // couverture/4e (un apercu grandeur reelle leur profite aussi).
+  onHover
 }) {
   const { t } = useTranslation('atelier');
   const ref = useRef(null);
@@ -200,6 +236,8 @@ function FilmstripCell({
         onMove.drop(Number(event.dataTransfer.getData(PAGE_DRAG_TYPE)), target);
       } : undefined}
       onClick={() => onSelect(target)}
+      onMouseEnter={onHover ? (event) => onHover.start(event, target, base) : undefined}
+      onMouseLeave={onHover ? () => onHover.end(target) : undefined}
       title={title}
     >
       {/* Couche purement visuelle : jamais de `draggable`/gestionnaire
@@ -249,7 +287,11 @@ function AtelierPageFilmstrip({
   // Deplacement de page (facultatif : sans lui, le filmstrip se comporte
   // exactement comme avant).
   onMovePage,
-  movingPage
+  movingPage,
+  // (target) => Promise<html|null> — apercu agrandi au survol (facultatif :
+  // sans lui, pas d'apercu, comportement d'avant inchange). Fourni par
+  // BookAtelierLuxe.js, qui reutilise son propre cache de rendu.
+  onRequestPreview
 }) {
   const { t } = useTranslation('atelier');
   const dims = FORMAT_DIMENSIONS_MM[printFormat] || FORMAT_DIMENSIONS_MM.standard;
@@ -257,6 +299,37 @@ function AtelierPageFilmstrip({
 
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dropTarget, setDropTarget] = useState(null); // { index, side }
+
+  // { target, rect, label, html } | null. `html` arrive apres coup (requete
+  // asynchrone) — survolerRef compare le target COURANT a celui pour lequel
+  // la requete a ete lancee, pour ignorer une reponse perimee si la souris a
+  // deja quitte la case ou glisse vers une autre pendant le chargement.
+  const [apercu, setApercu] = useState(null);
+  const survolerRef = useRef(null);
+  const apercuTimer = useRef(null);
+
+  const hover = onRequestPreview ? {
+    start: (event, target, label) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      clearTimeout(apercuTimer.current);
+      apercuTimer.current = setTimeout(() => {
+        survolerRef.current = target;
+        setApercu({ target, rect, label, html: null });
+        Promise.resolve(onRequestPreview(target)).then((html) => {
+          if (survolerRef.current !== target) return; // la souris a bouge entre-temps
+          setApercu((previous) => (previous?.target === target ? { ...previous, html } : previous));
+        }).catch(() => {
+          // Non bloquant : pas d'apercu plutot que de casser le filmstrip
+          // (meme principe que refreshPagePreview cote BookAtelierLuxe.js).
+        });
+      }, APERCU_DELAI_MS);
+    },
+    end: (target) => {
+      clearTimeout(apercuTimer.current);
+      if (survolerRef.current === target) survolerRef.current = null;
+      setApercu((previous) => (previous?.target === target ? null : previous));
+    }
+  } : null;
 
   const move = onMovePage ? {
     start: (index) => { setDraggedIndex(index); setDropTarget(null); },
@@ -297,6 +370,7 @@ function AtelierPageFilmstrip({
         isActive={activeTarget === 'cover'}
         aspectRatio={aspectRatio}
         onSelect={onSelect}
+        onHover={hover}
       />
       <div className="atelier-filmstrip-sep" aria-hidden="true" />
       {pageStatuses.map(({ pageIndex, status, preview }) => (
@@ -310,6 +384,7 @@ function AtelierPageFilmstrip({
           onSelect={onSelect}
           qualityWarnings={qualityWarningsByPage[pageIndex] || 0}
           preview={preview}
+          onHover={hover}
           {...cellMoveProps(pageIndex)}
         />
       ))}
@@ -354,7 +429,9 @@ function AtelierPageFilmstrip({
         isActive={activeTarget === 'back-cover'}
         aspectRatio={aspectRatio}
         onSelect={onSelect}
+        onHover={hover}
       />
+      <FilmstripHoverPreview apercu={apercu} aspectRatio={aspectRatio} />
     </div>
   );
 }
